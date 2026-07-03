@@ -84,9 +84,19 @@ _FACADE_CACHE = {}
 _MAT_CACHE = {}
 
 
+def _alive(m):
+    """Cached bpy references can die under us (asset addons purge materials between
+    loads); a dead StructRNA raises on any attribute access."""
+    try:
+        _ = m.name
+        return True
+    except ReferenceError:
+        return False
+
+
 def _mat_facade(color, bays, floors, roughness=0.85):
     key = (tuple(color), int(bays), int(floors))
-    if key in _FACADE_CACHE:
+    if key in _FACADE_CACHE and _alive(_FACADE_CACHE[key]):
         return _FACADE_CACHE[key]
     m = bpy.data.materials.new(f"facade{_COUNTER[0]}")
     _COUNTER[0] += 1
@@ -107,7 +117,7 @@ def _mat_facade(color, bays, floors, roughness=0.85):
 
 def _mat(color, roughness=0.8, name=None):
     key = (tuple(color), round(roughness, 2))
-    if name is None and key in _MAT_CACHE:
+    if name is None and key in _MAT_CACHE and _alive(_MAT_CACHE[key]):
         return _MAT_CACHE[key]
     m = bpy.data.materials.new(name or f"mat{_COUNTER[0]}")
     _COUNTER[0] += 1
@@ -215,6 +225,14 @@ class Builder:
             bpy.context.scene.collection.objects.link(obj)
             self.parts.append(Part(obj, obj.pass_index))
             return obj
+        return self._register(obj, color, roughness)
+
+    def custom(self, obj, color, roughness=0.8, smooth=True):
+        """Register an externally-built mesh object (lofts, skin-modifier bodies, sims)
+        into this creature's span — same material/identity treatment as primitives."""
+        if smooth:
+            for poly in obj.data.polygons:
+                poly.use_smooth = True
         return self._register(obj, color, roughness)
 
     def anchor(self, name, pt):

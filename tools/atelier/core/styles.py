@@ -222,6 +222,22 @@ BINDINGS = {
         "weight": "cel band count 6→3 (chunkier); line thickness",
         "pull":   "quantizer chips pull to the stock — literal screen-print inks at 1.0",
     },
+    "screenprint": {
+        "edge":   "separation boundary crispness: loose pull ↔ tight registration line",
+        "focus":  "the accent ink prints ONLY where the stager pointed (emphasis-gated)",
+        "order":  "registration: layers slip up to 5 px at low order",
+        "chroma": "color read boosted before ink assignment",
+        "weight": "ink coverage: heavy pulls flood the dark separations",
+        "pull":   "IMPLICITLY 1.0 — the stock is not a gravity well here, it IS the ink set",
+    },
+    "stagelight": {
+        "edge":   "terminator hardness: soft gradient light ↔ knife-edge posterized bands",
+        "focus":  "the followspot: lit-lift on the loved subject, pool strength, beams above 0.5",
+        "order":  "the film stock: grain + scanline whisper at low order",
+        "chroma": "gel amount 0.15→0.6 + saturation of the lit world",
+        "weight": "light band count 6→3 (chunkier light)",
+        "pull":   "the lit result pulls toward the stock (gel comes from accent[0])",
+    },
     "monet": {
         "edge":   "lost-edge sampling σ 13→3 px",
         "focus":  "—",
@@ -845,7 +861,17 @@ def comic(img, region, nrm, w, h, rng, depth=None, emphasis=None, mat=None,
     nb = 3 + int(round((1 - K["weight"]) * 3))          # weight: chunkier cels = fewer bands
     v_edges = np.linspace(0.15, 0.90, nb - 1).astype(F)
     v_mids = np.linspace(0.10, 0.96, nb).astype(F)
-    vq = v_mids[np.digitize(vflat, v_edges)]
+    # invariant #8, comic dialect: a band edge crossing a SMOOTH field (a road, a floor)
+    # becomes a wandering amoeba. The printed answer is a screentone gradient — dither the
+    # threshold in smooth areas so the cel break dissolves into stipple; hard edges stay
+    # hard exactly where the scene has real structure.
+    gmag = np.abs(np.diff(vflat, axis=0, prepend=0)) + np.abs(np.diff(vflat, axis=1, prepend=0))
+    gmag = np.asarray(Image.fromarray((np.clip(gmag * 30, 0, 1) * 255).astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(5)), dtype=F) / 255
+    smoothw = np.clip(1 - gmag * 2.2, 0, 1)
+    span = float(v_mids[1] - v_mids[0]) if nb > 1 else 0.2
+    dn = (value_noise(H, W, 2, rng) - 0.5) * span * 0.6
+    vq = v_mids[np.digitize(vflat + dn * smoothw * (regbig > 0), v_edges)]
     # the sky is ONE cel: banding a smooth gradient leaves a jagged quantization seam where
     # the vignette estimate under-corrects the corners
     if (regbig == 0).any():
@@ -930,8 +956,183 @@ def comic(img, region, nrm, w, h, rng, depth=None, emphasis=None, mat=None,
     return Image.fromarray((out * 255).astype(np.uint8)).resize((w, h), Image.LANCZOS)
 
 
+# ── STAGELIGHT: concert light on a void — light does the drawing ─────────────
+#
+# Born from the Byrne deck (Stop Making Sense / American Utopia): a body in hard stage
+# light against blackness. No ink, no washes — the image is MADE of light: posterized
+# light bands on the subject, a followspot pool on the floor, the stock's accent as the
+# gel, beams in the haze when focus runs high. The void is a color too.
+
+def stagelight(img, region, nrm, w, h, rng, depth=None, emphasis=None, mat=None,
+               knobs=None, stock=None):
+    S = 2
+    W, H = w * S, h * S
+    K = dict(knobs or KNOBS)
+    arr = np.stack([upN(img[..., i], W, H) for i in range(3)], axis=-1)
+    regbig = np.asarray(Image.fromarray(region.astype(np.uint8)).resize((W, H), Image.NEAREST))
+    yy, xx = np.mgrid[0:H, 0:W].astype(F)
+
+    hh, ss, vv = hsv_of(arr)
+    vflat, vig = unbake_vignette(vv, W)
+
+    # the gel: the stock's first accent pigment tints the light itself
+    gel = np.array(stock["accent"][0], F) if (stock and stock.get("accent")) else np.array([0.55, 0.65, 0.9], F)
+    gel_amt = 0.15 + K["chroma"] * 0.45
+
+    # light bands on the subject: weight = chunkier (fewer) bands; edge = terminator hardness
+    nb = 6 - int(round(K["weight"] * 3))
+    v_mids = np.linspace(0.06, 1.0, nb).astype(F)
+    v_edges = ((v_mids[:-1] + v_mids[1:]) / 2).astype(F)
+    vq = v_mids[np.digitize(vflat, v_edges)]
+    vband = vflat * (1 - K["edge"]) + vq * K["edge"]           # knife-edge terminator at 1.0
+
+    # the focus field: who the followspot loves
+    if emphasis is not None and emphasis.max() > 0:
+        fld = np.asarray(Image.fromarray((np.clip(upN(emphasis, W, H, Image.NEAREST), 0, 1)
+                                          * 255).astype(np.uint8)).filter(
+            ImageFilter.GaussianBlur(8)), dtype=F) / 255
+    else:
+        fld = np.asarray(Image.fromarray(((regbig == 2) * 255).astype(np.uint8)).filter(
+            ImageFilter.GaussianBlur(16)), dtype=F) / 255
+    fld = np.clip(fld * 1.5, 0, 1)
+
+    # assemble by region: subject in banded light, ground crushed, sky = the void
+    lift = 1.0 + fld * K["focus"] * 0.9                        # the loved one is LIT
+    subj_v = np.clip(vband * lift, 0, 1.08)
+    ground_v = np.clip(vband * (0.16 + 0.2 * (1 - K["focus"])), 0, 1)
+    void_v = np.clip(vflat * 0.05 + 0.015, 0, 1)
+    v_out = np.where(regbig == 2, subj_v, np.where(regbig == 1, ground_v, void_v))
+    s_out = np.clip(ss * (0.5 + K["chroma"] * 0.6), 0, 1) * np.where(regbig == 0, 0.3, 1.0)
+    out = rgb_of(hh, s_out.astype(F), np.clip(v_out, 0, 1).astype(F))
+    # gel the lit side: tint scales with how lit a pixel is
+    out = out * (1 - gel_amt * v_out[..., None]) + gel[None, None] * gel_amt * v_out[..., None] * (0.4 + 0.6 * out)
+
+    # the followspot pool on the floor, under the subject
+    subj_ys, subj_xs = np.where(regbig == 2)
+    if len(subj_xs):
+        cx = float(subj_xs.mean())
+        yb = float(np.percentile(subj_ys, 97))
+        rx, ry = (subj_xs.max() - subj_xs.min()) * 1.4 + 30, H * 0.06
+        pool = np.exp(-((xx - cx) / rx) ** 2 - ((yy - yb - ry * 0.4) / ry) ** 2)
+        pool = pool * (regbig == 1) * (0.25 + K["focus"] * 0.3)
+        out = np.clip(out + gel[None, None] * pool[..., None] * 0.7
+                      + np.array([1.0, 1.0, 1.0], F)[None, None] * pool[..., None] * 0.25, 0, 1.1)
+        # beams: two soft shafts converging on the subject when the followspot commits
+        if K["focus"] > 0.5 and len(subj_ys):
+            ct = float(np.percentile(subj_ys, 15))
+            for bx in (W * 0.12, W * 0.88):
+                t = np.clip((yy / max(ct, 1.0)), 0, 1)
+                axis_x = bx + (cx - bx) * t
+                hw = 14 + t * (rx * 0.5)
+                beam = np.exp(-((xx - axis_x) / hw) ** 2) * (1 - t * 0.55) * (yy < yb)
+                out = np.clip(out + (gel * 0.55 + 0.25)[None, None]
+                              * beam[..., None] * 0.10 * (K["focus"] - 0.4), 0, 1.1)
+
+    # order: the film the concert was shot on — grain and a whisper of scanline
+    disorder = 1 - K["order"]
+    if disorder > 0.05:
+        grain = (value_noise(H, W, 2, rng) - 0.5) * 0.10 * disorder
+        scan = (np.sin(yy * np.pi / 2.0) * 0.5 + 0.5) * 0.05 * disorder
+        out = np.clip(out + grain[..., None] - scan[..., None], 0, 1.1)
+
+    if stock is not None and K["pull"] > 0:
+        out = np.clip(out, 0, 1)
+        out = pull_to_stock(out, stock, K["pull"] * 0.7, roles=("core", "dark", "light"))
+
+    # the frame's own darkness returns; the void eats the corners willingly
+    out = np.clip(out, 0, 1) * (1 + (vig[..., None] - 1) * 0.5)
+    return Image.fromarray((np.clip(out, 0, 1) * 255).astype(np.uint8)).resize((w, h), Image.LANCZOS)
+
+
+# ── SCREENPRINT: the gig poster — the stock IS the ink set ───────────────────
+#
+# Born from the Byrne deck's other lineage: hand-pulled concert posters. Unlike every
+# other engine, the stock here is not a gravity well but the LITERAL ink set: each pixel
+# is assigned to its nearest ink and printed flat. order = registration (layers slip at
+# low order); weight = ink coverage (dark separations fatten); edge = boundary crispness
+# (a loose pull vs a tight one); focus gates the accent ink to where the stager pointed;
+# chroma boosts the color read before assignment. Smooth fields dither into halftone
+# instead of growing amoebas (invariant #8, print dialect).
+
+def screenprint(img, region, nrm, w, h, rng, depth=None, emphasis=None, mat=None,
+                knobs=None, stock=None):
+    S = 2
+    W, H = w * S, h * S
+    K = dict(knobs or KNOBS)
+    arr = np.stack([upN(img[..., i], W, H) for i in range(3)], axis=-1)
+    arr = np.stack([np.asarray(Image.fromarray((arr[..., i] * 255).astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(1.8)), dtype=F) / 255 for i in range(3)], axis=-1)
+    regbig = np.asarray(Image.fromarray(region.astype(np.uint8)).resize((W, H), Image.NEAREST))
+
+    hh, ss, vv = hsv_of(arr)
+    vflat, vig = unbake_vignette(vv, W)
+
+    if stock is None:
+        stock = {"core": [(0.35, 0.38, 0.42), (0.62, 0.58, 0.52)],
+                 "accent": [(0.82, 0.28, 0.20)], "dark": [(0.12, 0.12, 0.14)],
+                 "light": [(0.93, 0.91, 0.86)]}
+    paper = np.array(stock.get("light", [(0.94, 0.92, 0.88)])[0], F)
+    inks = [np.array(p, F) for r in ("core", "accent", "dark") for p in stock.get(r, [])]
+    accent_start = len(stock.get("core", []))
+    accent_n = len(stock.get("accent", []))
+
+    # the color each pixel ASKS for: flattened value, boosted chroma
+    ask = rgb_of(hh, np.clip(ss * (1.0 + K["chroma"] * 0.8), 0, 1), vflat)
+    lab = _srgb_to_oklab(ask)
+    ilab = _srgb_to_oklab(np.array(inks + [tuple(paper)], F))     # paper is a "print nothing"
+    d2 = ((lab[..., None, 1] - ilab[None, None, :, 1]) ** 2
+          + (lab[..., None, 2] - ilab[None, None, :, 2]) ** 2
+          + 1.6 * (lab[..., None, 0] - ilab[None, None, :, 0]) ** 2)
+    order2 = np.argsort(d2, axis=-1)
+    assign = order2[..., 0]
+    second = order2[..., 1]
+    # focus gates the accent inks: off-focus pixels asking for accent get their runner-up
+    if accent_n and emphasis is not None and emphasis.max() > 0:
+        fld = np.asarray(Image.fromarray((np.clip(upN(emphasis, W, H, Image.NEAREST), 0, 1)
+                                          * 255).astype(np.uint8)).filter(
+            ImageFilter.GaussianBlur(8)), dtype=F) / 255
+        is_accent = (assign >= accent_start) & (assign < accent_start + accent_n)
+        assign = np.where(is_accent & (fld * (0.4 + K["focus"]) < 0.35), second, assign)
+
+    # invariant #8, print dialect: halftone ONLY where the assignment is genuinely
+    # AMBIGUOUS (top two inks nearly tie) and the field is smooth — a boundary zone
+    # dissolves into dither; a solid area stays a solid pull
+    df = np.take_along_axis(d2, order2[..., :1], axis=-1)[..., 0]
+    ds = np.take_along_axis(d2, order2[..., 1:2], axis=-1)[..., 0]
+    ambig = df > ds * 0.55
+    gmag = np.abs(np.diff(vflat, axis=0, prepend=0)) + np.abs(np.diff(vflat, axis=1, prepend=0))
+    gmag = np.asarray(Image.fromarray((np.clip(gmag * 30, 0, 1) * 255).astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(5)), dtype=F) / 255
+    smoothw = np.clip(1 - gmag * 2.2, 0, 1)
+    dn = value_noise(H, W, 2, rng)
+    flip = ambig & (dn > 0.55) & (smoothw > 0.4)
+    assign = np.where(flip, second, assign)
+
+    fiber = value_noise(H, W, 3, rng)
+    out = paper[None, None] * (1 - fiber[..., None] * 0.05)
+    ink_order = sorted(range(len(inks)), key=lambda i: -float(inks[i].mean()))  # light→dark
+    for i in ink_order:
+        m = (assign == i).astype(F)
+        if K["weight"] > 0.55 and float(inks[i].mean()) < 0.35:
+            px = int((K["weight"] - 0.55) * 6) * 2 + 3
+            m = np.asarray(Image.fromarray((m * 255).astype(np.uint8)).filter(
+                ImageFilter.MaxFilter(px)), dtype=F) / 255      # heavy pulls flood the darks
+        m = np.asarray(Image.fromarray((m * 255).astype(np.uint8)).filter(
+            ImageFilter.GaussianBlur(0.6 + (1 - K["edge"]) * 2.4)), dtype=F) / 255
+        m = (m > 0.5).astype(F)
+        slip = (1 - K["order"]) * 5.0
+        m = np.roll(m, (int(rng.integers(-slip, slip + 1)), int(rng.integers(-slip, slip + 1))),
+                    axis=(0, 1))
+        # true overprint: ink multiplies the paper (and prior inks) like real translucent pulls
+        out = out * (1 - m[..., None] * 0.88) + (out * inks[i][None, None]
+                                                 * 1.12) * m[..., None] * 0.88
+    out = np.clip(out, 0, 1) * (1 + (vig[..., None] - 1) * 0.2)
+    return Image.fromarray((np.clip(out, 0, 1) * 255).astype(np.uint8)).resize((w, h), Image.LANCZOS)
+
+
 STYLES = {"vangogh": vangogh, "monet": monet, "picasso": picasso, "sketch": sketch,
-          "watercolor": watercolor, "comic": comic}
+          "watercolor": watercolor, "comic": comic, "stagelight": stagelight,
+          "screenprint": screenprint}
 
 def print_bindings():
     if hasattr(sys.stdout, "reconfigure"):
@@ -975,7 +1176,7 @@ if __name__ == "__main__":
         if len(pos) > 2:
             register = register or pos[2]
         kwargs["register_name"] = register or "heroes"
-    elif style in ("watercolor", "comic"):
+    elif style in ("watercolor", "comic", "stagelight", "screenprint"):
         kwargs["depth"] = extras["depth"]
         kwargs["emphasis"] = extras["emphasis"]
         kwargs["mat"] = extras["mat"]
