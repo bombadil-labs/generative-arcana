@@ -1,0 +1,13 @@
+{
+  "_readme": "External tool dependencies. Nothing under tools/vendor/ except this manifest, bootstrap.py, and .gitignore is committed — installs live in gitignored subdirectories. Resolve or install via: python tools/vendor/bootstrap.py <name> [--install]",
+  "blender": {
+    "version": "4.5.11",
+    "purpose": "atelier 3D backend — sculpt (metaballs/mesh), stage (constraints), frame (camera), G-buffer (passes/Cryptomatte/AOVs). Driven headless: blender --background --python <script>",
+    "windows-x64": {
+      "url": "https://download.blender.org/release/Blender4.5/blender-4.5.11-windows-x64.zip",
+      "unzips_to": "blender-4.5.11-windows-x64",
+      "exe": "blender-4.5.11-windows-x64/blender.exe"
+    },
+    "install_dir": "blender"
+  }
+}

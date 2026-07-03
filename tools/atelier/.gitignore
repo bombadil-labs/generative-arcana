@@ -1,0 +1,3 @@
+projects/*/out/
+report/report.html
+__pycache__/
