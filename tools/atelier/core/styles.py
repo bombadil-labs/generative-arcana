@@ -230,6 +230,38 @@ BINDINGS = {
         "weight": "ink coverage: heavy pulls flood the dark separations",
         "pull":   "IMPLICITLY 1.0 — the stock is not a gravity well here, it IS the ink set",
     },
+    "blueprint": {
+        "edge":   "drawn-line presence 0.5→1.1",
+        "focus":  "the surveyed object bright; context dimmed",
+        "order":  "drafting hand: CAD-steady ↔ the pen breathes (wobble)",
+        "chroma": "cyan of the drafting ground",
+        "weight": "hatch density",
+        "pull":   "— (ground + line come from stock dark/light)",
+    },
+    "linocut": {
+        "edge":   "block-edge crispness (pre-threshold blur)",
+        "focus":  "—",
+        "order":  "the carver's hand: gouge-angle jitter",
+        "chroma": "routes high-chroma midtones to the accent block",
+        "weight": "gouge thickness, length, density",
+        "pull":   "— (paper/ink/accent are the stock's light/dark/accent)",
+    },
+    "cutout": {
+        "edge":   "cut ↔ torn paper boundaries",
+        "focus":  "shadow size — the lifted piece",
+        "order":  "the gluer's neatness (shadow drift)",
+        "chroma": "color read boosted before paper assignment",
+        "weight": "piece size (pre-blur radius 4→13)",
+        "pull":   "IMPLICITLY 1.0 — every piece is stock paper",
+    },
+    "chrono": {
+        "edge":   "echo crispness",
+        "focus":  "how much the NOW outshines the then",
+        "order":  "echo discipline (vertical scatter at low order)",
+        "chroma": "the heat ramp on trailing echoes",
+        "weight": "echo count 3→7 and spread",
+        "pull":   "— (heat colors are the stock's accent+core)",
+    },
     "stagelight": {
         "edge":   "terminator hardness: soft gradient light ↔ knife-edge posterized bands",
         "focus":  "the followspot: lit-lift on the loved subject, pool strength, beams above 0.5",
@@ -858,6 +890,10 @@ def comic(img, region, nrm, w, h, rng, depth=None, emphasis=None, mat=None,
     # Quantize VIGNETTE-FLATTENED value or the frame's oval becomes a hard grey cel.
     hh, ss, vv = hsv_of(arr)
     vflat, vig = unbake_vignette(vv, W)
+    # invariant #9: the value read stretches to the scene's own percentiles. Self-gating:
+    # a hazy compressed scene gets its contrast back; a noir scene (already wide) is ~unmoved
+    p5, p95 = np.percentile(vflat, (5, 95))
+    vflat = np.clip((vflat - p5) / max(p95 - p5, 0.05), 0, 1) * 0.92 + 0.04
     nb = 3 + int(round((1 - K["weight"]) * 3))          # weight: chunkier cels = fewer bands
     v_edges = np.linspace(0.15, 0.90, nb - 1).astype(F)
     v_mids = np.linspace(0.10, 0.96, nb).astype(F)
@@ -1130,9 +1166,280 @@ def screenprint(img, region, nrm, w, h, rng, depth=None, emphasis=None, mat=None
     return Image.fromarray((np.clip(out, 0, 1) * 255).astype(np.uint8)).resize((w, h), Image.LANCZOS)
 
 
+
+# ── THE SUIT ENGINES: what the minor arcana yearn for ────────────────────────
+# Suit → engine + stock; rank → knobs; station → light rig (set at stage time).
+# blueprint = Structures ("architectural drawings, precise lines, measured spaces")
+# linocut   = Rivers     ("loops and spirals, repetitive structures, earth tones")
+# cutout    = Curiosity  ("bright optimistic paper, infographics that invite")
+# chrono    = Dance      ("motion blur, layered choreography, heat visible")
+
+
+def blueprint(img, region, nrm, w, h, rng, depth=None, emphasis=None, mat=None,
+              knobs=None, stock=None):
+    """White line-work on the drafting blue: edges become drawn lines, shadow becomes
+    hatching, the world gets a graph grid and a title block. edge = line presence;
+    weight = hatch density; order = drafting steadiness (CAD vs hand); chroma = cyan
+    of the ground; focus = the surveyed object bright, context dimmed."""
+    S = 2
+    W, H = w * S, h * S
+    K = dict(knobs or KNOBS)
+    arr = np.stack([upN(img[..., i], W, H) for i in range(3)], axis=-1)
+    regbig = np.asarray(Image.fromarray(region.astype(np.uint8)).resize((W, H), Image.NEAREST))
+    matbig = np.asarray(Image.fromarray((mat if mat is not None else region).astype(np.uint8)).resize((W, H), Image.NEAREST))
+    nrmbig = np.stack([upN(nrm[..., i], W, H, lo=-1.0, hi=1.0) for i in range(3)], axis=-1)
+    lum = arr @ np.array([0.299, 0.587, 0.114], F)
+
+    ground = np.array(stock["dark"][0], F) if (stock and stock.get("dark")) else np.array([0.07, 0.13, 0.30], F)
+    ground = ground * (1 - K["chroma"] * 0.3) + np.array([0.05, 0.12, 0.38], F) * (K["chroma"] * 0.3)
+    line = np.array(stock["light"][0], F) if (stock and stock.get("light")) else np.array([0.86, 0.93, 0.97], F)
+
+    yy, xx = np.mgrid[0:H, 0:W].astype(F)
+    out = ground[None, None] * (1 - value_noise(H, W, 3, rng)[..., None] * 0.06)
+    for period, a in ((14, 0.05), (70, 0.11)):
+        gl = ((xx % period) < 1.0) | ((yy % period) < 1.0)
+        out = out * (1 - gl[..., None] * a) + line[None, None] * gl[..., None] * a
+
+    # drawn lines: silhouettes, material seams, depth steps, creases (the comic sources)
+    ink = np.zeros((H, W), bool)
+    ink |= (np.abs(np.diff(regbig.astype(F), axis=0, prepend=0))
+            + np.abs(np.diff(regbig.astype(F), axis=1, prepend=0))) > 0
+    ink |= (np.abs(np.diff(matbig, axis=0, prepend=0))
+            + np.abs(np.diff(matbig, axis=1, prepend=0))) > 0.5
+    if depth is not None:
+        d = np.where(depth > 1e5, np.nan, depth)
+        dmax = float(np.nanmax(d)) if np.isfinite(np.nanmax(d)) else 1e4
+        dn = np.nan_to_num(d, nan=dmax)
+        dref = np.nanpercentile(d[region > 0], 60) if (region > 0).any() else 10.0
+        dbig = upN(np.clip(dn / dref / 4, 0, 1), W, H)
+        ink |= ((np.abs(np.diff(dbig, axis=0, prepend=0))
+                 + np.abs(np.diff(dbig, axis=1, prepend=0))) > 0.02) & (regbig > 0)
+    ncre = 1 - np.clip((nrmbig[2:, :, :] * nrmbig[:-2, :, :]).sum(-1), -1, 1)
+    crease = np.zeros((H, W), F)
+    crease[1:-1] = ncre
+    ink |= (crease > 0.5) & (regbig == 2)
+    if K["order"] < 0.75:                       # hand drafting: the pen breathes
+        wob = (value_noise(H, W, 6, rng) - 0.5) * (1 - K["order"]) * 3.0
+        my = np.clip(yy + wob, 0, H - 1).astype(np.int32)
+        mx_ = np.clip(xx + (wob.T[:H, :W] if wob.T.shape == (H, W) else wob), 0, W - 1).astype(np.int32)
+        ink = ink[my, mx_]
+    ink_f = np.asarray(Image.fromarray((ink * 255).astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(0.5)), dtype=F) / 255
+
+    # hatching where the render is in shadow — measured, diagonal
+    ph = (xx * 0.707 + yy * 0.707) / (9.0 - K["weight"] * 3.0)
+    hatch = ((ph % 1.0) < 0.16) & (lum < 0.42) & (regbig > 0)
+    hatch_f = hatch.astype(F) * 0.4
+
+    lvl = np.clip(ink_f * (0.5 + K["edge"] * 0.6) + hatch_f, 0, 1)
+    if emphasis is not None and emphasis.max() > 0:
+        fld = np.clip(upN(emphasis, W, H, Image.NEAREST) * 1.4, 0, 1)
+        lvl *= (0.45 + 0.55 * np.clip(fld + (1 - K["focus"]), 0, 1))
+    out = out * (1 - lvl[..., None]) + line[None, None] * lvl[..., None]
+
+    # drafting furniture: margin frame + an empty title block
+    fr = (((xx > W * 0.03) & (xx < W * 0.032)) | ((xx > W * 0.968) & (xx < W * 0.97))
+          | ((yy > H * 0.02) & (yy < H * 0.023)) | ((yy > H * 0.977) & (yy < H * 0.98)))
+    tbx = (xx > W * 0.62) & (xx < W * 0.968) & (yy > H * 0.9) & (yy < H * 0.977)
+    tb_edge = tbx & (((xx < W * 0.627) | (xx > W * 0.961))
+                     | ((yy < H * 0.906) | (yy > H * 0.971))
+                     | ((yy > H * 0.935) & (yy < H * 0.939)))
+    furn = fr | tb_edge
+    out = out * (1 - furn[..., None] * 0.8) + line[None, None] * furn[..., None] * 0.8
+    return Image.fromarray((np.clip(out, 0, 1) * 255).astype(np.uint8)).resize((w, h), Image.LANCZOS)
+
+
+def linocut(img, region, nrm, w, h, rng, depth=None, emphasis=None, mat=None,
+            knobs=None, stock=None):
+    """Carved ink: solids in the darks, paper in the lights, and in between —
+    parallel gouge lines riding the CONTOURS of the form (the rhythm made visible).
+    weight = gouge thickness/density; order = the carver's hand; edge = block-edge
+    crispness; chroma routes high-chroma midtones to the accent block."""
+    S = 2
+    W, H = w * S, h * S
+    K = dict(knobs or KNOBS)
+    arr = np.stack([upN(img[..., i], W, H) for i in range(3)], axis=-1)
+    regbig = np.asarray(Image.fromarray(region.astype(np.uint8)).resize((W, H), Image.NEAREST))
+    hh, ss, vv = hsv_of(arr)
+    vflat, vig = unbake_vignette(vv, W)
+    vs = np.asarray(Image.fromarray((np.clip(vflat, 0, 1) * 255).astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(2.5 + (1 - K["edge"]) * 3)), dtype=F) / 255
+
+    paper = np.array(stock["light"][0], F) if (stock and stock.get("light")) else np.array([0.93, 0.89, 0.8], F)
+    ink = np.array(stock["dark"][0], F) if (stock and stock.get("dark")) else np.array([0.16, 0.11, 0.09], F)
+    accent = np.array(stock["accent"][0], F) if (stock and stock.get("accent")) else None
+
+    sel = vs[regbig > 0] if (regbig > 0).any() else vs.ravel()
+    t_dark, t_light = np.percentile(sel, (22, 80))
+    fiber = value_noise(H, W, 3, rng)
+    base = Image.fromarray((np.clip(paper[None, None] * (1 - fiber[..., None] * 0.05), 0, 1)
+                            * 255).astype(np.uint8))
+    draw = ImageDraw.Draw(base, "RGBA")
+
+    solid = (vs < t_dark) & (regbig > 0)
+    solid_f = np.asarray(Image.fromarray((solid * 255).astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(1.0)), dtype=F) / 255
+    solid_m = solid_f > 0.5
+
+    gy, gx = np.gradient(vs)
+    cont = np.arctan2(gy, gx) + np.pi / 2
+    mid = (vs >= t_dark) & (vs < t_light) & (regbig > 0)
+    ys_, xs_ = np.where(mid)
+    inkt = tuple(int(v * 255) for v in ink)
+    acct = tuple(int(v * 255) for v in accent) if accent is not None else inkt
+    n = min(9000, len(xs_) * 2)
+    if len(xs_):
+        idx = rng.integers(0, len(xs_), n)
+        for i in idx:
+            x, y = int(xs_[i]), int(ys_[i])
+            dark = (t_light - vs[y, x]) / max(t_light - t_dark, 1e-3)
+            if rng.random() > 0.25 + dark * 0.75:
+                continue
+            length = (9 + 13 * dark) * (0.7 + K["weight"] * 0.6)
+            width = max(2, int(1 + dark * 2.4 + K["weight"] * 1.6))
+            jit = rng.normal(0, (1 - K["order"]) * 0.5)
+            col = acct if (K["chroma"] > 0.25 and ss[y, x] > 0.33 and accent is not None) else inkt
+            curved_stroke(draw, x, y, cont + jit, length, width, col + (235,), W, H, 0.06)
+
+    out = np.asarray(base, dtype=F) / 255
+    out = out * (1 - solid_m[..., None]) + ink[None, None] * solid_m[..., None]
+    out = np.clip(out * (1 - (value_noise(H, W, 2, rng)[..., None] - 0.5)
+                         * solid_m[..., None] * 0.12), 0, 1)
+    out = out * (1 + (vig[..., None] - 1) * 0.25)
+    return Image.fromarray((np.clip(out, 0, 1) * 255).astype(np.uint8)).resize((w, h), Image.LANCZOS)
+
+
+def cutout(img, region, nrm, w, h, rng, depth=None, emphasis=None, mat=None,
+           knobs=None, stock=None):
+    """Paper shapes with scissors and glue: big flat pieces in the stock's colors,
+    every piece casting a small honest shadow (the paper has THICKNESS). edge = cut
+    vs torn; weight = piece size; order = the gluer's neatness (shadow drift);
+    focus sizes the shadows (lifted paper)."""
+    S = 2
+    W, H = w * S, h * S
+    K = dict(knobs or KNOBS)
+    arr = np.stack([upN(img[..., i], W, H) for i in range(3)], axis=-1)
+    blur_r = 4.0 + K["weight"] * 9.0
+    arr = np.stack([np.asarray(Image.fromarray((arr[..., i] * 255).astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(blur_r)), dtype=F) / 255 for i in range(3)], axis=-1)
+    hh, ss, vv = hsv_of(arr)
+    vflat, vig = unbake_vignette(vv, W)
+    # invariant #9 for paper: stretch value to the scene's own percentiles, or a dark
+    # stage maps every pixel to the black paper and the collage is one sheet
+    p5, p95 = np.percentile(vflat, (5, 95))
+    vflat = np.clip((vflat - p5) / max(p95 - p5, 0.05), 0, 1) * 0.85 + 0.08
+    ask = rgb_of(hh, np.clip(ss * (1.1 + K["chroma"] * 0.7), 0, 1), vflat)
+
+    if stock is None:
+        stock = {"core": [(0.85, 0.66, 0.16), (0.29, 0.54, 0.78), (0.33, 0.63, 0.38)],
+                 "accent": [(0.82, 0.36, 0.24)], "dark": [(0.2, 0.22, 0.26)],
+                 "light": [(0.94, 0.92, 0.85)]}
+    papers = [np.array(p, F) for r in ("light", "core", "accent", "dark") for p in stock.get(r, [])]
+    lab = _srgb_to_oklab(ask)
+    plab = _srgb_to_oklab(np.array(papers, F))
+    d2 = ((lab[..., None, 1] - plab[None, None, :, 1]) ** 2
+          + (lab[..., None, 2] - plab[None, None, :, 2]) ** 2
+          + 1.3 * (lab[..., None, 0] - plab[None, None, :, 0]) ** 2)
+    assign = np.argmin(d2, axis=-1)
+
+    # a paper piece has ONE color — and the material buffer knows where the pieces are.
+    # Subject parts vote as wholes (median ask → nearest paper); sky and ground stay
+    # per-pixel (their gradients already blur into big blobs).
+    regbig = np.asarray(Image.fromarray(region.astype(np.uint8)).resize((W, H), Image.NEAREST))
+    if mat is not None:
+        matbig = np.asarray(Image.fromarray(mat.astype(np.float32)).resize((W, H), Image.NEAREST))
+        for pid in np.unique(matbig[regbig == 2]):
+            pm = (matbig == pid) & (regbig == 2)
+            if pm.sum() < 40:
+                continue
+            piece_lab = np.median(lab[pm], axis=0)
+            pd = ((piece_lab[1] - plab[:, 1]) ** 2 + (piece_lab[2] - plab[:, 2]) ** 2
+                  + 1.3 * (piece_lab[0] - plab[:, 0]) ** 2)
+            assign[pm] = int(np.argmin(pd))
+
+    yy, xx = np.mgrid[0:H, 0:W].astype(F)
+    torn_amp = 2.0 + (1 - K["edge"]) * 7.0
+    torn_freq = 24 if K["edge"] > 0.5 else 9
+    dd = (value_noise(H, W, torn_freq, rng) - 0.5) * 2 * torn_amp
+    my = np.clip(yy + dd, 0, H - 1).astype(np.int32)
+    mx_ = np.clip(xx + (dd.T[:H, :W] if dd.T.shape == (H, W) else dd), 0, W - 1).astype(np.int32)
+    assign = assign[my, mx_]
+
+    out = np.ones((H, W, 3), F) * papers[0][None, None]
+    shadow_dx = 3 + int(K["focus"] * 2)
+    for i in range(len(papers)):
+        m = (assign == i).astype(F)
+        if not m.any():
+            continue
+        m = np.asarray(Image.fromarray((m * 255).astype(np.uint8)).filter(
+            ImageFilter.GaussianBlur(1.2)), dtype=F) / 255
+        m = (m > 0.5).astype(F)
+        jx = shadow_dx + int(rng.integers(0, max(1, int((1 - K["order"]) * 4))))
+        jy = shadow_dx + int(rng.integers(0, max(1, int((1 - K["order"]) * 4))))
+        sh = np.roll(m, (jy, jx), axis=(0, 1)) * (1 - m)
+        sh = np.asarray(Image.fromarray((sh * 255).astype(np.uint8)).filter(
+            ImageFilter.GaussianBlur(2.0)), dtype=F) / 255
+        out *= (1 - sh[..., None] * 0.22)
+        tex = 1 - (value_noise(H, W, 4, rng)[..., None] - 0.5) * 0.05
+        out = out * (1 - m[..., None]) + papers[i][None, None] * tex * m[..., None]
+    out = np.clip(out, 0, 1) * (1 + (vig[..., None] - 1) * 0.15)
+    return Image.fromarray((np.clip(out, 0, 1) * 255).astype(np.uint8)).resize((w, h), Image.LANCZOS)
+
+
+def chrono(img, region, nrm, w, h, rng, depth=None, emphasis=None, mat=None,
+           knobs=None, stock=None):
+    """Chronophotography: the subject echoed backward through its own motion — one
+    body becoming three becoming heat. Echoes trail the move; the NOW-body stays
+    crisp on top. weight = echo count/spread; order = echo discipline; chroma = the
+    heat ramp; focus = how much the now outshines the then; edge = echo crispness."""
+    S = 2
+    W, H = w * S, h * S
+    K = dict(knobs or KNOBS)
+    arr = np.stack([upN(img[..., i], W, H) for i in range(3)], axis=-1)
+    regbig = np.asarray(Image.fromarray(region.astype(np.uint8)).resize((W, H), Image.NEAREST))
+    subj = (regbig == 2).astype(F)
+
+    if stock:
+        heat = [np.array(c, F) for c in (stock.get("accent", []) + stock.get("core", []))]
+    else:
+        heat = [np.array([0.9, 0.35, 0.2], F), np.array([0.95, 0.6, 0.2], F),
+                np.array([0.98, 0.8, 0.35], F)]
+    def _shift(a, dy, dx):
+        # zero-fill shift: echoes leave the frame, they do NOT wrap around the back
+        out_ = np.zeros_like(a)
+        ys0, ys1 = max(0, dy), min(a.shape[0], a.shape[0] + dy)
+        xs0, xs1 = max(0, dx), min(a.shape[1], a.shape[1] + dx)
+        out_[ys0:ys1, xs0:xs1] = a[ys0 - dy:ys1 - dy, xs0 - dx:xs1 - dx]
+        return out_
+
+    n_echo = 3 + int(round(K["weight"] * 4))
+    step_x = -int(W * 0.035)
+    out = arr.copy()
+    covered = subj.copy()
+    for k in range(1, n_echo + 1):
+        dx = step_x * k
+        dy = int(rng.integers(-1, 2) * (1 - K["order"]) * 6 * k)
+        em = _shift(subj, dy, dx)
+        ec = _shift(arr, dy, dx)
+        blur = 0.6 + (1 - K["edge"]) * 1.8 + k * 0.5
+        em = np.asarray(Image.fromarray((em * 255).astype(np.uint8)).filter(
+            ImageFilter.GaussianBlur(blur)), dtype=F) / 255
+        hcol = heat[min(k - 1, len(heat) - 1)]
+        t = k / n_echo
+        tint = ec * (1 - K["chroma"] * (0.35 + t * 0.4)) + hcol[None, None] * (K["chroma"] * (0.35 + t * 0.4))
+        a = em * (0.62 - t * 0.42) * (1 - covered)
+        out = out * (1 - a[..., None]) + tint * a[..., None]
+        covered = np.clip(covered + em * 0.5, 0, 1)
+    pop = 1.0 + K["focus"] * 0.22
+    out = np.where(subj[..., None] > 0.5,
+                   np.clip(0.5 + (out - 0.5) * pop + 0.03 * K["focus"], 0, 1), out)
+    return Image.fromarray((np.clip(out, 0, 1) * 255).astype(np.uint8)).resize((w, h), Image.LANCZOS)
+
+
 STYLES = {"vangogh": vangogh, "monet": monet, "picasso": picasso, "sketch": sketch,
           "watercolor": watercolor, "comic": comic, "stagelight": stagelight,
-          "screenprint": screenprint}
+          "screenprint": screenprint,
+          "blueprint": blueprint, "linocut": linocut, "cutout": cutout, "chrono": chrono}
 
 def print_bindings():
     if hasattr(sys.stdout, "reconfigure"):
@@ -1176,7 +1483,8 @@ if __name__ == "__main__":
         if len(pos) > 2:
             register = register or pos[2]
         kwargs["register_name"] = register or "heroes"
-    elif style in ("watercolor", "comic", "stagelight", "screenprint"):
+    elif style in ("watercolor", "comic", "stagelight", "screenprint",
+                   "blueprint", "linocut", "cutout", "chrono"):
         kwargs["depth"] = extras["depth"]
         kwargs["emphasis"] = extras["emphasis"]
         kwargs["mat"] = extras["mat"]
