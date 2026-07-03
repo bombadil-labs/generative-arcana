@@ -1,9 +1,15 @@
 # The Control Plane — formal specification
 
-The contract between the three layers of the code-native illustration pipeline
+The contract between the layers of the code-native illustration pipeline
 (`sculptor → stager → painter`). PRINCIPLES.md says *why*; this document says *what*: the data
 each layer owns, produces, and consumes. Reference implementation: `tools/atelier/`
 (`core/stage.py` · `core/styles.py` · `projects/fable/creatures.py`).
+
+> **Horizon note.** The atelier is becoming its own software project. The layer names here —
+> Sculptor, Stager, Framer, Painter — are on their way to being *interfaces*: the numpy-SDF
+> and Blender backends are already two implementations of the first three, and nothing in this
+> contract assumes either. When the atelier is extracted from generative-arcana, this document
+> is the seam it separates along.
 
 ## Layer contract
 
@@ -90,13 +96,94 @@ strokes cannot enter — dilation is what saves 1-px geometry like masts). Reser
 `wind` (vector field: fur ruffle, fog drift — one cause, many textures), `wet`, `event`
 (discrete scars/marks).
 
-## 4. Paint directives
+## 4. The direction plane
 
-Semantic instructions that are not per-pixel: currently `vortices`
-(`"fx,fy,polarity;…"` — field attractors on narrative points; **summed as direction vectors**,
-never angles) and `stars` (`"fx,fy;…"` — rendered as flow deviations: short bright strokes
-riding the local field + a soft core + a micro-vortex). Directives are *derived from staged
-semantics* (`attend()`), not hand-authored at the CLI (the CLI form is just transport).
+Everything the painter accepts beyond the G-buffer, in one sentence:
+
+> **A knob (semantic intent) modulates, via the engine's bindings (style), how the axes
+> (mechanics) respond to the buffers (the scene's facts) — drawing from a stock (the palette).**
+
+Intent → style → mechanics → world, from a limited pigment supply. Each entity only speaks to
+its neighbors; the deck and stager side of the wall speak *only* knob-and-stock language.
+
+### 4.1 The five entities
+
+| Entity | What it is | Denominated in | Owned by | Count discipline |
+|---|---|---|---|---|
+| **Buffers** | spatial scene facts (depth, emphasis, coherence, age, …) | world units | stager bake | grows with §3 |
+| **Axes** | mechanical affordances of one engine (bleed amplitude, rim-pool px, hatch period, sat chips) | engine units | each engine, private | many; push-driven — they exist because the mechanics exist |
+| **Knobs** | semantic tuning instruments, engine-independent | meaning, 0–1 | the direction vocabulary (below) | FEW; pull-driven — mint one only when a deck or stager needs to say something no single engine owns |
+| **Bindings** | how one engine translates knobs into axis motion — slope, shape, sign, or honest silence | per-engine tables | each engine, **declarative and inspectable** | one table per engine |
+| **Stock** | the palette: pigments the painter may reach for, with roles | color (perceptual space) | deck / card / direction | one per painting |
+
+**Membership test for knobs:** does it survive changing engines? Rim-pool tightness dies with
+watercolor; "how much does object identity survive" means something to every style that has
+edges. If a scene script ever wants to set an engine axis directly, either that axis is
+secretly an unnamed knob, or the layering has leaked.
+
+### 4.2 The knob vocabulary
+
+| Knob | The question it answers | Illustrative dialects |
+|---|---|---|
+| `edge` | how much does object identity survive? | watercolor: bleed↔glaze · comic: ink presence/weight · vangogh: region-stop↔trespass · monet: lost-edge σ |
+| `focus` | how unequal is the frame's treatment? (gain on the `emphasis` buffer's influence) | comic: the saturation/brightness grade · watercolor: local crispness + reserve · vangogh: vortex gain, emphasis protection |
+| `order` | how disciplined are the marks? | vangogh: coherence bias, curl, jitter · watercolor: edge wander, bloom count · sketch: hatch wobble |
+| `chroma` | how loud is the pigment? | vangogh: sat boost · comic: chip count/boost · monet: broken-color probability |
+| `weight` | how big/dense is the mark? | vangogh: stroke length/width · watercolor: glaze opacity/band depth · comic: cel bands, line px |
+| `pull` | how faithful to the stock? | comic: chips *become* the stock at 1.0 · watercolor: pigments mix within the stock's gamut · vangogh: color-jitter walks toward the nearest pigment |
+
+Reserved (named, unbound as yet): `key` (tonal register, high↔low), `temperature` (warm/cool
+economy, esp. shadows), `economy` (how much is left unsaid), `age` (the MEDIUM's age — foxing,
+misregistration, craquelure — distinct from the scene's `age` buffer).
+
+Knobs are scalars today, but any knob may be promoted to a **field** the stager writes
+(`focus` already is one in disguise: a gain on the emphasis map). "Crisp here, dissolving
+there" is a composition expressed as data.
+
+### 4.3 Bindings: interpretation, not implementation
+
+The contract is that an engine must **respond meaningfully or shrug honestly**. Sensitivity is
+a property of the binding, not the knob: a style exquisitely responsive to `edge` binds many
+axes to it steeply; a style deaf to `focus` ships an empty row. Inversion is legal and
+expressive (a cubist engine may bind `edge` inverted — more assertion, more fracture — because
+inverting boundary logic is its identity). Uniform bindings across engines are the trap, not
+the goal: they sand every style down to the same mush.
+
+Each engine ships its binding table as a declarative structure next to its code, and
+`styles.py bindings` prints them. An empty row is a documented shrug, not an omission.
+
+**Presets are points in knob space.** The Vico registers (`gods / heroes / men / ricorso`)
+are direction-level presets, not vangogh property — expressed over knobs, they are portable:
+a watercolor "gods" and a comic "gods" fall out of each engine's own bindings.
+
+### 4.4 The stock (palette)
+
+Not "you may only use these tones" (though a steep `pull` binding may mean exactly that) but
+"these are the pigments on the board." Structure is roles, not just a list:
+
+```
+stock = { core: [...], accent: [...], dark: [...], light: [...] }
+```
+
+- Pulls happen in a **perceptual space** (Oklab) and are **value-preserving**: lightness
+  carries form and lighting; hue and chroma are where the palette lives.
+- Color IDENTITY is scene-side (the sculptor colors the tram maroon; the underpainting is the
+  scene's color truth). The stock governs color RENDERING — what pigments realize those facts.
+  Per-object palettes are therefore rejected: that channel already exists at sculpt time.
+- The legitimate per-object desire survives through roles × buffers: bindings may gate
+  `accent` pigments on the `emphasis` buffer — the focused thing gets the saturated stock,
+  the world gets the earths — with zero object-level plumbing.
+- Decks supply stocks. For Ulysses this is canon, not decoration: the Linati/Gilbert schemas
+  assign each episode a color (Telemachus white/gold, Calypso orange, Hades black-white…) —
+  a per-card stock shipped by Joyce himself.
+
+### 4.5 Scene directives
+
+Narrative geometry — content, not knobs: `vortices` (`"fx,fy,polarity;…"` — field attractors
+on narrative points; **summed as direction vectors**, never angles) and `stars` (`"fx,fy;…"` —
+flow deviations: short bright strokes riding the local field + a soft core + a micro-vortex).
+Directives are *derived from staged semantics* (`attend()`), not hand-authored at the CLI
+(the CLI form is just transport).
 
 ## 5. Invariants (violations read as bugs to a close viewer)
 
@@ -115,3 +202,12 @@ semantics* (`attend()`), not hand-authored at the CLI (the CLI form is just tran
    downstream. A lone figure cannot refuse a field; a body can refuse a light. The field
    amplifies staged relations; it never originates them. (Learned from the failed Forger v1:
    a repulsor around a small dark figure read as a quiet spot, not as non serviam.)
+8. **Quantizing a smooth field invents shapes that are not there.** Learned three times in one
+   week: value-banding the framer's vignette (a giant amoeba wash), cel-quantizing a gradient
+   sky (a jagged oval seam), and it holds for hue under palette pull. The rule: unbake global
+   low-frequency fields before any value logic and re-apply them as mood after; smooth regions
+   get continuous treatment (ramps, single washes, one cel); hard treatment is reserved for
+   places where the scene has real structure. Hard edges are information only where structure
+   is real.
+9. **Thresholds are the scene's own.** Fixed cuts give a misty scene zero working washes and a
+   noon scene four black ones; percentiles of the scene's distribution give both their due.

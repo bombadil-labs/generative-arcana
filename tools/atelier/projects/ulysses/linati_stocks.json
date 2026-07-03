@@ -1,0 +1,39 @@
+{
+  "_comment": "Per-episode pigment stocks for the Ulysses deck, seeded from the colors Joyce assigned in the Linati/Gilbert schemas (Telemachus white/gold, Proteus green, Hades black-white, Aeolus red, ...) and extended to full role-structured palettes (CONTROL_PLANE 4.4). Use as: palette=@projects/ulysses/linati_stocks.json#telemachus",
+  "telemachus": {
+    "core": ["c8b98f", "8fa3a8", "6b7a6d", "a89a7a"],
+    "accent": ["e3c15e", "f0e6c8"],
+    "dark": ["3a3f3e", "26302f"],
+    "light": ["f2ead6"]
+  },
+  "proteus": {
+    "core": ["6f8a6e", "8aa08a", "5d7568", "9aa889"],
+    "accent": ["b9cf9e"],
+    "dark": ["2e3d33"],
+    "light": ["e6ecd8"]
+  },
+  "hades": {
+    "core": ["5a5a5c", "77787a", "9a9a98"],
+    "accent": ["d8d6d0"],
+    "dark": ["1f2022", "343538"],
+    "light": ["e8e8e4"]
+  },
+  "aeolus": {
+    "core": ["9b3a30", "b06a4e", "8a6a5a"],
+    "accent": ["d4432f"],
+    "dark": ["3c2a26"],
+    "light": ["ead9c8"]
+  },
+  "wandering_rocks": {
+    "core": ["8a7a66", "6e7a72", "a08a70", "7a6a78"],
+    "accent": ["b8563e", "5e7a9e"],
+    "dark": ["30322e"],
+    "light": ["e2dcc8"]
+  },
+  "eumaeus": {
+    "core": ["6a6456", "8a7f6a", "55584e"],
+    "accent": ["b98c4a"],
+    "dark": ["2a2c28"],
+    "light": ["ded6c0"]
+  }
+}

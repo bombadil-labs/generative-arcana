@@ -5,8 +5,16 @@ what they're painting. Every engine here reads the aux buffers (subject mask, de
 normals, material ids) and treats sky / ground / subject as different painting problems, with
 stroke orientation taken from 3D form (screen-projected normals), not just image gradients.
 
-Usage: python styles.py <render.png> <aux.npz> <style> <out.png>
-styles: vangogh | monet | picasso | sketch | watercolor
+Usage: python styles.py <render.png> <aux.npz> <style> <out.png> [seed] [args...]
+       python styles.py bindings                      # print every engine's binding table
+styles: vangogh | monet | picasso | sketch | watercolor | comic
+
+All engines speak the direction plane (CONTROL_PLANE §4): key=val args set KNOBS
+(edge / focus / order / chroma / weight / pull, all 0..1), `register=<gods|heroes|men|
+ricorso>` applies a knob-space preset, and `palette="core:hex,hex;accent:hex"` (or
+`palette=@stock.json`) supplies the stock. Aliases: clarity=→edge, focus=→focus.
+vangogh additionally takes legacy positional scene directives: "<vortices|->" "<stars|->"
+[register].
 """
 
 import sys
@@ -40,8 +48,226 @@ def load(img_path, aux_path):
         "age": g["age"].astype(F) if "age" in g.files else None,
         "depth": g["depth"].astype(F) if "depth" in g.files else None,
         "emphasis": g["emphasis"].astype(F) if "emphasis" in g.files else None,
+        "mat": mat.astype(F),
     }
     return img, region, nrm, extras, w, h
+
+
+def hsv_of(rgb):
+    """Vectorized rgb→hsv over an (...,3) float array."""
+    mx = rgb.max(-1)
+    mn = rgb.min(-1)
+    d = mx - mn + 1e-9
+    r, g_, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    hh = np.where(mx == r, ((g_ - b) / d) % 6, np.where(mx == g_, (b - r) / d + 2, (r - g_) / d + 4)) / 6.0
+    ss = np.where(mx > 1e-6, d / (mx + 1e-9), 0.0)
+    return hh.astype(F), ss.astype(F), mx.astype(F)
+
+
+def rgb_of(hh, ss, vv):
+    """Vectorized hsv→rgb."""
+    i = np.floor(hh * 6).astype(np.int32) % 6
+    f = hh * 6 - np.floor(hh * 6)
+    p = vv * (1 - ss)
+    q = vv * (1 - f * ss)
+    t = vv * (1 - (1 - f) * ss)
+    r = np.choose(i, [vv, q, p, p, t, vv])
+    g_ = np.choose(i, [t, vv, vv, q, p, p])
+    b = np.choose(i, [p, p, t, vv, vv, q])
+    return np.stack([r, g_, b], axis=-1).astype(F)
+
+
+def upN(a, W, H, mode=Image.BICUBIC, lo=0.0, hi=1.0):
+    """Resize a float array through PIL with a value range."""
+    span = hi - lo
+    im = Image.fromarray((np.clip((a - lo) / span, 0, 1) * 255).astype(np.uint8)).resize((W, H), mode)
+    return np.asarray(im, dtype=F) / 255.0 * span + lo
+
+
+# ── the direction plane: knobs, stock, bindings (CONTROL_PLANE §4) ───────────
+#
+# A knob (semantic intent) modulates, via the engine's BINDINGS (style), how the AXES
+# (mechanics) respond to the BUFFERS (scene facts) — drawing from a STOCK (the palette).
+# Engines respond meaningfully or shrug honestly; sensitivity lives in the binding.
+
+KNOBS = dict(
+    edge=0.5,     # how much does object identity survive?
+    focus=0.5,    # how unequal is the frame's treatment? (gain on the emphasis buffer)
+    order=0.6,    # how disciplined are the marks?
+    chroma=0.5,   # how loud is the pigment?
+    weight=0.5,   # how big/dense is the mark?
+    pull=0.0,     # how faithful to the stock?
+)
+
+# Presets are points in KNOB space — portable across engines (CONTROL_PLANE §4.3).
+# The Vico registers, re-expressed; vangogh's old axis values are recovered by its bindings.
+REGISTERS = {
+    "gods":    dict(weight=0.95, order=0.85, chroma=0.85, edge=0.70, focus=0.70),
+    "heroes":  dict(weight=0.60, order=0.60, chroma=0.78, edge=0.60, focus=0.55),
+    "men":     dict(weight=0.08, order=0.75, chroma=0.30, edge=0.60, focus=0.12),
+    "ricorso": dict(weight=0.65, order=0.25, chroma=0.55, edge=0.15, focus=0.50),
+}
+
+
+def parse_stock(spec):
+    """'core:8a6d4a,6b7a6d;accent:c9a45c;dark:2a2622' or a bare 'aabbcc,ddeeff' (all core),
+    or '@path.json' ({role: [hex,...]}), or '@path.json#key' to pick one stock from a
+    collection ({key: {role: [hex,...]}}, e.g. the Linati stocks). Returns
+    {role: [(r,g,b) floats 0..1]} or None."""
+    if not spec or spec in ("-", ""):
+        return None
+    if spec.startswith("@"):
+        import json
+        path, _, key = spec[1:].partition("#")
+        data = json.loads(Path(path).read_text())
+        if key:
+            data = data[key]
+        return {role: [_hex(c) for c in cols] for role, cols in data.items()
+                if not role.startswith("_")}
+    stock = {}
+    if ":" not in spec:
+        spec = "core:" + spec
+    for part in spec.split(";"):
+        role, _, cols = part.partition(":")
+        stock[role.strip()] = [_hex(c) for c in cols.split(",") if c.strip()]
+    return stock
+
+
+def _hex(s):
+    s = s.strip().lstrip("#")
+    return tuple(int(s[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
+
+
+def _srgb_to_oklab(c):
+    """(..., 3) sRGB 0..1 → Oklab. Björn Ottosson's fit."""
+    c = np.clip(np.asarray(c, dtype=F), 0, 1)
+    lin = np.where(c > 0.04045, ((c + 0.055) / 1.055) ** 2.4, c / 12.92)
+    l = 0.4122214708 * lin[..., 0] + 0.5363325363 * lin[..., 1] + 0.0514459929 * lin[..., 2]
+    m = 0.2119034982 * lin[..., 0] + 0.6806995451 * lin[..., 1] + 0.1073969566 * lin[..., 2]
+    s = 0.0883024619 * lin[..., 0] + 0.2817188376 * lin[..., 1] + 0.6299787005 * lin[..., 2]
+    l, m, s = np.cbrt(l), np.cbrt(m), np.cbrt(s)
+    return np.stack([0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
+                     1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
+                     0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s], axis=-1)
+
+
+def _oklab_to_srgb(lab):
+    lab = np.asarray(lab, dtype=F)
+    L, a, b = lab[..., 0], lab[..., 1], lab[..., 2]
+    l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3
+    m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3
+    s = (L - 0.0894841775 * a - 1.2914855480 * b) ** 3
+    lin = np.stack([+4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+                    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+                    -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s], axis=-1)
+    lin = np.clip(lin, 0, None)
+    return np.clip(np.where(lin > 0.0031308, 1.055 * lin ** (1 / 2.4) - 0.055, 12.92 * lin), 0, 1)
+
+
+def pull_to_stock(rgb, stock, pull, roles=("core",), gate=None):
+    """Pull colors toward the nearest stock pigment in Oklab, VALUE-PRESERVING: lightness
+    carries form and lighting; hue/chroma are where the palette lives. `gate` (same spatial
+    shape) scales pull locally — e.g. the emphasis buffer unlocking accent pigments.
+    Invariant #8 applies: at high pull on smooth fields, callers must gate or soften."""
+    if stock is None or pull <= 0:
+        return rgb
+    pigs = [p for r in roles for p in stock.get(r, [])]
+    if not pigs:
+        return rgb
+    lab = _srgb_to_oklab(rgb)
+    plab = _srgb_to_oklab(np.array(pigs, dtype=F))                # (K, 3)
+    d = ((lab[..., None, 1] - plab[None, :, 1]) ** 2
+         + (lab[..., None, 2] - plab[None, :, 2]) ** 2
+         + 0.25 * (lab[..., None, 0] - plab[None, :, 0]) ** 2)    # chroma-weighted distance
+    near = plab[np.argmin(d, axis=-1)]
+    k = np.full(lab.shape[:-1], pull, F) if gate is None else np.clip(pull * gate, 0, 1).astype(F)
+    lab2 = lab.copy()
+    lab2[..., 1] = lab[..., 1] * (1 - k) + near[..., 1] * k
+    lab2[..., 2] = lab[..., 2] * (1 - k) + near[..., 2] * k
+    lab2[..., 0] = lab[..., 0] + (near[..., 0] - lab[..., 0]) * k * 0.08     # L barely moves
+    return _oklab_to_srgb(lab2).astype(F)
+
+
+def pull_one(c, stock, pull, roles=("core",)):
+    """Tuple-in, tuple-out pull for per-stroke color paths (vangogh's jitter walk)."""
+    if stock is None or pull <= 0:
+        return c
+    return tuple(pull_to_stock(np.array(c, dtype=F)[None], stock, pull, roles)[0])
+
+
+# Each engine's binding table: knob → what it moves (declarative, printable via
+# `python styles.py bindings`). An empty row is a documented shrug.
+BINDINGS = {
+    "vangogh": {
+        "edge":   "region-stop ↔ trespass (strokes may cross silhouettes when edge < 0.25)",
+        "focus":  "vortex gain 0.3→1.7; emphasis protection + contrast boost scale",
+        "order":  "coherence bias ±0.25; curl contribution; stroke jitter",
+        "chroma": "stroke saturation boost 1.0→1.65",
+        "weight": "sky stroke length 0.4→1.4×; curl contribution",
+        "pull":   "per-stroke color jitter walks toward the nearest stock pigment",
+    },
+    "watercolor": {
+        "edge":   "bleed displacement 27→3 px; wash-edge wander; mask blur; rim-pool tightness+darkness; reserved boundary lines (gated > 0.35)",
+        "focus":  "gain on emphasis: local bleed resistance + the true-color glaze",
+        "order":  "wash-edge wander share; back-run bloom count 9→2",
+        "chroma": "wet-plate saturation 1.2→2.0",
+        "weight": "glaze opacity + band depth",
+        "pull":   "wet-plate pigments mix within the stock's gamut (accent gated on emphasis)",
+    },
+    "comic": {
+        "edge":   "ink alpha + presence; crease sensitivity; material-seam ink (off < 0.25)",
+        "focus":  "the grade: off-focus chroma −72%, value compression; on-focus sat/light pop; Ben-Day gating",
+        "order":  "print registration: ink offset up to 2.5 px at low order; dot lattice regularity",
+        "chroma": "saturation chips 2→5 + boost",
+        "weight": "cel band count 6→3 (chunkier); line thickness",
+        "pull":   "quantizer chips pull to the stock — literal screen-print inks at 1.0",
+    },
+    "monet": {
+        "edge":   "lost-edge sampling σ 13→3 px",
+        "focus":  "—",
+        "order":  "—",
+        "chroma": "broken-color probability 0.1→0.5",
+        "weight": "dab size 0.7→1.5×",
+        "pull":   "dab colors pull toward the stock",
+    },
+    "sketch": {
+        "edge":   "contour pass density",
+        "focus":  "—",
+        "order":  "hatch wobble 3.2→0.4",
+        "chroma": "— (ink is ink)",
+        "weight": "hatch period 1.4→0.7×",
+        "pull":   "—",
+    },
+    "picasso": {
+        "edge":   "INVERTED: fracture site count 18→70 — more assertion, more fracture; inverting boundary logic is this engine's identity",
+        "focus":  "—",
+        "order":  "—",
+        "chroma": "palette keep-fraction",
+        "weight": "—",
+        "pull":   "facet tones snap toward the stock",
+    },
+}
+
+
+def resolve_knobs(register=None, **overrides):
+    """Preset (knob-space register) + explicit overrides → a full knob dict."""
+    k = dict(KNOBS)
+    if register:
+        k.update(REGISTERS.get(register, {}))
+    k.update({n: float(v) for n, v in overrides.items() if n in KNOBS})
+    return k
+
+
+def unbake_vignette(v, W):
+    """The framer bakes an oval vignette into every card. Engines that BAND or QUANTIZE
+    luminance read that radial gradient as scene structure (a giant amoeba wash, a hard
+    grey oval cel). Estimate the low-frequency field, divide it out, hand it back so the
+    engine can re-apply the frame mood AFTER its value logic."""
+    est = np.asarray(Image.fromarray((np.clip(v, 0, 1) * 255).astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(W * 0.22)), dtype=F) / 255
+    est = np.maximum(est, 0.06)
+    flat = np.clip(v * (est.mean() / est), 0, 1)
+    return flat, est / est.mean()
 
 
 def form_angle(nrm, rng, h, w):
@@ -100,17 +326,21 @@ def curved_stroke(draw, x, y, ang_field, length, width, color, w, h, curl=0.0, s
 
 
 # ── VAN GOGH: curved impasto strokes; the sky gets vortices ──────────────────
+# Bindings (see BINDINGS["vangogh"]): the old VICO axis table is recovered from the
+# knob-space REGISTERS presets through these mappings.
 
-VICO = {
-    # sky_len, sky_curl, chroma, subj_coh_bias, trespass (strokes may cross silhouettes)
-    "gods":    dict(sky_len=1.35, curl=0.34, chroma=1.55, coh_bias=+0.10, trespass=False, vort_gain=1.3),
-    "heroes":  dict(sky_len=1.00, curl=0.30, chroma=1.50, coh_bias=0.00, trespass=False, vort_gain=1.0),
-    "men":     dict(sky_len=0.45, curl=0.06, chroma=1.12, coh_bias=+0.05, trespass=False, vort_gain=0.45),
-    "ricorso": dict(sky_len=1.10, curl=0.42, chroma=1.35, coh_bias=-0.30, trespass=True, vort_gain=1.0),
-}
+def _vg_axes(K):
+    return dict(
+        vort_gain=0.3 + K["focus"] * 1.4,
+        coh_bias=(K["order"] - 0.6) * 0.66,
+        trespass=K["edge"] < 0.25,
+        sky_len=0.4 + K["weight"] * 1.0,
+        sky_curl=0.05 + K["weight"] * 0.25 + (1 - K["order"]) * 0.25,
+        chroma=1.0 + K["chroma"] * 0.65,
+    )
 
 
-def vangogh(img, region, nrm, w, h, rng, mist=None, vortices=None, flow=None, flowmask=None, stars=None, coherence=None, age=None, register_name="heroes", depth=None, emphasis=None):
+def vangogh(img, region, nrm, w, h, rng, mist=None, vortices=None, flow=None, flowmask=None, stars=None, coherence=None, age=None, register_name="heroes", depth=None, emphasis=None, knobs=None, stock=None):
     S = 3
     W, H = w * S, h * S
     base = Image.fromarray((np.clip(img * 0.75, 0, 1) * 255).astype(np.uint8)).resize((W, H), Image.LANCZOS)
@@ -122,7 +352,12 @@ def vangogh(img, region, nrm, w, h, rng, mist=None, vortices=None, flow=None, fl
     form = form_angle(nrmbig, rng, H, W)
     # sky field: swirls centered on the STORY's points of energy, summed as direction VECTORS
     # (summing angles kinks the field; summing vectors gives counter-rotation a smooth saddle)
-    R = VICO.get(register_name, VICO["heroes"])
+    K = knobs or resolve_knobs(register_name)
+    R = _vg_axes(K)
+
+    def jc(cf, **kw):
+        # the color-jitter walk, palette-aware: it drifts toward the nearest stock pigment
+        return jitter_color(pull_one(tuple(np.clip(cf, 0, 1)), stock, K["pull"]), rng, **kw)
     if vortices is None:
         vortices = ((0.30, 0.18, 1), (0.78, 0.34, -1))
     yy, xx = np.mgrid[0:H, 0:W].astype(F)
@@ -199,7 +434,7 @@ def vangogh(img, region, nrm, w, h, rng, mist=None, vortices=None, flow=None, fl
         if mv > 0.10 and rng.random() < mv * 1.6:
             # fog participates in proportion to its local density: wisps, not a blanket
             ang, length, width, curl = ground_ang, (18 + 60 * mv) * (0.7 + 0.6 * rng.random()), 3, 0.02
-            col = jitter_color(np.clip(c * 1.05 + 0.02, 0, 1), rng, dh=0.008, ds=0.02, dv=0.04, boost_s=0.8)
+            col = jc(np.clip(c * 1.05 + 0.02, 0, 1), dh=0.008, ds=0.02, dv=0.04, boost_s=0.8)
             col = col + (int(80 + 130 * mv),)
             dkr = tuple(int(v * 0.8) for v in col[:3]) + (int(50 * mv),)
             lit = tuple(min(255, int(v * 1.1)) for v in col[:3]) + (int(60 * mv),)
@@ -208,11 +443,11 @@ def vangogh(img, region, nrm, w, h, rng, mist=None, vortices=None, flow=None, fl
             curved_stroke(draw, x, y, ang, length, width, col, W, H, curl)
             continue
         if r == 0:
-            ang, length, width, curl = sky_ang, 30 + 26 * rng.random(), 5, 0.30
-            col = jitter_color(c, rng, dh=0.02, ds=0.05, dv=0.06, boost_s=1.5)
+            ang, length, width, curl = sky_ang, (30 + 26 * rng.random()) * R["sky_len"], 5, R["sky_curl"]
+            col = jc(c, dh=0.02, ds=0.05, dv=0.06, boost_s=R["chroma"])
         elif r == 1:
             ang, length, width, curl = ground_ang, 26 + 18 * rng.random(), 5, 0.05
-            col = jitter_color(c, rng, dh=0.015, ds=0.04, dv=0.05, boost_s=1.3)
+            col = jc(c, dh=0.015, ds=0.04, dv=0.05, boost_s=R["chroma"] * 0.87)
         else:
             if fmaskbig is not None and fmaskbig[y, x] > 0.5:
                 coh = np.clip((cohbig[y, x] if cohbig is not None else 0.75) + R["coh_bias"], 0.05, 1.0)
@@ -229,7 +464,7 @@ def vangogh(img, region, nrm, w, h, rng, mist=None, vortices=None, flow=None, fl
                     draw.ellipse([x - 3, y - 3, x + 3, y + 3], fill=lc)
             else:
                 ang, length, width, curl = form, 12 + 10 * rng.random(), 4, 0.10
-            col = jitter_color(c, rng, dh=0.018, ds=0.05, dv=0.07, boost_s=1.45)
+            col = jc(c, dh=0.018, ds=0.05, dv=0.07, boost_s=R["chroma"] * 0.96)
         if R["trespass"] and r == 2:
             home = None                      # ricorso: the world melts through its own boundaries
         if depth_scale_big is not None and r != 0:
@@ -241,7 +476,7 @@ def vangogh(img, region, nrm, w, h, rng, mist=None, vortices=None, flow=None, fl
             home = 7                       # emphasized pixels are their own protected region
             length *= 0.65
             width = max(1, width - 1)
-            col = jitter_color(arr[y, x], rng, dh=0.008, ds=0.03, dv=0.03, boost_s=1.5)
+            col = jc(arr[y, x], dh=0.008, ds=0.03, dv=0.03, boost_s=R["chroma"])
         if depth_scale_big is not None and r != 0:
             pass
         regmap = regbig_emph if embig is not None else (regbig if home is not None else None)
@@ -270,7 +505,11 @@ def vangogh(img, region, nrm, w, h, rng, mist=None, vortices=None, flow=None, fl
 
 # ── MONET: broken color, lost edges, atmosphere ──────────────────────────────
 
-def monet(img, region, nrm, w, h, rng):
+def monet(img, region, nrm, w, h, rng, knobs=None, stock=None):
+    K = dict(knobs or KNOBS)
+    lost_sigma = 3 + (1 - K["edge"]) * 10          # edge: how far edges melt
+    broken_p = 0.1 + K["chroma"] * 0.4             # chroma: broken-color probability
+    dab_k = 0.7 + K["weight"] * 0.8                # weight: dab size
     S = 3
     W, H = w * S, h * S
     soft = Image.fromarray((img * 255).astype(np.uint8)).resize((W, H), Image.LANCZOS).filter(ImageFilter.GaussianBlur(5))
@@ -285,16 +524,17 @@ def monet(img, region, nrm, w, h, rng):
     for i in range(n):
         x, y = int(xs[i]), int(ys[i])
         # lost edges: sample color from a slightly displaced point (edges melt)
-        sx = int(np.clip(x + rng.normal(0, 7), 0, W - 1))
-        sy = int(np.clip(y + rng.normal(0, 7), 0, H - 1))
+        sx = int(np.clip(x + rng.normal(0, lost_sigma), 0, W - 1))
+        sy = int(np.clip(y + rng.normal(0, lost_sigma), 0, H - 1))
         c = arr[sy, sx]
         lt = lum[y, x]
         # broken color: cool lavender dabs in light, warm dabs in shadow
-        if rng.random() < 0.30:
+        if rng.random() < broken_p:
             shift = np.array([0.05, 0.02, 0.14]) if lt > 0.45 else np.array([0.10, 0.02, -0.05])
             c = np.clip(c + shift * (0.5 + rng.random()), 0, 1)
-        col = jitter_color(c, rng, dh=0.03, ds=0.06, dv=0.05, boost_s=1.1)
-        rx = 7 + 9 * rng.random() + (4 if regbig[y, x] == 0 else 0)
+        col = jitter_color(pull_one(tuple(np.clip(c, 0, 1)), stock, K["pull"]), rng,
+                           dh=0.03, ds=0.06, dv=0.05, boost_s=1.1)
+        rx = (7 + 9 * rng.random() + (4 if regbig[y, x] == 0 else 0)) * dab_k
         ry = rx * (0.5 + 0.3 * rng.random())
         a = rng.random() * np.pi
         # a dab: small rotated ellipse via short fat line
@@ -308,8 +548,11 @@ def monet(img, region, nrm, w, h, rng):
 
 # ── PICASSO (analytic-cubist gesture): faceted planes, shifted, contoured ───
 
-def picasso(img, region, nrm, w, h, rng):
-    n_sites = 42
+def picasso(img, region, nrm, w, h, rng, knobs=None, stock=None):
+    K = dict(knobs or KNOBS)
+    # edge binds INVERTED here: more assertion, more fracture — inverting boundary
+    # logic is this engine's identity (CONTROL_PLANE 4.3)
+    n_sites = 18 + int(K["edge"] * 60)
     # sites: subject silhouette + interior + a few in the field
     edge = (np.abs(np.diff(region.astype(F), axis=0, prepend=0)) + np.abs(np.diff(region.astype(F), axis=1, prepend=0))) > 0
     ey, ex = np.where(edge)
@@ -341,8 +584,10 @@ def picasso(img, region, nrm, w, h, rng):
         # snap to nearest palette tone but keep 35% of the true color
         pi = np.argmin(((pal - mean_c[None]) ** 2).sum(axis=1))
         cell_reg = region[int(sites[i][1]) if sites[i][1] < h else h - 1, int(sites[i][0]) if sites[i][0] < w else w - 1]
-        keep = 0.78 if cell_reg == 2 else 0.25
+        keep = (0.4 + K["chroma"] * 0.6) if cell_reg == 2 else 0.25
         tone = pal[pi] * (1 - keep) + mean_c * keep
+        if stock is not None and K["pull"] > 0:
+            tone = np.array(pull_one(tuple(tone), stock, K["pull"]), F)
         grad = 0.85 + 0.3 * ((xx[cell] - sites[i][0]) / (w * 0.6))
         out[cell] = tone[None, :] * grad[:, None]
     out[border] *= 0.25
@@ -364,7 +609,10 @@ def picasso(img, region, nrm, w, h, rng):
 
 # ── NATURALIST SKETCH: ink contours + tonal hatching on paper ────────────────
 
-def sketch(img, region, nrm, w, h, rng):
+def sketch(img, region, nrm, w, h, rng, knobs=None, stock=None):
+    K = dict(knobs or KNOBS)
+    per_k = 1.4 - K["weight"] * 0.8                # weight: hatch density
+    wob_amp = 4.0 * (1 - K["order"])               # order: pen steadiness
     S = 2
     W, H = w * S, h * S
     lum = np.asarray(Image.fromarray((((img @ np.array([0.299, 0.587, 0.114], F))) * 255).astype(np.uint8)).resize((W, H), Image.LANCZOS), dtype=F) / 255
@@ -379,8 +627,8 @@ def sketch(img, region, nrm, w, h, rng):
     subj = regbig == 2
 
     def hatch(angle, period, duty):
-        ph = (xx * np.cos(angle) + yy * np.sin(angle)) / period
-        wob = value_noise(H, W, 30, rng) * 1.6
+        ph = (xx * np.cos(angle) + yy * np.sin(angle)) / (period * per_k)
+        wob = value_noise(H, W, 30, rng) * wob_amp
         return ((ph + wob) % 1.0) < duty
 
     # tone bands (subject only): light→sparse, dark→cross-hatch
@@ -399,95 +647,341 @@ def sketch(img, region, nrm, w, h, rng):
     order = np.argsort(eyy * W + exx)
     pts = list(zip(exx[order].tolist(), eyy[order].tolist()))
     inkt = tuple(int(v * 255) for v in ink)
-    for (px, py) in pts[:: 2]:
+    for (px, py) in pts[:: max(1, 3 - int(K["edge"] * 2))]:
         j = rng.normal(0, 0.7, 4)
         dr.line([(px + j[0] - 1, py + j[1]), (px + j[2] + 1, py + j[3])], fill=inkt + (200,), width=2)
     return im.resize((w, h), Image.LANCZOS)
 
 
-# ── WATERCOLOR: displaced washes, pooled edges, blooms, reserved paper ───────
+# ── WATERCOLOR v2: layered glazes with a BOUNDARY-CLARITY knob ───────────────
+#
+# clarity ∈ [0,1] is the ONE knob: how much shapes keep their identity.
+#   1.0 → glazed hard-edge watercolor: washes end where objects end, pigment pools in a
+#         tight dark rim at the true boundary, thin reserved-paper lines separate objects.
+#   0.0 → wet-in-wet: color is sampled through a displacement field so it bleeds across
+#         boundaries, wash edges wander, rims soften, blooms multiply. Objects are implied.
+# Emphasis is honored as LOCAL clarity: the emphasized thing stays crisp in a soft world.
 
-def watercolor(img, region, nrm, w, h, rng):
+def watercolor(img, region, nrm, w, h, rng, depth=None, emphasis=None, mat=None,
+               knobs=None, stock=None, clarity=None):
     S = 2
     W, H = w * S, h * S
-    arr = np.asarray(Image.fromarray((img * 255).astype(np.uint8)).resize((W, H), Image.LANCZOS), dtype=F) / 255
+    K = dict(knobs or KNOBS)
+    if clarity is not None:                       # back-compat: clarity was edge's maiden name
+        K["edge"] = float(clarity)
+    edge = float(np.clip(K["edge"], 0, 1))
+    arr = np.stack([upN(img[..., i], W, H) for i in range(3)], axis=-1)
     regbig = np.asarray(Image.fromarray(region.astype(np.uint8)).resize((W, H), Image.NEAREST))
-    lum = arr @ np.array([0.299, 0.587, 0.114], F)
-
-    paper = np.array([0.96, 0.94, 0.88], F)
-    grain = value_noise(H, W, 4, rng)
-    out = paper[None, None] * (1 - grain[..., None] * 0.05)
-
-    # displaced region masks → washes, 3 tone layers per region (multiply blending)
-    for reg, tones in ((0, [0.75]), (1, [0.6, 0.35]), (2, [0.8, 0.5, 0.28])):
-        base_m = (regbig == reg).astype(F)
-        for li, tcut in enumerate(tones):
-            m = base_m * (lum < tcut if reg == 2 else np.ones_like(lum))
-            if reg != 2:
-                m = base_m * (lum < (tcut + 0.2))
-            disp = (value_noise(H, W, 26 + li * 9, rng) - 0.5) * 26
-            ys2 = np.clip(np.mgrid[0:H, 0:W][0] + disp, 0, H - 1).astype(int)
-            xs2 = np.clip(np.mgrid[0:H, 0:W][1] + disp.T[:H, :W] if disp.T.shape == (H, W) else np.mgrid[0:H, 0:W][1] + disp, 0, W - 1).astype(int)
-            md = m[ys2, xs2]
-            md = np.asarray(Image.fromarray((md * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(2)), dtype=F) / 255
-            wash_m = (md > 0.5).astype(F)
-            # pigment = regional mean color, lightened per layer
-            sel = md > 0.5
-            if not sel.any():
-                continue
-            band_sel = sel & (regbig == reg)
-            pig = arr[band_sel].mean(axis=0) if band_sel.any() else arr[sel].mean(axis=0)
-            import colorsys
-            hh, ss, vv = colorsys.rgb_to_hsv(*np.clip(pig, 0, 1))
-            pig = np.array(colorsys.hsv_to_rgb(hh, min(1, ss * 1.6), vv), F)
-            pig = 1 - (1 - pig) * (0.6 + 0.25 * li)
-            # edge pooling: darker rim just inside the wash
-            inner = np.asarray(Image.fromarray((wash_m * 255).astype(np.uint8)).filter(ImageFilter.MinFilter(7)), dtype=F) / 255
-            rim = np.clip(wash_m - inner, 0, 1)
-            layer = pig[None, None] * wash_m[..., None]
-            out = out * (1 - wash_m[..., None] * 0.72) + out * layer * 0.72
-            out *= 1 - rim[..., None] * 0.18
-    # reserved paper for the brightest highlights
-    hi = (lum > 0.82).astype(F)
-    hi = np.asarray(Image.fromarray((hi * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(3)), dtype=F) / 255
-    out = out * (1 - hi[..., None]) + paper[None, None] * hi[..., None]
-    # blooms
+    matbig = np.asarray(Image.fromarray((mat if mat is not None else region).astype(np.uint8)).resize((W, H), Image.NEAREST))
     yy, xx = np.mgrid[0:H, 0:W].astype(F)
+
+    # the wet plate: colors sampled through a displacement field — bleed grows as edge falls
+    amp = 3.0 + (1.0 - edge) * 24.0
+    dxf = (value_noise(H, W, 34, rng) - 0.5) * 2 * amp
+    dyf = (value_noise(H, W, 41, rng) - 0.5) * 2 * amp
+    embig = None
+    if emphasis is not None and emphasis.max() > 0:
+        embig = upN(emphasis, W, H, Image.NEAREST)
+        # focus = how strongly the emphasized thing resists the bleed
+        keep = np.clip(embig * (0.6 + 1.6 * K["focus"]), 0, 1)
+        dxf *= (1 - keep)
+        dyf *= (1 - keep)
+    ys2 = np.clip(yy + dyf, 0, H - 1).astype(np.int32)
+    xs2 = np.clip(xx + dxf, 0, W - 1).astype(np.int32)
+    wet = arr[ys2, xs2]
+    blur_r = 1.5 + (1.0 - edge) * 4.5
+    wet = np.stack([np.asarray(Image.fromarray((wet[..., i] * 255).astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(blur_r)), dtype=F) / 255 for i in range(3)], axis=-1)
+    hh, ss, vv = hsv_of(wet)
+    wet = rgb_of(hh, np.clip(ss * (1.2 + K["chroma"] * 0.8), 0, 1), np.clip(vv * 1.06, 0, 1))
+    if stock is not None and K["pull"] > 0:
+        # pigments mix within the stock's gamut; accent unlocks where the stager pointed
+        wet = pull_to_stock(wet, stock, K["pull"], roles=("core", "dark", "light"))
+        if embig is not None and "accent" in stock:
+            wet = pull_to_stock(wet, stock, K["pull"], roles=("accent",), gate=embig)
+    raw_lum = wet @ np.array([0.299, 0.587, 0.114], F)
+    # band on VIGNETTE-FLATTENED luminance or the washes chase the frame's oval, not the scene
+    lum, vig = unbake_vignette(raw_lum, W)
+
+    paper = np.array([0.965, 0.945, 0.895], F)
+    fiber = value_noise(H, W, 3, rng)
+    out = paper[None, None] * (1 - fiber[..., None] * 0.03)
+
+    # the sky is ONE wash (banding a smooth gradient invents shapes that aren't there)
+    skym = np.asarray(Image.fromarray(((regbig == 0) * 255).astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(1.5 + (1 - edge) * 3)), dtype=F) / 255
+    sky_pig = 1 - (1 - wet) * 0.62
+    out = out * (1 - skym[..., None] * 0.8) + out * sky_pig * skym[..., None] * 0.8
+
+    # base wash over ALL land: everything gets pigment before the bands deepen it — bare
+    # paper is a decision reserved for true highlights, never a gap in coverage
+    gm = np.asarray(Image.fromarray(((regbig > 0) * 255).astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(1.2 + (1 - edge) * 2.5)), dtype=F) / 255
+    base_pig = 1 - (1 - wet) * 0.52
+    base_op = 0.65 + K["weight"] * 0.25
+    out = out * (1 - gm[..., None] * base_op) + out * base_pig * gm[..., None] * base_op
+
+    # GROUND: soft continuous glazes that follow the real value gradient. Thresholding a
+    # smooth haze-lit ground invents contour-map amoebas; a ramp cannot.
+    scene_l = lum[regbig > 0]
+    g_bands = np.percentile(scene_l, (65, 38)) if scene_l.size else np.array((0.6, 0.4))
+    for li, tcut in enumerate(g_bands):
+        ramp = np.clip((tcut - lum) * 6.0, 0, 1) * (regbig > 0)
+        ramp = np.asarray(Image.fromarray((ramp * 255).astype(np.uint8)).filter(
+            ImageFilter.GaussianBlur(1.5 + (1 - edge) * 2.0)), dtype=F) / 255
+        pig = 1 - (1 - wet) * (0.58 + 0.12 * li)
+        g_op = 0.5 + K["weight"] * 0.2
+        out = out * (1 - ramp[..., None] * g_op) + out * pig * ramp[..., None] * g_op
+
+    # SUBJECTS: banded, displaced, rim-pooled washes — structure is real there, so hard
+    # wash edges carry information instead of inventing it
+    subj_l = lum[regbig == 2]
+    s_bands = np.percentile(subj_l, (72, 46, 22)) if subj_l.size else np.array((0.6, 0.42, 0.25))
+    for li, tcut in enumerate(s_bands):
+        m = ((lum < tcut) & (regbig == 2)).astype(F)
+        edge_amp = 1.0 + (1.0 - edge) * 5.0 + (1.0 - K["order"]) * 4.0
+        dd = (value_noise(H, W, 23 + 7 * li, rng) - 0.5) * 2 * edge_amp
+        my = np.clip(yy + dd, 0, H - 1).astype(np.int32)
+        mx_ = np.clip(xx + dd.T[:H, :W] if dd.T.shape == (H, W) else xx + dd, 0, W - 1).astype(np.int32)
+        m = m[my, mx_]
+        m = np.asarray(Image.fromarray((m * 255).astype(np.uint8)).filter(
+            ImageFilter.GaussianBlur(1.0 + (1 - edge) * 2.5)), dtype=F) / 255
+        wash = (m > 0.5).astype(F)
+        pig = 1 - (1 - wet) * (0.42 + K["weight"] * 0.16 + 0.13 * li)   # deeper bands glaze darker
+        s_op = 0.6 + K["weight"] * 0.2
+        out = out * (1 - wash[..., None] * s_op) + out * pig * wash[..., None] * s_op
+        # pigment pools at the wash edge: tight and dark when crisp, soft when wet
+        pool_px = int(3 + edge * 4) | 1
+        inner = np.asarray(Image.fromarray((wash * 255).astype(np.uint8)).filter(
+            ImageFilter.MinFilter(pool_px)), dtype=F) / 255
+        rim = np.clip(wash - inner, 0, 1)
+        out *= 1 - rim[..., None] * (0.06 + edge * 0.16)
+
+    # object boundaries: at high clarity the paper shows through in a thin reserved line
+    if edge > 0.35:
+        bound = (np.abs(np.diff(regbig.astype(F), axis=0, prepend=0))
+                 + np.abs(np.diff(regbig.astype(F), axis=1, prepend=0))
+                 + np.abs(np.diff(matbig, axis=0, prepend=0))
+                 + np.abs(np.diff(matbig, axis=1, prepend=0))) > 0
+        bnd = np.asarray(Image.fromarray((bound * 255).astype(np.uint8)).filter(
+            ImageFilter.GaussianBlur(0.6)), dtype=F) / 255
+        res = np.clip(bnd * (edge - 0.35) / 0.65, 0, 1) * 0.5
+        out = out * (1 - res[..., None]) + paper[None, None] * res[..., None]
+
+    # depth dilution: the far city thins toward the paper (watercolor's own aerial perspective)
+    if depth is not None:
+        d = np.where(depth > 1e5, np.nan, depth)
+        if (region > 0).any():
+            d_ref = np.nanpercentile(d[region > 0], 25)
+            dil = np.clip(1 - d_ref / np.maximum(np.nan_to_num(d, nan=d_ref), 1e-3), 0, 1) * 0.35
+            dilbig = upN(dil, W, H)
+            out = out * (1 - dilbig[..., None]) + paper[None, None] * dilbig[..., None] * 0.985
+
+    # reserved paper for TRUE highlights — adaptive: only the scene's top few percent may
+    # reserve, or a bright haze-lit foreground turns into acres of white amoeba
+    hi_t = max(0.84, float(np.percentile(raw_lum, 96.5)))
+    hi = np.asarray(Image.fromarray(((raw_lum > hi_t) * 255).astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(2.5)), dtype=F) / 255
+    out = out * (1 - hi[..., None] * 0.9) + paper[None, None] * hi[..., None] * 0.9
+
+    # subjects keep their identity: one true-color glaze so figures don't dissolve into bands
+    subj = np.asarray(Image.fromarray(((regbig == 2) * 255).astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(1.2)), dtype=F) / 255
+    sg = subj[..., None] * (0.3 + 0.25 * edge)
+    out = out * (1 - sg) + out * (1 - (1 - arr) * 0.7) * sg
+
+    # granulation settles into the darks; blooms multiply as the sheet gets wetter
+    gran = value_noise(H, W, 2, rng)
+    out *= 1 - (gran[..., None] - 0.5) * np.clip(0.55 - lum, 0, 1)[..., None] * 0.22
     sub_ys, sub_xs = np.where(regbig > 0)
-    for _ in range(4):
-        bi = rng.integers(0, len(sub_xs))
-        bx, by, br = int(sub_xs[bi]), int(sub_ys[bi]), 14 + rng.random() * 30
-        d = np.sqrt((xx - bx) ** 2 + (yy - by) ** 2)
-        ring = np.exp(-((d - br) / 5.5) ** 2) * 0.10
-        core = np.clip(1 - d / br, 0, 1) * 0.08
-        out = np.clip(out + core[..., None] - ring[..., None] * 0.6, 0, 1)
+    if len(sub_xs):
+        for _ in range(2 + int((1 - K["order"]) * 7)):
+            bi = rng.integers(0, len(sub_xs))
+            bx, by, br = int(sub_xs[bi]), int(sub_ys[bi]), 12 + rng.random() * 34
+            d2 = np.sqrt((xx - bx) ** 2 + (yy - by) ** 2)
+            ring = np.exp(-((d2 - br) / 5.0) ** 2) * 0.09
+            core = np.clip(1 - d2 / br, 0, 1) * 0.07
+            out = np.clip(out + core[..., None] - ring[..., None] * 0.55, 0, 1)
+    if embig is not None:
+        # the focused thing gets one extra true-color glaze — crisp in the soft world
+        gl = np.clip(embig, 0, 1)[..., None] * (0.25 + K["focus"] * 0.35)
+        out = out * (1 - gl) + out * (1 - (1 - arr) * 0.55) * gl
+    # re-apply the frame mood gently — a watercolor page carries its vignette in dilution
+    out *= (1 + (vig[..., None] - 1) * 0.35)
     out = np.clip(out, 0, 1)
     return Image.fromarray((out * 255).astype(np.uint8)).resize((w, h), Image.LANCZOS)
 
 
-STYLES = {"vangogh": vangogh, "monet": monet, "picasso": picasso, "sketch": sketch, "watercolor": watercolor}
+# ── COMIC: cel-quantized color, depth-weighted ink, a FOCUS knob ─────────────
+#
+# focus ∈ [0,1] is the ONE knob: how strongly the frame grades attention.
+#   0.0 → flat democracy: everything equally saturated and lit, an even Sunday-strip page.
+#   1.0 → hard cinematic grade: the focused subject holds full chroma and value while the
+#         rest of the frame desaturates toward a muted key and compresses toward mid-tone;
+#         Ben-Day dots creep into the unfocused shadows.
+# The focus FIELD comes from the emphasis buffer when the stager set one; otherwise the
+# subject region (blurred) stands in — subjects focused, world behind them graded down.
+
+def comic(img, region, nrm, w, h, rng, depth=None, emphasis=None, mat=None,
+          knobs=None, stock=None, focus=None):
+    S = 2
+    W, H = w * S, h * S
+    K = dict(knobs or KNOBS)
+    if focus is not None:                          # back-compat: focus predates the knob dict
+        K["focus"] = float(focus)
+    focus = float(np.clip(K["focus"], 0, 1))
+    arr = np.stack([upN(img[..., i], W, H) for i in range(3)], axis=-1)
+    # flatten local texture so the quantization reads as CELS, not noise
+    arr = np.stack([np.asarray(Image.fromarray((arr[..., i] * 255).astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(2.2)), dtype=F) / 255 for i in range(3)], axis=-1)
+    regbig = np.asarray(Image.fromarray(region.astype(np.uint8)).resize((W, H), Image.NEAREST))
+    matbig = np.asarray(Image.fromarray((mat if mat is not None else region).astype(np.uint8)).resize((W, H), Image.NEAREST))
+    nrmbig = np.stack([upN(nrm[..., i], W, H, lo=-1.0, hi=1.0) for i in range(3)], axis=-1)
+
+    # cel quantization: value snaps to bands, saturation to three chips, hue survives intact.
+    # Quantize VIGNETTE-FLATTENED value or the frame's oval becomes a hard grey cel.
+    hh, ss, vv = hsv_of(arr)
+    vflat, vig = unbake_vignette(vv, W)
+    nb = 3 + int(round((1 - K["weight"]) * 3))          # weight: chunkier cels = fewer bands
+    v_edges = np.linspace(0.15, 0.90, nb - 1).astype(F)
+    v_mids = np.linspace(0.10, 0.96, nb).astype(F)
+    vq = v_mids[np.digitize(vflat, v_edges)]
+    # the sky is ONE cel: banding a smooth gradient leaves a jagged quantization seam where
+    # the vignette estimate under-corrects the corners
+    if (regbig == 0).any():
+        sky_chip = v_mids[np.digitize(np.median(vflat[regbig == 0]), v_edges)]
+        vq = np.where(regbig == 0, sky_chip, vq)
+    vq_scene = vq.copy()                       # pre-grade scene bands: true shadows live here
+    chips = 2 + int(round(K["chroma"] * 3))            # chroma: 2..5 saturation chips + boost
+    sq = np.round(np.clip(ss * (1.1 + K["chroma"] * 0.5), 0, 1) * (chips - 1)) / (chips - 1)
+    # the focus field
+    if emphasis is not None and emphasis.max() > 0:
+        fld = upN(emphasis, W, H, Image.NEAREST)
+        fld = np.asarray(Image.fromarray((np.clip(fld, 0, 1) * 255).astype(np.uint8)).filter(
+            ImageFilter.GaussianBlur(6)), dtype=F) / 255
+    else:
+        fld = np.asarray(Image.fromarray(((regbig == 2) * 255).astype(np.uint8)).filter(
+            ImageFilter.GaussianBlur(18)), dtype=F) / 255
+    fld = np.clip(fld * 1.5, 0, 1)
+    # the grade: unfocused loses chroma and compresses toward the page's mid-grey key
+    lose = focus * (1 - fld)
+    sq = sq * (1 - 0.72 * lose)
+    vq = vq * (1 - lose) + (0.58 + (vq - 0.58) * 0.55) * lose
+    # focused pops: one saturation chip up, a touch of light
+    sq = np.clip(sq + fld * focus * 0.18, 0, 1)
+    vq = np.clip(vq + fld * focus * 0.06, 0, 1)
+    out = rgb_of(hh, sq, vq)
+
+    # ink: depth discontinuities + silhouette + material seams + normal creases
+    ink = np.zeros((H, W), bool)
+    ink |= (np.abs(np.diff(regbig.astype(F), axis=0, prepend=0))
+            + np.abs(np.diff(regbig.astype(F), axis=1, prepend=0))) > 0
+    if K["edge"] > 0.25:                                # material-seam ink is an edge assertion
+        ink |= (np.abs(np.diff(matbig, axis=0, prepend=0))
+                + np.abs(np.diff(matbig, axis=1, prepend=0))) > 0.5
+    dbig = None
+    if depth is not None:
+        d = np.where(depth > 1e5, np.nan, depth)
+        d_ref = np.nanpercentile(d[region > 0], 25) if (region > 0).any() else 10.0
+        dn = np.nan_to_num(d, nan=float(np.nanmax(d)) if np.isfinite(np.nanmax(d)) else 1e4)
+        dbig = upN(np.clip(dn / (d_ref * 8), 0, 1), W, H)
+        gy = np.abs(np.diff(dbig, axis=0, prepend=0))
+        gx = np.abs(np.diff(dbig, axis=1, prepend=0))
+        ink |= ((gy + gx) > 0.015) & (regbig > 0)
+    ncre = 1 - np.clip((nrmbig[2:, :, :] * nrmbig[:-2, :, :]).sum(-1), -1, 1)
+    crease = np.zeros((H, W), F)
+    crease[1:-1] = ncre
+    ink |= (crease > (0.75 - K["edge"] * 0.4)) & (regbig == 2)
+    # line weight follows nearness: the close world is drawn heavier
+    inkim = Image.fromarray((ink * 255).astype(np.uint8))
+    heavy = np.asarray(inkim.filter(ImageFilter.MaxFilter(3)), dtype=bool)
+    if dbig is not None:
+        near = dbig < 0.10
+        ink = np.where(near, heavy, ink)
+    else:
+        ink = heavy
+    ink_f = np.asarray(Image.fromarray((ink * 255).astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(0.5)), dtype=F) / 255
+    if K["order"] < 0.6:                                # low order: the print slips register
+        slip = (1 - K["order"]) * 2.5 * S / 2
+        ink_f = np.roll(ink_f, (int(rng.integers(-slip, slip + 1)),
+                                int(rng.integers(-slip, slip + 1))), axis=(0, 1))
+    if stock is not None and K["pull"] > 0:
+        # the chips pull to the stock — literal screen-print inks at pull=1
+        out = pull_to_stock(out, stock, K["pull"], roles=("core", "dark", "light"))
+        if "accent" in stock:
+            out = pull_to_stock(out, stock, K["pull"], roles=("accent",), gate=fld * focus)
+    ink_alpha = min(0.95, 0.6 + K["edge"] * 0.45)
+    INK = np.array([0.105, 0.09, 0.085], F)
+    out = out * (1 - ink_f[..., None] * ink_alpha) + INK[None, None] * ink_f[..., None] * ink_alpha
+
+    # Ben-Day dots settle into the UNFOCUSED shadows — the grade made printable
+    if focus > 0.15:
+        period = 7
+        dotmask = (((np.mgrid[0:H, 0:W][0] % period) - period / 2) ** 2
+                   + ((np.mgrid[0:H, 0:W][1] % period) - period / 2) ** 2) < (period * 0.30) ** 2
+        shadow = (vq_scene < 0.3) & (fld < 0.4) & (regbig > 0)
+        dots = dotmask & shadow
+        out = np.where(dots[..., None], out * 0.72, out)
+
+    # the frame mood returns as a soft printed grade, not a quantized shape
+    out = np.clip(out * 1.05, 0, 1) * (1 + (vig[..., None] - 1) * 0.3)
+    out = np.clip(out, 0, 1)
+    return Image.fromarray((out * 255).astype(np.uint8)).resize((w, h), Image.LANCZOS)
+
+
+STYLES = {"vangogh": vangogh, "monet": monet, "picasso": picasso, "sketch": sketch,
+          "watercolor": watercolor, "comic": comic}
+
+def print_bindings():
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")     # the tables use arrows; cp1252 chokes
+    for engine, table in BINDINGS.items():
+        print(f"\n{engine}")
+        for knob, binding in table.items():
+            print(f"  {knob:<7} {binding}")
+
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "bindings":
+        print_bindings()
+        sys.exit(0)
     img_path, aux_path, style, out_path = sys.argv[1:5]
     seed = int(sys.argv[5]) if len(sys.argv) > 5 else 11
     rng = np.random.default_rng(seed)
     img, region, nrm, extras, w, h = load(img_path, aux_path)
+
+    # split trailing args: key=val tokens are direction (knobs / register / palette / aliases);
+    # bare tokens are vangogh's legacy positional directives (vortices, stars, register)
+    kv, pos = {}, []
+    for tok in sys.argv[6:]:
+        (kv.update([tok.split("=", 1)]) if "=" in tok else pos.append(tok))
+
+    register = kv.pop("register", None)
+    stock = parse_stock(kv.pop("palette", None))
+    if "clarity" in kv:                        # aliases from the knobs' maiden names
+        kv["edge"] = kv.pop("clarity")
+    overrides = {k: v for k, v in kv.items() if k in KNOBS}
+
     kwargs = {}
     if style == "vangogh":
-        kwargs["mist"] = extras["mist"]
-        kwargs["flow"] = extras["flow"]
-        kwargs["flowmask"] = extras["flowmask"]
-        kwargs["coherence"] = extras["coherence"]
-        kwargs["age"] = extras["age"]
+        for name in ("mist", "flow", "flowmask", "coherence", "age", "depth", "emphasis"):
+            kwargs[name] = extras[name]
+        if len(pos) > 0:
+            kwargs["vortices"] = () if pos[0] in ("-", "") else tuple(
+                tuple(float(q) for q in v.split(",")) for v in pos[0].split(";"))
+        if len(pos) > 1 and pos[1] not in ("-", ""):
+            kwargs["stars"] = tuple(tuple(float(q) for q in v.split(",")) for v in pos[1].split(";"))
+        if len(pos) > 2:
+            register = register or pos[2]
+        kwargs["register_name"] = register or "heroes"
+    elif style in ("watercolor", "comic"):
         kwargs["depth"] = extras["depth"]
         kwargs["emphasis"] = extras["emphasis"]
-        if len(sys.argv) > 6:
-            kwargs["vortices"] = () if sys.argv[6] in ("-", "") else tuple(
-                tuple(float(q) for q in v.split(",")) for v in sys.argv[6].split(";"))
-        if len(sys.argv) > 7 and sys.argv[7] not in ("-", ""):
-            kwargs["stars"] = tuple(tuple(float(q) for q in v.split(",")) for v in sys.argv[7].split(";"))
-        if len(sys.argv) > 8:
-            kwargs["register_name"] = sys.argv[8]
+        kwargs["mat"] = extras["mat"]
+
+    kwargs["knobs"] = resolve_knobs(register, **overrides)
+    kwargs["stock"] = stock
     res = STYLES[style](img, region, nrm, w, h, rng, **kwargs)
     res.save(out_path)
     print(out_path)
