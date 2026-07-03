@@ -1,0 +1,27 @@
+{
+  "_comment": "Pigment stocks for the Byrne Journey majors — one per era/album mood. Use as palette=@projects/byrne/byrne_stocks.json#utopia",
+  "utopia": {
+    "core": ["6b7484", "9aa2ae", "4a505e"],
+    "accent": ["5b8fd9"],
+    "dark": ["101014", "1c1d24"],
+    "light": ["e8eaf0"]
+  },
+  "remain": {
+    "core": ["a83226", "d8d5cc", "484a4e"],
+    "accent": ["e04432"],
+    "dark": ["1a1a1c"],
+    "light": ["efece4"]
+  },
+  "nowhere": {
+    "core": ["5e8a4e", "7ea0c8", "8a8276"],
+    "accent": ["f0e6c0"],
+    "dark": ["2e3430"],
+    "light": ["f2f4ea"]
+  },
+  "lifetime": {
+    "core": ["7d94a6", "b8c4cc", "8a8474"],
+    "accent": ["f0dca0"],
+    "dark": ["2a3038"],
+    "light": ["eef0ee"]
+  }
+}
