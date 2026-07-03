@@ -161,6 +161,18 @@
   --font-mono:'Space Mono', ui-monospace, monospace;
 }
 
+[data-theme="deep-time"] {
+  --paper:#0B0A08; --paper-2:#12100C; --card:#181510; --raise:#221E17;
+  --ink:#E9E2D2; --ink-2:#A39B85; --ink-3:#6E6757;
+  --line:rgba(233,226,210,.12); --line-2:rgba(233,226,210,.24);
+  --accent:#C08A4E; --accent-2:#D8A662; --accent-ink:#0B0A08; --accent-wash:rgba(192,138,78,.14);
+  --error:#D2737B; --ok:#6FB59A;
+  --scrim:rgba(4,3,1,.62); --scrim-soft:rgba(4,3,1,.34);
+  --font-display:'Spectral', ui-serif, serif; /* patient, geological serif */
+  --font-body:'Archivo', system-ui, sans-serif;
+  --font-mono:'Space Mono', ui-monospace, monospace;
+}
+
 /* ----------------------------------------------------------------------------
    CARD FRAME COMPATIBILITY ALIASES
    The existing <CardFrame> reads --card-bg / --banner-fg / --banner-title-bg.

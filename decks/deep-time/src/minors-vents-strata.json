@@ -1,0 +1,422 @@
+{
+  "vents-ace": {
+    "name": "Ace of Vents",
+    "number": "1",
+    "slug": "vents-ace",
+    "arcana": "minor",
+    "suit_slug": "vents",
+    "rank_slug": "ace",
+    "meaning": {
+      "upright": "The first breach: a creative force arriving from below, small at the surface but sourced from something bottomless. The conditions were ready before you were -- what emerges now is not your plan but your material, and it is still too hot to shape. Let it arrive.",
+      "inverted": "The spark without the magma column: a beginning that has no source pressure behind it, or a breach opening under a surface that was never made ready. Not every glow is a vent; some are only reflections of wanting one."
+    },
+    "visuals": {
+      "detailed_description": "A night ocean, featureless and dark, except for one point where the black water domes upward and glows from beneath. The first gout of lava meets the sea in a burst of steam-lit orange; the surface all around it softens and shimmers with rising heat. Nothing else in the frame -- one small incandescent arrival in a world of dark water."
+    }
+  },
+  "vents-two": {
+    "name": "Two of Vents",
+    "number": "2",
+    "slug": "vents-two",
+    "arcana": "minor",
+    "suit_slug": "vents",
+    "rank_slug": "two",
+    "meaning": {
+      "upright": "Creation's negotiation with what it touches: at the meeting face, commitment forms instantly -- a skin exact enough to hold, thin enough to let the new keep moving inside it. The contact does not stop the fire; it gives the fire a form in which to continue.",
+      "inverted": "The chilled margin worn as armor: contact sealed so quickly that nothing is exchanged across it. A rind that forms too fast leaves the interior molten and unmet -- committed at the surface, undecided everywhere else."
+    },
+    "visuals": {
+      "detailed_description": "A pillow lava lobe caught mid-formation on the sea floor: its glassy black rind crusting into exact facets precisely where glowing interior meets dark water, the contact line burning like a drawn wire. Through cracks in the older pillows behind it, new lobes bud and swell -- every one of them a fresh negotiation, every rind a signed agreement between fire and sea."
+    }
+  },
+  "vents-three": {
+    "name": "Three of Vents",
+    "number": "3",
+    "slug": "vents-three",
+    "arcana": "minor",
+    "suit_slug": "vents",
+    "rank_slug": "three",
+    "meaning": {
+      "upright": "Creation compounding: each act becomes the ground the next one stands on, and the horizon itself begins to rise. This is the collaboration of successive fires -- no single flow is the mountain, and the mountain is nothing but flows. Keep going; the elevation is real.",
+      "inverted": "Piling higher without spreading the base: growth stacked on growth until the whole young edifice oversteepens. Compounding without design does not make a mountain; it makes a collapse with a schedule."
+    },
+    "visuals": {
+      "detailed_description": "A young shield volcano in cross-section under thin bright air: three great flows visibly lapped one over another, the oldest weathered dull at the base, the newest still darkly fresh at the crest. Long morning shadows rake across the tilted flanks, and the raised horizon line -- higher than yesterday -- is the whole story told in silhouette."
+    }
+  },
+  "vents-four": {
+    "name": "Four of Vents",
+    "number": "4",
+    "slug": "vents-four",
+    "arcana": "minor",
+    "suit_slug": "vents",
+    "rank_slug": "four",
+    "meaning": {
+      "upright": "The eruption become ground: violence cooled into a platform, its origin still legible but domesticated. A foundation is proven by exposure -- rain pools in its hollows, roots test its seams, and it holds. What you made in fire can now be lived on.",
+      "inverted": "The foundation mistaken for the finish: black rock so proud of its hardness that it refuses to weather into soil. A platform nothing can root in is not stability; it is sterility with good posture."
+    },
+    "visuals": {
+      "detailed_description": "An old lava field under mild, mottled daylight: ropy pahoehoe surfaces rounded and pitted by years of rain, water pooled in the low coils, and the first lichens mapping pale continents across the black stone. The violence of its making is still written in every frozen swirl -- and moss is quietly annotating the margins."
+    }
+  },
+  "vents-five": {
+    "name": "Five of Vents",
+    "number": "5",
+    "slug": "vents-five",
+    "arcana": "minor",
+    "suit_slug": "vents",
+    "rank_slug": "five",
+    "meaning": {
+      "upright": "The stress of motion revealing the fire's true interior: the crust tears as it is carried, and what shows in the cracks is the same heat that started everything. Being tested in transit is how the work proves it is still alive inside.",
+      "inverted": "A crust maintained over a core gone cold: the look of moving fire with nothing molten left to move it. Or the opposite failure -- breaking up entirely mid-carriage, the interior spent through every crack at once."
+    },
+    "visuals": {
+      "detailed_description": "An 'a'a flow front grinding downslope at dusk: a clinkery black face taller than a house, rubble tumbling continuously from its advancing edge, the whole mass blurred with slow implacable motion. Where the crust tears, streaks of interior glow open like wounds that heal and reopen -- the fire shown only under strain, sparks trailing downwind in the cooling air."
+    }
+  },
+  "vents-six": {
+    "name": "Six of Vents",
+    "number": "6",
+    "slug": "vents-six",
+    "arcana": "minor",
+    "suit_slug": "vents",
+    "rank_slug": "six",
+    "meaning": {
+      "upright": "Fire finds its settled slope: the cone stands at exactly the angle it can hold, discovered grain by falling grain rather than imposed. After the arrival, this -- equilibrium as a form of grace, the eruption become geometry at rest.",
+      "inverted": "The cone loaded past repose: new material heaped on slopes that were finished, calm mistaken for spentness. A resting fire is not an extinguished one, and a settled slope is not an invitation to stack more on it."
+    },
+    "visuals": {
+      "detailed_description": "A young cinder cone at dusk, perfectly conical, its flanks lying at the exact angle of repose -- the shape a million small fallings agreed on. Low warm light grazes the scoria; thin final fumes rise dead vertical in still air; around the base, ash aprons level themselves toward the darkening plain. Everything in the frame has found where it holds."
+    }
+  },
+  "vents-seven": {
+    "name": "Seven of Vents",
+    "number": "7",
+    "slug": "vents-seven",
+    "arcana": "minor",
+    "suit_slug": "vents",
+    "rank_slug": "seven",
+    "meaning": {
+      "upright": "The single fire dividing along its natural lines: as the mass cools in the sealed dark, it discovers the parts it was always implicitly made of. Honest differentiation happens under weight and out of sight -- let the joints form where the cooling says they must.",
+      "inverted": "Shattering along false lines: the colonnade forced, or collapsed into rubble that remembers no geometry. Division imposed from outside gives fragments; division discovered from within gives columns."
+    },
+    "visuals": {
+      "detailed_description": "Deep inside a buried flow, close-framed and airless: a basalt colonnade forming in real time, hexagonal columns parting with soft cracks as the mass cools under the weight of younger flows stacked above. Each new joint exhales a breath of stored heat into the dark. The geometry is perfect, patient, and entirely unwitnessed -- and will stay sealed for a million years."
+    }
+  },
+  "vents-eight": {
+    "name": "Eight of Vents",
+    "number": "8",
+    "slug": "vents-eight",
+    "arcana": "minor",
+    "suit_slug": "vents",
+    "rank_slug": "eight",
+    "meaning": {
+      "upright": "The fire become an instrument: a single blade of melt driven precisely along the one seam that would open. This is capability with economy -- no eruption, no spectacle, just the exact application of heat where the structure permits it. Mastery is knowing the weakness and filling it cleanly.",
+      "inverted": "The dike that knows only one direction: intrusion as habit, force applied along yesterday's seam because it opened once. An instrument that cannot re-aim is on its way to being a scar."
+    },
+    "visuals": {
+      "detailed_description": "A dark basalt dike knifing upward through folded, veined gneiss: one clean sheet, its edges chilled to glass, cutting dead straight across every contortion of the older rock. The country rock's strain-sheen flows and buckles around the newcomer's absolute geometry -- endured force meeting applied force, and the applied force is one line wide."
+    }
+  },
+  "vents-nine": {
+    "name": "Nine of Vents",
+    "number": "9",
+    "slug": "vents-nine",
+    "arcana": "minor",
+    "suit_slug": "vents",
+    "rank_slug": "nine",
+    "meaning": {
+      "upright": "The volcano at full maturity, and its destiny plainly visible: a mountain that is also a mouth. The completed edifice does not seal itself -- its final shape is an open line back to the source. To finish, for fire, is to remain in permanent relation with where you came from.",
+      "inverted": "Destiny read as doom: the fear that everything built must drain back down the conduit that built it. A summit hoarded against its own source goes cold from the top."
+    },
+    "visuals": {
+      "detailed_description": "The summit of a great shield volcano at night: a lava lake seething at the caldera's heart, incandescence from below softening every rim it touches, the mountain's enormous dark bulk falling away beneath into starless slopes. The highest point of all that building is a window -- the finished mountain holding its own beginning open like a kept promise."
+    }
+  },
+  "vents-ten": {
+    "name": "Ten of Vents",
+    "number": "10",
+    "slug": "vents-ten",
+    "arcana": "minor",
+    "suit_slug": "vents",
+    "rank_slug": "ten",
+    "meaning": {
+      "upright": "The fire finished into permanence: the whole province cooled into exact, patient stone, and the stone become ground for whatever comes next. Completion here is not an ending but a bequest -- the eruption's last act is to be a place.",
+      "inverted": "Legacy as barren pavement: a completion so total, so hard, that nothing else can begin on it. The gift of new land is cancelled if the land will not receive a seed."
+    },
+    "visuals": {
+      "detailed_description": "A vast stepped plateau of stacked flows in cold, clear morning light, each colonnade edge exact as cut crystal, terrace above terrace to the horizon. On the highest step, a thin new skin of soil has gathered in a hollow, and a single green shoot stands in it -- the entire fire's work resolved, at its very top, into a foundation for something that is not fire."
+    }
+  },
+  "vents-prospector": {
+    "name": "Prospector of Vents",
+    "number": "11",
+    "slug": "vents-prospector",
+    "arcana": "minor",
+    "suit_slug": "vents",
+    "rank_slug": "prospector",
+    "meaning": {
+      "upright": "Hope with a hammer in brand-new country: reading fumaroles like want-ads, staking the future on warmth underfoot. The one who arrives early, while the ground is still deciding what it will be, and has the nerve to call it home.",
+      "inverted": "Gold fever at the vent: every wisp of steam read as a promise, heat mistaken for wealth. Arriving early is only a virtue if you can tell a beginning from a flare."
+    },
+    "visuals": {
+      "detailed_description": "A lone figure, small against thin bright air, standing on a raised black ridge with a long morning shadow thrown behind. They chip a sample from the edge of a steaming fissure; below, a valley of fresh flows still smokes in patches. A claim cairn -- three stacked stones, absurdly human -- already marks the spot."
+    }
+  },
+  "vents-surveyor": {
+    "name": "Surveyor of Vents",
+    "number": "12",
+    "slug": "vents-surveyor",
+    "arcana": "minor",
+    "suit_slug": "vents",
+    "rank_slug": "surveyor",
+    "meaning": {
+      "upright": "The discipline of instruments on ground that changes weekly: measuring the mountain honestly means recording its growth and its decay in the same notebook. Precision here is a form of respect for what will not hold still.",
+      "inverted": "Mapping the volcano as if it will wait: measurements polished while the ground moves under the tripod. A survey that cannot admit its subject is alive is already a historical document."
+    },
+    "visuals": {
+      "detailed_description": "A single figure with level and stakes on an old, pitted flow in mottled diffuse daylight, sighting across a valley to a young cone that smokes as it grows. On the field slate, two columns of figures side by side: the new land rising, the old land softening -- both dated the same morning."
+    }
+  },
+  "vents-reader": {
+    "name": "Reader of Vents",
+    "number": "13",
+    "slug": "vents-reader",
+    "arcana": "minor",
+    "suit_slug": "vents",
+    "rank_slug": "reader",
+    "meaning": {
+      "upright": "Reading the eruption in what traveled from it: the ash bed found far downstream is testimony that made a journey, and the reader honors both the fire and the distance. The story arrives displaced; interpretation is knowing how far it came.",
+      "inverted": "Reading the ash as the whole fire: a fragment's account mistaken for the event, provenance ignored because the text was conveniently near. Every carried layer is an excerpt."
+    },
+    "visuals": {
+      "detailed_description": "A figure kneeling at a stream cutbank far from any volcano, one hand flat on a pale ash bed sandwiched between dark river gravels, current-blurred water sliding past below. Their eyes are closed. In a deposit that drifted here on wind and water, they are reading the biography of a mountain that is nowhere in the frame."
+    }
+  },
+  "vents-witness": {
+    "name": "Witness of Vents",
+    "number": "14",
+    "slug": "vents-witness",
+    "arcana": "minor",
+    "suit_slug": "vents",
+    "rank_slug": "witness",
+    "meaning": {
+      "upright": "Presence at creation without demand: to watch new land being made and want nothing from it -- not spectacle, not profit, not even meaning. Awe metabolized into steadiness; the fire honored by a stillness that matches its patience rather than its heat.",
+      "inverted": "Spectacle addiction: chasing eruptions to avoid the quiet work of one's own ground. Witness that needs the show to keep escalating was never witness -- it was appetite in a contemplative costume."
+    },
+    "visuals": {
+      "detailed_description": "Dusk, across still water: on a black-sand beach, a small seated figure watches a distant shore where slow incandescence lays itself down, layer by layer, into the sea. Low warm light, quiet water, steam rising far off like a held breath. The figure carries no instrument, takes no sample, and stays."
+    }
+  },
+  "strata-ace": {
+    "name": "Ace of Strata",
+    "number": "1",
+    "slug": "strata-ace",
+    "arcana": "minor",
+    "suit_slug": "strata",
+    "rank_slug": "ace",
+    "meaning": {
+      "upright": "Memory begins as debris: the first thin layer is laid down from what the day wore off something else. The archive does not open with a monument -- it opens with dust honestly kept. Keep today's small residue; it is the first page.",
+      "inverted": "The first entry that never gets a second: a beginning kept but not continued, one lamina proud of itself on bare rock. A single layer is not yet a record; it is a hope with sediment in it."
+    },
+    "visuals": {
+      "detailed_description": "A pitted, weathered bedrock surface under soft open daylight, and settling into every low place on it, a first film of pale silt -- taking the exact shape of each hollow, thickening by grains. It is almost nothing: a dusting, a beginning. The oldest page of a book that does not exist yet."
+    }
+  },
+  "strata-two": {
+    "name": "Two of Strata",
+    "number": "2",
+    "slug": "strata-two",
+    "arcana": "minor",
+    "suit_slug": "strata",
+    "rank_slug": "two",
+    "meaning": {
+      "upright": "The record holding two origins in one column: what the river brought and what the wind brought, lying together with the contact honest between them. The archive's first power is this -- it can keep two journeys in one place without making them one story.",
+      "inverted": "The contact read as contradiction: two sources treated as rival claims, the archive audited for a winner. A boundary in the record is information, not a dispute."
+    },
+    "visuals": {
+      "detailed_description": "A stream-cut bank in cool grey moving light: rust-red river gravels below, cream wind-laid silts above, and between them a contact knife-sharp and gently undulating. Each body still carries its journey in its grain -- the tumble-rounded cobbles, the sifted flour-fine dust -- two long trips ended in the same quiet place, filed touching."
+    }
+  },
+  "strata-three": {
+    "name": "Three of Strata",
+    "number": "3",
+    "slug": "strata-three",
+    "arcana": "minor",
+    "suit_slug": "strata",
+    "rank_slug": "three",
+    "meaning": {
+      "upright": "The archive compounding: layer answering layer, deposit answering season, until repetition itself becomes structure. Nothing dramatic happens and everything accrues -- this is growth by faithfulness, the record thickening simply because the keeping continued.",
+      "inverted": "Accumulation without sorting: more and more kept, none of it in order, the pile that is not yet a record. Volume is not memory; rhythm is."
+    },
+    "visuals": {
+      "detailed_description": "Varves in intimate close-up, filling the frame in low warm light: paired light and dark laminae -- summer's silt, winter's clay -- repeating upward in a calm unbroken pulse, each pair one year. Three interleaved rhythms are visible: the annual pairs, the decadal swellings, the slow ochre deepening of centuries -- one rising wall of kept time."
+    }
+  },
+  "strata-four": {
+    "name": "Four of Strata",
+    "number": "4",
+    "slug": "strata-four",
+    "arcana": "minor",
+    "suit_slug": "strata",
+    "rank_slug": "four",
+    "meaning": {
+      "upright": "The record consolidated into rock: pages pressed to stone, the past acquiring load-bearing strength. What was merely kept becomes something you can build on -- foundation as the reward of sustained keeping.",
+      "inverted": "The past cemented past revision: a record so lithified it can no longer admit an erratum. Foundations should bear weight, not forbid amendment."
+    },
+    "visuals": {
+      "detailed_description": "Deep in the section, close-framed and airless: loose sands visibly welding into sandstone, grain contacts suturing one by one, the small lights of pore-space dimming bed by bed as the weight above presses down. In deepened, breathless color, the archive is acquiring its binding -- the moment paper becomes book."
+    }
+  },
+  "strata-five": {
+    "name": "Five of Strata",
+    "number": "5",
+    "slug": "strata-five",
+    "arcana": "minor",
+    "suit_slug": "strata",
+    "rank_slug": "five",
+    "meaning": {
+      "upright": "The record strained until it shows its fabric: folding reveals which layers were strong and which were soft, and the testimony bends without erasing. What stress exposes in an archive is not its falsehood but its texture -- read the fold as part of the record.",
+      "inverted": "The record deformed into a preferred shape and the strain passed off as the original story. Bent testimony can still be honest; testimony that denies it was ever bent cannot."
+    },
+    "visuals": {
+      "detailed_description": "A cliff face of banded ochre and rust beds folded into one great recumbent S, the whole face sheened with strain, thin white veins threading the fold hinges where the rock nearly gave. Every layer remains traceable through the contortion -- the sequence fully legible even bent double, wearing its ordeal as fabric rather than wound."
+    }
+  },
+  "strata-six": {
+    "name": "Six of Strata",
+    "number": "6",
+    "slug": "strata-six",
+    "arcana": "minor",
+    "suit_slug": "strata",
+    "rank_slug": "six",
+    "meaning": {
+      "upright": "Equilibrium found at the edge of erasure: the archive learns exactly how close to the fire it can lie and still keep. Peace with impermanence is not surrender -- it is knowing your distance, holding your level, and continuing the record one layer above the forge.",
+      "inverted": "Repose too near the heat: records kept where they cannot survive, calm maintained by not looking down. The baked layer at the bottom is a boundary, not a rug."
+    },
+    "visuals": {
+      "detailed_description": "In cross-section: flat-lying beds resting calm and level above a glowing sill, the lowest layers baked brick-red and hardened where the heat reached, incandescence from below softening the floor of the frame. Above that bright line, ochre and cream beds lie in perfect archival stillness -- the record at rest exactly one layer above the place where records end."
+    }
+  },
+  "strata-seven": {
+    "name": "Seven of Strata",
+    "number": "7",
+    "slug": "strata-seven",
+    "arcana": "minor",
+    "suit_slug": "strata",
+    "rank_slug": "seven",
+    "meaning": {
+      "upright": "The record parting cleanly along its own pages: division that restores legibility rather than destroying it. The archive's natural fracture lines are its bedding -- split there, and every piece comes away whole, a complete day in the hand.",
+      "inverted": "Split into leaves and scattered: pages without a spine, each slab carried off to a different wall. Clean division is a virtue only while the order of the pages survives it."
+    },
+    "visuals": {
+      "detailed_description": "A quarry face in cool, exact light: flagstones parting along perfect bedding planes with soft dry sighs, each lifted slab a single season complete in itself -- ripple marks on one, rain prints on another. Beside the face they stand stacked in order, an unbound codex, every page crystal-edged and legible."
+    }
+  },
+  "strata-eight": {
+    "name": "Eight of Strata",
+    "number": "8",
+    "slug": "strata-eight",
+    "arcana": "minor",
+    "suit_slug": "strata",
+    "rank_slug": "eight",
+    "meaning": {
+      "upright": "The record become load-bearing: one hardened bed holding up a landscape, memory doing structural work. This is the archive's mature power -- not merely to recall the past but to carry the present on its shoulders, dead level, for miles.",
+      "inverted": "One resistant layer dictating everything: the caprock that decides what every softer bed beneath it is allowed to become. Strength in an archive should support the column, not censor it."
+    },
+    "visuals": {
+      "detailed_description": "A long escarpment at morning in thin bright air: a single indurated cream bed capping softer rusts and ochres, holding the raised horizon dead level from frame edge to frame edge. Long shadows pool beneath the overhang where the soft beds retreat; above, the hard layer takes the light like proof. Memory, load-bearing."
+    }
+  },
+  "strata-nine": {
+    "name": "Nine of Strata",
+    "number": "9",
+    "slug": "strata-nine",
+    "arcana": "minor",
+    "suit_slug": "strata",
+    "rank_slug": "nine",
+    "meaning": {
+      "upright": "The record's destiny arriving: exposure. The archive was always being written toward the day a surface would open it -- every buried layer aimed, across unthinkable patience, at legibility. The face is opening now; the destiny of keeping is being read.",
+      "inverted": "Destined exposure feared: the record kept buried past its ripeness, the canyon resented for doing what the archive was for. A memory that must never be read has become a hoard."
+    },
+    "visuals": {
+      "detailed_description": "A canyon wall in mild, diffuse daylight: hundreds of bands rising from river to rim, ochre and rust and cream in their long-kept order. Across the face, the newest pitting and rounding of weathering has just begun to open the surface -- edges softening, seams loosening -- the whole column standing one page-turn from fully legible."
+    }
+  },
+  "strata-ten": {
+    "name": "Ten of Strata",
+    "number": "10",
+    "slug": "strata-ten",
+    "arcana": "minor",
+    "suit_slug": "strata",
+    "rank_slug": "ten",
+    "meaning": {
+      "upright": "Completion as source: the finished record giving itself, grain by grain, as raw material to the record that comes next. The archive's last act is generosity -- what it kept so carefully, it now hands forward in moving water. Inheritance is not what stays; it is what transfers.",
+      "inverted": "The old record dominating the new column: a completed past that insists on being every future's largest ingredient. Legacy given with a grip is sediment that never quite settles."
+    },
+    "visuals": {
+      "detailed_description": "A river undercutting a complete banded cliff in cool wet greys and blues: whole strata calving away into the current, their edges blurring as they go, grains already streaming seaward in long pale plumes. The finished archive is visibly becoming sediment again -- completing itself by consenting to be carried, en route to lying down in some newer column downstream."
+    }
+  },
+  "strata-prospector": {
+    "name": "Prospector of Strata",
+    "number": "11",
+    "slug": "strata-prospector",
+    "arcana": "minor",
+    "suit_slug": "strata",
+    "rank_slug": "prospector",
+    "meaning": {
+      "upright": "Prospecting the quiet places: the knowledge that value settles where nothing seems to happen, and the patience to search by waiting. The seeker of archives does not chase the glitter; they core the floodplain, trusting that stillness has been keeping accounts.",
+      "inverted": "Digging the archive for one payable seam: the record valued only where it glints, whole centuries discarded as overburden. A prospector who cannot love the barren pages will misread the rich ones."
+    },
+    "visuals": {
+      "detailed_description": "Dusk on a level floodplain, low warm light along quiet water: a small figure turns an auger into the silts, unhurried. Beside them, the day's extracted cores lie in a neat row like recovered scrolls, each banded cylinder darker and older than the last. Nothing in the scene moves but their hands."
+    }
+  },
+  "strata-surveyor": {
+    "name": "Surveyor of Strata",
+    "number": "12",
+    "slug": "strata-surveyor",
+    "arcana": "minor",
+    "suit_slug": "strata",
+    "rank_slug": "surveyor",
+    "meaning": {
+      "upright": "Measuring what cannot be seen: sounding the sealed layers by discipline rather than sight, converting darkness into depth-figures a hand can hold. Trust the instrument, log every rung, and the buried column becomes knowledge without ever being exposed.",
+      "inverted": "The column mapped and never consulted: soundings filed, depths certified, and the archive itself left unread beneath its perfect index. Measurement was supposed to be an introduction, not a substitute."
+    },
+    "visuals": {
+      "detailed_description": "Night at a small drill rig, close-framed, the air thick and still: a figure logs depths by lamplight as the string descends through bed after unseen bed. Each recorded stratum is a rung into the sealed dark below -- the notebook filling with the shape of a country no light has ever entered."
+    }
+  },
+  "strata-reader": {
+    "name": "Reader of Strata",
+    "number": "13",
+    "slug": "strata-reader",
+    "arcana": "minor",
+    "suit_slug": "strata",
+    "rank_slug": "reader",
+    "meaning": {
+      "upright": "Reading through deformation: testimony bent, sheared, and cooked -- and still heard. The interpreter honors what the strain did to the record without letting the strain replace the sentence; the fold is context, not content. Follow the thin true band all the way through.",
+      "inverted": "Blaming the strain for what the reading imposed: every inconvenient passage attributed to deformation, the fold used as an alibi for the thesis. Some bends are in the rock; some are in the reader."
+    },
+    "visuals": {
+      "detailed_description": "A figure with a lamp stands close against a folded gneiss face, veined and sheened with strain, in dim heat-tinged light. One fingertip rests on a thin, persistent pale band, tracing it slowly through hairpin after hairpin of contortion -- following a single sentence through the whole crumpled page, refusing to lose it."
+    }
+  },
+  "strata-witness": {
+    "name": "Witness of Strata",
+    "number": "14",
+    "slug": "strata-witness",
+    "arcana": "minor",
+    "suit_slug": "strata",
+    "rank_slug": "witness",
+    "meaning": {
+      "upright": "Standing where the record ends: presence at the boundary between the kept and the unkeepable. To hold memory where memory fails -- not rescuing the dissolving layers, not looking away from them -- is the archive's last office, and someone must perform it.",
+      "inverted": "Refusing to look at the erasing edge: the archive loved only where it is intact, its mortal boundary politely unvisited. Witness that cannot attend an ending will eventually falsify the middle."
+    },
+    "visuals": {
+      "detailed_description": "At the glowing floor of a great section, a small, still figure stands where the lowest, oldest beds soften -- banding loosening, colors sliding toward incandescence, the archive's bottom edge dissolving into shimmer. The figure does not step back and does not reach in. They watch the exact line where the record gives way to fire, and they stay."
+    }
+  }
+}

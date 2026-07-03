@@ -1,0 +1,389 @@
+{
+  "major-0": {
+    "name": "The Hadean",
+    "number": "0",
+    "slug": "major-0",
+    "arcana": "major",
+    "meaning": {
+      "upright": "The state before any record: everything is possible because nothing is yet true. This is a situation that has not cooled into a story -- do not look for the ink; there is only heat. Begin from the honest admission that nothing has been written yet, least of all you.",
+      "inverted": "Formlessness clung to: refusing to cool into anything because every form is a limit. Potential hoarded becomes a way of never being read. The molten state is a precondition, not a home."
+    },
+    "visuals": {
+      "detailed_description": "A planet-wide magma ocean in cross-section, with no strata anywhere -- there is nothing yet to layer. Meteoric fire falls into a sea of fire; the horizon is indistinguishable from the glow above it; forms soften at every edge and the air itself shimmers. The only structure in the frame is convection: vast, slow cells of brighter and darker incandescence, black masses surfacing and melting back against orange-white heat."
+    },
+    "factorization": {
+      "character": "identity",
+      "gloss": "The additive identity. Zero: the world before addition -- nothing written and nothing yet writable. Every later card is a sum built on this silence."
+    }
+  },
+  "major-1": {
+    "name": "The Zircon",
+    "number": "1",
+    "slug": "major-1",
+    "arcana": "major",
+    "meaning": {
+      "upright": "The first thing that persists. A commitment small enough to hold its shape, and therefore the beginning of all measurement: once one grain endures, there is a before and an after. Make the smallest durable act available to you -- it will outlast the circumstances that produced it.",
+      "inverted": "The witness mistaken for the story. Clinging to the first form that survived, as though surviving were the same as mattering; the unit of measure promoted to the thing measured. Endure, but do not confuse endurance with significance."
+    },
+    "visuals": {
+      "detailed_description": "A single zircon crystal rendered monumental: a faceted prism suspended in a dark matrix of half-cooled melt, its interior banded with concentric growth zones like tree rings in glass. Cold, clear light seems to come from its own lattice -- every edge exact -- while everything around it still glows soft and undecided. It is the smallest thing in the frame and the only thing in focus."
+    },
+    "factorization": {
+      "character": "identity",
+      "gloss": "The multiplicative identity. One: the unit that changes nothing it multiplies and yet makes counting possible -- the first grain by which all later ages are measured."
+    }
+  },
+  "major-2": {
+    "name": "Pressure",
+    "number": "2",
+    "slug": "major-2",
+    "arcana": "major",
+    "meaning": {
+      "upright": "The push of accumulated mass: force applied steadily until it becomes geography. What bears down on you is also what raises you -- burden and elevation are the same act read at different depths. Hold, and let the weight do its slow work of lifting.",
+      "inverted": "Weight without direction: bearing down as a way of being, the load denied until it quietly deforms everything beneath it. Pressure unacknowledged does not disappear; it folds."
+    },
+    "visuals": {
+      "detailed_description": "Two continental masses meeting in cross-section, their junction thickening like scar tissue, strata bowed upward in a single great arch. Above the rising welt the air is thin and bright, long shadows raking across freshly tilted planes; below, the rock roots plunge downward in mirror image, pressed into the dark. Nothing moves in the frame, and everything in it is the record of an irresistible push."
+    },
+    "factorization": {
+      "character": "prime",
+      "gloss": "Prime -- irreducible. Weight cannot be factored into anything gentler; every structure in this deck that holds, holds against it or because of it."
+    }
+  },
+  "major-3": {
+    "name": "Heat",
+    "number": "3",
+    "slug": "major-3",
+    "arcana": "major",
+    "meaning": {
+      "upright": "The interior engine: the gradient that makes everything move. Warmth is difference, and difference drives -- convection, motion, work. Find the gradient in your situation; that is where all the energy is.",
+      "inverted": "The engine running for its own sake: churn without work, warmth that scorches what it meant to move. A gradient exploited too fast becomes mere burning."
+    },
+    "visuals": {
+      "detailed_description": "A desert outcrop at the instant of thermal fracture: a granite face in mottled, diffuse daylight spalling off a curved sheet of itself, the new crack still propagating. The rock's seams carry a faint interior glow, as if the planet's deep engine were visible through its skin; all around, older surfaces are pitted and rounded by ten thousand such days, and one scar is sharp and new."
+    },
+    "factorization": {
+      "character": "prime",
+      "gloss": "Prime -- irreducible. The gradient itself: there is no factoring heat into parts, only hotter and cooler, and a whole planet moving to erase the difference."
+    }
+  },
+  "major-4": {
+    "name": "The Mountain",
+    "number": "4",
+    "slug": "major-4",
+    "arcana": "major",
+    "meaning": {
+      "upright": "Pressure stabilized into standing structure: an achievement you can stand on. But look closely at its flanks -- the mountain is a slow fountain, rising and shedding at once. Permanence is a rate, not a state; maintain the uplift and the shedding both.",
+      "inverted": "The monument mistaken for the process: structure defended long after its raising force has gone, a summit held while everything moves through and past it. What stops rising has already begun to be carried away."
+    },
+    "visuals": {
+      "detailed_description": "A great peak in cross-section, its folded roots reaching deeper below the surface than its summit stands above it. Scree streams off its flanks in blurred grey-blue trails, sorted and carried by implied currents of air and water, while the core of the range still bows visibly upward -- the whole form simultaneously rising and dispersing, a still summit wearing a moving body."
+    },
+    "factorization": {
+      "character": "composite",
+      "factors": [2, 2],
+      "gloss": "Pressure squared -- the push stabilized into a frame that holds. The first thing weight builds when it agrees with itself."
+    }
+  },
+  "major-5": {
+    "name": "Water",
+    "number": "5",
+    "slug": "major-5",
+    "arcana": "major",
+    "meaning": {
+      "upright": "The universal solvent, carrier, and undertaker of stone: the patience that dismantles mountains and files them, grain by grain, into archives. Take the low, quiet route; it is the one that ends in record rather than ruin.",
+      "inverted": "Dissolution of what needed to stay; the carrier that never sets its burden down. Water that will not deposit is just erosion with nowhere to go -- movement mistaken for purpose, drowning mistaken for depth."
+    },
+    "visuals": {
+      "detailed_description": "A still, shallow sea over pale flats in low warm light, the waterline a band of gold. A plume of fine sediment fans out beneath the surface and settles, grain by visible grain, onto perfectly horizontal beds -- each new lamina a finished sentence. The water asks for nothing; the layers thicken with a patience that reads as tenderness."
+    },
+    "factorization": {
+      "character": "prime",
+      "gloss": "Prime, doubly so -- numerically irreducible and standing at a prime station of the cycle. Water decomposes everything in this deck and is decomposed by nothing; the arcana's most elemental solvent."
+    }
+  },
+  "major-6": {
+    "name": "The Crucible",
+    "number": "6",
+    "slug": "major-6",
+    "arcana": "major",
+    "meaning": {
+      "upright": "Pressure meets heat in the sealed dark: the first true collaboration of the great forces. Transformation is being prepared where no one can watch, and the seal is part of the recipe. Let the depth hold you while the work compounds.",
+      "inverted": "The pressure-cooker: forces combined without a vessel that can hold them, or depth used as hiding rather than incubation. What is sealed away from all witness can cook into something no one intended."
+    },
+    "visuals": {
+      "detailed_description": "Deep crust in close cross-section, airless and compressed, the strata squeezed to deep umber and black with the frame itself pressing inward like part of the load. At the center, the banding begins to sweat new minerals: garnets blooming in the dark like slow coals, small red certainties forming exactly where the weight and the warmth agree."
+    },
+    "factorization": {
+      "character": "composite",
+      "factors": [2, 3],
+      "gloss": "Pressure meets Heat -- the deck's first true product. Neither could transform alone: weight without warmth only crushes, and warmth without weight only escapes."
+    }
+  },
+  "major-7": {
+    "name": "Life",
+    "number": "7",
+    "slug": "major-7",
+    "arcana": "major",
+    "meaning": {
+      "upright": "The biosphere as a geological force: a film thinner than a hair on the planet's body, which nonetheless rewrote the air, rusted the oceans, and taught limestone to grow. Smallness compounding into planetary consequence -- act at your scale and trust the compounding.",
+      "inverted": "The transformer consumed by its transformations: growth that poisons its own air, vitality mistaken for permission. The first great extinction was committed by the first great success."
+    },
+    "visuals": {
+      "detailed_description": "A banded iron formation in cross-section -- red-black ribbons folded back on themselves, sheened with strain -- and along its upper surface, in veined dim light, a living mat of stromatolites: low domes quietly breathing, each exhalation of oxygen the very thing that rusted an ocean into the bands below. The transformer and its transformation in one frame, the fold still holding both."
+    },
+    "factorization": {
+      "character": "prime",
+      "gloss": "Prime, doubly atomic -- a prime number standing on a prime station. The one force in the deck that is not physics: it cannot be derived from the others, and everything after it must account for it."
+    }
+  },
+  "major-8": {
+    "name": "Subduction",
+    "number": "8",
+    "slug": "major-8",
+    "arcana": "major",
+    "meaning": {
+      "upright": "Mastery become descent: pressure compounded until the only way forward is down. To feed the forge with what you built is not failure -- it is how the engine is paid. Surrender structure deliberately, and it returns as new ground elsewhere.",
+      "inverted": "Consumption: dragging everything attached to you down the same trench, descent past the depth where anything returns. There is a difference between offering your work to the fire and becoming unable to stop sinking."
+    },
+    "visuals": {
+      "detailed_description": "An oceanic slab in cross-section angling steeply down into incandescence, its cool blue-grey length keeping its composure for miles before the edges begin to soften. At the surface it drags a dark trench behind it like a hem; far below, its leading edge dissolves into black-and-orange shimmer, feeding a glow that already rises elsewhere in the frame as the seed of new fire."
+    },
+    "factorization": {
+      "character": "composite",
+      "factors": [2, 2, 2],
+      "gloss": "Pressure cubed -- weight past structure, past mastery, into consumption. The push compounded until it eats its own plate."
+    }
+  },
+  "major-9": {
+    "name": "The Pluton",
+    "number": "9",
+    "slug": "major-9",
+    "arcana": "major",
+    "meaning": {
+      "upright": "Heat fulfilled and turned inward: the chamber that cools under its own roof into granite. This is mastery that no longer needs to erupt -- the slow interior work that becomes, in time, the bedrock others build on. Stay under the roof; become stone all the way through.",
+      "inverted": "Brilliance that never surfaces: cooling in isolation until the chamber is mistaken for the world. Interior work is fulfilled by eventually bearing weight -- a pluton that is never unroofed is just a buried fire that gave up."
+    },
+    "visuals": {
+      "detailed_description": "A vast teardrop of magma stalled in cross-section beneath miles of country rock, crystallizing from its margins inward: rinds of exact, faceted grain advance ring by ring into a still-glowing core. The mineral light sharpens as heat becomes form -- the outermost zones already cold, precise, and permanent, the center still soft with intention."
+    },
+    "factorization": {
+      "character": "composite",
+      "factors": [3, 3],
+      "gloss": "Heat squared -- the engine structured by its own product. Warmth contained until it becomes the very rock that contains it."
+    }
+  },
+  "major-10": {
+    "name": "The Geyser",
+    "number": "10",
+    "slug": "major-10",
+    "arcana": "major",
+    "meaning": {
+      "upright": "The appointment kept between depth and water: what goes down under pressure returns on schedule. Fortune here is not caprice but plumbing -- the interval is real, and it can be trusted even when the surface shows nothing. Wait like the chamber waits: filling.",
+      "inverted": "Erupting on someone else's schedule; or worshipping the cycle instead of drawing from it. To stand at the vent forever, waiting, is to mistake the wheel's turning for your own motion."
+    },
+    "visuals": {
+      "detailed_description": "A white column standing at full height in thin bright air, caught at the top of its hour, backlit spray peeling off the crown in long drifting shadows. Below the surface, the cross-section shows the truth of it: flooded chambers in tilted, shimmering rock already refilling drop by drop, the next eruption assembling itself in the dark while this one still hangs in the light."
+    },
+    "factorization": {
+      "character": "composite",
+      "factors": [2, 5],
+      "gloss": "Pressure meets Water -- weight applied to the one thing that will not compress, so it rises. Fate as an interval; fortune as plumbing."
+    }
+  },
+  "major-11": {
+    "name": "Time",
+    "number": "11",
+    "slug": "major-11",
+    "arcana": "major",
+    "meaning": {
+      "upright": "The irreducible dimension: not a force but the medium every force is paid in. Everything is being weathered at all times, gently and without malice -- what feels permanent is only slow. Take the long view; it is the only view in which anything is actually happening.",
+      "inverted": "Time denied: racing the erosion, patching the pitted face daily and calling it victory. Or time weaponized -- waiting used as cruelty, the refusal to let anything finish. The weathering wins either way; the only choice is your relationship to it."
+    },
+    "visuals": {
+      "detailed_description": "A single unconformity in cross-section: tilted, truncated beds below, flat young beds lying calmly across their broken tops, and between them a thin, pitted, lichen-flecked surface in mild diffuse daylight. The card's true subject is the gap itself -- four hundred million years that passed across that one quiet line without leaving a single grain behind."
+    },
+    "factorization": {
+      "character": "prime",
+      "gloss": "Prime, doubly atomic -- a prime number on a prime station, the deck's most elemental trump. Time does not decompose; every other card happens inside it, and it is the one judge that never recuses."
+    }
+  },
+  "major-12": {
+    "name": "The Hotspot",
+    "number": "12",
+    "slug": "major-12",
+    "arcana": "major",
+    "meaning": {
+      "upright": "The fixed flame beneath a moving world: the revelation that it was never the source that moved. Hang where you are and let the perspective invert -- the chain of your works, receding toward the horizon, is the true map of your position and drift.",
+      "inverted": "Staying put mistaken for constancy while everything is quietly carried away; building the same island again and again and calling it progress. The plume's stillness is only meaningful because it knows the plate is moving."
+    },
+    "visuals": {
+      "detailed_description": "A mantle plume rising fixed and vertical from the deep interior while the plate above slides visibly sideways across it. Trailing off toward the horizon in cool blurred greys, a chain of islands in every stage of the same biography -- newborn and glowing over the flame, green and settling farther on, drowned and flat-topped in the far distance -- the one motionless thing in the frame having authored the entire procession."
+    },
+    "factorization": {
+      "character": "composite",
+      "factors": [2, 2, 3],
+      "gloss": "The Mountain (2 squared) acted on by Heat -- structure fed by a flame it cannot keep. Each mountain is finished by being carried away, and the flame's constancy is proven by the length of the chain."
+    }
+  },
+  "major-13": {
+    "name": "Extinction",
+    "number": "13",
+    "slug": "major-13",
+    "arcana": "major",
+    "meaning": {
+      "upright": "The irreducible ending: a horizon others are dated by. This is not punishment but punctuation -- after this layer, the fauna changes. Let the ending be as thin, as level, and as final as it is; everything that comes after will take its bearings from this line.",
+      "inverted": "The ending refused its dignity: treated as an error to be reversed, negotiated with, redecorated. Or its opposite -- taking up residence at the boundary, mistaking one dark bed for the whole of the column above and below it."
+    },
+    "visuals": {
+      "detailed_description": "In low warm light near the ground, a finger-thin grey clay bed runs perfectly level through the cross-section -- riotous, fossil-crowded layers below it; sparse, quiet, simpler beds above. Nothing in the image is violent: only a thin line laid down with terrible calm, still water over everything, the whole world's turning recorded as one unhurried, horizontal stroke."
+    },
+    "factorization": {
+      "character": "prime",
+      "gloss": "Prime, doubly atomic -- prime on a prime station. An ending that will not factor into causes and lessons; it simply is, and afterward everything is dated from it."
+    }
+  },
+  "major-14": {
+    "name": "The Fossil",
+    "number": "14",
+    "slug": "major-14",
+    "arcana": "major",
+    "meaning": {
+      "upright": "Pressure meets life in the sealed dark: the patient transmutation of the living into the legible. Nothing is kept as it was; it is kept as it can be kept -- translated, mineral by mineral, into a durable tongue. Accept the terms of preservation; they are generous over the long run.",
+      "inverted": "Preservation that falsifies: the past curated into stone and then mistaken for the creature itself. A cast is a translation, and every translation has a translator -- ask what the pressure chose to keep, and what it quietly let go."
+    },
+    "visuals": {
+      "detailed_description": "Close-framed in compressed darkness, an ammonite caught mid-transmutation: half its chambers still nacre and pearl, half already pyrite and stone, the exchange proceeding suture by suture. The beds above press down in deepened, airless color, and the seam of the spiral catches the frame's only light -- a small brightness being made immortal very, very slowly."
+    },
+    "factorization": {
+      "character": "composite",
+      "factors": [2, 7],
+      "gloss": "Pressure meets Life -- weight applied to the one force that means something, producing the record's first legible sentence. The deck's gentlest use of its heaviest prime."
+    }
+  },
+  "major-15": {
+    "name": "The Serpentine",
+    "number": "15",
+    "slug": "major-15",
+    "arcana": "major",
+    "meaning": {
+      "upright": "Heat meets water inside the rock: seduction at depth. The altered stone is green, scaled, and beautiful, and its surfaces slide -- transformation that flatters is still transformation, but check your footing with every gift. Some invitations change you on contact.",
+      "inverted": "Captivity in the beautiful: ground that will not hold a footing, alteration you invited and can no longer reverse. The serpent stone does not lie about what it is; the bondage is in continuing to build on it."
+    },
+    "visuals": {
+      "detailed_description": "A shear zone in veined dim heat: mantle rock gone green-black and scaled like snakeskin, banded with silky slickensides that gleam with the sheen of strain. The whole mass is folded and contorted around itself, and in fractures that should be dry at this depth, water glints -- present where it has no right to be, working, changing everything it touches to more of itself."
+    },
+    "factorization": {
+      "character": "composite",
+      "factors": [3, 5],
+      "gloss": "Heat meets Water -- each alone is honest work; married inside rock they make the slick green stone. Transformation as temptation: a composite wearing an atomic station's key."
+    }
+  },
+  "major-16": {
+    "name": "The Eruption",
+    "number": "16",
+    "slug": "major-16",
+    "arcana": "major",
+    "meaning": {
+      "upright": "The structure overpressured past containment: the edifice unroofs itself. This is catastrophic honesty -- everything suppressed departs at once, and for a moment the sky is made of what was held down. After it, the pressure reading is finally true.",
+      "inverted": "The drawn-out failure: venting endlessly to avoid the one necessary blast, or rebuilding the ruins directly on the same sealed chamber. A tower that will not fall cleanly falls forever."
+    },
+    "visuals": {
+      "detailed_description": "The mountain blown open in cross-section: one flank collapsed outward in a frozen avalanche, the chamber beneath emptying upward as a black-and-orange column that forks with lightning inside its own ash. Every form softens at the edges in the heat-shimmer; the cone's own stones fall back through the glare, and at the base the melt shines through the wound like a truth that was always there."
+    },
+    "factorization": {
+      "character": "composite",
+      "factors": [2, 2, 2, 2],
+      "gloss": "The Mountain squared -- pressure structured, then structured again past what structure bears. Weight's final power is to abolish its own monument."
+    }
+  },
+  "major-17": {
+    "name": "The Field",
+    "number": "17",
+    "slug": "major-17",
+    "arcana": "major",
+    "meaning": {
+      "upright": "The invisible orientation: a planetary whisper that says which way is north, recorded faithfully by every mineral patient enough to cool. Guidance that asks nothing, promises nothing, and is everywhere. Hope, here, is not a light on the horizon -- it is knowing your heading in the dark.",
+      "inverted": "The reversal: north and south trading places while the compasses keep pointing. Guidance present but unread, or worse -- a course held faithfully to a field that has since flipped. Check when your bearings were last locked in."
+    },
+    "visuals": {
+      "detailed_description": "A mid-ocean ridge in cross-section under cold, clear abyssal light: fresh basalt striping away from the axis in symmetric bands, mirror twins to either side. Each stripe carries a faint interior sheen -- a hidden lattice-alignment alternating dark and bright, dark and bright, marching outward like a recorded heartbeat -- while at the center the newest rock, still warm, is quietly cooling into its own testimony."
+    },
+    "factorization": {
+      "character": "prime",
+      "gloss": "Prime -- irreducible. The field is not made of anything else the deck knows; it is simply there, invisible and planet-wide, and the stones write it down without being asked."
+    }
+  },
+  "major-18": {
+    "name": "The Dome",
+    "number": "18",
+    "slug": "major-18",
+    "arcana": "major",
+    "meaning": {
+      "upright": "The deep work hoisted into half-light: you are seeing the summit of something whose mass is almost entirely hidden. What shows is real -- and it is not all there is. Navigate by the visible face, but weight your decisions by the unseen extent.",
+      "inverted": "Living by the visible fraction: the hidden mass denied until it shoulders through the valley floor. Grandeur mistaken for the whole story is the oldest illusion in the mountains; the moon shows one face too."
+    },
+    "visuals": {
+      "detailed_description": "A granite half-dome rising sheer above a shadowed valley at dusk, thin air, long violet shadows -- the exposed face pale and lunar in the last light. Below the valley floor the cross-section tells the rest: the pluton's true body plunging away for miles, unlit grey and vast, ten times the mountain that shows, holding the bright half-face up like an offering."
+    },
+    "factorization": {
+      "character": "composite",
+      "factors": [2, 3, 3],
+      "gloss": "Pressure meets the fulfilled Pluton (3 squared) -- the finished interior work raised by weight into partial view. A completion that can only ever be half-seen."
+    }
+  },
+  "major-19": {
+    "name": "The Sun",
+    "number": "19",
+    "slug": "major-19",
+    "arcana": "major",
+    "meaning": {
+      "upright": "The exterior engine, irreducible: the daily arrival of the energy that runs the water, the weather, and the green film. Every exposed face is worked by it, opened by it, gilded by it. Joy is a force of erosion -- let it work on you; what it wears away needed wearing.",
+      "inverted": "Exposure without shelter: the engine of everything mistaken for a personal audience, brightness so constant it bleaches the record it illuminates. Even stone needs its nights."
+    },
+    "visuals": {
+      "detailed_description": "A canyon wall at full noon in open, diffuse blaze: every surface pitted, mottled, rounded, gilt with lichen, desert varnish shining like hammered bronze. Heat shimmers off the stone -- and in the deepest seams, last night's frost-cracks still hold thin blades of blue shadow, so that one frame carries the whole day's tide of energy caught in the act of working."
+    },
+    "factorization": {
+      "character": "prime",
+      "gloss": "Prime -- irreducible. The deck's one force that arrives from outside the planet: it cannot be derived from the Earth at all, only received."
+    }
+  },
+  "major-20": {
+    "name": "The River",
+    "number": "20",
+    "slug": "major-20",
+    "arcana": "major",
+    "meaning": {
+      "upright": "The long verdict: water reading the mountain and carrying the judgment, grain by grain, to the sea. Nothing is condemned -- everything is weighed, sorted, and sent where it now belongs. The reckoning you are in is not an ending; it is a relocation.",
+      "inverted": "The verdict resisted mid-channel: damming the sentence, hoarding the sorted load, grinding what you refuse to carry. A river denied its mouth does not stop judging; it just floods."
+    },
+    "visuals": {
+      "detailed_description": "A braided river descending a cross-sectioned gorge in cool wet greys and blues, its channels weaving like plaited rope. Its bed carries the mountain's sorted body in strict order -- boulders upstream, gravels midway, silts fanning seaward into the light -- every stone blurred slightly at its trailing edge, in transit, already addressed to its right resting place."
+    },
+    "factorization": {
+      "character": "composite",
+      "factors": [2, 2, 5],
+      "gloss": "The Mountain meets Water -- the standing structure meets the solvent that has nowhere to be. Judgment is simply what patience does to monuments."
+    }
+  },
+  "major-21": {
+    "name": "The Blue Marble",
+    "number": "21",
+    "slug": "major-21",
+    "arcana": "major",
+    "meaning": {
+      "upright": "Heat meets life: a planet warm enough to move and alive enough to remember. The whole archive seen at once -- and still being written, the presses still running, the layers still settling. Completion here is not an arrival but a practice; wholeness with the ink still wet.",
+      "inverted": "The whole mistaken for finished: the archive admired instead of continued, the portrait framed while the sitter is still breathing. To see everything at once is a privilege only if you then return to your own layer and keep writing."
+    },
+    "visuals": {
+      "detailed_description": "The full sphere hanging in black: blue and white and ochre, cloud-spirals caught mid-turn, continents visibly a mosaic of every other card's work -- sutured ranges, rusted bands, river deltas fanning into green. At the limb, the view slips briefly into luminous cross-section, the layered depth beneath the visible face still settling, still recording, in the low warm light of a sun just off-frame.",
+      "style_override": "The one card that steps out of cross-section: the planet seen whole from space, the deck's monumental interior grandeur folded into a single exterior view -- with the cross-section idiom surviving only as a luminous section glimpsed at the limb."
+    },
+    "factorization": {
+      "character": "composite",
+      "factors": [3, 7],
+      "gloss": "Heat meets Life -- the interior engine and the animate force, the only marriage that produces a world. Every prime in the deck attends this card, but these two sign it."
+    }
+  }
+}

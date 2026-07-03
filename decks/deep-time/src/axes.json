@@ -1,0 +1,405 @@
+{
+  "name": "The Deep Time Tarot",
+  "slug": "deep-time",
+  "version": "1.0.0",
+  "theme": {
+    "name": "Deep Time",
+    "description": "The Earth is an archive that writes itself -- in ash beds and river gravels, in folded gneiss and the magnetic whisper locked into cooling basalt -- and then buries, deforms, and rereads its own testimony. This is a tarot of geology: of pressure and heat, water and life, rupture and patience. Every card is a moment in the planet's four-and-a-half-billion-year act of self-inscription. A reading is not prophecy; it is stratigraphy -- a core sample of the present, in which the reader learns which forces laid down the layer they are standing on, and which are still moving beneath it. The deck's thesis: the difference between a catastrophe and a landscape is only the patience of the observer.",
+    "creator": "Fable (Claude), at Myk's invitation"
+  },
+  "dialectic": {
+    "axes": [
+      { "name": "Tempo", "poles": ["Sudden", "Gradual"] },
+      { "name": "Vector", "poles": ["Building", "Unmaking"] }
+    ],
+    "cells": {
+      "vents": ["Sudden", "Building"],
+      "strata": ["Gradual", "Building"],
+      "grains": ["Gradual", "Unmaking"],
+      "faults": ["Sudden", "Unmaking"]
+    }
+  },
+  "suits": {
+    "vents": {
+      "index": 0,
+      "name": "Vents",
+      "slug": "vents",
+      "description": "Sudden x Building. Volcanism: new land in a night. The suit of creation by fire -- of arrivals that cannot be recalled, ground that did not exist yesterday, and the price of making something where nothing was. A vent does not negotiate; it commits.",
+      "symbol": {
+        "name": "Erupting cone",
+        "description": "A volcanic cone with an open conduit, a single ejected bomb above the vent -- creation arriving from below.",
+        "svg": "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><defs><mask id=\"dt-vents-m\"><rect width=\"100\" height=\"100\" fill=\"#fff\"/><rect x=\"43\" y=\"38\" width=\"14\" height=\"58\" fill=\"#000\"/></mask></defs><polygon points=\"50,24 96,96 4,96\" fill=\"currentColor\" mask=\"url(#dt-vents-m)\"/><circle cx=\"50\" cy=\"11\" r=\"8\" fill=\"currentColor\"/></svg>"
+      },
+      "meaning": {
+        "upright": [
+          "eruption of the new",
+          "creative force that makes ground",
+          "arrival",
+          "irreversible commitment",
+          "heat that becomes land"
+        ],
+        "inverted": [
+          "destruction disguised as creation",
+          "the new that buries the living",
+          "scorched ground",
+          "spectacle without substance",
+          "commitment that cannot be recalled"
+        ]
+      },
+      "visual_style": "Incandescent oranges and reds against volcanic black; compositions that surge upward and are lit from behind or below; hard rim light on fresh, glassy surfaces; the newest rock in the world, still radiating."
+    },
+    "strata": {
+      "index": 1,
+      "name": "Strata",
+      "slug": "strata",
+      "description": "Gradual x Building. Deposition: the slow archive. The suit of memory, patience, and inheritance -- of small acts compounding into record, and record compounding into ground. Nothing in Strata is dramatic and everything in Strata is permanent.",
+      "symbol": {
+        "name": "Bedding bands",
+        "description": "Four horizontal beds of unequal thickness -- the archive in cross-section, no two layers alike.",
+        "svg": "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"8\" y=\"14\" width=\"84\" height=\"13\" fill=\"currentColor\"/><rect x=\"8\" y=\"37\" width=\"84\" height=\"7\" fill=\"currentColor\"/><rect x=\"8\" y=\"54\" width=\"84\" height=\"21\" fill=\"currentColor\"/><rect x=\"8\" y=\"85\" width=\"84\" height=\"7\" fill=\"currentColor\"/></svg>"
+      },
+      "meaning": {
+        "upright": [
+          "memory",
+          "patience",
+          "the record that vindicates",
+          "compounding of small acts",
+          "inheritance",
+          "stillness that accumulates"
+        ],
+        "inverted": [
+          "burial",
+          "the weight of the past",
+          "history that will not release its grip",
+          "hoarding",
+          "sediment become sludge"
+        ]
+      },
+      "visual_style": "Banded ochres, rusts, and creams; strictly horizontal compositions that read as cross-sections, the picture plane a freshly cut face; flat, even, archival light with no single source; every band subtly distinct."
+    },
+    "grains": {
+      "index": 2,
+      "name": "Grains",
+      "slug": "grains",
+      "description": "Gradual x Unmaking. Weathering and erosion: the long kindness of wind and water. The suit of release, humility, and transport -- of edges surrendered, mass carried elsewhere, and the leveling that frees material for forms it cannot imagine.",
+      "symbol": {
+        "name": "Dune and drift",
+        "description": "A settled dune with grains still travelling above it -- unmaking as movement, movement as gift.",
+        "svg": "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M4 96 Q34 54 60 70 Q82 80 96 96 Z\" fill=\"currentColor\"/><circle cx=\"28\" cy=\"34\" r=\"6\" fill=\"currentColor\"/><circle cx=\"52\" cy=\"20\" r=\"5\" fill=\"currentColor\"/><circle cx=\"72\" cy=\"38\" r=\"5\" fill=\"currentColor\"/><circle cx=\"88\" cy=\"22\" r=\"4\" fill=\"currentColor\"/></svg>"
+      },
+      "meaning": {
+        "upright": [
+          "letting go",
+          "humility",
+          "smoothing",
+          "being carried",
+          "material freed for new forms",
+          "the long kindness of wind and water"
+        ],
+        "inverted": [
+          "attrition",
+          "being worn featureless",
+          "dissipation",
+          "loss of definition",
+          "everything becoming the same sand"
+        ]
+      },
+      "visual_style": "Pale golds, bone, and dust; wind-swept diagonal compositions; hazy, diffuse light without shadows; granular texture throughout, forms dissolving at their downwind edges."
+    },
+    "faults": {
+      "index": 3,
+      "name": "Faults",
+      "slug": "faults",
+      "description": "Sudden x Unmaking. Rupture: stored strain released in a moment. The suit of the honest break -- of realignment along the true line of stress, the relief after the snap, and the cost of pretending the strain was never there.",
+      "symbol": {
+        "name": "Offset blocks",
+        "description": "Two blocks displaced along a slip line -- the same body, no longer at the same height.",
+        "svg": "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"10\" y=\"8\" width=\"28\" height=\"62\" fill=\"currentColor\"/><rect x=\"62\" y=\"30\" width=\"28\" height=\"62\" fill=\"currentColor\"/><line x1=\"56\" y1=\"2\" x2=\"44\" y2=\"98\" stroke=\"currentColor\" stroke-width=\"6\"/></svg>"
+      },
+      "meaning": {
+        "upright": [
+          "release of stored strain",
+          "the truth of where the stress really was",
+          "realignment",
+          "the relief after the break",
+          "sudden clarity"
+        ],
+        "inverted": [
+          "betrayal of foundations",
+          "strain denied until failure",
+          "the break that keeps breaking",
+          "aftershocks",
+          "rupture as habit"
+        ]
+      },
+      "visual_style": "Slates and charcoals with a single seam of vivid mineral color; broken, offset compositions in which continuity is visibly displaced; hard raking light that catches the scarp; stillness immediately after violence."
+    }
+  },
+  "ranks": {
+    "ace": {
+      "index": 0, "arcana": "minor", "numeric_value": 1, "name": "Ace", "symbol": "A",
+      "description": "The seed condition: the first appearance of the process, small enough to miss, already carrying everything it will become.",
+      "question": "Under what conditions does {suit} first appear?",
+      "meaning": {
+        "upright": ["pure potential of the process", "the first sign", "initiation", "a beginning small enough to miss"],
+        "inverted": ["a false start", "potential that never finds its conditions", "the spark without fuel", "beginnings hoarded and never spent"]
+      },
+      "visual_content": "A single small instance of the suit's process, isolated in a wide empty field -- the first mark on a blank surface."
+    },
+    "two": {
+      "index": 1, "arcana": "minor", "numeric_value": 2, "name": "Two", "symbol": "II",
+      "description": "The contact: two bodies meeting along one plane, and the charged surface where they touch.",
+      "question": "What two things does {suit} hold in contact?",
+      "meaning": {
+        "upright": ["juxtaposition", "the meeting surface", "tension held without breaking", "dialogue between two bodies"],
+        "inverted": ["the contact hardened into a frontier", "opposition mistaken for war", "a boundary worshipped", "touch without exchange"]
+      },
+      "visual_content": "Two distinct bodies or materials meeting along one visible plane of contact -- the line where they touch carrying the image's whole charge."
+    },
+    "three": {
+      "index": 2, "arcana": "minor", "numeric_value": 3, "name": "Three", "symbol": "III",
+      "description": "Compounding: the process finding collaborators; a third thing visibly born of two.",
+      "question": "What does {suit} build when it compounds?",
+      "meaning": {
+        "upright": ["first composite growth", "synergy", "structure from repetition", "the collaboration of forces"],
+        "inverted": ["overgrowth", "compounding without design", "the third element that destabilizes", "collaboration become crowding"]
+      },
+      "visual_content": "Three elements of the process in active combination, the third visibly produced by the meeting of the other two."
+    },
+    "four": {
+      "index": 3, "arcana": "minor", "numeric_value": 4, "name": "Four", "symbol": "IV",
+      "description": "Foundation: the process consolidated into a form that holds weight.",
+      "question": "What gives {suit} a foundation?",
+      "meaning": {
+        "upright": ["stability", "a platform", "consolidation", "the process at rest in a form that holds"],
+        "inverted": ["rigidity", "foundations mistaken for finish lines", "the stable form that traps", "consolidation as refusal"]
+      },
+      "visual_content": "A four-square, load-bearing arrangement -- the process built into something that visibly carries weight."
+    },
+    "five": {
+      "index": 4, "arcana": "minor", "numeric_value": 5, "name": "Five", "symbol": "V",
+      "description": "The test: strain applied until the inner structure shows.",
+      "question": "What does {suit} reveal under stress?",
+      "meaning": {
+        "upright": ["revelation under strain", "the hidden made visible by pressure", "the test that clarifies", "strength discovered at the limit"],
+        "inverted": ["strain concealed", "the crack painted over", "revelation refused", "testing prolonged into torment"]
+      },
+      "visual_content": "The process strained to the point of showing its inner structure -- stress lines legible across the form."
+    },
+    "six": {
+      "index": 5, "arcana": "minor", "numeric_value": 6, "name": "Six", "symbol": "VI",
+      "description": "The angle of repose: equilibrium found rather than imposed; the slope at which things hold.",
+      "question": "Where does {suit} find its angle of repose?",
+      "meaning": {
+        "upright": ["equilibrium found not imposed", "the settled slope", "a sustainable arrangement", "grace after adjustment"],
+        "inverted": ["false equilibrium", "a slope oversteepened", "balance kept by ignoring the load", "rest mistaken for resolution"]
+      },
+      "visual_content": "The process settled at its natural angle -- a poised, self-organized arrangement holding without visible effort."
+    },
+    "seven": {
+      "index": 6, "arcana": "minor", "numeric_value": 7, "name": "Seven", "symbol": "VII",
+      "description": "Jointing: division along the natural fracture lines; the parts the whole was always made of.",
+      "question": "Into what parts does {suit} break?",
+      "meaning": {
+        "upright": ["differentiation", "knowing the natural fracture lines", "honest division", "each part carrying the pattern of the whole"],
+        "inverted": ["fragmentation", "division along false lines", "parts warring over the whole", "a break that loses the pattern"]
+      },
+      "visual_content": "The process divided into distinct parts along visible natural lines -- each fragment still legible as the whole in miniature."
+    },
+    "eight": {
+      "index": 7, "arcana": "minor", "numeric_value": 8, "name": "Eight", "symbol": "VIII",
+      "description": "Induration: the process hardened into an instrument; endurance applied with economy.",
+      "question": "What is a hardened {suit} capable of?",
+      "meaning": {
+        "upright": ["competence", "the process become an instrument", "endurance applied", "power exercised with economy"],
+        "inverted": ["hardness become brittleness", "capability serving habit", "the tool that knows one motion", "strength without judgment"]
+      },
+      "visual_content": "The hardened, refined form of the process at work -- force applied precisely, nothing wasted."
+    },
+    "nine": {
+      "index": 8, "arcana": "minor", "numeric_value": 9, "name": "Nine", "symbol": "IX",
+      "description": "The long intention: the shape the process was always making, one step from complete.",
+      "question": "What is the destiny of {suit}?",
+      "meaning": {
+        "upright": ["maturity", "the long intention visible", "the shape almost finished", "arrival within sight"],
+        "inverted": ["destiny as rut", "the completed shape resented", "telos mistaken for entitlement", "ripeness left to spoil"]
+      },
+      "visual_content": "The process near its full expression -- the final shape legible, one step from complete."
+    },
+    "ten": {
+      "index": 9, "arcana": "minor", "numeric_value": 10, "name": "Ten", "symbol": "X",
+      "description": "The unconformity: an ending that becomes a surface others build on; what completion leaves legible.",
+      "question": "What remains when {suit} completes?",
+      "meaning": {
+        "upright": ["completion as legacy", "an ending that becomes ground", "transmission", "the surface on which the new begins"],
+        "inverted": ["overstayed completion", "the record that buries its heirs", "an ending refused", "legacy as dead weight"]
+      },
+      "visual_content": "The completed work of the process as a surface or horizon on which something new has visibly begun."
+    },
+    "prospector": {
+      "index": 10, "arcana": "minor", "numeric_value": 11, "name": "Prospector", "symbol": "P",
+      "description": "The seeker: reads surface signs for what lies beneath; hope with a hammer. First of the four human presences in the deck -- in deep time, people appear only in the last instant.",
+      "meaning": {
+        "upright": ["the educated hunch", "hope with a hammer", "reading surface signs for depth", "appetite for discovery", "the courage to stake a claim"],
+        "inverted": ["gold fever", "seeing only what is sought", "claims staked on noise", "discovery hoarded", "the hunch that outruns the evidence"]
+      },
+      "visual_content": "The tools and marks of a lone search through the suit's terrain -- a fresh chip in the rock, a cairn, a claim newly staked -- with a single small figure at work."
+    },
+    "surveyor": {
+      "index": 11, "arcana": "minor", "numeric_value": 12, "name": "Surveyor", "symbol": "S",
+      "description": "The measurer: converts terrain into knowledge; the discipline of instruments and the humility of triangulation.",
+      "meaning": {
+        "upright": ["measurement", "patient triangulation", "terrain converted to knowledge", "the discipline of instruments", "precision in service of others"],
+        "inverted": ["the map mistaken for the mountain", "precision without purpose", "surveying forever to avoid deciding", "the instrument trusted over the eye"]
+      },
+      "visual_content": "A single figure with instruments taking the measure of the suit's terrain -- sightlines, stakes, careful notation against an indifferent immensity."
+    },
+    "reader": {
+      "index": 12, "arcana": "minor", "numeric_value": 13, "name": "Reader", "symbol": "R",
+      "description": "The interpreter: reads the outcrop as testimony, and hears the gaps -- the unconformities -- as loudly as the layers.",
+      "meaning": {
+        "upright": ["interpretation", "hearing testimony in stone", "patience with ambiguity", "honoring the gaps in the record", "the past given voice"],
+        "inverted": ["overreading", "testimony bent to a thesis", "gaps filled with wish", "the record made to flatter the reader"]
+      },
+      "visual_content": "A single figure close against an exposed face of the suit's record, reading it like a text -- one hand flat on the surface."
+    },
+    "witness": {
+      "index": 13, "arcana": "minor", "numeric_value": 14, "name": "Witness", "symbol": "W",
+      "description": "The holder: stands in the presence of deep time without flinching; carries the whole record and asks nothing of it.",
+      "meaning": {
+        "upright": ["presence without demand", "awe metabolized into steadiness", "holding the whole span", "humility that enlarges", "time made bearable"],
+        "inverted": ["paralysis before scale", "awe curdled into insignificance", "witnessing as an excuse for inaction", "the span held at arm's length"]
+      },
+      "visual_content": "A small, still figure before an immensity of the suit's making -- not measuring, not reading; simply present."
+    }
+  },
+  "transversal": {
+    "name": "The Rock Cycle",
+    "description": "The circuit every parcel of stone rides: melted, crystallized, uplifted, weathered, carried, deposited, buried, transformed -- and melted again. The deck's second worldview: not what a thing is, but where it stands in the one journey all stone shares. Sublimated into every card as light, weight, and weather.",
+    "ordering_rationale": "The rock cycle read as a single parcel of stone's journey. The order is the process itself: each station is the only place the previous one can go. Melt is the origin because it is the state without memory -- the deck begins where the record cannot.",
+    "suit_stride": 3,
+    "stations": {
+      "melt": {
+        "slug": "melt", "index": 0, "name": "Melt",
+        "description": "Return to the undifferentiated -- all structure dissolved back into potential.",
+        "symbol": {
+          "name": "Rising droplet",
+          "description": "A molten drop, rising rather than falling -- matter returned to potential.",
+          "svg": "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M50 6 C50 6 80 46 80 66 A30 30 0 1 1 20 66 C20 46 50 6 50 6 Z\" fill=\"currentColor\"/></svg>"
+        },
+        "meaning": {
+          "upright": ["total potential", "the forge", "dissolution of form", "the state without memory", "readiness to become anything"],
+          "inverted": ["annihilation of identity", "formlessness as loss", "the archive erased", "potential that consumes the actual"]
+        },
+        "visual_motif": "Deep incandescence from below; forms softened at their edges; the air itself shimmering; black masses against orange-white heat."
+      },
+      "crystallization": {
+        "slug": "crystallization", "index": 1, "name": "Crystallization",
+        "description": "Cooling into first form -- minerals lock, and commitment becomes structure.",
+        "symbol": {
+          "name": "Facet",
+          "description": "A five-faced crystal -- the first commitment of matter to form.",
+          "svg": "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><polygon points=\"50,5 86,34 72,95 28,95 14,34\" fill=\"currentColor\"/></svg>"
+        },
+        "meaning": {
+          "upright": ["commitment", "first structure", "purity of form", "the lattice chosen", "clarity that costs freedom"],
+          "inverted": ["premature rigidity", "brittleness", "form chosen before it was understood", "purity as exclusion"]
+        },
+        "visual_motif": "Faceted clarity; sharp internal geometry; cool mineral light; the highest definition in the deck -- every edge exact."
+      },
+      "uplift": {
+        "slug": "uplift", "index": 2, "name": "Uplift",
+        "description": "The buried brought to light -- elevation, exposure, and the price of being seen.",
+        "symbol": {
+          "name": "Double chevron",
+          "description": "Two chevrons rising -- the deep made visible.",
+          "svg": "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><polygon points=\"50,6 92,48 70,48 50,28 30,48 8,48\" fill=\"currentColor\"/><polygon points=\"50,48 92,90 70,90 50,70 30,90 8,90\" fill=\"currentColor\"/></svg>"
+        },
+        "meaning": {
+          "upright": ["emergence into view", "elevation", "exposure", "the reward of deep work made visible", "standing where the pressure pushed"],
+          "inverted": ["overexposure", "the precariousness of height", "raised only to be weathered", "visibility mistaken for arrival"]
+        },
+        "visual_motif": "Raised horizons; thin bright air; long shadows; tilted planes -- everything at an angle it was not formed at."
+      },
+      "weathering": {
+        "slug": "weathering", "index": 3, "name": "Weathering",
+        "description": "The surface meets the sky -- breakdown in place, the honest critique of exposure.",
+        "symbol": {
+          "name": "Pitted disc",
+          "description": "A disc opened by three pits -- the surface honestly worked.",
+          "svg": "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><defs><mask id=\"dt-weath-m\"><rect width=\"100\" height=\"100\" fill=\"#fff\"/><circle cx=\"38\" cy=\"38\" r=\"9\" fill=\"#000\"/><circle cx=\"66\" cy=\"52\" r=\"7\" fill=\"#000\"/><circle cx=\"44\" cy=\"70\" r=\"6\" fill=\"#000\"/></mask></defs><circle cx=\"50\" cy=\"50\" r=\"42\" fill=\"currentColor\" mask=\"url(#dt-weath-m)\"/></svg>"
+        },
+        "meaning": {
+          "upright": ["honest critique", "breakdown in place", "softening", "the surface renegotiated", "truth applied gently and constantly"],
+          "inverted": ["corrosion", "being picked apart", "critique without construction", "the surface given up entirely"]
+        },
+        "visual_motif": "Pitted, mottled surfaces; diffuse open daylight; rounded edges; lichen-flecked color -- everything touched, nothing spared."
+      },
+      "transport": {
+        "slug": "transport", "index": 4, "name": "Transport",
+        "description": "The journey of fragments -- carried, sorted, and re-contextualized on the way.",
+        "symbol": {
+          "name": "Carrying current",
+          "description": "An arrow of current -- material in transit.",
+          "svg": "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"6\" y=\"44\" width=\"58\" height=\"12\" fill=\"currentColor\"/><polygon points=\"64,28 96,50 64,72\" fill=\"currentColor\"/></svg>"
+        },
+        "meaning": {
+          "upright": ["movement", "being carried", "change of context", "sorting by the journey", "distance as teacher"],
+          "inverted": ["rootlessness", "lost provenance", "carried past the destination", "identity abraded in transit"]
+        },
+        "visual_motif": "Directional flow; blurred trailing edges; implied current; cool wet greys and blues -- nothing at rest, everything en route."
+      },
+      "deposition": {
+        "slug": "deposition", "index": 5, "name": "Deposition",
+        "description": "Settling -- arrival, rest, and the choice of where to lie down.",
+        "symbol": {
+          "name": "Settling grains",
+          "description": "Grains descending onto a bed -- arrival made permanent.",
+          "svg": "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><circle cx=\"30\" cy=\"24\" r=\"7\" fill=\"currentColor\"/><circle cx=\"54\" cy=\"40\" r=\"6\" fill=\"currentColor\"/><circle cx=\"72\" cy=\"26\" r=\"5\" fill=\"currentColor\"/><rect x=\"8\" y=\"68\" width=\"84\" height=\"16\" fill=\"currentColor\"/></svg>"
+        },
+        "meaning": {
+          "upright": ["arrival", "settling", "choosing rest", "the journey converted into record", "peace that accumulates"],
+          "inverted": ["stagnation", "silting up", "rest chosen too early", "the archive as swamp"]
+        },
+        "visual_motif": "Horizontal calm; layered stillness; low warm light near the ground; quiet water -- the world laid down flat and easy."
+      },
+      "burial": {
+        "slug": "burial", "index": 6, "name": "Burial",
+        "description": "The past sealed -- accumulation overhead, pressure beginning, preservation by weight.",
+        "symbol": {
+          "name": "Weight over seed",
+          "description": "A bar of overburden above a buried round -- the sealed and keeping dark.",
+          "svg": "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"8\" y=\"14\" width=\"84\" height=\"16\" fill=\"currentColor\"/><circle cx=\"50\" cy=\"66\" r=\"20\" fill=\"currentColor\"/></svg>"
+        },
+        "meaning": {
+          "upright": ["the sealed past", "incubation", "pressure that preserves", "work done in the dark", "safety in depth"],
+          "inverted": ["suffocation", "the repressed", "preservation become imprisonment", "the dark mistaken for home"]
+        },
+        "visual_motif": "Compressed darkness; weight pressing from above; deepened, airless color; close framing -- the frame itself part of the load."
+      },
+      "metamorphism": {
+        "slug": "metamorphism", "index": 7, "name": "Metamorphism",
+        "description": "Transformation without dissolution -- becoming other while remaining oneself.",
+        "symbol": {
+          "name": "Folded band",
+          "description": "A single band folded back on itself -- changed utterly, still one piece.",
+          "svg": "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M8 68 Q28 22 50 48 Q72 74 92 34\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"13\" stroke-linecap=\"round\"/></svg>"
+        },
+        "meaning": {
+          "upright": ["transformation without dissolution", "depth work", "recrystallized identity", "the same substance, a truer form", "change that keeps faith"],
+          "inverted": ["deformation", "warping under stress", "transformation that loses the thread", "change endured rather than undergone"]
+        },
+        "visual_motif": "Folded, banded forms; the sheen of strain; veined color under dim heat; contorted composition -- beauty made of endured force."
+      }
+    }
+  },
+  "major_arcana": {
+    "story": "The Earth learning to write. Act I (0-7): the irreducible forces assemble and the first world is built -- a planet with no memory acquires the means of record. Act II (8-14): the engine turns; cycles, returns, and losses -- the record is made, buried, and paid for. Act III (15-21): exposure and revelation -- the record surfaces, is read, and is finally seen whole, still being written.",
+    "visual_style": "Cross-section grandeur: the picture plane cut clean through the planet. Monumental scale with no human figures anywhere in the trumps; deep geological color -- basalt black, magma orange, granite grey, glacial and abyssal blue-greens; luminous mineral light, as if the stone itself were the light source.",
+    "symbol": {
+      "name": "Hourglass of stone",
+      "description": "Two triangles meeting at a point -- strata above, strata below, time as the waist between them.",
+      "svg": "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><polygon points=\"18,8 82,8 50,50\" fill=\"currentColor\"/><polygon points=\"18,92 82,92 50,50\" fill=\"currentColor\"/></svg>"
+    }
+  }
+}

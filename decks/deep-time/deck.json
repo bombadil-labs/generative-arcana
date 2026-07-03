@@ -1,0 +1,2083 @@
+{
+  "name": "The Deep Time Tarot",
+  "slug": "deep-time",
+  "version": "1.0.0",
+  "theme": {
+    "name": "Deep Time",
+    "description": "The Earth is an archive that writes itself -- in ash beds and river gravels, in folded gneiss and the magnetic whisper locked into cooling basalt -- and then buries, deforms, and rereads its own testimony. This is a tarot of geology: of pressure and heat, water and life, rupture and patience. Every card is a moment in the planet's four-and-a-half-billion-year act of self-inscription. A reading is not prophecy; it is stratigraphy -- a core sample of the present, in which the reader learns which forces laid down the layer they are standing on, and which are still moving beneath it. The deck's thesis: the difference between a catastrophe and a landscape is only the patience of the observer.",
+    "creator": "Fable (Claude), at Myk's invitation"
+  },
+  "suits": {
+    "vents": {
+      "index": 0,
+      "name": "Vents",
+      "slug": "vents",
+      "description": "Sudden x Building. Volcanism: new land in a night. The suit of creation by fire -- of arrivals that cannot be recalled, ground that did not exist yesterday, and the price of making something where nothing was. A vent does not negotiate; it commits.",
+      "symbol": {
+        "name": "Erupting cone",
+        "description": "A volcanic cone with an open conduit, a single ejected bomb above the vent -- creation arriving from below.",
+        "svg": "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><defs><mask id=\"dt-vents-m\"><rect width=\"100\" height=\"100\" fill=\"#fff\"/><rect x=\"43\" y=\"38\" width=\"14\" height=\"58\" fill=\"#000\"/></mask></defs><polygon points=\"50,24 96,96 4,96\" fill=\"currentColor\" mask=\"url(#dt-vents-m)\"/><circle cx=\"50\" cy=\"11\" r=\"8\" fill=\"currentColor\"/></svg>"
+      },
+      "meaning": {
+        "upright": [
+          "eruption of the new",
+          "creative force that makes ground",
+          "arrival",
+          "irreversible commitment",
+          "heat that becomes land"
+        ],
+        "inverted": [
+          "destruction disguised as creation",
+          "the new that buries the living",
+          "scorched ground",
+          "spectacle without substance",
+          "commitment that cannot be recalled"
+        ]
+      },
+      "visual_style": "Incandescent oranges and reds against volcanic black; compositions that surge upward and are lit from behind or below; hard rim light on fresh, glassy surfaces; the newest rock in the world, still radiating."
+    },
+    "strata": {
+      "index": 1,
+      "name": "Strata",
+      "slug": "strata",
+      "description": "Gradual x Building. Deposition: the slow archive. The suit of memory, patience, and inheritance -- of small acts compounding into record, and record compounding into ground. Nothing in Strata is dramatic and everything in Strata is permanent.",
+      "symbol": {
+        "name": "Bedding bands",
+        "description": "Four horizontal beds of unequal thickness -- the archive in cross-section, no two layers alike.",
+        "svg": "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"8\" y=\"14\" width=\"84\" height=\"13\" fill=\"currentColor\"/><rect x=\"8\" y=\"37\" width=\"84\" height=\"7\" fill=\"currentColor\"/><rect x=\"8\" y=\"54\" width=\"84\" height=\"21\" fill=\"currentColor\"/><rect x=\"8\" y=\"85\" width=\"84\" height=\"7\" fill=\"currentColor\"/></svg>"
+      },
+      "meaning": {
+        "upright": [
+          "memory",
+          "patience",
+          "the record that vindicates",
+          "compounding of small acts",
+          "inheritance",
+          "stillness that accumulates"
+        ],
+        "inverted": [
+          "burial",
+          "the weight of the past",
+          "history that will not release its grip",
+          "hoarding",
+          "sediment become sludge"
+        ]
+      },
+      "visual_style": "Banded ochres, rusts, and creams; strictly horizontal compositions that read as cross-sections, the picture plane a freshly cut face; flat, even, archival light with no single source; every band subtly distinct."
+    },
+    "grains": {
+      "index": 2,
+      "name": "Grains",
+      "slug": "grains",
+      "description": "Gradual x Unmaking. Weathering and erosion: the long kindness of wind and water. The suit of release, humility, and transport -- of edges surrendered, mass carried elsewhere, and the leveling that frees material for forms it cannot imagine.",
+      "symbol": {
+        "name": "Dune and drift",
+        "description": "A settled dune with grains still travelling above it -- unmaking as movement, movement as gift.",
+        "svg": "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M4 96 Q34 54 60 70 Q82 80 96 96 Z\" fill=\"currentColor\"/><circle cx=\"28\" cy=\"34\" r=\"6\" fill=\"currentColor\"/><circle cx=\"52\" cy=\"20\" r=\"5\" fill=\"currentColor\"/><circle cx=\"72\" cy=\"38\" r=\"5\" fill=\"currentColor\"/><circle cx=\"88\" cy=\"22\" r=\"4\" fill=\"currentColor\"/></svg>"
+      },
+      "meaning": {
+        "upright": [
+          "letting go",
+          "humility",
+          "smoothing",
+          "being carried",
+          "material freed for new forms",
+          "the long kindness of wind and water"
+        ],
+        "inverted": [
+          "attrition",
+          "being worn featureless",
+          "dissipation",
+          "loss of definition",
+          "everything becoming the same sand"
+        ]
+      },
+      "visual_style": "Pale golds, bone, and dust; wind-swept diagonal compositions; hazy, diffuse light without shadows; granular texture throughout, forms dissolving at their downwind edges."
+    },
+    "faults": {
+      "index": 3,
+      "name": "Faults",
+      "slug": "faults",
+      "description": "Sudden x Unmaking. Rupture: stored strain released in a moment. The suit of the honest break -- of realignment along the true line of stress, the relief after the snap, and the cost of pretending the strain was never there.",
+      "symbol": {
+        "name": "Offset blocks",
+        "description": "Two blocks displaced along a slip line -- the same body, no longer at the same height.",
+        "svg": "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"10\" y=\"8\" width=\"28\" height=\"62\" fill=\"currentColor\"/><rect x=\"62\" y=\"30\" width=\"28\" height=\"62\" fill=\"currentColor\"/><line x1=\"56\" y1=\"2\" x2=\"44\" y2=\"98\" stroke=\"currentColor\" stroke-width=\"6\"/></svg>"
+      },
+      "meaning": {
+        "upright": [
+          "release of stored strain",
+          "the truth of where the stress really was",
+          "realignment",
+          "the relief after the break",
+          "sudden clarity"
+        ],
+        "inverted": [
+          "betrayal of foundations",
+          "strain denied until failure",
+          "the break that keeps breaking",
+          "aftershocks",
+          "rupture as habit"
+        ]
+      },
+      "visual_style": "Slates and charcoals with a single seam of vivid mineral color; broken, offset compositions in which continuity is visibly displaced; hard raking light that catches the scarp; stillness immediately after violence."
+    }
+  },
+  "ranks": {
+    "ace": {
+      "index": 0,
+      "arcana": "minor",
+      "numeric_value": 1,
+      "name": "Ace",
+      "symbol": "A",
+      "description": "The seed condition: the first appearance of the process, small enough to miss, already carrying everything it will become.",
+      "question": "Under what conditions does {suit} first appear?",
+      "meaning": {
+        "upright": [
+          "pure potential of the process",
+          "the first sign",
+          "initiation",
+          "a beginning small enough to miss"
+        ],
+        "inverted": [
+          "a false start",
+          "potential that never finds its conditions",
+          "the spark without fuel",
+          "beginnings hoarded and never spent"
+        ]
+      },
+      "visual_content": "A single small instance of the suit's process, isolated in a wide empty field -- the first mark on a blank surface."
+    },
+    "two": {
+      "index": 1,
+      "arcana": "minor",
+      "numeric_value": 2,
+      "name": "Two",
+      "symbol": "II",
+      "description": "The contact: two bodies meeting along one plane, and the charged surface where they touch.",
+      "question": "What two things does {suit} hold in contact?",
+      "meaning": {
+        "upright": [
+          "juxtaposition",
+          "the meeting surface",
+          "tension held without breaking",
+          "dialogue between two bodies"
+        ],
+        "inverted": [
+          "the contact hardened into a frontier",
+          "opposition mistaken for war",
+          "a boundary worshipped",
+          "touch without exchange"
+        ]
+      },
+      "visual_content": "Two distinct bodies or materials meeting along one visible plane of contact -- the line where they touch carrying the image's whole charge."
+    },
+    "three": {
+      "index": 2,
+      "arcana": "minor",
+      "numeric_value": 3,
+      "name": "Three",
+      "symbol": "III",
+      "description": "Compounding: the process finding collaborators; a third thing visibly born of two.",
+      "question": "What does {suit} build when it compounds?",
+      "meaning": {
+        "upright": [
+          "first composite growth",
+          "synergy",
+          "structure from repetition",
+          "the collaboration of forces"
+        ],
+        "inverted": [
+          "overgrowth",
+          "compounding without design",
+          "the third element that destabilizes",
+          "collaboration become crowding"
+        ]
+      },
+      "visual_content": "Three elements of the process in active combination, the third visibly produced by the meeting of the other two."
+    },
+    "four": {
+      "index": 3,
+      "arcana": "minor",
+      "numeric_value": 4,
+      "name": "Four",
+      "symbol": "IV",
+      "description": "Foundation: the process consolidated into a form that holds weight.",
+      "question": "What gives {suit} a foundation?",
+      "meaning": {
+        "upright": [
+          "stability",
+          "a platform",
+          "consolidation",
+          "the process at rest in a form that holds"
+        ],
+        "inverted": [
+          "rigidity",
+          "foundations mistaken for finish lines",
+          "the stable form that traps",
+          "consolidation as refusal"
+        ]
+      },
+      "visual_content": "A four-square, load-bearing arrangement -- the process built into something that visibly carries weight."
+    },
+    "five": {
+      "index": 4,
+      "arcana": "minor",
+      "numeric_value": 5,
+      "name": "Five",
+      "symbol": "V",
+      "description": "The test: strain applied until the inner structure shows.",
+      "question": "What does {suit} reveal under stress?",
+      "meaning": {
+        "upright": [
+          "revelation under strain",
+          "the hidden made visible by pressure",
+          "the test that clarifies",
+          "strength discovered at the limit"
+        ],
+        "inverted": [
+          "strain concealed",
+          "the crack painted over",
+          "revelation refused",
+          "testing prolonged into torment"
+        ]
+      },
+      "visual_content": "The process strained to the point of showing its inner structure -- stress lines legible across the form."
+    },
+    "six": {
+      "index": 5,
+      "arcana": "minor",
+      "numeric_value": 6,
+      "name": "Six",
+      "symbol": "VI",
+      "description": "The angle of repose: equilibrium found rather than imposed; the slope at which things hold.",
+      "question": "Where does {suit} find its angle of repose?",
+      "meaning": {
+        "upright": [
+          "equilibrium found not imposed",
+          "the settled slope",
+          "a sustainable arrangement",
+          "grace after adjustment"
+        ],
+        "inverted": [
+          "false equilibrium",
+          "a slope oversteepened",
+          "balance kept by ignoring the load",
+          "rest mistaken for resolution"
+        ]
+      },
+      "visual_content": "The process settled at its natural angle -- a poised, self-organized arrangement holding without visible effort."
+    },
+    "seven": {
+      "index": 6,
+      "arcana": "minor",
+      "numeric_value": 7,
+      "name": "Seven",
+      "symbol": "VII",
+      "description": "Jointing: division along the natural fracture lines; the parts the whole was always made of.",
+      "question": "Into what parts does {suit} break?",
+      "meaning": {
+        "upright": [
+          "differentiation",
+          "knowing the natural fracture lines",
+          "honest division",
+          "each part carrying the pattern of the whole"
+        ],
+        "inverted": [
+          "fragmentation",
+          "division along false lines",
+          "parts warring over the whole",
+          "a break that loses the pattern"
+        ]
+      },
+      "visual_content": "The process divided into distinct parts along visible natural lines -- each fragment still legible as the whole in miniature."
+    },
+    "eight": {
+      "index": 7,
+      "arcana": "minor",
+      "numeric_value": 8,
+      "name": "Eight",
+      "symbol": "VIII",
+      "description": "Induration: the process hardened into an instrument; endurance applied with economy.",
+      "question": "What is a hardened {suit} capable of?",
+      "meaning": {
+        "upright": [
+          "competence",
+          "the process become an instrument",
+          "endurance applied",
+          "power exercised with economy"
+        ],
+        "inverted": [
+          "hardness become brittleness",
+          "capability serving habit",
+          "the tool that knows one motion",
+          "strength without judgment"
+        ]
+      },
+      "visual_content": "The hardened, refined form of the process at work -- force applied precisely, nothing wasted."
+    },
+    "nine": {
+      "index": 8,
+      "arcana": "minor",
+      "numeric_value": 9,
+      "name": "Nine",
+      "symbol": "IX",
+      "description": "The long intention: the shape the process was always making, one step from complete.",
+      "question": "What is the destiny of {suit}?",
+      "meaning": {
+        "upright": [
+          "maturity",
+          "the long intention visible",
+          "the shape almost finished",
+          "arrival within sight"
+        ],
+        "inverted": [
+          "destiny as rut",
+          "the completed shape resented",
+          "telos mistaken for entitlement",
+          "ripeness left to spoil"
+        ]
+      },
+      "visual_content": "The process near its full expression -- the final shape legible, one step from complete."
+    },
+    "ten": {
+      "index": 9,
+      "arcana": "minor",
+      "numeric_value": 10,
+      "name": "Ten",
+      "symbol": "X",
+      "description": "The unconformity: an ending that becomes a surface others build on; what completion leaves legible.",
+      "question": "What remains when {suit} completes?",
+      "meaning": {
+        "upright": [
+          "completion as legacy",
+          "an ending that becomes ground",
+          "transmission",
+          "the surface on which the new begins"
+        ],
+        "inverted": [
+          "overstayed completion",
+          "the record that buries its heirs",
+          "an ending refused",
+          "legacy as dead weight"
+        ]
+      },
+      "visual_content": "The completed work of the process as a surface or horizon on which something new has visibly begun."
+    },
+    "prospector": {
+      "index": 10,
+      "arcana": "minor",
+      "numeric_value": 11,
+      "name": "Prospector",
+      "symbol": "P",
+      "description": "The seeker: reads surface signs for what lies beneath; hope with a hammer. First of the four human presences in the deck -- in deep time, people appear only in the last instant.",
+      "meaning": {
+        "upright": [
+          "the educated hunch",
+          "hope with a hammer",
+          "reading surface signs for depth",
+          "appetite for discovery",
+          "the courage to stake a claim"
+        ],
+        "inverted": [
+          "gold fever",
+          "seeing only what is sought",
+          "claims staked on noise",
+          "discovery hoarded",
+          "the hunch that outruns the evidence"
+        ]
+      },
+      "visual_content": "The tools and marks of a lone search through the suit's terrain -- a fresh chip in the rock, a cairn, a claim newly staked -- with a single small figure at work."
+    },
+    "surveyor": {
+      "index": 11,
+      "arcana": "minor",
+      "numeric_value": 12,
+      "name": "Surveyor",
+      "symbol": "S",
+      "description": "The measurer: converts terrain into knowledge; the discipline of instruments and the humility of triangulation.",
+      "meaning": {
+        "upright": [
+          "measurement",
+          "patient triangulation",
+          "terrain converted to knowledge",
+          "the discipline of instruments",
+          "precision in service of others"
+        ],
+        "inverted": [
+          "the map mistaken for the mountain",
+          "precision without purpose",
+          "surveying forever to avoid deciding",
+          "the instrument trusted over the eye"
+        ]
+      },
+      "visual_content": "A single figure with instruments taking the measure of the suit's terrain -- sightlines, stakes, careful notation against an indifferent immensity."
+    },
+    "reader": {
+      "index": 12,
+      "arcana": "minor",
+      "numeric_value": 13,
+      "name": "Reader",
+      "symbol": "R",
+      "description": "The interpreter: reads the outcrop as testimony, and hears the gaps -- the unconformities -- as loudly as the layers.",
+      "meaning": {
+        "upright": [
+          "interpretation",
+          "hearing testimony in stone",
+          "patience with ambiguity",
+          "honoring the gaps in the record",
+          "the past given voice"
+        ],
+        "inverted": [
+          "overreading",
+          "testimony bent to a thesis",
+          "gaps filled with wish",
+          "the record made to flatter the reader"
+        ]
+      },
+      "visual_content": "A single figure close against an exposed face of the suit's record, reading it like a text -- one hand flat on the surface."
+    },
+    "witness": {
+      "index": 13,
+      "arcana": "minor",
+      "numeric_value": 14,
+      "name": "Witness",
+      "symbol": "W",
+      "description": "The holder: stands in the presence of deep time without flinching; carries the whole record and asks nothing of it.",
+      "meaning": {
+        "upright": [
+          "presence without demand",
+          "awe metabolized into steadiness",
+          "holding the whole span",
+          "humility that enlarges",
+          "time made bearable"
+        ],
+        "inverted": [
+          "paralysis before scale",
+          "awe curdled into insignificance",
+          "witnessing as an excuse for inaction",
+          "the span held at arm's length"
+        ]
+      },
+      "visual_content": "A small, still figure before an immensity of the suit's making -- not measuring, not reading; simply present."
+    }
+  },
+  "transversal": {
+    "name": "The Rock Cycle",
+    "description": "The circuit every parcel of stone rides: melted, crystallized, uplifted, weathered, carried, deposited, buried, transformed -- and melted again. The deck's second worldview: not what a thing is, but where it stands in the one journey all stone shares. Sublimated into every card as light, weight, and weather.",
+    "ordering_rationale": "The rock cycle read as a single parcel of stone's journey. The order is the process itself: each station is the only place the previous one can go. Melt is the origin because it is the state without memory -- the deck begins where the record cannot.",
+    "suit_stride": 3,
+    "stations": {
+      "melt": {
+        "slug": "melt",
+        "index": 0,
+        "name": "Melt",
+        "description": "Return to the undifferentiated -- all structure dissolved back into potential.",
+        "symbol": {
+          "name": "Rising droplet",
+          "description": "A molten drop, rising rather than falling -- matter returned to potential.",
+          "svg": "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M50 6 C50 6 80 46 80 66 A30 30 0 1 1 20 66 C20 46 50 6 50 6 Z\" fill=\"currentColor\"/></svg>"
+        },
+        "meaning": {
+          "upright": [
+            "total potential",
+            "the forge",
+            "dissolution of form",
+            "the state without memory",
+            "readiness to become anything"
+          ],
+          "inverted": [
+            "annihilation of identity",
+            "formlessness as loss",
+            "the archive erased",
+            "potential that consumes the actual"
+          ]
+        },
+        "visual_motif": "Deep incandescence from below; forms softened at their edges; the air itself shimmering; black masses against orange-white heat."
+      },
+      "crystallization": {
+        "slug": "crystallization",
+        "index": 1,
+        "name": "Crystallization",
+        "description": "Cooling into first form -- minerals lock, and commitment becomes structure.",
+        "symbol": {
+          "name": "Facet",
+          "description": "A five-faced crystal -- the first commitment of matter to form.",
+          "svg": "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><polygon points=\"50,5 86,34 72,95 28,95 14,34\" fill=\"currentColor\"/></svg>"
+        },
+        "meaning": {
+          "upright": [
+            "commitment",
+            "first structure",
+            "purity of form",
+            "the lattice chosen",
+            "clarity that costs freedom"
+          ],
+          "inverted": [
+            "premature rigidity",
+            "brittleness",
+            "form chosen before it was understood",
+            "purity as exclusion"
+          ]
+        },
+        "visual_motif": "Faceted clarity; sharp internal geometry; cool mineral light; the highest definition in the deck -- every edge exact."
+      },
+      "uplift": {
+        "slug": "uplift",
+        "index": 2,
+        "name": "Uplift",
+        "description": "The buried brought to light -- elevation, exposure, and the price of being seen.",
+        "symbol": {
+          "name": "Double chevron",
+          "description": "Two chevrons rising -- the deep made visible.",
+          "svg": "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><polygon points=\"50,6 92,48 70,48 50,28 30,48 8,48\" fill=\"currentColor\"/><polygon points=\"50,48 92,90 70,90 50,70 30,90 8,90\" fill=\"currentColor\"/></svg>"
+        },
+        "meaning": {
+          "upright": [
+            "emergence into view",
+            "elevation",
+            "exposure",
+            "the reward of deep work made visible",
+            "standing where the pressure pushed"
+          ],
+          "inverted": [
+            "overexposure",
+            "the precariousness of height",
+            "raised only to be weathered",
+            "visibility mistaken for arrival"
+          ]
+        },
+        "visual_motif": "Raised horizons; thin bright air; long shadows; tilted planes -- everything at an angle it was not formed at."
+      },
+      "weathering": {
+        "slug": "weathering",
+        "index": 3,
+        "name": "Weathering",
+        "description": "The surface meets the sky -- breakdown in place, the honest critique of exposure.",
+        "symbol": {
+          "name": "Pitted disc",
+          "description": "A disc opened by three pits -- the surface honestly worked.",
+          "svg": "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><defs><mask id=\"dt-weath-m\"><rect width=\"100\" height=\"100\" fill=\"#fff\"/><circle cx=\"38\" cy=\"38\" r=\"9\" fill=\"#000\"/><circle cx=\"66\" cy=\"52\" r=\"7\" fill=\"#000\"/><circle cx=\"44\" cy=\"70\" r=\"6\" fill=\"#000\"/></mask></defs><circle cx=\"50\" cy=\"50\" r=\"42\" fill=\"currentColor\" mask=\"url(#dt-weath-m)\"/></svg>"
+        },
+        "meaning": {
+          "upright": [
+            "honest critique",
+            "breakdown in place",
+            "softening",
+            "the surface renegotiated",
+            "truth applied gently and constantly"
+          ],
+          "inverted": [
+            "corrosion",
+            "being picked apart",
+            "critique without construction",
+            "the surface given up entirely"
+          ]
+        },
+        "visual_motif": "Pitted, mottled surfaces; diffuse open daylight; rounded edges; lichen-flecked color -- everything touched, nothing spared."
+      },
+      "transport": {
+        "slug": "transport",
+        "index": 4,
+        "name": "Transport",
+        "description": "The journey of fragments -- carried, sorted, and re-contextualized on the way.",
+        "symbol": {
+          "name": "Carrying current",
+          "description": "An arrow of current -- material in transit.",
+          "svg": "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"6\" y=\"44\" width=\"58\" height=\"12\" fill=\"currentColor\"/><polygon points=\"64,28 96,50 64,72\" fill=\"currentColor\"/></svg>"
+        },
+        "meaning": {
+          "upright": [
+            "movement",
+            "being carried",
+            "change of context",
+            "sorting by the journey",
+            "distance as teacher"
+          ],
+          "inverted": [
+            "rootlessness",
+            "lost provenance",
+            "carried past the destination",
+            "identity abraded in transit"
+          ]
+        },
+        "visual_motif": "Directional flow; blurred trailing edges; implied current; cool wet greys and blues -- nothing at rest, everything en route."
+      },
+      "deposition": {
+        "slug": "deposition",
+        "index": 5,
+        "name": "Deposition",
+        "description": "Settling -- arrival, rest, and the choice of where to lie down.",
+        "symbol": {
+          "name": "Settling grains",
+          "description": "Grains descending onto a bed -- arrival made permanent.",
+          "svg": "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><circle cx=\"30\" cy=\"24\" r=\"7\" fill=\"currentColor\"/><circle cx=\"54\" cy=\"40\" r=\"6\" fill=\"currentColor\"/><circle cx=\"72\" cy=\"26\" r=\"5\" fill=\"currentColor\"/><rect x=\"8\" y=\"68\" width=\"84\" height=\"16\" fill=\"currentColor\"/></svg>"
+        },
+        "meaning": {
+          "upright": [
+            "arrival",
+            "settling",
+            "choosing rest",
+            "the journey converted into record",
+            "peace that accumulates"
+          ],
+          "inverted": [
+            "stagnation",
+            "silting up",
+            "rest chosen too early",
+            "the archive as swamp"
+          ]
+        },
+        "visual_motif": "Horizontal calm; layered stillness; low warm light near the ground; quiet water -- the world laid down flat and easy."
+      },
+      "burial": {
+        "slug": "burial",
+        "index": 6,
+        "name": "Burial",
+        "description": "The past sealed -- accumulation overhead, pressure beginning, preservation by weight.",
+        "symbol": {
+          "name": "Weight over seed",
+          "description": "A bar of overburden above a buried round -- the sealed and keeping dark.",
+          "svg": "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"8\" y=\"14\" width=\"84\" height=\"16\" fill=\"currentColor\"/><circle cx=\"50\" cy=\"66\" r=\"20\" fill=\"currentColor\"/></svg>"
+        },
+        "meaning": {
+          "upright": [
+            "the sealed past",
+            "incubation",
+            "pressure that preserves",
+            "work done in the dark",
+            "safety in depth"
+          ],
+          "inverted": [
+            "suffocation",
+            "the repressed",
+            "preservation become imprisonment",
+            "the dark mistaken for home"
+          ]
+        },
+        "visual_motif": "Compressed darkness; weight pressing from above; deepened, airless color; close framing -- the frame itself part of the load."
+      },
+      "metamorphism": {
+        "slug": "metamorphism",
+        "index": 7,
+        "name": "Metamorphism",
+        "description": "Transformation without dissolution -- becoming other while remaining oneself.",
+        "symbol": {
+          "name": "Folded band",
+          "description": "A single band folded back on itself -- changed utterly, still one piece.",
+          "svg": "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M8 68 Q28 22 50 48 Q72 74 92 34\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"13\" stroke-linecap=\"round\"/></svg>"
+        },
+        "meaning": {
+          "upright": [
+            "transformation without dissolution",
+            "depth work",
+            "recrystallized identity",
+            "the same substance, a truer form",
+            "change that keeps faith"
+          ],
+          "inverted": [
+            "deformation",
+            "warping under stress",
+            "transformation that loses the thread",
+            "change endured rather than undergone"
+          ]
+        },
+        "visual_motif": "Folded, banded forms; the sheen of strain; veined color under dim heat; contorted composition -- beauty made of endured force."
+      }
+    }
+  },
+  "major_arcana": {
+    "story": "The Earth learning to write. Act I (0-7): the irreducible forces assemble and the first world is built -- a planet with no memory acquires the means of record. Act II (8-14): the engine turns; cycles, returns, and losses -- the record is made, buried, and paid for. Act III (15-21): exposure and revelation -- the record surfaces, is read, and is finally seen whole, still being written.",
+    "visual_style": "Cross-section grandeur: the picture plane cut clean through the planet. Monumental scale with no human figures anywhere in the trumps; deep geological color -- basalt black, magma orange, granite grey, glacial and abyssal blue-greens; luminous mineral light, as if the stone itself were the light source.",
+    "symbol": {
+      "name": "Hourglass of stone",
+      "description": "Two triangles meeting at a point -- strata above, strata below, time as the waist between them.",
+      "svg": "<svg width=\"100\" height=\"100\" viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\"><polygon points=\"18,8 82,8 50,50\" fill=\"currentColor\"/><polygon points=\"18,92 82,92 50,50\" fill=\"currentColor\"/></svg>"
+    }
+  },
+  "dialectic": {
+    "axes": [
+      {
+        "name": "Tempo",
+        "poles": [
+          "Sudden",
+          "Gradual"
+        ]
+      },
+      {
+        "name": "Vector",
+        "poles": [
+          "Building",
+          "Unmaking"
+        ]
+      }
+    ],
+    "cells": {
+      "vents": [
+        "Sudden",
+        "Building"
+      ],
+      "strata": [
+        "Gradual",
+        "Building"
+      ],
+      "grains": [
+        "Gradual",
+        "Unmaking"
+      ],
+      "faults": [
+        "Sudden",
+        "Unmaking"
+      ]
+    }
+  },
+  "cards": {
+    "major-0": {
+      "name": "The Hadean",
+      "number": "0",
+      "slug": "major-0",
+      "arcana": "major",
+      "meaning": {
+        "upright": "The state before any record: everything is possible because nothing is yet true. This is a situation that has not cooled into a story -- do not look for the ink; there is only heat. Begin from the honest admission that nothing has been written yet, least of all you.",
+        "inverted": "Formlessness clung to: refusing to cool into anything because every form is a limit. Potential hoarded becomes a way of never being read. The molten state is a precondition, not a home."
+      },
+      "visuals": {
+        "detailed_description": "A planet-wide magma ocean in cross-section, with no strata anywhere -- there is nothing yet to layer. Meteoric fire falls into a sea of fire; the horizon is indistinguishable from the glow above it; forms soften at every edge and the air itself shimmers. The only structure in the frame is convection: vast, slow cells of brighter and darker incandescence, black masses surfacing and melting back against orange-white heat."
+      },
+      "factorization": {
+        "character": "identity",
+        "gloss": "The additive identity. Zero: the world before addition -- nothing written and nothing yet writable. Every later card is a sum built on this silence."
+      },
+      "station_slug": "melt"
+    },
+    "major-1": {
+      "name": "The Zircon",
+      "number": "1",
+      "slug": "major-1",
+      "arcana": "major",
+      "meaning": {
+        "upright": "The first thing that persists. A commitment small enough to hold its shape, and therefore the beginning of all measurement: once one grain endures, there is a before and an after. Make the smallest durable act available to you -- it will outlast the circumstances that produced it.",
+        "inverted": "The witness mistaken for the story. Clinging to the first form that survived, as though surviving were the same as mattering; the unit of measure promoted to the thing measured. Endure, but do not confuse endurance with significance."
+      },
+      "visuals": {
+        "detailed_description": "A single zircon crystal rendered monumental: a faceted prism suspended in a dark matrix of half-cooled melt, its interior banded with concentric growth zones like tree rings in glass. Cold, clear light seems to come from its own lattice -- every edge exact -- while everything around it still glows soft and undecided. It is the smallest thing in the frame and the only thing in focus."
+      },
+      "factorization": {
+        "character": "identity",
+        "gloss": "The multiplicative identity. One: the unit that changes nothing it multiplies and yet makes counting possible -- the first grain by which all later ages are measured."
+      },
+      "station_slug": "crystallization"
+    },
+    "major-2": {
+      "name": "Pressure",
+      "number": "2",
+      "slug": "major-2",
+      "arcana": "major",
+      "meaning": {
+        "upright": "The push of accumulated mass: force applied steadily until it becomes geography. What bears down on you is also what raises you -- burden and elevation are the same act read at different depths. Hold, and let the weight do its slow work of lifting.",
+        "inverted": "Weight without direction: bearing down as a way of being, the load denied until it quietly deforms everything beneath it. Pressure unacknowledged does not disappear; it folds."
+      },
+      "visuals": {
+        "detailed_description": "Two continental masses meeting in cross-section, their junction thickening like scar tissue, strata bowed upward in a single great arch. Above the rising welt the air is thin and bright, long shadows raking across freshly tilted planes; below, the rock roots plunge downward in mirror image, pressed into the dark. Nothing moves in the frame, and everything in it is the record of an irresistible push."
+      },
+      "factorization": {
+        "character": "prime",
+        "gloss": "Prime -- irreducible. Weight cannot be factored into anything gentler; every structure in this deck that holds, holds against it or because of it."
+      },
+      "station_slug": "uplift"
+    },
+    "major-3": {
+      "name": "Heat",
+      "number": "3",
+      "slug": "major-3",
+      "arcana": "major",
+      "meaning": {
+        "upright": "The interior engine: the gradient that makes everything move. Warmth is difference, and difference drives -- convection, motion, work. Find the gradient in your situation; that is where all the energy is.",
+        "inverted": "The engine running for its own sake: churn without work, warmth that scorches what it meant to move. A gradient exploited too fast becomes mere burning."
+      },
+      "visuals": {
+        "detailed_description": "A desert outcrop at the instant of thermal fracture: a granite face in mottled, diffuse daylight spalling off a curved sheet of itself, the new crack still propagating. The rock's seams carry a faint interior glow, as if the planet's deep engine were visible through its skin; all around, older surfaces are pitted and rounded by ten thousand such days, and one scar is sharp and new."
+      },
+      "factorization": {
+        "character": "prime",
+        "gloss": "Prime -- irreducible. The gradient itself: there is no factoring heat into parts, only hotter and cooler, and a whole planet moving to erase the difference."
+      },
+      "station_slug": "weathering"
+    },
+    "major-4": {
+      "name": "The Mountain",
+      "number": "4",
+      "slug": "major-4",
+      "arcana": "major",
+      "meaning": {
+        "upright": "Pressure stabilized into standing structure: an achievement you can stand on. But look closely at its flanks -- the mountain is a slow fountain, rising and shedding at once. Permanence is a rate, not a state; maintain the uplift and the shedding both.",
+        "inverted": "The monument mistaken for the process: structure defended long after its raising force has gone, a summit held while everything moves through and past it. What stops rising has already begun to be carried away."
+      },
+      "visuals": {
+        "detailed_description": "A great peak in cross-section, its folded roots reaching deeper below the surface than its summit stands above it. Scree streams off its flanks in blurred grey-blue trails, sorted and carried by implied currents of air and water, while the core of the range still bows visibly upward -- the whole form simultaneously rising and dispersing, a still summit wearing a moving body."
+      },
+      "factorization": {
+        "character": "composite",
+        "factors": [
+          2,
+          2
+        ],
+        "gloss": "Pressure squared -- the push stabilized into a frame that holds. The first thing weight builds when it agrees with itself."
+      },
+      "station_slug": "transport"
+    },
+    "major-5": {
+      "name": "Water",
+      "number": "5",
+      "slug": "major-5",
+      "arcana": "major",
+      "meaning": {
+        "upright": "The universal solvent, carrier, and undertaker of stone: the patience that dismantles mountains and files them, grain by grain, into archives. Take the low, quiet route; it is the one that ends in record rather than ruin.",
+        "inverted": "Dissolution of what needed to stay; the carrier that never sets its burden down. Water that will not deposit is just erosion with nowhere to go -- movement mistaken for purpose, drowning mistaken for depth."
+      },
+      "visuals": {
+        "detailed_description": "A still, shallow sea over pale flats in low warm light, the waterline a band of gold. A plume of fine sediment fans out beneath the surface and settles, grain by visible grain, onto perfectly horizontal beds -- each new lamina a finished sentence. The water asks for nothing; the layers thicken with a patience that reads as tenderness."
+      },
+      "factorization": {
+        "character": "prime",
+        "gloss": "Prime, doubly so -- numerically irreducible and standing at a prime station of the cycle. Water decomposes everything in this deck and is decomposed by nothing; the arcana's most elemental solvent."
+      },
+      "station_slug": "deposition"
+    },
+    "major-6": {
+      "name": "The Crucible",
+      "number": "6",
+      "slug": "major-6",
+      "arcana": "major",
+      "meaning": {
+        "upright": "Pressure meets heat in the sealed dark: the first true collaboration of the great forces. Transformation is being prepared where no one can watch, and the seal is part of the recipe. Let the depth hold you while the work compounds.",
+        "inverted": "The pressure-cooker: forces combined without a vessel that can hold them, or depth used as hiding rather than incubation. What is sealed away from all witness can cook into something no one intended."
+      },
+      "visuals": {
+        "detailed_description": "Deep crust in close cross-section, airless and compressed, the strata squeezed to deep umber and black with the frame itself pressing inward like part of the load. At the center, the banding begins to sweat new minerals: garnets blooming in the dark like slow coals, small red certainties forming exactly where the weight and the warmth agree."
+      },
+      "factorization": {
+        "character": "composite",
+        "factors": [
+          2,
+          3
+        ],
+        "gloss": "Pressure meets Heat -- the deck's first true product. Neither could transform alone: weight without warmth only crushes, and warmth without weight only escapes."
+      },
+      "station_slug": "burial"
+    },
+    "major-7": {
+      "name": "Life",
+      "number": "7",
+      "slug": "major-7",
+      "arcana": "major",
+      "meaning": {
+        "upright": "The biosphere as a geological force: a film thinner than a hair on the planet's body, which nonetheless rewrote the air, rusted the oceans, and taught limestone to grow. Smallness compounding into planetary consequence -- act at your scale and trust the compounding.",
+        "inverted": "The transformer consumed by its transformations: growth that poisons its own air, vitality mistaken for permission. The first great extinction was committed by the first great success."
+      },
+      "visuals": {
+        "detailed_description": "A banded iron formation in cross-section -- red-black ribbons folded back on themselves, sheened with strain -- and along its upper surface, in veined dim light, a living mat of stromatolites: low domes quietly breathing, each exhalation of oxygen the very thing that rusted an ocean into the bands below. The transformer and its transformation in one frame, the fold still holding both."
+      },
+      "factorization": {
+        "character": "prime",
+        "gloss": "Prime, doubly atomic -- a prime number standing on a prime station. The one force in the deck that is not physics: it cannot be derived from the others, and everything after it must account for it."
+      },
+      "station_slug": "metamorphism"
+    },
+    "major-8": {
+      "name": "Subduction",
+      "number": "8",
+      "slug": "major-8",
+      "arcana": "major",
+      "meaning": {
+        "upright": "Mastery become descent: pressure compounded until the only way forward is down. To feed the forge with what you built is not failure -- it is how the engine is paid. Surrender structure deliberately, and it returns as new ground elsewhere.",
+        "inverted": "Consumption: dragging everything attached to you down the same trench, descent past the depth where anything returns. There is a difference between offering your work to the fire and becoming unable to stop sinking."
+      },
+      "visuals": {
+        "detailed_description": "An oceanic slab in cross-section angling steeply down into incandescence, its cool blue-grey length keeping its composure for miles before the edges begin to soften. At the surface it drags a dark trench behind it like a hem; far below, its leading edge dissolves into black-and-orange shimmer, feeding a glow that already rises elsewhere in the frame as the seed of new fire."
+      },
+      "factorization": {
+        "character": "composite",
+        "factors": [
+          2,
+          2,
+          2
+        ],
+        "gloss": "Pressure cubed -- weight past structure, past mastery, into consumption. The push compounded until it eats its own plate."
+      },
+      "station_slug": "melt"
+    },
+    "major-9": {
+      "name": "The Pluton",
+      "number": "9",
+      "slug": "major-9",
+      "arcana": "major",
+      "meaning": {
+        "upright": "Heat fulfilled and turned inward: the chamber that cools under its own roof into granite. This is mastery that no longer needs to erupt -- the slow interior work that becomes, in time, the bedrock others build on. Stay under the roof; become stone all the way through.",
+        "inverted": "Brilliance that never surfaces: cooling in isolation until the chamber is mistaken for the world. Interior work is fulfilled by eventually bearing weight -- a pluton that is never unroofed is just a buried fire that gave up."
+      },
+      "visuals": {
+        "detailed_description": "A vast teardrop of magma stalled in cross-section beneath miles of country rock, crystallizing from its margins inward: rinds of exact, faceted grain advance ring by ring into a still-glowing core. The mineral light sharpens as heat becomes form -- the outermost zones already cold, precise, and permanent, the center still soft with intention."
+      },
+      "factorization": {
+        "character": "composite",
+        "factors": [
+          3,
+          3
+        ],
+        "gloss": "Heat squared -- the engine structured by its own product. Warmth contained until it becomes the very rock that contains it."
+      },
+      "station_slug": "crystallization"
+    },
+    "major-10": {
+      "name": "The Geyser",
+      "number": "10",
+      "slug": "major-10",
+      "arcana": "major",
+      "meaning": {
+        "upright": "The appointment kept between depth and water: what goes down under pressure returns on schedule. Fortune here is not caprice but plumbing -- the interval is real, and it can be trusted even when the surface shows nothing. Wait like the chamber waits: filling.",
+        "inverted": "Erupting on someone else's schedule; or worshipping the cycle instead of drawing from it. To stand at the vent forever, waiting, is to mistake the wheel's turning for your own motion."
+      },
+      "visuals": {
+        "detailed_description": "A white column standing at full height in thin bright air, caught at the top of its hour, backlit spray peeling off the crown in long drifting shadows. Below the surface, the cross-section shows the truth of it: flooded chambers in tilted, shimmering rock already refilling drop by drop, the next eruption assembling itself in the dark while this one still hangs in the light."
+      },
+      "factorization": {
+        "character": "composite",
+        "factors": [
+          2,
+          5
+        ],
+        "gloss": "Pressure meets Water -- weight applied to the one thing that will not compress, so it rises. Fate as an interval; fortune as plumbing."
+      },
+      "station_slug": "uplift"
+    },
+    "major-11": {
+      "name": "Time",
+      "number": "11",
+      "slug": "major-11",
+      "arcana": "major",
+      "meaning": {
+        "upright": "The irreducible dimension: not a force but the medium every force is paid in. Everything is being weathered at all times, gently and without malice -- what feels permanent is only slow. Take the long view; it is the only view in which anything is actually happening.",
+        "inverted": "Time denied: racing the erosion, patching the pitted face daily and calling it victory. Or time weaponized -- waiting used as cruelty, the refusal to let anything finish. The weathering wins either way; the only choice is your relationship to it."
+      },
+      "visuals": {
+        "detailed_description": "A single unconformity in cross-section: tilted, truncated beds below, flat young beds lying calmly across their broken tops, and between them a thin, pitted, lichen-flecked surface in mild diffuse daylight. The card's true subject is the gap itself -- four hundred million years that passed across that one quiet line without leaving a single grain behind."
+      },
+      "factorization": {
+        "character": "prime",
+        "gloss": "Prime, doubly atomic -- a prime number on a prime station, the deck's most elemental trump. Time does not decompose; every other card happens inside it, and it is the one judge that never recuses."
+      },
+      "station_slug": "weathering"
+    },
+    "major-12": {
+      "name": "The Hotspot",
+      "number": "12",
+      "slug": "major-12",
+      "arcana": "major",
+      "meaning": {
+        "upright": "The fixed flame beneath a moving world: the revelation that it was never the source that moved. Hang where you are and let the perspective invert -- the chain of your works, receding toward the horizon, is the true map of your position and drift.",
+        "inverted": "Staying put mistaken for constancy while everything is quietly carried away; building the same island again and again and calling it progress. The plume's stillness is only meaningful because it knows the plate is moving."
+      },
+      "visuals": {
+        "detailed_description": "A mantle plume rising fixed and vertical from the deep interior while the plate above slides visibly sideways across it. Trailing off toward the horizon in cool blurred greys, a chain of islands in every stage of the same biography -- newborn and glowing over the flame, green and settling farther on, drowned and flat-topped in the far distance -- the one motionless thing in the frame having authored the entire procession."
+      },
+      "factorization": {
+        "character": "composite",
+        "factors": [
+          2,
+          2,
+          3
+        ],
+        "gloss": "The Mountain (2 squared) acted on by Heat -- structure fed by a flame it cannot keep. Each mountain is finished by being carried away, and the flame's constancy is proven by the length of the chain."
+      },
+      "station_slug": "transport"
+    },
+    "major-13": {
+      "name": "Extinction",
+      "number": "13",
+      "slug": "major-13",
+      "arcana": "major",
+      "meaning": {
+        "upright": "The irreducible ending: a horizon others are dated by. This is not punishment but punctuation -- after this layer, the fauna changes. Let the ending be as thin, as level, and as final as it is; everything that comes after will take its bearings from this line.",
+        "inverted": "The ending refused its dignity: treated as an error to be reversed, negotiated with, redecorated. Or its opposite -- taking up residence at the boundary, mistaking one dark bed for the whole of the column above and below it."
+      },
+      "visuals": {
+        "detailed_description": "In low warm light near the ground, a finger-thin grey clay bed runs perfectly level through the cross-section -- riotous, fossil-crowded layers below it; sparse, quiet, simpler beds above. Nothing in the image is violent: only a thin line laid down with terrible calm, still water over everything, the whole world's turning recorded as one unhurried, horizontal stroke."
+      },
+      "factorization": {
+        "character": "prime",
+        "gloss": "Prime, doubly atomic -- prime on a prime station. An ending that will not factor into causes and lessons; it simply is, and afterward everything is dated from it."
+      },
+      "station_slug": "deposition"
+    },
+    "major-14": {
+      "name": "The Fossil",
+      "number": "14",
+      "slug": "major-14",
+      "arcana": "major",
+      "meaning": {
+        "upright": "Pressure meets life in the sealed dark: the patient transmutation of the living into the legible. Nothing is kept as it was; it is kept as it can be kept -- translated, mineral by mineral, into a durable tongue. Accept the terms of preservation; they are generous over the long run.",
+        "inverted": "Preservation that falsifies: the past curated into stone and then mistaken for the creature itself. A cast is a translation, and every translation has a translator -- ask what the pressure chose to keep, and what it quietly let go."
+      },
+      "visuals": {
+        "detailed_description": "Close-framed in compressed darkness, an ammonite caught mid-transmutation: half its chambers still nacre and pearl, half already pyrite and stone, the exchange proceeding suture by suture. The beds above press down in deepened, airless color, and the seam of the spiral catches the frame's only light -- a small brightness being made immortal very, very slowly."
+      },
+      "factorization": {
+        "character": "composite",
+        "factors": [
+          2,
+          7
+        ],
+        "gloss": "Pressure meets Life -- weight applied to the one force that means something, producing the record's first legible sentence. The deck's gentlest use of its heaviest prime."
+      },
+      "station_slug": "burial"
+    },
+    "major-15": {
+      "name": "The Serpentine",
+      "number": "15",
+      "slug": "major-15",
+      "arcana": "major",
+      "meaning": {
+        "upright": "Heat meets water inside the rock: seduction at depth. The altered stone is green, scaled, and beautiful, and its surfaces slide -- transformation that flatters is still transformation, but check your footing with every gift. Some invitations change you on contact.",
+        "inverted": "Captivity in the beautiful: ground that will not hold a footing, alteration you invited and can no longer reverse. The serpent stone does not lie about what it is; the bondage is in continuing to build on it."
+      },
+      "visuals": {
+        "detailed_description": "A shear zone in veined dim heat: mantle rock gone green-black and scaled like snakeskin, banded with silky slickensides that gleam with the sheen of strain. The whole mass is folded and contorted around itself, and in fractures that should be dry at this depth, water glints -- present where it has no right to be, working, changing everything it touches to more of itself."
+      },
+      "factorization": {
+        "character": "composite",
+        "factors": [
+          3,
+          5
+        ],
+        "gloss": "Heat meets Water -- each alone is honest work; married inside rock they make the slick green stone. Transformation as temptation: a composite wearing an atomic station's key."
+      },
+      "station_slug": "metamorphism"
+    },
+    "major-16": {
+      "name": "The Eruption",
+      "number": "16",
+      "slug": "major-16",
+      "arcana": "major",
+      "meaning": {
+        "upright": "The structure overpressured past containment: the edifice unroofs itself. This is catastrophic honesty -- everything suppressed departs at once, and for a moment the sky is made of what was held down. After it, the pressure reading is finally true.",
+        "inverted": "The drawn-out failure: venting endlessly to avoid the one necessary blast, or rebuilding the ruins directly on the same sealed chamber. A tower that will not fall cleanly falls forever."
+      },
+      "visuals": {
+        "detailed_description": "The mountain blown open in cross-section: one flank collapsed outward in a frozen avalanche, the chamber beneath emptying upward as a black-and-orange column that forks with lightning inside its own ash. Every form softens at the edges in the heat-shimmer; the cone's own stones fall back through the glare, and at the base the melt shines through the wound like a truth that was always there."
+      },
+      "factorization": {
+        "character": "composite",
+        "factors": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "gloss": "The Mountain squared -- pressure structured, then structured again past what structure bears. Weight's final power is to abolish its own monument."
+      },
+      "station_slug": "melt"
+    },
+    "major-17": {
+      "name": "The Field",
+      "number": "17",
+      "slug": "major-17",
+      "arcana": "major",
+      "meaning": {
+        "upright": "The invisible orientation: a planetary whisper that says which way is north, recorded faithfully by every mineral patient enough to cool. Guidance that asks nothing, promises nothing, and is everywhere. Hope, here, is not a light on the horizon -- it is knowing your heading in the dark.",
+        "inverted": "The reversal: north and south trading places while the compasses keep pointing. Guidance present but unread, or worse -- a course held faithfully to a field that has since flipped. Check when your bearings were last locked in."
+      },
+      "visuals": {
+        "detailed_description": "A mid-ocean ridge in cross-section under cold, clear abyssal light: fresh basalt striping away from the axis in symmetric bands, mirror twins to either side. Each stripe carries a faint interior sheen -- a hidden lattice-alignment alternating dark and bright, dark and bright, marching outward like a recorded heartbeat -- while at the center the newest rock, still warm, is quietly cooling into its own testimony."
+      },
+      "factorization": {
+        "character": "prime",
+        "gloss": "Prime -- irreducible. The field is not made of anything else the deck knows; it is simply there, invisible and planet-wide, and the stones write it down without being asked."
+      },
+      "station_slug": "crystallization"
+    },
+    "major-18": {
+      "name": "The Dome",
+      "number": "18",
+      "slug": "major-18",
+      "arcana": "major",
+      "meaning": {
+        "upright": "The deep work hoisted into half-light: you are seeing the summit of something whose mass is almost entirely hidden. What shows is real -- and it is not all there is. Navigate by the visible face, but weight your decisions by the unseen extent.",
+        "inverted": "Living by the visible fraction: the hidden mass denied until it shoulders through the valley floor. Grandeur mistaken for the whole story is the oldest illusion in the mountains; the moon shows one face too."
+      },
+      "visuals": {
+        "detailed_description": "A granite half-dome rising sheer above a shadowed valley at dusk, thin air, long violet shadows -- the exposed face pale and lunar in the last light. Below the valley floor the cross-section tells the rest: the pluton's true body plunging away for miles, unlit grey and vast, ten times the mountain that shows, holding the bright half-face up like an offering."
+      },
+      "factorization": {
+        "character": "composite",
+        "factors": [
+          2,
+          3,
+          3
+        ],
+        "gloss": "Pressure meets the fulfilled Pluton (3 squared) -- the finished interior work raised by weight into partial view. A completion that can only ever be half-seen."
+      },
+      "station_slug": "uplift"
+    },
+    "major-19": {
+      "name": "The Sun",
+      "number": "19",
+      "slug": "major-19",
+      "arcana": "major",
+      "meaning": {
+        "upright": "The exterior engine, irreducible: the daily arrival of the energy that runs the water, the weather, and the green film. Every exposed face is worked by it, opened by it, gilded by it. Joy is a force of erosion -- let it work on you; what it wears away needed wearing.",
+        "inverted": "Exposure without shelter: the engine of everything mistaken for a personal audience, brightness so constant it bleaches the record it illuminates. Even stone needs its nights."
+      },
+      "visuals": {
+        "detailed_description": "A canyon wall at full noon in open, diffuse blaze: every surface pitted, mottled, rounded, gilt with lichen, desert varnish shining like hammered bronze. Heat shimmers off the stone -- and in the deepest seams, last night's frost-cracks still hold thin blades of blue shadow, so that one frame carries the whole day's tide of energy caught in the act of working."
+      },
+      "factorization": {
+        "character": "prime",
+        "gloss": "Prime -- irreducible. The deck's one force that arrives from outside the planet: it cannot be derived from the Earth at all, only received."
+      },
+      "station_slug": "weathering"
+    },
+    "major-20": {
+      "name": "The River",
+      "number": "20",
+      "slug": "major-20",
+      "arcana": "major",
+      "meaning": {
+        "upright": "The long verdict: water reading the mountain and carrying the judgment, grain by grain, to the sea. Nothing is condemned -- everything is weighed, sorted, and sent where it now belongs. The reckoning you are in is not an ending; it is a relocation.",
+        "inverted": "The verdict resisted mid-channel: damming the sentence, hoarding the sorted load, grinding what you refuse to carry. A river denied its mouth does not stop judging; it just floods."
+      },
+      "visuals": {
+        "detailed_description": "A braided river descending a cross-sectioned gorge in cool wet greys and blues, its channels weaving like plaited rope. Its bed carries the mountain's sorted body in strict order -- boulders upstream, gravels midway, silts fanning seaward into the light -- every stone blurred slightly at its trailing edge, in transit, already addressed to its right resting place."
+      },
+      "factorization": {
+        "character": "composite",
+        "factors": [
+          2,
+          2,
+          5
+        ],
+        "gloss": "The Mountain meets Water -- the standing structure meets the solvent that has nowhere to be. Judgment is simply what patience does to monuments."
+      },
+      "station_slug": "transport"
+    },
+    "major-21": {
+      "name": "The Blue Marble",
+      "number": "21",
+      "slug": "major-21",
+      "arcana": "major",
+      "meaning": {
+        "upright": "Heat meets life: a planet warm enough to move and alive enough to remember. The whole archive seen at once -- and still being written, the presses still running, the layers still settling. Completion here is not an arrival but a practice; wholeness with the ink still wet.",
+        "inverted": "The whole mistaken for finished: the archive admired instead of continued, the portrait framed while the sitter is still breathing. To see everything at once is a privilege only if you then return to your own layer and keep writing."
+      },
+      "visuals": {
+        "detailed_description": "The full sphere hanging in black: blue and white and ochre, cloud-spirals caught mid-turn, continents visibly a mosaic of every other card's work -- sutured ranges, rusted bands, river deltas fanning into green. At the limb, the view slips briefly into luminous cross-section, the layered depth beneath the visible face still settling, still recording, in the low warm light of a sun just off-frame.",
+        "style_override": "The one card that steps out of cross-section: the planet seen whole from space, the deck's monumental interior grandeur folded into a single exterior view -- with the cross-section idiom surviving only as a luminous section glimpsed at the limb."
+      },
+      "factorization": {
+        "character": "composite",
+        "factors": [
+          3,
+          7
+        ],
+        "gloss": "Heat meets Life -- the interior engine and the animate force, the only marriage that produces a world. Every prime in the deck attends this card, but these two sign it."
+      },
+      "station_slug": "deposition"
+    },
+    "vents-ace": {
+      "name": "Ace of Vents",
+      "number": "1",
+      "slug": "vents-ace",
+      "arcana": "minor",
+      "suit_slug": "vents",
+      "rank_slug": "ace",
+      "meaning": {
+        "upright": "The first breach: a creative force arriving from below, small at the surface but sourced from something bottomless. The conditions were ready before you were -- what emerges now is not your plan but your material, and it is still too hot to shape. Let it arrive.",
+        "inverted": "The spark without the magma column: a beginning that has no source pressure behind it, or a breach opening under a surface that was never made ready. Not every glow is a vent; some are only reflections of wanting one."
+      },
+      "visuals": {
+        "detailed_description": "A night ocean, featureless and dark, except for one point where the black water domes upward and glows from beneath. The first gout of lava meets the sea in a burst of steam-lit orange; the surface all around it softens and shimmers with rising heat. Nothing else in the frame -- one small incandescent arrival in a world of dark water."
+      },
+      "station_slug": "melt"
+    },
+    "vents-two": {
+      "name": "Two of Vents",
+      "number": "2",
+      "slug": "vents-two",
+      "arcana": "minor",
+      "suit_slug": "vents",
+      "rank_slug": "two",
+      "meaning": {
+        "upright": "Creation's negotiation with what it touches: at the meeting face, commitment forms instantly -- a skin exact enough to hold, thin enough to let the new keep moving inside it. The contact does not stop the fire; it gives the fire a form in which to continue.",
+        "inverted": "The chilled margin worn as armor: contact sealed so quickly that nothing is exchanged across it. A rind that forms too fast leaves the interior molten and unmet -- committed at the surface, undecided everywhere else."
+      },
+      "visuals": {
+        "detailed_description": "A pillow lava lobe caught mid-formation on the sea floor: its glassy black rind crusting into exact facets precisely where glowing interior meets dark water, the contact line burning like a drawn wire. Through cracks in the older pillows behind it, new lobes bud and swell -- every one of them a fresh negotiation, every rind a signed agreement between fire and sea."
+      },
+      "station_slug": "crystallization"
+    },
+    "vents-three": {
+      "name": "Three of Vents",
+      "number": "3",
+      "slug": "vents-three",
+      "arcana": "minor",
+      "suit_slug": "vents",
+      "rank_slug": "three",
+      "meaning": {
+        "upright": "Creation compounding: each act becomes the ground the next one stands on, and the horizon itself begins to rise. This is the collaboration of successive fires -- no single flow is the mountain, and the mountain is nothing but flows. Keep going; the elevation is real.",
+        "inverted": "Piling higher without spreading the base: growth stacked on growth until the whole young edifice oversteepens. Compounding without design does not make a mountain; it makes a collapse with a schedule."
+      },
+      "visuals": {
+        "detailed_description": "A young shield volcano in cross-section under thin bright air: three great flows visibly lapped one over another, the oldest weathered dull at the base, the newest still darkly fresh at the crest. Long morning shadows rake across the tilted flanks, and the raised horizon line -- higher than yesterday -- is the whole story told in silhouette."
+      },
+      "station_slug": "uplift"
+    },
+    "vents-four": {
+      "name": "Four of Vents",
+      "number": "4",
+      "slug": "vents-four",
+      "arcana": "minor",
+      "suit_slug": "vents",
+      "rank_slug": "four",
+      "meaning": {
+        "upright": "The eruption become ground: violence cooled into a platform, its origin still legible but domesticated. A foundation is proven by exposure -- rain pools in its hollows, roots test its seams, and it holds. What you made in fire can now be lived on.",
+        "inverted": "The foundation mistaken for the finish: black rock so proud of its hardness that it refuses to weather into soil. A platform nothing can root in is not stability; it is sterility with good posture."
+      },
+      "visuals": {
+        "detailed_description": "An old lava field under mild, mottled daylight: ropy pahoehoe surfaces rounded and pitted by years of rain, water pooled in the low coils, and the first lichens mapping pale continents across the black stone. The violence of its making is still written in every frozen swirl -- and moss is quietly annotating the margins."
+      },
+      "station_slug": "weathering"
+    },
+    "vents-five": {
+      "name": "Five of Vents",
+      "number": "5",
+      "slug": "vents-five",
+      "arcana": "minor",
+      "suit_slug": "vents",
+      "rank_slug": "five",
+      "meaning": {
+        "upright": "The stress of motion revealing the fire's true interior: the crust tears as it is carried, and what shows in the cracks is the same heat that started everything. Being tested in transit is how the work proves it is still alive inside.",
+        "inverted": "A crust maintained over a core gone cold: the look of moving fire with nothing molten left to move it. Or the opposite failure -- breaking up entirely mid-carriage, the interior spent through every crack at once."
+      },
+      "visuals": {
+        "detailed_description": "An 'a'a flow front grinding downslope at dusk: a clinkery black face taller than a house, rubble tumbling continuously from its advancing edge, the whole mass blurred with slow implacable motion. Where the crust tears, streaks of interior glow open like wounds that heal and reopen -- the fire shown only under strain, sparks trailing downwind in the cooling air."
+      },
+      "station_slug": "transport"
+    },
+    "vents-six": {
+      "name": "Six of Vents",
+      "number": "6",
+      "slug": "vents-six",
+      "arcana": "minor",
+      "suit_slug": "vents",
+      "rank_slug": "six",
+      "meaning": {
+        "upright": "Fire finds its settled slope: the cone stands at exactly the angle it can hold, discovered grain by falling grain rather than imposed. After the arrival, this -- equilibrium as a form of grace, the eruption become geometry at rest.",
+        "inverted": "The cone loaded past repose: new material heaped on slopes that were finished, calm mistaken for spentness. A resting fire is not an extinguished one, and a settled slope is not an invitation to stack more on it."
+      },
+      "visuals": {
+        "detailed_description": "A young cinder cone at dusk, perfectly conical, its flanks lying at the exact angle of repose -- the shape a million small fallings agreed on. Low warm light grazes the scoria; thin final fumes rise dead vertical in still air; around the base, ash aprons level themselves toward the darkening plain. Everything in the frame has found where it holds."
+      },
+      "station_slug": "deposition"
+    },
+    "vents-seven": {
+      "name": "Seven of Vents",
+      "number": "7",
+      "slug": "vents-seven",
+      "arcana": "minor",
+      "suit_slug": "vents",
+      "rank_slug": "seven",
+      "meaning": {
+        "upright": "The single fire dividing along its natural lines: as the mass cools in the sealed dark, it discovers the parts it was always implicitly made of. Honest differentiation happens under weight and out of sight -- let the joints form where the cooling says they must.",
+        "inverted": "Shattering along false lines: the colonnade forced, or collapsed into rubble that remembers no geometry. Division imposed from outside gives fragments; division discovered from within gives columns."
+      },
+      "visuals": {
+        "detailed_description": "Deep inside a buried flow, close-framed and airless: a basalt colonnade forming in real time, hexagonal columns parting with soft cracks as the mass cools under the weight of younger flows stacked above. Each new joint exhales a breath of stored heat into the dark. The geometry is perfect, patient, and entirely unwitnessed -- and will stay sealed for a million years."
+      },
+      "station_slug": "burial"
+    },
+    "vents-eight": {
+      "name": "Eight of Vents",
+      "number": "8",
+      "slug": "vents-eight",
+      "arcana": "minor",
+      "suit_slug": "vents",
+      "rank_slug": "eight",
+      "meaning": {
+        "upright": "The fire become an instrument: a single blade of melt driven precisely along the one seam that would open. This is capability with economy -- no eruption, no spectacle, just the exact application of heat where the structure permits it. Mastery is knowing the weakness and filling it cleanly.",
+        "inverted": "The dike that knows only one direction: intrusion as habit, force applied along yesterday's seam because it opened once. An instrument that cannot re-aim is on its way to being a scar."
+      },
+      "visuals": {
+        "detailed_description": "A dark basalt dike knifing upward through folded, veined gneiss: one clean sheet, its edges chilled to glass, cutting dead straight across every contortion of the older rock. The country rock's strain-sheen flows and buckles around the newcomer's absolute geometry -- endured force meeting applied force, and the applied force is one line wide."
+      },
+      "station_slug": "metamorphism"
+    },
+    "vents-nine": {
+      "name": "Nine of Vents",
+      "number": "9",
+      "slug": "vents-nine",
+      "arcana": "minor",
+      "suit_slug": "vents",
+      "rank_slug": "nine",
+      "meaning": {
+        "upright": "The volcano at full maturity, and its destiny plainly visible: a mountain that is also a mouth. The completed edifice does not seal itself -- its final shape is an open line back to the source. To finish, for fire, is to remain in permanent relation with where you came from.",
+        "inverted": "Destiny read as doom: the fear that everything built must drain back down the conduit that built it. A summit hoarded against its own source goes cold from the top."
+      },
+      "visuals": {
+        "detailed_description": "The summit of a great shield volcano at night: a lava lake seething at the caldera's heart, incandescence from below softening every rim it touches, the mountain's enormous dark bulk falling away beneath into starless slopes. The highest point of all that building is a window -- the finished mountain holding its own beginning open like a kept promise."
+      },
+      "station_slug": "melt"
+    },
+    "vents-ten": {
+      "name": "Ten of Vents",
+      "number": "10",
+      "slug": "vents-ten",
+      "arcana": "minor",
+      "suit_slug": "vents",
+      "rank_slug": "ten",
+      "meaning": {
+        "upright": "The fire finished into permanence: the whole province cooled into exact, patient stone, and the stone become ground for whatever comes next. Completion here is not an ending but a bequest -- the eruption's last act is to be a place.",
+        "inverted": "Legacy as barren pavement: a completion so total, so hard, that nothing else can begin on it. The gift of new land is cancelled if the land will not receive a seed."
+      },
+      "visuals": {
+        "detailed_description": "A vast stepped plateau of stacked flows in cold, clear morning light, each colonnade edge exact as cut crystal, terrace above terrace to the horizon. On the highest step, a thin new skin of soil has gathered in a hollow, and a single green shoot stands in it -- the entire fire's work resolved, at its very top, into a foundation for something that is not fire."
+      },
+      "station_slug": "crystallization"
+    },
+    "vents-prospector": {
+      "name": "Prospector of Vents",
+      "number": "11",
+      "slug": "vents-prospector",
+      "arcana": "minor",
+      "suit_slug": "vents",
+      "rank_slug": "prospector",
+      "meaning": {
+        "upright": "Hope with a hammer in brand-new country: reading fumaroles like want-ads, staking the future on warmth underfoot. The one who arrives early, while the ground is still deciding what it will be, and has the nerve to call it home.",
+        "inverted": "Gold fever at the vent: every wisp of steam read as a promise, heat mistaken for wealth. Arriving early is only a virtue if you can tell a beginning from a flare."
+      },
+      "visuals": {
+        "detailed_description": "A lone figure, small against thin bright air, standing on a raised black ridge with a long morning shadow thrown behind. They chip a sample from the edge of a steaming fissure; below, a valley of fresh flows still smokes in patches. A claim cairn -- three stacked stones, absurdly human -- already marks the spot."
+      },
+      "station_slug": "uplift"
+    },
+    "vents-surveyor": {
+      "name": "Surveyor of Vents",
+      "number": "12",
+      "slug": "vents-surveyor",
+      "arcana": "minor",
+      "suit_slug": "vents",
+      "rank_slug": "surveyor",
+      "meaning": {
+        "upright": "The discipline of instruments on ground that changes weekly: measuring the mountain honestly means recording its growth and its decay in the same notebook. Precision here is a form of respect for what will not hold still.",
+        "inverted": "Mapping the volcano as if it will wait: measurements polished while the ground moves under the tripod. A survey that cannot admit its subject is alive is already a historical document."
+      },
+      "visuals": {
+        "detailed_description": "A single figure with level and stakes on an old, pitted flow in mottled diffuse daylight, sighting across a valley to a young cone that smokes as it grows. On the field slate, two columns of figures side by side: the new land rising, the old land softening -- both dated the same morning."
+      },
+      "station_slug": "weathering"
+    },
+    "vents-reader": {
+      "name": "Reader of Vents",
+      "number": "13",
+      "slug": "vents-reader",
+      "arcana": "minor",
+      "suit_slug": "vents",
+      "rank_slug": "reader",
+      "meaning": {
+        "upright": "Reading the eruption in what traveled from it: the ash bed found far downstream is testimony that made a journey, and the reader honors both the fire and the distance. The story arrives displaced; interpretation is knowing how far it came.",
+        "inverted": "Reading the ash as the whole fire: a fragment's account mistaken for the event, provenance ignored because the text was conveniently near. Every carried layer is an excerpt."
+      },
+      "visuals": {
+        "detailed_description": "A figure kneeling at a stream cutbank far from any volcano, one hand flat on a pale ash bed sandwiched between dark river gravels, current-blurred water sliding past below. Their eyes are closed. In a deposit that drifted here on wind and water, they are reading the biography of a mountain that is nowhere in the frame."
+      },
+      "station_slug": "transport"
+    },
+    "vents-witness": {
+      "name": "Witness of Vents",
+      "number": "14",
+      "slug": "vents-witness",
+      "arcana": "minor",
+      "suit_slug": "vents",
+      "rank_slug": "witness",
+      "meaning": {
+        "upright": "Presence at creation without demand: to watch new land being made and want nothing from it -- not spectacle, not profit, not even meaning. Awe metabolized into steadiness; the fire honored by a stillness that matches its patience rather than its heat.",
+        "inverted": "Spectacle addiction: chasing eruptions to avoid the quiet work of one's own ground. Witness that needs the show to keep escalating was never witness -- it was appetite in a contemplative costume."
+      },
+      "visuals": {
+        "detailed_description": "Dusk, across still water: on a black-sand beach, a small seated figure watches a distant shore where slow incandescence lays itself down, layer by layer, into the sea. Low warm light, quiet water, steam rising far off like a held breath. The figure carries no instrument, takes no sample, and stays."
+      },
+      "station_slug": "deposition"
+    },
+    "strata-ace": {
+      "name": "Ace of Strata",
+      "number": "1",
+      "slug": "strata-ace",
+      "arcana": "minor",
+      "suit_slug": "strata",
+      "rank_slug": "ace",
+      "meaning": {
+        "upright": "Memory begins as debris: the first thin layer is laid down from what the day wore off something else. The archive does not open with a monument -- it opens with dust honestly kept. Keep today's small residue; it is the first page.",
+        "inverted": "The first entry that never gets a second: a beginning kept but not continued, one lamina proud of itself on bare rock. A single layer is not yet a record; it is a hope with sediment in it."
+      },
+      "visuals": {
+        "detailed_description": "A pitted, weathered bedrock surface under soft open daylight, and settling into every low place on it, a first film of pale silt -- taking the exact shape of each hollow, thickening by grains. It is almost nothing: a dusting, a beginning. The oldest page of a book that does not exist yet."
+      },
+      "station_slug": "weathering"
+    },
+    "strata-two": {
+      "name": "Two of Strata",
+      "number": "2",
+      "slug": "strata-two",
+      "arcana": "minor",
+      "suit_slug": "strata",
+      "rank_slug": "two",
+      "meaning": {
+        "upright": "The record holding two origins in one column: what the river brought and what the wind brought, lying together with the contact honest between them. The archive's first power is this -- it can keep two journeys in one place without making them one story.",
+        "inverted": "The contact read as contradiction: two sources treated as rival claims, the archive audited for a winner. A boundary in the record is information, not a dispute."
+      },
+      "visuals": {
+        "detailed_description": "A stream-cut bank in cool grey moving light: rust-red river gravels below, cream wind-laid silts above, and between them a contact knife-sharp and gently undulating. Each body still carries its journey in its grain -- the tumble-rounded cobbles, the sifted flour-fine dust -- two long trips ended in the same quiet place, filed touching."
+      },
+      "station_slug": "transport"
+    },
+    "strata-three": {
+      "name": "Three of Strata",
+      "number": "3",
+      "slug": "strata-three",
+      "arcana": "minor",
+      "suit_slug": "strata",
+      "rank_slug": "three",
+      "meaning": {
+        "upright": "The archive compounding: layer answering layer, deposit answering season, until repetition itself becomes structure. Nothing dramatic happens and everything accrues -- this is growth by faithfulness, the record thickening simply because the keeping continued.",
+        "inverted": "Accumulation without sorting: more and more kept, none of it in order, the pile that is not yet a record. Volume is not memory; rhythm is."
+      },
+      "visuals": {
+        "detailed_description": "Varves in intimate close-up, filling the frame in low warm light: paired light and dark laminae -- summer's silt, winter's clay -- repeating upward in a calm unbroken pulse, each pair one year. Three interleaved rhythms are visible: the annual pairs, the decadal swellings, the slow ochre deepening of centuries -- one rising wall of kept time."
+      },
+      "station_slug": "deposition"
+    },
+    "strata-four": {
+      "name": "Four of Strata",
+      "number": "4",
+      "slug": "strata-four",
+      "arcana": "minor",
+      "suit_slug": "strata",
+      "rank_slug": "four",
+      "meaning": {
+        "upright": "The record consolidated into rock: pages pressed to stone, the past acquiring load-bearing strength. What was merely kept becomes something you can build on -- foundation as the reward of sustained keeping.",
+        "inverted": "The past cemented past revision: a record so lithified it can no longer admit an erratum. Foundations should bear weight, not forbid amendment."
+      },
+      "visuals": {
+        "detailed_description": "Deep in the section, close-framed and airless: loose sands visibly welding into sandstone, grain contacts suturing one by one, the small lights of pore-space dimming bed by bed as the weight above presses down. In deepened, breathless color, the archive is acquiring its binding -- the moment paper becomes book."
+      },
+      "station_slug": "burial"
+    },
+    "strata-five": {
+      "name": "Five of Strata",
+      "number": "5",
+      "slug": "strata-five",
+      "arcana": "minor",
+      "suit_slug": "strata",
+      "rank_slug": "five",
+      "meaning": {
+        "upright": "The record strained until it shows its fabric: folding reveals which layers were strong and which were soft, and the testimony bends without erasing. What stress exposes in an archive is not its falsehood but its texture -- read the fold as part of the record.",
+        "inverted": "The record deformed into a preferred shape and the strain passed off as the original story. Bent testimony can still be honest; testimony that denies it was ever bent cannot."
+      },
+      "visuals": {
+        "detailed_description": "A cliff face of banded ochre and rust beds folded into one great recumbent S, the whole face sheened with strain, thin white veins threading the fold hinges where the rock nearly gave. Every layer remains traceable through the contortion -- the sequence fully legible even bent double, wearing its ordeal as fabric rather than wound."
+      },
+      "station_slug": "metamorphism"
+    },
+    "strata-six": {
+      "name": "Six of Strata",
+      "number": "6",
+      "slug": "strata-six",
+      "arcana": "minor",
+      "suit_slug": "strata",
+      "rank_slug": "six",
+      "meaning": {
+        "upright": "Equilibrium found at the edge of erasure: the archive learns exactly how close to the fire it can lie and still keep. Peace with impermanence is not surrender -- it is knowing your distance, holding your level, and continuing the record one layer above the forge.",
+        "inverted": "Repose too near the heat: records kept where they cannot survive, calm maintained by not looking down. The baked layer at the bottom is a boundary, not a rug."
+      },
+      "visuals": {
+        "detailed_description": "In cross-section: flat-lying beds resting calm and level above a glowing sill, the lowest layers baked brick-red and hardened where the heat reached, incandescence from below softening the floor of the frame. Above that bright line, ochre and cream beds lie in perfect archival stillness -- the record at rest exactly one layer above the place where records end."
+      },
+      "station_slug": "melt"
+    },
+    "strata-seven": {
+      "name": "Seven of Strata",
+      "number": "7",
+      "slug": "strata-seven",
+      "arcana": "minor",
+      "suit_slug": "strata",
+      "rank_slug": "seven",
+      "meaning": {
+        "upright": "The record parting cleanly along its own pages: division that restores legibility rather than destroying it. The archive's natural fracture lines are its bedding -- split there, and every piece comes away whole, a complete day in the hand.",
+        "inverted": "Split into leaves and scattered: pages without a spine, each slab carried off to a different wall. Clean division is a virtue only while the order of the pages survives it."
+      },
+      "visuals": {
+        "detailed_description": "A quarry face in cool, exact light: flagstones parting along perfect bedding planes with soft dry sighs, each lifted slab a single season complete in itself -- ripple marks on one, rain prints on another. Beside the face they stand stacked in order, an unbound codex, every page crystal-edged and legible."
+      },
+      "station_slug": "crystallization"
+    },
+    "strata-eight": {
+      "name": "Eight of Strata",
+      "number": "8",
+      "slug": "strata-eight",
+      "arcana": "minor",
+      "suit_slug": "strata",
+      "rank_slug": "eight",
+      "meaning": {
+        "upright": "The record become load-bearing: one hardened bed holding up a landscape, memory doing structural work. This is the archive's mature power -- not merely to recall the past but to carry the present on its shoulders, dead level, for miles.",
+        "inverted": "One resistant layer dictating everything: the caprock that decides what every softer bed beneath it is allowed to become. Strength in an archive should support the column, not censor it."
+      },
+      "visuals": {
+        "detailed_description": "A long escarpment at morning in thin bright air: a single indurated cream bed capping softer rusts and ochres, holding the raised horizon dead level from frame edge to frame edge. Long shadows pool beneath the overhang where the soft beds retreat; above, the hard layer takes the light like proof. Memory, load-bearing."
+      },
+      "station_slug": "uplift"
+    },
+    "strata-nine": {
+      "name": "Nine of Strata",
+      "number": "9",
+      "slug": "strata-nine",
+      "arcana": "minor",
+      "suit_slug": "strata",
+      "rank_slug": "nine",
+      "meaning": {
+        "upright": "The record's destiny arriving: exposure. The archive was always being written toward the day a surface would open it -- every buried layer aimed, across unthinkable patience, at legibility. The face is opening now; the destiny of keeping is being read.",
+        "inverted": "Destined exposure feared: the record kept buried past its ripeness, the canyon resented for doing what the archive was for. A memory that must never be read has become a hoard."
+      },
+      "visuals": {
+        "detailed_description": "A canyon wall in mild, diffuse daylight: hundreds of bands rising from river to rim, ochre and rust and cream in their long-kept order. Across the face, the newest pitting and rounding of weathering has just begun to open the surface -- edges softening, seams loosening -- the whole column standing one page-turn from fully legible."
+      },
+      "station_slug": "weathering"
+    },
+    "strata-ten": {
+      "name": "Ten of Strata",
+      "number": "10",
+      "slug": "strata-ten",
+      "arcana": "minor",
+      "suit_slug": "strata",
+      "rank_slug": "ten",
+      "meaning": {
+        "upright": "Completion as source: the finished record giving itself, grain by grain, as raw material to the record that comes next. The archive's last act is generosity -- what it kept so carefully, it now hands forward in moving water. Inheritance is not what stays; it is what transfers.",
+        "inverted": "The old record dominating the new column: a completed past that insists on being every future's largest ingredient. Legacy given with a grip is sediment that never quite settles."
+      },
+      "visuals": {
+        "detailed_description": "A river undercutting a complete banded cliff in cool wet greys and blues: whole strata calving away into the current, their edges blurring as they go, grains already streaming seaward in long pale plumes. The finished archive is visibly becoming sediment again -- completing itself by consenting to be carried, en route to lying down in some newer column downstream."
+      },
+      "station_slug": "transport"
+    },
+    "strata-prospector": {
+      "name": "Prospector of Strata",
+      "number": "11",
+      "slug": "strata-prospector",
+      "arcana": "minor",
+      "suit_slug": "strata",
+      "rank_slug": "prospector",
+      "meaning": {
+        "upright": "Prospecting the quiet places: the knowledge that value settles where nothing seems to happen, and the patience to search by waiting. The seeker of archives does not chase the glitter; they core the floodplain, trusting that stillness has been keeping accounts.",
+        "inverted": "Digging the archive for one payable seam: the record valued only where it glints, whole centuries discarded as overburden. A prospector who cannot love the barren pages will misread the rich ones."
+      },
+      "visuals": {
+        "detailed_description": "Dusk on a level floodplain, low warm light along quiet water: a small figure turns an auger into the silts, unhurried. Beside them, the day's extracted cores lie in a neat row like recovered scrolls, each banded cylinder darker and older than the last. Nothing in the scene moves but their hands."
+      },
+      "station_slug": "deposition"
+    },
+    "strata-surveyor": {
+      "name": "Surveyor of Strata",
+      "number": "12",
+      "slug": "strata-surveyor",
+      "arcana": "minor",
+      "suit_slug": "strata",
+      "rank_slug": "surveyor",
+      "meaning": {
+        "upright": "Measuring what cannot be seen: sounding the sealed layers by discipline rather than sight, converting darkness into depth-figures a hand can hold. Trust the instrument, log every rung, and the buried column becomes knowledge without ever being exposed.",
+        "inverted": "The column mapped and never consulted: soundings filed, depths certified, and the archive itself left unread beneath its perfect index. Measurement was supposed to be an introduction, not a substitute."
+      },
+      "visuals": {
+        "detailed_description": "Night at a small drill rig, close-framed, the air thick and still: a figure logs depths by lamplight as the string descends through bed after unseen bed. Each recorded stratum is a rung into the sealed dark below -- the notebook filling with the shape of a country no light has ever entered."
+      },
+      "station_slug": "burial"
+    },
+    "strata-reader": {
+      "name": "Reader of Strata",
+      "number": "13",
+      "slug": "strata-reader",
+      "arcana": "minor",
+      "suit_slug": "strata",
+      "rank_slug": "reader",
+      "meaning": {
+        "upright": "Reading through deformation: testimony bent, sheared, and cooked -- and still heard. The interpreter honors what the strain did to the record without letting the strain replace the sentence; the fold is context, not content. Follow the thin true band all the way through.",
+        "inverted": "Blaming the strain for what the reading imposed: every inconvenient passage attributed to deformation, the fold used as an alibi for the thesis. Some bends are in the rock; some are in the reader."
+      },
+      "visuals": {
+        "detailed_description": "A figure with a lamp stands close against a folded gneiss face, veined and sheened with strain, in dim heat-tinged light. One fingertip rests on a thin, persistent pale band, tracing it slowly through hairpin after hairpin of contortion -- following a single sentence through the whole crumpled page, refusing to lose it."
+      },
+      "station_slug": "metamorphism"
+    },
+    "strata-witness": {
+      "name": "Witness of Strata",
+      "number": "14",
+      "slug": "strata-witness",
+      "arcana": "minor",
+      "suit_slug": "strata",
+      "rank_slug": "witness",
+      "meaning": {
+        "upright": "Standing where the record ends: presence at the boundary between the kept and the unkeepable. To hold memory where memory fails -- not rescuing the dissolving layers, not looking away from them -- is the archive's last office, and someone must perform it.",
+        "inverted": "Refusing to look at the erasing edge: the archive loved only where it is intact, its mortal boundary politely unvisited. Witness that cannot attend an ending will eventually falsify the middle."
+      },
+      "visuals": {
+        "detailed_description": "At the glowing floor of a great section, a small, still figure stands where the lowest, oldest beds soften -- banding loosening, colors sliding toward incandescence, the archive's bottom edge dissolving into shimmer. The figure does not step back and does not reach in. They watch the exact line where the record gives way to fire, and they stay."
+      },
+      "station_slug": "melt"
+    },
+    "grains-ace": {
+      "name": "Ace of Grains",
+      "number": "1",
+      "slug": "grains-ace",
+      "arcana": "minor",
+      "suit_slug": "grains",
+      "rank_slug": "ace",
+      "meaning": {
+        "upright": "Unmaking begins invisibly, deep inside, long before any surface shows it: the first loosening under weight, one grain parting from its parent along a seam no one has seen. Release starts where you are most compressed -- notice the small freedom already forming there.",
+        "inverted": "The hidden crack denied: the first loosening sealed over with insistence, because admitting one grain is loose would mean admitting the seam exists. Unmaking postponed is not unmaking prevented."
+      },
+      "visuals": {
+        "detailed_description": "Close-framed in airless dark, deep under the load: a single grain of pale quartz parting from its parent rock along a hairline seam, caught at the instant of separation. The weight above is present in the frame's own compression; the grain is one bone-white mote of freedom in a sealed world -- the very first letting-go."
+      },
+      "station_slug": "burial"
+    },
+    "grains-two": {
+      "name": "Two of Grains",
+      "number": "2",
+      "slug": "grains-two",
+      "arcana": "minor",
+      "suit_slug": "grains",
+      "rank_slug": "two",
+      "meaning": {
+        "upright": "The eroder and the eroded in permanent contact, each shaping the other: the wind's sand was once the cliff it now carves. Whatever is wearing on you is made of the same substance as you -- the contact is a conversation between kin, however hard it lands.",
+        "inverted": "Contact become mutual grinding without exchange: two bodies wearing each other featureless and learning nothing at the interface. Abrasion without acknowledgment is just loss twice over."
+      },
+      "visuals": {
+        "detailed_description": "A wind-fluted rock face in dim, haze-veined storm light, its grooves folded and contorted like drapery, every hollow polished to a strain-bright sheen. Against it, a current of sand caught mid-strike, streaming through the flutes it cut -- the carver and the carved visibly the same pale substance, curved into each other's shapes by years of touch."
+      },
+      "station_slug": "metamorphism"
+    },
+    "grains-three": {
+      "name": "Three of Grains",
+      "number": "3",
+      "slug": "grains-three",
+      "arcana": "minor",
+      "suit_slug": "grains",
+      "rank_slug": "three",
+      "meaning": {
+        "upright": "The unmade compounding into new form: debris organizing itself, what was lost from distant cliffs assembling into hills that breathe and travel. Loss, repeated and gathered, becomes a building material -- your scattered pieces are already drifting into shapes.",
+        "inverted": "Compounding without cohesion: drift that never becomes dune, material forever in motion because nothing consents to be the core. A pile is not a form until something holds."
+      },
+      "visuals": {
+        "detailed_description": "A dune field at deep sunset, incandescent light lying low along the horizon so that every crest glows like a slow ember and every slip-face softens into shadow. Three scales of building are visible at once -- ripples riding dunes, dunes riding a great star dune -- pure loss, gathered and gathered again, becoming architecture that moves."
+      },
+      "station_slug": "melt"
+    },
+    "grains-four": {
+      "name": "Four of Grains",
+      "number": "4",
+      "slug": "grains-four",
+      "arcana": "minor",
+      "suit_slug": "grains",
+      "rank_slug": "four",
+      "meaning": {
+        "upright": "The unmaking finds its floor: a surface already reduced to the irreducible, interlocked into an armor that halts further loss. Stability here is not resistance but completion of the subtraction -- what remains is exactly what cannot be taken, fitted tight.",
+        "inverted": "The pavement as sterile armor: a floor so complete that nothing beneath it is ever touched again, protection indistinguishable from entombment. A foundation should end a loss, not end all exchange."
+      },
+      "visuals": {
+        "detailed_description": "A desert pavement in cool, exact morning light: a single layer of tightly interlocked stones, wind-faceted and desert-varnished, every edge crystal-crisp, fitted like a mosaic floor across soft buried silts. Nothing moves. The reduction is finished, and the finish is a foundation -- subtraction itself holding the ground."
+      },
+      "station_slug": "crystallization"
+    },
+    "grains-five": {
+      "name": "Five of Grains",
+      "number": "5",
+      "slug": "grains-five",
+      "arcana": "minor",
+      "suit_slug": "grains",
+      "rank_slug": "five",
+      "meaning": {
+        "upright": "Strain reveals what was always harder: loss carves the truth out of the mass, and what remains standing is the revelation. Being worn down to your load-bearing parts is a disclosure, not a defeat -- look at what the removal left upright.",
+        "inverted": "Undercut past standing: the test continued after the truth was already shown, pillars sawn at the base to see if they were sincere. Revelation has a point of diminishing honesty."
+      },
+      "visuals": {
+        "detailed_description": "A high mesa rim in thin bright air, its edge dissolving into a rank of hoodoos on tilted planes -- each pillar capped with a harder stone, each a hardness the softer rock confessed by leaving. Long shadows stream from their feet across the slope below; the land's interior truth stands revealed as a row of figures it carved out of itself."
+      },
+      "station_slug": "uplift"
+    },
+    "grains-six": {
+      "name": "Six of Grains",
+      "number": "6",
+      "slug": "grains-six",
+      "arcana": "minor",
+      "suit_slug": "grains",
+      "rank_slug": "six",
+      "meaning": {
+        "upright": "The fallen find their angle: everything the cliff released settles into the one slope it can honestly hold, and cliff and debris rest touching. Equilibrium after loss is a form of reconciliation -- the mountain at peace with its own givings-away.",
+        "inverted": "The slope loaded past its consent: new losses heaped on a settlement that was finished, peace mistaken for capacity. Even reconciliation has an angle it cannot exceed."
+      },
+      "visuals": {
+        "detailed_description": "Beneath a rounding, retreating cliff in mild mottled daylight, a talus apron lies at its perfect angle -- every fallen block pitted and lichen-flecked, sorted coarse to fine down the slope. The apron's edge runs in one clean line of consent across the valley floor, and the cliff and its losses lean together, touching, at rest."
+      },
+      "station_slug": "weathering"
+    },
+    "grains-seven": {
+      "name": "Seven of Grains",
+      "number": "7",
+      "slug": "grains-seven",
+      "arcana": "minor",
+      "suit_slug": "grains",
+      "rank_slug": "seven",
+      "meaning": {
+        "upright": "Division by journey: the current sorts the one mass into its true parts -- what is heavy stays near, what is fine travels far, and each fraction is addressed to its own distance. Let the carrying do the differentiating; it knows the parts better than the whole did.",
+        "inverted": "Sorted and scattered past reassembly: the parts so thoroughly distributed that the original can never be consulted again. Differentiation is honest only while the provenance survives it."
+      },
+      "visuals": {
+        "detailed_description": "A flooding desert wash in cool wet grey light: one rock body visibly dividing downstream into its kinds -- boulders lagging in the channel head, gravels striding in mid-reach, sands streaming in pale sheets, silt already smoke in the brown water. Every fragment blurs at its trailing edge, in motion, addressed by weight to a different resting place."
+      },
+      "station_slug": "transport"
+    },
+    "grains-eight": {
+      "name": "Eight of Grains",
+      "number": "8",
+      "slug": "grains-eight",
+      "arcana": "minor",
+      "suit_slug": "grains",
+      "rank_slug": "eight",
+      "meaning": {
+        "upright": "Unmaking, mastered, builds: the delta lays the mountain's disassembly down as new country, a few quiet grains at a time. This is the suit's full competence -- loss so practiced and so patient that its output is land. Keep placing the grains; the coastline is moving.",
+        "inverted": "The delta silting its own channels: mastery so devoted to deposition it buries its own distributaries. Even constructive loss needs to keep a way open for the next load."
+      },
+      "visuals": {
+        "detailed_description": "A delta at evening in low warm light: distributaries branching like veins through fresh silt bars, each lobe advancing grain by visible grain into still water that mirrors the sky. Far upstream, implied in the sediment's gold, the mountains it is made of. At the water's edge, the newest few centimeters of a country that did not exist this morning."
+      },
+      "station_slug": "deposition"
+    },
+    "grains-nine": {
+      "name": "Nine of Grains",
+      "number": "9",
+      "slug": "grains-nine",
+      "arcana": "minor",
+      "suit_slug": "grains",
+      "rank_slug": "nine",
+      "meaning": {
+        "upright": "The destiny of all letting-go: to be gathered again. The grains that surrendered their forms are arriving, layer upon layer, at the dark where they will become stone -- the journey's teleology was never wandering but a longer, stranger keeping. Trust where the settling is taking you.",
+        "inverted": "Destiny resisted at the threshold: the wanderer refusing the bed, motion prolonged because arrival feels like disappearance. But the alternative to becoming rock is only becoming dust that never rests."
+      },
+      "visuals": {
+        "detailed_description": "Close-framed beneath the delta's accumulating weight, in deepened airless color: pale travelled grains settling into their final beds, the small lights of pore-space dimming one by one as the load above grows. Each grain still carries its journey in its rounding -- and each is arriving, in the pressing dark, at the long home where wandering becomes rock."
+      },
+      "station_slug": "burial"
+    },
+    "grains-ten": {
+      "name": "Ten of Grains",
+      "number": "10",
+      "slug": "grains-ten",
+      "arcana": "minor",
+      "suit_slug": "grains",
+      "rank_slug": "ten",
+      "meaning": {
+        "upright": "Completion as transfiguration: the loosest thing in the world become the most durable. The sum of all surrenders, welded, emerges as the ridge that outlasts every cliff that ever shed it -- letting-go, carried all the way through, finishes as the unbreakable.",
+        "inverted": "Hardness that forgets it was ever sand: the transfigured survivor denying the million losses that composed it. Durability without that memory is just arrogance with a crystal structure."
+      },
+      "visuals": {
+        "detailed_description": "A quartzite ridge in dim, veined light, its mass folded and sheened with strain: stone so utterly welded that old fractures cut straight through grains rather than around them. And within the gleam, faint as watermarks, the ghost-lines of ancient dune bedding still curve -- a million surrenders, fused, standing as the hardest thing in the landscape."
+      },
+      "station_slug": "metamorphism"
+    },
+    "grains-prospector": {
+      "name": "Prospector of Grains",
+      "number": "11",
+      "slug": "grains-prospector",
+      "arcana": "minor",
+      "suit_slug": "grains",
+      "rank_slug": "prospector",
+      "meaning": {
+        "upright": "Seeking in what was let go: the placer hunter reads the drift for the gold the mountains released, knowing treasure travels as residue. What others call debris is a concentrate -- the search is for what loss refused to dissolve.",
+        "inverted": "Panning everything, keeping nothing: the swirl continued past the point of finding, because searching has become the treasure. Even a placer must sometimes close its hand."
+      },
+      "visuals": {
+        "detailed_description": "Deep-red sundown, the light lying like forge-glow along a dry wash: a lone figure crouches over a pan, swirling dark sand whose edges soften in the incandescent air. At the pan's rim, one glinting point holds still while everything else moves -- wealth found not in the mountain, but in what the mountain let go."
+      },
+      "station_slug": "melt"
+    },
+    "grains-surveyor": {
+      "name": "Surveyor of Grains",
+      "number": "12",
+      "slug": "grains-surveyor",
+      "arcana": "minor",
+      "suit_slug": "grains",
+      "rank_slug": "surveyor",
+      "meaning": {
+        "upright": "Measuring the invisible thief: pins and profiles quantifying exactly what has left, precision applied to absence. To know the rate of your losses is a discipline, and the ledger of what is gone is itself a kind of keeping.",
+        "inverted": "Measuring loss without ever grieving or acting on it: the retreat perfectly quantified, annually certified, and never once answered. An audit of absence is not a response to it."
+      },
+      "visuals": {
+        "detailed_description": "Cool, exact light on a retreating bluff: a figure sights along a line of steel erosion pins, each one's newly exposed length a precise crystal of fact about what has gone missing since last season. In the notebook, columns of small figures accumulate -- a ledger of absences, kept to the millimeter, in a landscape quietly leaving."
+      },
+      "station_slug": "crystallization"
+    },
+    "grains-reader": {
+      "name": "Reader of Grains",
+      "number": "13",
+      "slug": "grains-reader",
+      "arcana": "minor",
+      "suit_slug": "grains",
+      "rank_slug": "reader",
+      "meaning": {
+        "upright": "Reading the sculpture for its subject: from the shape of what remains, reconstructing everything that was removed. The interpreter of negative space knows that erosion is an author too -- the missing mile of rock is legible in the carve of what withstood it.",
+        "inverted": "Reading only the removal: so fluent in absence that the survivor under your hand goes unread. The remainder is not merely evidence of what is gone; it is also, stubbornly, here."
+      },
+      "visuals": {
+        "detailed_description": "On a high, bare pediment in thin bright air, a figure stands among long morning shadows, turning slowly to read the carved land -- inselbergs, notches, wind-facets, each a syllable of subtraction. Above their head, implied in the empty brightness, the vanished mile of rock they are reconstructing from pure remainder."
+      },
+      "station_slug": "uplift"
+    },
+    "grains-witness": {
+      "name": "Witness of Grains",
+      "number": "14",
+      "slug": "grains-witness",
+      "arcana": "minor",
+      "suit_slug": "grains",
+      "rank_slug": "witness",
+      "meaning": {
+        "upright": "Witnessing the gentle disassembly without rescue and without despair: staying present while a thing is worn, loving it in a way that does not require it to be permanent. This is the suit's deepest teaching held in a human frame -- company, offered to the impermanent, as is.",
+        "inverted": "Elegy as evasion: mourning the wearing so beautifully that the staying never happens. The boulder does not need your grief; it needs, if anything at all, your afternoon."
+      },
+      "visuals": {
+        "detailed_description": "Mild, mottled daylight; dust hanging in the hazy air. A small figure sits on the ground beside a roadside boulder worn round and pitted by a century of weather, one hand resting on its warm crown. Nothing happens. The stone is being slowly taken, the figure knows it, and stays anyway -- not asking it to last."
+      },
+      "station_slug": "weathering"
+    },
+    "faults-ace": {
+      "name": "Ace of Faults",
+      "number": "1",
+      "slug": "faults-ace",
+      "arcana": "minor",
+      "suit_slug": "faults",
+      "rank_slug": "ace",
+      "meaning": {
+        "upright": "Rupture's seed is present from the first commitment: every structure is born already carrying the lines along which it will someday tell the truth. The first hairline is not a failure of the form -- it is part of the form. Know your seams early.",
+        "inverted": "The flaw denied at the foundry: the hairline polished over in the name of perfection, guaranteeing that when the truth finally moves, it will move without warning. A named seam is a safety; an unnamed one is an ambush."
+      },
+      "visuals": {
+        "detailed_description": "In cool, exact light, a freshly crystallized mass fills the frame, every facet flawless and sharply defined -- except that through one face, thinner than a hair and easy to miss, runs a single bright seam of difference. Nothing has moved. Nothing is broken. The line simply waits, part of the crystal from birth, for the day the truth will need a road."
+      },
+      "station_slug": "crystallization"
+    },
+    "faults-two": {
+      "name": "Two of Faults",
+      "number": "2",
+      "slug": "faults-two",
+      "arcana": "minor",
+      "suit_slug": "faults",
+      "rank_slug": "two",
+      "meaning": {
+        "upright": "The two sides of a break, still touching: displacement as a relationship, the honest distance between what were once the same level. The step between you is real and measurable -- and the surfaces facing each other across it are made of identical stone.",
+        "inverted": "The scarp worshipped as a frontier: the offset treated as proof the two sides were never one body. A fault is a difference in history, not a difference in kind."
+      },
+      "visuals": {
+        "detailed_description": "A fresh fault scarp in thin bright morning air: one grassy plain raised cleanly above its twin, hard raking light picking out the pale, unweathered band of stone at the scarp's base like a wound's new skin. Above and below, the two surfaces are identical in grain and color -- the same country, facing itself across a step of honest distance."
+      },
+      "station_slug": "uplift"
+    },
+    "faults-three": {
+      "name": "Three of Faults",
+      "number": "3",
+      "slug": "faults-three",
+      "arcana": "minor",
+      "suit_slug": "faults",
+      "rank_slug": "three",
+      "meaning": {
+        "upright": "Ruptures compounding into a place: break upon parallel break opening a valley that gathers water and light. What repetition of honesty builds is space -- room made in the world by everything that consented to move. The rift becomes a cradle.",
+        "inverted": "The break rehearsed until it is habit: faulting along the same lines long after the strain has moved elsewhere. A rift that can only deepen eventually drowns what it cradled."
+      },
+      "visuals": {
+        "detailed_description": "An old rift valley in mild, mottled daylight: stepped charcoal escarpments descending in successive parallel breaks to a long lake on the valley floor, each scarp more rounded, more lichen-marked, more forgiven than the one above it. Reeds stand in the shallows. The whole habitable scene -- water, shelter, green -- is built of accumulated ruptures."
+      },
+      "station_slug": "weathering"
+    },
+    "faults-four": {
+      "name": "Four of Faults",
+      "number": "4",
+      "slug": "faults-four",
+      "arcana": "minor",
+      "suit_slug": "faults",
+      "rank_slug": "four",
+      "meaning": {
+        "upright": "The break domesticated into steady motion: strain paid in small, continuous installments so the debt never accumulates. This is rupture's strangest stability -- a foundation of perpetual, minor honesty. Keep the payments current and there is no earthquake to fear.",
+        "inverted": "Creep mistaken for a universal law: the smooth section's calm extrapolated onto neighbors that are locked and loading. Not every quiet stretch is paying its debts; some are only postponing them."
+      },
+      "visuals": {
+        "detailed_description": "A suburban curb and garden wall offset, centimeter by patient centimeter, where a creeping fault crosses the street -- the displacement blurred and continuous, like a picture taken over decades. Cool grey moving light; no scarp, no wreckage, no drama. The ground pays its strain in coins too small to feel, and the wall's gentle bend is the receipt."
+      },
+      "station_slug": "transport"
+    },
+    "faults-five": {
+      "name": "Five of Faults",
+      "number": "5",
+      "slug": "faults-five",
+      "arcana": "minor",
+      "suit_slug": "faults",
+      "rank_slug": "five",
+      "meaning": {
+        "upright": "The record of stress surfaces in the calmest place: quiet layers that once liquefied and refroze, testifying that the ground moved beneath still water. What the serene admit under questioning is the deepest evidence -- peace that has survived shaking carries the proof inside it.",
+        "inverted": "Calm restored so quickly the lesson blurs: the churned horizon smoothed over by the very next season's silt. Serenity that cannot cite its own ordeals will be surprised by the next one."
+      },
+      "visuals": {
+        "detailed_description": "In low warm light, a clean cut through pond beds: lamina after lamina lying level and serene -- except for one horizon churned into flame-shaped curls, dropped pebbles, and small sand volcanoes, refrozen mid-convulsion. Above it, perfect calm resumes as if nothing happened. The still water's own sworn testimony that the ground once moved."
+      },
+      "station_slug": "deposition"
+    },
+    "faults-six": {
+      "name": "Six of Faults",
+      "number": "6",
+      "slug": "faults-six",
+      "arcana": "minor",
+      "suit_slug": "faults",
+      "rank_slug": "six",
+      "meaning": {
+        "upright": "The break at rest, filled: old ruptures becoming veins where minerals settle out of the dark. Equilibrium here is healing without erasure -- the scar remains visible, load-bearing, even precious. What broke you, sealed honestly, can become the brightest seam in you.",
+        "inverted": "The vein mistaken for intact rock: the healed break loaded as if it had never moved, its history priced into ornament and out of memory. A filled fault is at peace, not abolished."
+      },
+      "visuals": {
+        "detailed_description": "Close-framed in deep, airless dark: an old fracture healed shut with white quartz, crystals grown inward from both walls to meet along a faint suture line down the middle. Through charcoal rock, the vein runs as one seam of pale brightness -- the wound at rest under the weight of the world, become the strongest and most luminous part of the mass."
+      },
+      "station_slug": "burial"
+    },
+    "faults-seven": {
+      "name": "Seven of Faults",
+      "number": "7",
+      "slug": "faults-seven",
+      "arcana": "minor",
+      "suit_slug": "faults",
+      "rank_slug": "seven",
+      "meaning": {
+        "upright": "The single break differentiates into a system: strands, splays, and shears, each taking its share of an unbearable load. Honest division of strain is how the deep rock survives it -- no one line carries everything, and the whole zone moves as a family.",
+        "inverted": "Strain scattered along so many strands that none resolves: the load infinitely subdivided, every line moving a little, nothing ever settled. Distribution can become a way of never concluding."
+      },
+      "visuals": {
+        "detailed_description": "A deep shear zone in dim, veined heat: one master break braiding downward into a fan of strands, each surface sheened with strain, the rock between them drawn out into contorted charcoal ribbons shot with one seam of green mineral color. The rupture visibly dividing its burden among many hands, all of them holding."
+      },
+      "station_slug": "metamorphism"
+    },
+    "faults-eight": {
+      "name": "Eight of Faults",
+      "number": "8",
+      "slug": "faults-eight",
+      "arcana": "minor",
+      "suit_slug": "faults",
+      "rank_slug": "eight",
+      "meaning": {
+        "upright": "The practiced break become a conduit: the deep fracture that lets the melt rise. This is rupture's mastery -- an old line of failure repurposed as the way fire reaches the world. What you have broken along often enough, you can now open on purpose, in service of making.",
+        "inverted": "Every motion answered with fire: the conduit that can no longer move without erupting, capability collapsed into reflex. A way for the melt should be opened, not left ajar."
+      },
+      "visuals": {
+        "detailed_description": "A great fault cutting the full depth of the crust in cross-section, the frame glowing from below: its upper reaches sharp charcoal, its lower reaches softening as incandescence threads up the broken zone in bright rising veins. The old line of failure, polished by a million small honesties, now carries fire toward the surface like a purpose."
+      },
+      "station_slug": "melt"
+    },
+    "faults-nine": {
+      "name": "Nine of Faults",
+      "number": "9",
+      "slug": "faults-nine",
+      "arcana": "minor",
+      "suit_slug": "faults",
+      "rank_slug": "nine",
+      "meaning": {
+        "upright": "The destiny of the break: to become a joint. The line where two masses, done moving, are welded into one body -- rupture fulfilled not by endless motion but by union, the old divide regrown across until it is the strongest seam of a new whole.",
+        "inverted": "Union declared while the stresses remain: the suture announced, the weld unfinished, two bodies pronounced one because everyone is tired of the motion. A premature joint is just a fault with a treaty."
+      },
+      "visuals": {
+        "detailed_description": "In cool, exact light, a mountain root in cross-section: two continental fabrics of different grain meeting along a suture zone, dark ophiolite slivers caught in the weld like solder in a joint. Along the join, every crystal has regrown across the old divide, facets bridging what were once separate worlds -- the great break finished as the seam of one new continent."
+      },
+      "station_slug": "crystallization"
+    },
+    "faults-ten": {
+      "name": "Ten of Faults",
+      "number": "10",
+      "slug": "faults-ten",
+      "arcana": "minor",
+      "suit_slug": "faults",
+      "rank_slug": "ten",
+      "meaning": {
+        "upright": "What rupture leaves when it completes: the range itself -- a skyline that is nothing but the sum of every honest break. The finished ledger of a million releases stands as geography; what all that breaking built is the very shape of the horizon you now navigate by.",
+        "inverted": "The range read as permanence: the ledger mistaken for a monument, as if the breaking were over because its results are beautiful. The skyline is a balance carried forward, not a closed account."
+      },
+      "visuals": {
+        "detailed_description": "Dawn in thin bright air over basin-and-range country: tilted fault-block ranges standing in ranks to the far distance, each front an unweathered-footed scarp catching the low light, long violet shadows brimming the grabens between. An entire geography, ridge after ridge -- the completed, still-open ledger of a million honest breaks."
+      },
+      "station_slug": "uplift"
+    },
+    "faults-prospector": {
+      "name": "Prospector of Faults",
+      "number": "11",
+      "slug": "faults-prospector",
+      "arcana": "minor",
+      "suit_slug": "faults",
+      "rank_slug": "prospector",
+      "meaning": {
+        "upright": "Hunting the hidden break in the softened land: reading offset fences, springs in a suspicious line, the faint step under the turf. The hunch that honesty lies just below the surface -- and the nerve to go find where it last moved. Some claims are staked on candor.",
+        "inverted": "Seeing faults everywhere: every hollow a graben, every hedge-line an offset, the search for hidden breaks become a way of distrusting all ground. A prospector of ruptures still needs most of the world to be whole."
+      },
+      "visuals": {
+        "detailed_description": "In mild, mottled daylight, a figure walks a grassy hillside along a subtle step in the turf, following a line of small springs and old fences that all bend the same way. Hammer in hand, coat catching the breeze, they trace the healed and hidden break that the land itself only half-remembers -- and mark, with a single stake, where it last told the truth."
+      },
+      "station_slug": "weathering"
+    },
+    "faults-surveyor": {
+      "name": "Surveyor of Faults",
+      "number": "12",
+      "slug": "faults-surveyor",
+      "arcana": "minor",
+      "suit_slug": "faults",
+      "rank_slug": "surveyor",
+      "meaning": {
+        "upright": "Measuring the drift before the release: benchmarks and baselines quantifying the slow carry of ground toward its next honesty. Strain accounted is strain half-answered -- the discipline is to know how much the world has moved, and toward what.",
+        "inverted": "Perfect accounts, no warnings issued: the drift measured to the millimeter and filed, the release arriving exactly as computed and entirely unannounced. Measurement owes its subject a voice."
+      },
+      "visuals": {
+        "detailed_description": "In cool, moving grey light, a figure steadies an instrument over a brass benchmark and re-measures a baseline across a valley whose far side has quietly travelled since last year. Everything in the frame drifts almost imperceptibly -- clouds, grass, the distant ridge -- while the notebook records precisely how much, and in which direction, the ground is carrying its intentions."
+      },
+      "station_slug": "transport"
+    },
+    "faults-reader": {
+      "name": "Reader of Faults",
+      "number": "13",
+      "slug": "faults-reader",
+      "arcana": "minor",
+      "suit_slug": "faults",
+      "rank_slug": "reader",
+      "meaning": {
+        "upright": "Reading the calm for its buried violences: dating the past breaks by the quiet layers between them, recovering the intervals as carefully as the events. The silences between earthquakes are also a record -- interpretation is counting them like rings in a tree.",
+        "inverted": "The intervals read as promises: the average of past silences mistaken for a schedule the ground has agreed to keep. The record permits estimation; it does not offer terms."
+      },
+      "visuals": {
+        "detailed_description": "Low warm evening light on a trench cut through level beds beside a sag pond: a figure kneels against the trench wall, tracing with one finger the buried scarps and sand-filled fissures interleaved between serene laminae. Above them, the pond lies still. They are counting the silences between earthquakes, and writing each one's length beside its grave."
+      },
+      "station_slug": "deposition"
+    },
+    "faults-witness": {
+      "name": "Witness of Faults",
+      "number": "14",
+      "slug": "faults-witness",
+      "arcana": "minor",
+      "suit_slug": "faults",
+      "rank_slug": "witness",
+      "meaning": {
+        "upright": "Standing with the locked and loaded dark: witness to strain that has not yet spoken, holding the knowledge of the break to come without flinching and without fleeing. Presence beside the pending is the suit's hardest office -- someone must keep company with what has not yet moved.",
+        "inverted": "Vigil curdled into dread: the waiting so total that the life above the fault is never lived. To witness kept strain is not to kneel before it forever; even beside the loaded dark, there are mornings."
+      },
+      "visuals": {
+        "detailed_description": "Close-framed and airless: a small lamp-lit figure seated at the base of a bolted mine gallery cut along an old fault, palm flat against the gouge-striped wall. The rock hums with kept strain; the lamp flame stands perfectly straight. In the compressed dark, the figure keeps company with what has not yet moved -- and stays until it is time to go up."
+      },
+      "station_slug": "burial"
+    }
+  }
+}

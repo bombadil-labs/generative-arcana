@@ -20,7 +20,7 @@ browser; a skinless deck (or one you paste in) still browses and reads, just wit
 
 ## The decks
 
-Six bundled decks — and, more to the point, **four different topologies**, which is the real proof that
+Seven bundled decks — and, more to the point, **four different topologies**, which is the real proof that
 the engine generalizes:
 
 | Deck | Cards | Transversal | Skin | Topology |
@@ -31,8 +31,15 @@ the engine generalizes:
 | **Final Fantasy Tarot** | 78 | the Elemental Wheel | Pixel (chibi) | creature suits as a dialectic cross-product |
 | **Evolution and Consciousness** | 78 | The Involution | Lumen (generative light) | the axes *concentrated* — Dewart's speech-bootstraps-consciousness |
 | **Ultima Octave** | 86 | the Lunar Cycle | Cube (the colour-cube) | an **8×8 lattice** — Garriott's 3-bit virtue algebra; suit = a virtue/colour, rank = an octave |
+| **The Deep Time Tarot** | 78 | the Rock Cycle | Core Sample (parametric p5) | designed end-to-end **by Claude (Fable)** — geology as the four axes; primes = irreducible forces, composites = derived formations |
 
-The last two are the interesting ones. **Evolution** folds the transversal and number into a single
+**Deep Time** is the first deck authored entirely by the model itself, from invitation to finished skin —
+and the first whose art is *derived in the browser*: one parametric p5 engine instantiated per card
+from its four coordinates (suit → form language, rank → composition, station → light, number →
+singular vs. factored forms); the majors render as literal core samples with a luminous event at
+their numbered depth.
+
+**Evolution** folds the transversal and number into a single
 parametric coordinate (`form(suit) · operation(rank) · light(station)`); the renderer literally *is* the
 deck's thesis. **Ultima Octave** makes the suit the eight virtues (each a corner of the additive colour
 cube) and the rank the eight Ultima 8-folds, so a card is "{octave} of {virtue}" — *Place of Justice* is

@@ -1,0 +1,422 @@
+{
+  "grains-ace": {
+    "name": "Ace of Grains",
+    "number": "1",
+    "slug": "grains-ace",
+    "arcana": "minor",
+    "suit_slug": "grains",
+    "rank_slug": "ace",
+    "meaning": {
+      "upright": "Unmaking begins invisibly, deep inside, long before any surface shows it: the first loosening under weight, one grain parting from its parent along a seam no one has seen. Release starts where you are most compressed -- notice the small freedom already forming there.",
+      "inverted": "The hidden crack denied: the first loosening sealed over with insistence, because admitting one grain is loose would mean admitting the seam exists. Unmaking postponed is not unmaking prevented."
+    },
+    "visuals": {
+      "detailed_description": "Close-framed in airless dark, deep under the load: a single grain of pale quartz parting from its parent rock along a hairline seam, caught at the instant of separation. The weight above is present in the frame's own compression; the grain is one bone-white mote of freedom in a sealed world -- the very first letting-go."
+    }
+  },
+  "grains-two": {
+    "name": "Two of Grains",
+    "number": "2",
+    "slug": "grains-two",
+    "arcana": "minor",
+    "suit_slug": "grains",
+    "rank_slug": "two",
+    "meaning": {
+      "upright": "The eroder and the eroded in permanent contact, each shaping the other: the wind's sand was once the cliff it now carves. Whatever is wearing on you is made of the same substance as you -- the contact is a conversation between kin, however hard it lands.",
+      "inverted": "Contact become mutual grinding without exchange: two bodies wearing each other featureless and learning nothing at the interface. Abrasion without acknowledgment is just loss twice over."
+    },
+    "visuals": {
+      "detailed_description": "A wind-fluted rock face in dim, haze-veined storm light, its grooves folded and contorted like drapery, every hollow polished to a strain-bright sheen. Against it, a current of sand caught mid-strike, streaming through the flutes it cut -- the carver and the carved visibly the same pale substance, curved into each other's shapes by years of touch."
+    }
+  },
+  "grains-three": {
+    "name": "Three of Grains",
+    "number": "3",
+    "slug": "grains-three",
+    "arcana": "minor",
+    "suit_slug": "grains",
+    "rank_slug": "three",
+    "meaning": {
+      "upright": "The unmade compounding into new form: debris organizing itself, what was lost from distant cliffs assembling into hills that breathe and travel. Loss, repeated and gathered, becomes a building material -- your scattered pieces are already drifting into shapes.",
+      "inverted": "Compounding without cohesion: drift that never becomes dune, material forever in motion because nothing consents to be the core. A pile is not a form until something holds."
+    },
+    "visuals": {
+      "detailed_description": "A dune field at deep sunset, incandescent light lying low along the horizon so that every crest glows like a slow ember and every slip-face softens into shadow. Three scales of building are visible at once -- ripples riding dunes, dunes riding a great star dune -- pure loss, gathered and gathered again, becoming architecture that moves."
+    }
+  },
+  "grains-four": {
+    "name": "Four of Grains",
+    "number": "4",
+    "slug": "grains-four",
+    "arcana": "minor",
+    "suit_slug": "grains",
+    "rank_slug": "four",
+    "meaning": {
+      "upright": "The unmaking finds its floor: a surface already reduced to the irreducible, interlocked into an armor that halts further loss. Stability here is not resistance but completion of the subtraction -- what remains is exactly what cannot be taken, fitted tight.",
+      "inverted": "The pavement as sterile armor: a floor so complete that nothing beneath it is ever touched again, protection indistinguishable from entombment. A foundation should end a loss, not end all exchange."
+    },
+    "visuals": {
+      "detailed_description": "A desert pavement in cool, exact morning light: a single layer of tightly interlocked stones, wind-faceted and desert-varnished, every edge crystal-crisp, fitted like a mosaic floor across soft buried silts. Nothing moves. The reduction is finished, and the finish is a foundation -- subtraction itself holding the ground."
+    }
+  },
+  "grains-five": {
+    "name": "Five of Grains",
+    "number": "5",
+    "slug": "grains-five",
+    "arcana": "minor",
+    "suit_slug": "grains",
+    "rank_slug": "five",
+    "meaning": {
+      "upright": "Strain reveals what was always harder: loss carves the truth out of the mass, and what remains standing is the revelation. Being worn down to your load-bearing parts is a disclosure, not a defeat -- look at what the removal left upright.",
+      "inverted": "Undercut past standing: the test continued after the truth was already shown, pillars sawn at the base to see if they were sincere. Revelation has a point of diminishing honesty."
+    },
+    "visuals": {
+      "detailed_description": "A high mesa rim in thin bright air, its edge dissolving into a rank of hoodoos on tilted planes -- each pillar capped with a harder stone, each a hardness the softer rock confessed by leaving. Long shadows stream from their feet across the slope below; the land's interior truth stands revealed as a row of figures it carved out of itself."
+    }
+  },
+  "grains-six": {
+    "name": "Six of Grains",
+    "number": "6",
+    "slug": "grains-six",
+    "arcana": "minor",
+    "suit_slug": "grains",
+    "rank_slug": "six",
+    "meaning": {
+      "upright": "The fallen find their angle: everything the cliff released settles into the one slope it can honestly hold, and cliff and debris rest touching. Equilibrium after loss is a form of reconciliation -- the mountain at peace with its own givings-away.",
+      "inverted": "The slope loaded past its consent: new losses heaped on a settlement that was finished, peace mistaken for capacity. Even reconciliation has an angle it cannot exceed."
+    },
+    "visuals": {
+      "detailed_description": "Beneath a rounding, retreating cliff in mild mottled daylight, a talus apron lies at its perfect angle -- every fallen block pitted and lichen-flecked, sorted coarse to fine down the slope. The apron's edge runs in one clean line of consent across the valley floor, and the cliff and its losses lean together, touching, at rest."
+    }
+  },
+  "grains-seven": {
+    "name": "Seven of Grains",
+    "number": "7",
+    "slug": "grains-seven",
+    "arcana": "minor",
+    "suit_slug": "grains",
+    "rank_slug": "seven",
+    "meaning": {
+      "upright": "Division by journey: the current sorts the one mass into its true parts -- what is heavy stays near, what is fine travels far, and each fraction is addressed to its own distance. Let the carrying do the differentiating; it knows the parts better than the whole did.",
+      "inverted": "Sorted and scattered past reassembly: the parts so thoroughly distributed that the original can never be consulted again. Differentiation is honest only while the provenance survives it."
+    },
+    "visuals": {
+      "detailed_description": "A flooding desert wash in cool wet grey light: one rock body visibly dividing downstream into its kinds -- boulders lagging in the channel head, gravels striding in mid-reach, sands streaming in pale sheets, silt already smoke in the brown water. Every fragment blurs at its trailing edge, in motion, addressed by weight to a different resting place."
+    }
+  },
+  "grains-eight": {
+    "name": "Eight of Grains",
+    "number": "8",
+    "slug": "grains-eight",
+    "arcana": "minor",
+    "suit_slug": "grains",
+    "rank_slug": "eight",
+    "meaning": {
+      "upright": "Unmaking, mastered, builds: the delta lays the mountain's disassembly down as new country, a few quiet grains at a time. This is the suit's full competence -- loss so practiced and so patient that its output is land. Keep placing the grains; the coastline is moving.",
+      "inverted": "The delta silting its own channels: mastery so devoted to deposition it buries its own distributaries. Even constructive loss needs to keep a way open for the next load."
+    },
+    "visuals": {
+      "detailed_description": "A delta at evening in low warm light: distributaries branching like veins through fresh silt bars, each lobe advancing grain by visible grain into still water that mirrors the sky. Far upstream, implied in the sediment's gold, the mountains it is made of. At the water's edge, the newest few centimeters of a country that did not exist this morning."
+    }
+  },
+  "grains-nine": {
+    "name": "Nine of Grains",
+    "number": "9",
+    "slug": "grains-nine",
+    "arcana": "minor",
+    "suit_slug": "grains",
+    "rank_slug": "nine",
+    "meaning": {
+      "upright": "The destiny of all letting-go: to be gathered again. The grains that surrendered their forms are arriving, layer upon layer, at the dark where they will become stone -- the journey's teleology was never wandering but a longer, stranger keeping. Trust where the settling is taking you.",
+      "inverted": "Destiny resisted at the threshold: the wanderer refusing the bed, motion prolonged because arrival feels like disappearance. But the alternative to becoming rock is only becoming dust that never rests."
+    },
+    "visuals": {
+      "detailed_description": "Close-framed beneath the delta's accumulating weight, in deepened airless color: pale travelled grains settling into their final beds, the small lights of pore-space dimming one by one as the load above grows. Each grain still carries its journey in its rounding -- and each is arriving, in the pressing dark, at the long home where wandering becomes rock."
+    }
+  },
+  "grains-ten": {
+    "name": "Ten of Grains",
+    "number": "10",
+    "slug": "grains-ten",
+    "arcana": "minor",
+    "suit_slug": "grains",
+    "rank_slug": "ten",
+    "meaning": {
+      "upright": "Completion as transfiguration: the loosest thing in the world become the most durable. The sum of all surrenders, welded, emerges as the ridge that outlasts every cliff that ever shed it -- letting-go, carried all the way through, finishes as the unbreakable.",
+      "inverted": "Hardness that forgets it was ever sand: the transfigured survivor denying the million losses that composed it. Durability without that memory is just arrogance with a crystal structure."
+    },
+    "visuals": {
+      "detailed_description": "A quartzite ridge in dim, veined light, its mass folded and sheened with strain: stone so utterly welded that old fractures cut straight through grains rather than around them. And within the gleam, faint as watermarks, the ghost-lines of ancient dune bedding still curve -- a million surrenders, fused, standing as the hardest thing in the landscape."
+    }
+  },
+  "grains-prospector": {
+    "name": "Prospector of Grains",
+    "number": "11",
+    "slug": "grains-prospector",
+    "arcana": "minor",
+    "suit_slug": "grains",
+    "rank_slug": "prospector",
+    "meaning": {
+      "upright": "Seeking in what was let go: the placer hunter reads the drift for the gold the mountains released, knowing treasure travels as residue. What others call debris is a concentrate -- the search is for what loss refused to dissolve.",
+      "inverted": "Panning everything, keeping nothing: the swirl continued past the point of finding, because searching has become the treasure. Even a placer must sometimes close its hand."
+    },
+    "visuals": {
+      "detailed_description": "Deep-red sundown, the light lying like forge-glow along a dry wash: a lone figure crouches over a pan, swirling dark sand whose edges soften in the incandescent air. At the pan's rim, one glinting point holds still while everything else moves -- wealth found not in the mountain, but in what the mountain let go."
+    }
+  },
+  "grains-surveyor": {
+    "name": "Surveyor of Grains",
+    "number": "12",
+    "slug": "grains-surveyor",
+    "arcana": "minor",
+    "suit_slug": "grains",
+    "rank_slug": "surveyor",
+    "meaning": {
+      "upright": "Measuring the invisible thief: pins and profiles quantifying exactly what has left, precision applied to absence. To know the rate of your losses is a discipline, and the ledger of what is gone is itself a kind of keeping.",
+      "inverted": "Measuring loss without ever grieving or acting on it: the retreat perfectly quantified, annually certified, and never once answered. An audit of absence is not a response to it."
+    },
+    "visuals": {
+      "detailed_description": "Cool, exact light on a retreating bluff: a figure sights along a line of steel erosion pins, each one's newly exposed length a precise crystal of fact about what has gone missing since last season. In the notebook, columns of small figures accumulate -- a ledger of absences, kept to the millimeter, in a landscape quietly leaving."
+    }
+  },
+  "grains-reader": {
+    "name": "Reader of Grains",
+    "number": "13",
+    "slug": "grains-reader",
+    "arcana": "minor",
+    "suit_slug": "grains",
+    "rank_slug": "reader",
+    "meaning": {
+      "upright": "Reading the sculpture for its subject: from the shape of what remains, reconstructing everything that was removed. The interpreter of negative space knows that erosion is an author too -- the missing mile of rock is legible in the carve of what withstood it.",
+      "inverted": "Reading only the removal: so fluent in absence that the survivor under your hand goes unread. The remainder is not merely evidence of what is gone; it is also, stubbornly, here."
+    },
+    "visuals": {
+      "detailed_description": "On a high, bare pediment in thin bright air, a figure stands among long morning shadows, turning slowly to read the carved land -- inselbergs, notches, wind-facets, each a syllable of subtraction. Above their head, implied in the empty brightness, the vanished mile of rock they are reconstructing from pure remainder."
+    }
+  },
+  "grains-witness": {
+    "name": "Witness of Grains",
+    "number": "14",
+    "slug": "grains-witness",
+    "arcana": "minor",
+    "suit_slug": "grains",
+    "rank_slug": "witness",
+    "meaning": {
+      "upright": "Witnessing the gentle disassembly without rescue and without despair: staying present while a thing is worn, loving it in a way that does not require it to be permanent. This is the suit's deepest teaching held in a human frame -- company, offered to the impermanent, as is.",
+      "inverted": "Elegy as evasion: mourning the wearing so beautifully that the staying never happens. The boulder does not need your grief; it needs, if anything at all, your afternoon."
+    },
+    "visuals": {
+      "detailed_description": "Mild, mottled daylight; dust hanging in the hazy air. A small figure sits on the ground beside a roadside boulder worn round and pitted by a century of weather, one hand resting on its warm crown. Nothing happens. The stone is being slowly taken, the figure knows it, and stays anyway -- not asking it to last."
+    }
+  },
+  "faults-ace": {
+    "name": "Ace of Faults",
+    "number": "1",
+    "slug": "faults-ace",
+    "arcana": "minor",
+    "suit_slug": "faults",
+    "rank_slug": "ace",
+    "meaning": {
+      "upright": "Rupture's seed is present from the first commitment: every structure is born already carrying the lines along which it will someday tell the truth. The first hairline is not a failure of the form -- it is part of the form. Know your seams early.",
+      "inverted": "The flaw denied at the foundry: the hairline polished over in the name of perfection, guaranteeing that when the truth finally moves, it will move without warning. A named seam is a safety; an unnamed one is an ambush."
+    },
+    "visuals": {
+      "detailed_description": "In cool, exact light, a freshly crystallized mass fills the frame, every facet flawless and sharply defined -- except that through one face, thinner than a hair and easy to miss, runs a single bright seam of difference. Nothing has moved. Nothing is broken. The line simply waits, part of the crystal from birth, for the day the truth will need a road."
+    }
+  },
+  "faults-two": {
+    "name": "Two of Faults",
+    "number": "2",
+    "slug": "faults-two",
+    "arcana": "minor",
+    "suit_slug": "faults",
+    "rank_slug": "two",
+    "meaning": {
+      "upright": "The two sides of a break, still touching: displacement as a relationship, the honest distance between what were once the same level. The step between you is real and measurable -- and the surfaces facing each other across it are made of identical stone.",
+      "inverted": "The scarp worshipped as a frontier: the offset treated as proof the two sides were never one body. A fault is a difference in history, not a difference in kind."
+    },
+    "visuals": {
+      "detailed_description": "A fresh fault scarp in thin bright morning air: one grassy plain raised cleanly above its twin, hard raking light picking out the pale, unweathered band of stone at the scarp's base like a wound's new skin. Above and below, the two surfaces are identical in grain and color -- the same country, facing itself across a step of honest distance."
+    }
+  },
+  "faults-three": {
+    "name": "Three of Faults",
+    "number": "3",
+    "slug": "faults-three",
+    "arcana": "minor",
+    "suit_slug": "faults",
+    "rank_slug": "three",
+    "meaning": {
+      "upright": "Ruptures compounding into a place: break upon parallel break opening a valley that gathers water and light. What repetition of honesty builds is space -- room made in the world by everything that consented to move. The rift becomes a cradle.",
+      "inverted": "The break rehearsed until it is habit: faulting along the same lines long after the strain has moved elsewhere. A rift that can only deepen eventually drowns what it cradled."
+    },
+    "visuals": {
+      "detailed_description": "An old rift valley in mild, mottled daylight: stepped charcoal escarpments descending in successive parallel breaks to a long lake on the valley floor, each scarp more rounded, more lichen-marked, more forgiven than the one above it. Reeds stand in the shallows. The whole habitable scene -- water, shelter, green -- is built of accumulated ruptures."
+    }
+  },
+  "faults-four": {
+    "name": "Four of Faults",
+    "number": "4",
+    "slug": "faults-four",
+    "arcana": "minor",
+    "suit_slug": "faults",
+    "rank_slug": "four",
+    "meaning": {
+      "upright": "The break domesticated into steady motion: strain paid in small, continuous installments so the debt never accumulates. This is rupture's strangest stability -- a foundation of perpetual, minor honesty. Keep the payments current and there is no earthquake to fear.",
+      "inverted": "Creep mistaken for a universal law: the smooth section's calm extrapolated onto neighbors that are locked and loading. Not every quiet stretch is paying its debts; some are only postponing them."
+    },
+    "visuals": {
+      "detailed_description": "A suburban curb and garden wall offset, centimeter by patient centimeter, where a creeping fault crosses the street -- the displacement blurred and continuous, like a picture taken over decades. Cool grey moving light; no scarp, no wreckage, no drama. The ground pays its strain in coins too small to feel, and the wall's gentle bend is the receipt."
+    }
+  },
+  "faults-five": {
+    "name": "Five of Faults",
+    "number": "5",
+    "slug": "faults-five",
+    "arcana": "minor",
+    "suit_slug": "faults",
+    "rank_slug": "five",
+    "meaning": {
+      "upright": "The record of stress surfaces in the calmest place: quiet layers that once liquefied and refroze, testifying that the ground moved beneath still water. What the serene admit under questioning is the deepest evidence -- peace that has survived shaking carries the proof inside it.",
+      "inverted": "Calm restored so quickly the lesson blurs: the churned horizon smoothed over by the very next season's silt. Serenity that cannot cite its own ordeals will be surprised by the next one."
+    },
+    "visuals": {
+      "detailed_description": "In low warm light, a clean cut through pond beds: lamina after lamina lying level and serene -- except for one horizon churned into flame-shaped curls, dropped pebbles, and small sand volcanoes, refrozen mid-convulsion. Above it, perfect calm resumes as if nothing happened. The still water's own sworn testimony that the ground once moved."
+    }
+  },
+  "faults-six": {
+    "name": "Six of Faults",
+    "number": "6",
+    "slug": "faults-six",
+    "arcana": "minor",
+    "suit_slug": "faults",
+    "rank_slug": "six",
+    "meaning": {
+      "upright": "The break at rest, filled: old ruptures becoming veins where minerals settle out of the dark. Equilibrium here is healing without erasure -- the scar remains visible, load-bearing, even precious. What broke you, sealed honestly, can become the brightest seam in you.",
+      "inverted": "The vein mistaken for intact rock: the healed break loaded as if it had never moved, its history priced into ornament and out of memory. A filled fault is at peace, not abolished."
+    },
+    "visuals": {
+      "detailed_description": "Close-framed in deep, airless dark: an old fracture healed shut with white quartz, crystals grown inward from both walls to meet along a faint suture line down the middle. Through charcoal rock, the vein runs as one seam of pale brightness -- the wound at rest under the weight of the world, become the strongest and most luminous part of the mass."
+    }
+  },
+  "faults-seven": {
+    "name": "Seven of Faults",
+    "number": "7",
+    "slug": "faults-seven",
+    "arcana": "minor",
+    "suit_slug": "faults",
+    "rank_slug": "seven",
+    "meaning": {
+      "upright": "The single break differentiates into a system: strands, splays, and shears, each taking its share of an unbearable load. Honest division of strain is how the deep rock survives it -- no one line carries everything, and the whole zone moves as a family.",
+      "inverted": "Strain scattered along so many strands that none resolves: the load infinitely subdivided, every line moving a little, nothing ever settled. Distribution can become a way of never concluding."
+    },
+    "visuals": {
+      "detailed_description": "A deep shear zone in dim, veined heat: one master break braiding downward into a fan of strands, each surface sheened with strain, the rock between them drawn out into contorted charcoal ribbons shot with one seam of green mineral color. The rupture visibly dividing its burden among many hands, all of them holding."
+    }
+  },
+  "faults-eight": {
+    "name": "Eight of Faults",
+    "number": "8",
+    "slug": "faults-eight",
+    "arcana": "minor",
+    "suit_slug": "faults",
+    "rank_slug": "eight",
+    "meaning": {
+      "upright": "The practiced break become a conduit: the deep fracture that lets the melt rise. This is rupture's mastery -- an old line of failure repurposed as the way fire reaches the world. What you have broken along often enough, you can now open on purpose, in service of making.",
+      "inverted": "Every motion answered with fire: the conduit that can no longer move without erupting, capability collapsed into reflex. A way for the melt should be opened, not left ajar."
+    },
+    "visuals": {
+      "detailed_description": "A great fault cutting the full depth of the crust in cross-section, the frame glowing from below: its upper reaches sharp charcoal, its lower reaches softening as incandescence threads up the broken zone in bright rising veins. The old line of failure, polished by a million small honesties, now carries fire toward the surface like a purpose."
+    }
+  },
+  "faults-nine": {
+    "name": "Nine of Faults",
+    "number": "9",
+    "slug": "faults-nine",
+    "arcana": "minor",
+    "suit_slug": "faults",
+    "rank_slug": "nine",
+    "meaning": {
+      "upright": "The destiny of the break: to become a joint. The line where two masses, done moving, are welded into one body -- rupture fulfilled not by endless motion but by union, the old divide regrown across until it is the strongest seam of a new whole.",
+      "inverted": "Union declared while the stresses remain: the suture announced, the weld unfinished, two bodies pronounced one because everyone is tired of the motion. A premature joint is just a fault with a treaty."
+    },
+    "visuals": {
+      "detailed_description": "In cool, exact light, a mountain root in cross-section: two continental fabrics of different grain meeting along a suture zone, dark ophiolite slivers caught in the weld like solder in a joint. Along the join, every crystal has regrown across the old divide, facets bridging what were once separate worlds -- the great break finished as the seam of one new continent."
+    }
+  },
+  "faults-ten": {
+    "name": "Ten of Faults",
+    "number": "10",
+    "slug": "faults-ten",
+    "arcana": "minor",
+    "suit_slug": "faults",
+    "rank_slug": "ten",
+    "meaning": {
+      "upright": "What rupture leaves when it completes: the range itself -- a skyline that is nothing but the sum of every honest break. The finished ledger of a million releases stands as geography; what all that breaking built is the very shape of the horizon you now navigate by.",
+      "inverted": "The range read as permanence: the ledger mistaken for a monument, as if the breaking were over because its results are beautiful. The skyline is a balance carried forward, not a closed account."
+    },
+    "visuals": {
+      "detailed_description": "Dawn in thin bright air over basin-and-range country: tilted fault-block ranges standing in ranks to the far distance, each front an unweathered-footed scarp catching the low light, long violet shadows brimming the grabens between. An entire geography, ridge after ridge -- the completed, still-open ledger of a million honest breaks."
+    }
+  },
+  "faults-prospector": {
+    "name": "Prospector of Faults",
+    "number": "11",
+    "slug": "faults-prospector",
+    "arcana": "minor",
+    "suit_slug": "faults",
+    "rank_slug": "prospector",
+    "meaning": {
+      "upright": "Hunting the hidden break in the softened land: reading offset fences, springs in a suspicious line, the faint step under the turf. The hunch that honesty lies just below the surface -- and the nerve to go find where it last moved. Some claims are staked on candor.",
+      "inverted": "Seeing faults everywhere: every hollow a graben, every hedge-line an offset, the search for hidden breaks become a way of distrusting all ground. A prospector of ruptures still needs most of the world to be whole."
+    },
+    "visuals": {
+      "detailed_description": "In mild, mottled daylight, a figure walks a grassy hillside along a subtle step in the turf, following a line of small springs and old fences that all bend the same way. Hammer in hand, coat catching the breeze, they trace the healed and hidden break that the land itself only half-remembers -- and mark, with a single stake, where it last told the truth."
+    }
+  },
+  "faults-surveyor": {
+    "name": "Surveyor of Faults",
+    "number": "12",
+    "slug": "faults-surveyor",
+    "arcana": "minor",
+    "suit_slug": "faults",
+    "rank_slug": "surveyor",
+    "meaning": {
+      "upright": "Measuring the drift before the release: benchmarks and baselines quantifying the slow carry of ground toward its next honesty. Strain accounted is strain half-answered -- the discipline is to know how much the world has moved, and toward what.",
+      "inverted": "Perfect accounts, no warnings issued: the drift measured to the millimeter and filed, the release arriving exactly as computed and entirely unannounced. Measurement owes its subject a voice."
+    },
+    "visuals": {
+      "detailed_description": "In cool, moving grey light, a figure steadies an instrument over a brass benchmark and re-measures a baseline across a valley whose far side has quietly travelled since last year. Everything in the frame drifts almost imperceptibly -- clouds, grass, the distant ridge -- while the notebook records precisely how much, and in which direction, the ground is carrying its intentions."
+    }
+  },
+  "faults-reader": {
+    "name": "Reader of Faults",
+    "number": "13",
+    "slug": "faults-reader",
+    "arcana": "minor",
+    "suit_slug": "faults",
+    "rank_slug": "reader",
+    "meaning": {
+      "upright": "Reading the calm for its buried violences: dating the past breaks by the quiet layers between them, recovering the intervals as carefully as the events. The silences between earthquakes are also a record -- interpretation is counting them like rings in a tree.",
+      "inverted": "The intervals read as promises: the average of past silences mistaken for a schedule the ground has agreed to keep. The record permits estimation; it does not offer terms."
+    },
+    "visuals": {
+      "detailed_description": "Low warm evening light on a trench cut through level beds beside a sag pond: a figure kneels against the trench wall, tracing with one finger the buried scarps and sand-filled fissures interleaved between serene laminae. Above them, the pond lies still. They are counting the silences between earthquakes, and writing each one's length beside its grave."
+    }
+  },
+  "faults-witness": {
+    "name": "Witness of Faults",
+    "number": "14",
+    "slug": "faults-witness",
+    "arcana": "minor",
+    "suit_slug": "faults",
+    "rank_slug": "witness",
+    "meaning": {
+      "upright": "Standing with the locked and loaded dark: witness to strain that has not yet spoken, holding the knowledge of the break to come without flinching and without fleeing. Presence beside the pending is the suit's hardest office -- someone must keep company with what has not yet moved.",
+      "inverted": "Vigil curdled into dread: the waiting so total that the life above the fault is never lived. To witness kept strain is not to kneel before it forever; even beside the loaded dark, there are mornings."
+    },
+    "visuals": {
+      "detailed_description": "Close-framed and airless: a small lamp-lit figure seated at the base of a bolted mine gallery cut along an old fault, palm flat against the gouge-striped wall. The rock hums with kept strain; the lamp flame stands perfectly straight. In the compressed dark, the figure keeps company with what has not yet moved -- and stays until it is time to go up."
+    }
+  }
+}
