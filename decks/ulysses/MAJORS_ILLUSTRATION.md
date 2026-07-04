@@ -1,7 +1,7 @@
 # Ulysses Majors — illustration plan through the control plane
 
-Applying the sculptor→stager→painter pipeline (`tools/atelier/`, see
-`CONTROL_PLANE.md`) to the 21 Ulysses majors. Pilot: `tools/atelier/projects/ulysses/telemachus.py` → `projects/ulysses/out/s_telemachus.png`.
+Applying the sculptor→stager→painter pipeline (the [atelier](https://github.com/mbilokonsky/atelier) (formerly `tools/atelier/`), see
+`CONTROL_PLANE.md`) to the 21 Ulysses majors. Pilot: `projects/ulysses/telemachus_set.py` (atelier repo) → `projects/ulysses/out/s_telemachus.png`.
 
 ## The mapping (the deck's structure IS the control plane)
 
@@ -61,7 +61,7 @@ of soap, the key, the cocoa cups, the fireworks.
 
 ## Production notes
 
-- One scene script per card (`tools/atelier/projects/ulysses/<episode>.py`), each ~25
+- One scene script per card (`projects/ulysses/<episode>.py` in the atelier repo), each ~25
   declarative lines against the stage API. Sculpt-once economics: ~10 new builders cover all 21.
 - Register the output as a third Ulysses skin (`registerImagePack("ulysses", "vico-oil", …)`) —
   static PNGs from the pipeline, selectable next to "Animated" and "Pixel · Vico".
