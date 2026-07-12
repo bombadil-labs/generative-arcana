@@ -26,3 +26,7 @@ __pycache__/
 
 # art-tooling review artifacts (montage contact sheets; the real art lives in app/src/decks/*/<skin>/)
 tools/*/*montage*.png
+.adlc/*
+!.adlc/tickets.json
+!.adlc/specs/
+.claude/settings.local.json
