@@ -1,79 +1,13 @@
-/** Card registry: importing each card module registers its sketch (side effect). Auto-listed. */
-import "./blades-ace";
-import "./blades-eight";
-import "./blades-five";
-import "./blades-four";
-import "./blades-knight";
-import "./blades-nine";
-import "./blades-oracle";
-import "./blades-paragon";
-import "./blades-seeker";
-import "./blades-seven";
-import "./blades-six";
-import "./blades-ten";
-import "./blades-three";
-import "./blades-two";
-import "./crowns-ace";
-import "./crowns-eight";
-import "./crowns-five";
-import "./crowns-four";
-import "./crowns-knight";
-import "./crowns-nine";
-import "./crowns-oracle";
-import "./crowns-paragon";
-import "./crowns-seeker";
-import "./crowns-seven";
-import "./crowns-six";
-import "./crowns-ten";
-import "./crowns-three";
-import "./crowns-two";
-import "./major-0";
-import "./major-1";
-import "./major-10";
-import "./major-11";
-import "./major-12";
-import "./major-13";
-import "./major-14";
-import "./major-15";
-import "./major-16";
-import "./major-17";
-import "./major-18";
-import "./major-19";
-import "./major-2";
-import "./major-20";
-import "./major-21";
-import "./major-3";
-import "./major-4";
-import "./major-5";
-import "./major-6";
-import "./major-7";
-import "./major-8";
-import "./major-9";
-import "./moongates-ace";
-import "./moongates-eight";
-import "./moongates-five";
-import "./moongates-four";
-import "./moongates-knight";
-import "./moongates-nine";
-import "./moongates-oracle";
-import "./moongates-paragon";
-import "./moongates-seeker";
-import "./moongates-seven";
-import "./moongates-six";
-import "./moongates-ten";
-import "./moongates-three";
-import "./moongates-two";
-import "./runes-ace";
-import "./runes-eight";
-import "./runes-five";
-import "./runes-four";
-import "./runes-knight";
-import "./runes-nine";
-import "./runes-oracle";
-import "./runes-paragon";
-import "./runes-seeker";
-import "./runes-seven";
-import "./runes-six";
-import "./runes-ten";
-import "./runes-three";
-import "./runes-two";
+/**
+ * Ultima's typed card definitions are pure modules. This index owns the batch explicitly and binds
+ * every definition to the `ultima/animated` visual pack in one place.
+ */
+import { registerKitPack } from "@/runtime/defineCard";
+import type { CardSketch } from "@/runtime/types";
+
+const modules = import.meta.glob(["./*.ts", "!./index.ts"], {
+  eager: true,
+  import: "default",
+}) as Record<string, CardSketch>;
+
+registerKitPack("ultima", "animated", Object.values(modules));

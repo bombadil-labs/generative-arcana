@@ -1,6 +1,6 @@
 /**
  * The Ultima Tarot deck — the app's renderer for it. Importing this module:
- *   1. registers all implemented card sketches (side effect of ./cards)
+ *   1. imports the animated visual pack, whose index explicitly owns its card definitions
  *   2. registers the deck manifest into the global deck registry
  *
  * The canonical DATA lives in the top-level corpus (`/decks/ultima/deck.json`, via `@decks`);
@@ -10,10 +10,9 @@ import deckJson from "@decks/ultima/deck.json";
 import { registerDeck } from "../registry";
 import type { DeckDataFile, DeckModule } from "../types";
 import type { CardData } from "@/runtime/types";
-import { claimSketchesFor, registerPack } from "@/runtime/defineCard";
-import "./cards"; // side effect: registers this deck's sketches into the PENDING bucket
+import { registerPack } from "@/runtime/defineCard";
+import "./cards"; // side effect: explicitly registers this deck's definitions under ultima/animated
 
-claimSketchesFor("ultima", "animated"); // move those registrations under the "ultima"/"animated" pack
 registerPack("ultima", { id: "animated", label: "Animated", description: "kinetic generative sketches" });
 
 const data = deckJson as unknown as DeckDataFile;

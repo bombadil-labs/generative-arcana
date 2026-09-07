@@ -16,6 +16,7 @@
     "src/decks/validate.ts",
     "src/reading/types.ts",
     "src/reading/deal.ts",
-    "src/reading/encode.ts"
+    "src/reading/encode.ts",
+    "src/runtime/defineCard.ts"
   ]
 }
