@@ -42,7 +42,7 @@ function ReadingComposer({ deck }: { deck: DeckModule }) {
     setCasting(true);
     setCastError(null);
     try {
-      const dealt = deal(spread, deck.cards.length);
+      const dealt = deal(spread, deck.cards.map((card) => card.slug));
       const tk = await encodeReading(deck, spread, question.trim(), dealt);
       navigate(`/deck/${deck.id}/r/${tk}`);
     } catch (error) {
@@ -138,7 +138,8 @@ function ReadingResult({ deck, token }: { deck: DeckModule; token: string }) {
   if (!resolution || resolution.token !== token || resolution.deck !== deck) return <p role="status" style={lede}>Verifying reading…</p>;
   if (!resolution.result.ok) return <p role="alert" style={errorText}>{resolution.result.error}</p>;
   const { spread, dealt, legacy } = resolution.result;
-  const seqCards = dealt.map((dc) => deck.cards[dc.index]); // aligned 1:1 with the dealt order
+  const cardsBySlug = new Map(deck.cards.map((card) => [card.slug, card]));
+  const seqCards = dealt.map((dc) => cardsBySlug.get(dc.slug)!); // resolution guarantees every identity exists
   const prompt = buildPrompt(deck, spread, dealt, decoded.q);
   const packs = listPacks(deck.id);
   const prefer = (packs.find((p) => p.id === getPackId(deck.id, packs[0]?.id ?? "")) ?? packs[0])?.id;
@@ -162,7 +163,7 @@ function ReadingResult({ deck, token }: { deck: DeckModule; token: string }) {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: "var(--s-4)", marginTop: "var(--s-4)" }}>
         {dealt.map((dc, i) => {
-          const card = deck.cards[dc.index];
+          const card = cardsBySlug.get(dc.slug);
           const pos = spread.positions[i];
           if (!card || !pos) return null;
           const meaning = dc.reversed ? card.meaning.inverted : card.meaning.upright;
