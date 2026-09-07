@@ -16,6 +16,52 @@ export interface Spread {
   deckId?: string;
 }
 
+/** Shared safety bound for authored, registered, and serialized spreads. */
+export const MAX_SPREAD_POSITIONS = 512;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === "object" && !Array.isArray(value);
+const text = (value: unknown): value is string => typeof value === "string";
+const nonempty = (value: unknown): value is string => text(value) && !!value.trim();
+
+/** Renderer- and transport-independent spread validation. */
+export function isValidSpread(value: unknown): value is Spread {
+  return isRecord(value)
+    && nonempty(value.id)
+    && nonempty(value.name)
+    && text(value.description)
+    && (value.deckId === undefined || nonempty(value.deckId))
+    && Array.isArray(value.positions)
+    && value.positions.length > 0
+    && value.positions.length <= MAX_SPREAD_POSITIONS
+    && value.positions.every((position) =>
+      isRecord(position) && nonempty(position.name) && text(position.prompt));
+}
+
+/**
+ * Validate and normalize deck-native spreads at the deck construction boundary.
+ * Ownership is explicit in the returned snapshots even when a manifest omits `deckId`.
+ */
+export function normalizeDeckSpreads(value: unknown, deckId: string): Spread[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) throw new Error("spreads: must be an array.");
+  const ids = new Set<string>();
+  return value.map((raw, index) => {
+    if (!isValidSpread(raw)) throw new Error(`spreads[${index}]: must be a valid spread.`);
+    if (raw.deckId !== undefined && raw.deckId !== deckId) {
+      throw new Error(`spreads[${index}].deckId: must match the owning deck “${deckId}”.`);
+    }
+    if (GENERIC_BY_ID.has(raw.id)) throw new Error(`spreads[${index}].id: collides with a generic spread id.`);
+    if (ids.has(raw.id)) throw new Error(`spreads[${index}].id: duplicates another native spread id.`);
+    ids.add(raw.id);
+    return {
+      ...raw,
+      deckId,
+      positions: raw.positions.map((position) => ({ ...position })),
+    };
+  });
+}
+
 export const GENERIC_SPREADS: Spread[] = [
   {
     id: "single",
