@@ -13,7 +13,10 @@ function rnd(): number {
  * so a given reading is reproducible/shareable.
  */
 export function deal(spread: Spread, deckCardCount: number, reversalRate = 0.5): DealtCard[] {
-  const n = Math.min(spread.positions.length, deckCardCount);
+  if (!Number.isSafeInteger(deckCardCount) || deckCardCount < 1) throw new Error("The deck must contain cards.");
+  if (!Number.isFinite(reversalRate) || reversalRate < 0 || reversalRate > 1) throw new Error("Reversal rate must be between 0 and 1.");
+  const n = spread.positions.length;
+  if (n < 1 || n > deckCardCount) throw new Error("The deck does not have enough cards for this spread.");
   const pool = Array.from({ length: deckCardCount }, (_, i) => i);
   for (let i = 0; i < n; i++) {
     const j = i + Math.floor(rnd() * (pool.length - i));

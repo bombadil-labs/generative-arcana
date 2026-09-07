@@ -1,20 +1,26 @@
 import type { Spread } from "@/decks/spreads";
 
-/** One dealt card: an index into the deck's ordered card list, plus orientation. */
-export interface DealtCard {
-  index: number;
-  reversed: boolean;
-}
+/** An in-memory position in the currently loaded deck, never a v2 persisted identity. */
+export interface DealtCard { index: number; reversed: boolean }
 
-/** The compact, URL-encodable reading payload (kept in the # fragment, never sent to a server). */
-export interface ReadingToken {
+/** Legacy links cannot detect changes to a deck's order or contents. */
+export interface LegacyReadingToken {
   v: 1;
-  /** deck id */
   d: string;
-  /** spread id (generic/per-deck) OR an inline custom Spread */
   s: string | Spread;
-  /** question text */
   q: string;
-  /** dealt cards: [cardIndex, reversed(0|1)] */
   c: [number, 0 | 1][];
 }
+
+/** New links bind stable card slugs to a content revision and snapshot the spread. */
+export interface StableReadingToken {
+  v: 2;
+  /** Canonical deck slug, independent of the renderer or registry. */
+  d: string;
+  /** SHA-256 of canonical deck JSON. A change detector, not a signature. */
+  r: string;
+  s: Spread;
+  q: string;
+  c: [string, 0 | 1][];
+}
+export type ReadingToken = LegacyReadingToken | StableReadingToken;
