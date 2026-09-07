@@ -1,6 +1,74 @@
 import type { CardData } from "./card";
 import type { Spread } from "./spreads";
 
+export interface AxisMeaning {
+  upright: string[];
+  inverted: string[];
+}
+
+export interface FactorizationData {
+  character: "identity" | "prime" | "composite";
+  factors?: number[];
+  gloss: string;
+}
+
+export interface SymbolData {
+  name?: string;
+  description?: string;
+  svg?: string;
+}
+
+export interface AxisEntry {
+  name: string;
+  index: number;
+  slug?: string;
+  description?: string;
+  visual_style?: string;
+  visual_content?: string;
+  visual_motif?: string;
+  question?: string;
+  meaning?: AxisMeaning;
+  factorization?: FactorizationData;
+  [key: string]: unknown;
+}
+
+export interface SuitEntry extends AxisEntry {
+  symbol?: SymbolData;
+}
+
+export interface RankEntry extends AxisEntry {
+  symbol?: string;
+  numeric_value?: number;
+  arcana?: "minor";
+}
+
+export interface StationEntry extends AxisEntry {
+  symbol?: SymbolData;
+}
+
+export interface TransversalData {
+  name: string;
+  description: string;
+  ordering_rationale?: string;
+  suit_stride?: number;
+  stations: Record<string, StationEntry>;
+  [key: string]: unknown;
+}
+
+export interface MajorArcanaData {
+  story?: string;
+  visual_style?: string;
+  symbol?: SymbolData;
+  [key: string]: unknown;
+}
+
+export interface DeckTheme {
+  name: string;
+  description: string;
+  creator: string;
+  [key: string]: unknown;
+}
+
 /** One pole-pair axis of the suit cross-product, e.g. { name: "Realm", poles: ["World","Soul"] }. */
 export interface DialecticAxis { name: string; poles: [string, string] }
 /** Optional, deck-level: present only when the suits are a cross-product of two dialectics. Names the
@@ -10,19 +78,26 @@ export interface SuitDialectic {
   cells: Record<string, [string, string]>;
 }
 
-/** The raw shape of a deck's deck.json (as emitted by the generative-arcana skill). */
+/**
+ * The validated, renderer-independent deck domain model.
+ *
+ * Raw JSON enters the system as `unknown` and must pass `validateDeck` before becoming this type.
+ * Unknown extension fields are intentionally preserved so authoring profiles can evolve independently
+ * of the runtime contract.
+ */
 export interface DeckDataFile {
   name: string;
   slug: string;
   version: string;
-  theme: { name: string; description: string; creator: string };
-  suits: Record<string, unknown>;
-  ranks: Record<string, unknown>;
-  transversal: unknown;
-  major_arcana: unknown;
+  theme: DeckTheme;
+  suits: Record<string, SuitEntry>;
+  ranks: Record<string, RankEntry>;
+  transversal: TransversalData;
+  major_arcana: MajorArcanaData;
   /** the suit cross-product axes, if this deck's suits were built dialectically. */
   dialectic?: SuitDialectic;
   cards: Record<string, CardData>;
+  [key: string]: unknown;
 }
 
 /**
