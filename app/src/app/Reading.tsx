@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { getDeck } from "@/decks";
-import { spreadsForDeck, resolveSpread, type Spread } from "@/decks/spreads";
+import { spreadsForDeck } from "@/decks/spreads";
 import { CardFrame } from "@/components/CardFrame";
 import { CardModal } from "@/components/CardModal";
 import { deal } from "@/reading/deal";
-import { encodeReading, decodeReading, tokenToDealt } from "@/reading/encode";
+import { encodeReading, decodeReading, resolveReading, MAX_QUESTION_LENGTH, type ResolvedReading } from "@/reading/encode";
 import { buildPrompt } from "@/reading/prompt";
-import type { DealtCard } from "@/reading/types";
 import type { DeckModule } from "@/decks/types";
 import { navigate } from "./router";
 import { getPackId } from "./packPref";
@@ -17,14 +16,14 @@ export function Reading({ deckId, token }: { deckId: string; token?: string }) {
   if (!deck) {
     return (
       <div style={{ padding: "var(--s-5)" }}>
-        <p style={{ color: "var(--ink)", font: "400 16px/1.5 var(--font-body)" }}>Unknown deck “{deckId}”.</p>
+        <p style={{ color: "var(--ink)", font: "400 16px/1.5 var(--font-body)" }}>Unknown deck “{deckId}”. For a custom reading, import the original deck JSON from the home page first.</p>
         <button onClick={() => navigate("/")} style={link}>← all decks</button>
       </div>
     );
   }
   return (
     <div style={{ maxWidth: 980, margin: "0 auto", padding: "var(--s-4) var(--s-4) var(--s-6)" }}>
-      {token ? <ReadingResult deck={deck} token={token} /> : <ReadingComposer deck={deck} />}
+      {token ? <ReadingResult key={deck.id} deck={deck} token={token} /> : <ReadingComposer key={deck.id} deck={deck} />}
     </div>
   );
 }
@@ -32,13 +31,21 @@ export function Reading({ deckId, token }: { deckId: string; token?: string }) {
 function ReadingComposer({ deck }: { deck: DeckModule }) {
   const spreads = useMemo(() => spreadsForDeck(deck.spreads), [deck]);
   const [question, setQuestion] = useState("");
+  const [casting, setCasting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [spreadId, setSpreadId] = useState(spreads[1]?.id ?? spreads[0].id);
   const spread = spreads.find((s) => s.id === spreadId)!;
 
-  function castReading() {
-    const dealt = deal(spread, deck.cards.length);
-    const tk = encodeReading(deck.id, spread.id, question.trim(), dealt);
-    navigate(`/deck/${deck.id}/r/${tk}`);
+  async function castReading() {
+    setCasting(true);
+    setError(null);
+    try {
+      const dealt = deal(spread, deck.cards.length);
+      const tk = await encodeReading(deck, spread, question.trim(), dealt);
+      navigate(`/deck/${deck.id}/r/${tk}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to create this reading.");
+    } finally { setCasting(false); }
   }
 
   const n = spread.positions.length;
@@ -52,6 +59,7 @@ function ReadingComposer({ deck }: { deck: DeckModule }) {
       <label style={fieldLabel}>Your question <span style={{ color: "var(--ink-3)" }}>(optional)</span></label>
       <textarea
         value={question}
+        maxLength={MAX_QUESTION_LENGTH}
         onChange={(e) => setQuestion(e.target.value)}
         placeholder="What should I focus on right now?"
         style={{
@@ -93,7 +101,11 @@ function ReadingComposer({ deck }: { deck: DeckModule }) {
       </div>
 
       <div style={{ marginTop: "var(--s-4)" }}>
-        <button onClick={castReading} style={dealBtn}>Deal {n} card{n > 1 ? "s" : ""} →</button>
+        <button onClick={castReading} disabled={casting || n > deck.cards.length} style={dealBtn}>
+          {casting ? "Preparing reading…" : `Deal ${n} card${n > 1 ? "s" : ""} →`}
+        </button>
+        {n > deck.cards.length && <p role="alert" style={errorText}>This spread needs {n} cards; this deck has {deck.cards.length}. Choose a smaller spread.</p>}
+        {error && <p role="alert" style={errorText}>{error}</p>}
       </div>
     </div>
   );
@@ -105,15 +117,22 @@ function ReadingResult({ deck, token }: { deck: DeckModule; token: string }) {
   // modal walks the dealt order, so prev/next moves through the spread itself.
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
-  useEffect(() => { setCopied(null); setOpenIndex(null); }, [token]);
+  const [resolution, setResolution] = useState<{ token: string; deck: DeckModule; result: ResolvedReading } | null>(null);
+  useEffect(() => {
+    let active = true;
+    setCopied(null);
+    setOpenIndex(null);
+    resolveReading(decoded, deck).then((result) => {
+      if (active) setResolution({ token, deck, result });
+    });
+    return () => { active = false; };
+  }, [decoded, deck, token]);
 
-  if (!decoded) return <p style={errorText}>This reading link is malformed.</p>;
-  const spread: Spread | undefined = resolveSpread(decoded.s, deck.spreads);
-  if (!spread) return <p style={errorText}>Unknown spread in this reading.</p>;
-
-  const dealt: DealtCard[] = tokenToDealt(decoded);
-  const seqCards = dealt.map((dc) => deck.cards[dc.index]); // aligned 1:1 with the dealt order
-  const prompt = buildPrompt(deck, spread, dealt, decoded.q);
+  if (!resolution || resolution.token !== token || resolution.deck !== deck) return <p role="status">Checking reading…</p>;
+  if (!resolution.result.ok) return <p role="alert" style={errorText}>{resolution.result.error}</p>;
+  const { spread, dealt, question, legacy } = resolution.result;
+  const seqCards = dealt.map((dc) => deck.cards[dc.index]);
+  const prompt = buildPrompt(deck, spread, dealt, question);
   const packs = listPacks(deck.id);
   const prefer = (packs.find((p) => p.id === getPackId(deck.id, packs[0]?.id ?? "")) ?? packs[0])?.id;
 
@@ -126,11 +145,13 @@ function ReadingResult({ deck, token }: { deck: DeckModule; token: string }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "var(--s-2)" }}>
         <div>
           <div style={kicker}>{spread.name} · {deck.name}</div>
-          {decoded.q && <p style={{ margin: "var(--s-1) 0 0", color: "var(--ink)", font: "400 22px/1.3 var(--font-display)" }}>“{decoded.q}”</p>}
+          {question && <p style={{ margin: "var(--s-1) 0 0", color: "var(--ink)", font: "400 22px/1.3 var(--font-display)" }}>“{question}”</p>}
         </div>
         <button onClick={() => navigate(`/deck/${deck.id}/read`)} style={secondaryBtn}>↺ New reading</button>
       </div>
 
+      {legacy && <p role="status" style={lede}>This legacy link stores card positions, not stable IDs or a deck revision. Verify the card names if the deck has changed.</p>}
+      {deck.custom && <p style={lede}>Custom deck data is not included in this link. The recipient needs the original deck JSON.</p>}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: "var(--s-4)", marginTop: "var(--s-4)" }}>
         {dealt.map((dc, i) => {
           const card = deck.cards[dc.index];
