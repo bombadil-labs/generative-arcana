@@ -118,10 +118,16 @@ export function validateDeck(value: unknown): DeckValidation {
       });
       const cells = object(dialectic.cells, "dialectic.cells");
       if (Object.keys(cells).length !== Object.keys(suits).length) fail("dialectic.cells", "must cover each suit exactly once");
+      const expectedCellCount = poles[0].length * poles[1].length;
+      if (Object.keys(suits).length !== expectedCellCount) fail("dialectic.cells", `a two-axis dialectic must contain exactly ${expectedCellCount} suit cells`);
+      const seenCells = new Set<string>();
       for (const [key, cell] of Object.entries(cells)) {
         if (!own(suits, key) || !Array.isArray(cell) || cell.length !== 2 || !poles[0].includes(cell[0]) || !poles[1].includes(cell[1])) {
           fail(`dialectic.cells.${key}`, "must reference a suit and a pole from each axis");
         }
+        const cellKey = JSON.stringify(cell);
+        if (seenCells.has(cellKey)) fail(`dialectic.cells.${key}`, "duplicates another dialectic cell");
+        seenCells.add(cellKey);
       }
     }
 
@@ -158,8 +164,8 @@ export function validateDeck(value: unknown): DeckValidation {
 
 /** Never use JSON property insertion order as the browser's card order. */
 export function canonicalCards(data: DeckDataFile): CardData[] {
-  const suits = data.suits as Record<string, { index: number }>;
-  const ranks = data.ranks as Record<string, { index: number }>;
+  const suits = data.suits;
+  const ranks = data.ranks;
   return Object.values(data.cards).sort((a, b) => {
     if (a.arcana !== b.arcana) return a.arcana === "major" ? -1 : 1;
     const order = a.arcana === "major"
