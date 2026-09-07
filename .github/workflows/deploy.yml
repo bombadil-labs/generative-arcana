@@ -28,6 +28,8 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
       - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
       - run: npm run build   # vite reads ../decks for deck data
       - uses: actions/upload-pages-artifact@v3
         with:
