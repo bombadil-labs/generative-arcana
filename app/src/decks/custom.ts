@@ -26,7 +26,7 @@ export function loadCustomDeck(jsonText: string): Result {
     data,
     cards: canonicalCards(data),
     custom: true,
-  });
+  }, { replaceExisting: !!existing });
   return { ok: true, deck };
 }
 
