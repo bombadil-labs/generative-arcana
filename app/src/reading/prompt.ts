@@ -2,18 +2,20 @@
  *  entirely in the deck's authored data — no backend, no tokens, works pasted into any model. */
 import type { DeckModule } from "@/decks/types";
 import type { Spread } from "@/decks/spreads";
-import type { DealtCard } from "./types";
+import type { ReadingCard } from "./types";
 import { rankLabel, suitLabel } from "@/components/cardMeta";
 import type { DeckDataFile } from "@/decks/types";
 
 type Named = { name: string; description?: string };
 type Station = { name: string; description?: string };
 
-export function buildPrompt(deck: DeckModule, spread: Spread, dealt: DealtCard[], question: string): string {
+export function buildPrompt(deck: DeckModule, spread: Spread, dealt: ReadingCard[], question: string): string {
   const data = deck.data;
-  const suits = data.suits as Record<string, Named>;
-  const transversal = data.transversal as { name?: string; description?: string; stations?: Record<string, Station> };
-  const stations = transversal.stations ?? {};
+  const suits = data.suits;
+  const transversal = data.transversal;
+  const stations = transversal.stations;
+  const cardsBySlug = new Map(deck.cards.map((card) => [card.slug, card]));
+  if (cardsBySlug.size !== deck.cards.length) throw new Error("The deck has duplicate card identities.");
 
   const suitLines = Object.values(suits)
     .map((s) => `  - ${s.name}: ${firstSentence(s.description ?? "")}`)
@@ -37,9 +39,10 @@ export function buildPrompt(deck: DeckModule, spread: Spread, dealt: DealtCard[]
   lines.push("");
 
   dealt.forEach((dc, i) => {
-    const card = deck.cards[dc.index];
+    const card = cardsBySlug.get(dc.slug);
     const pos = spread.positions[i];
-    if (!card || !pos) return;
+    if (!card) throw new Error(`Reading references a missing card: ${dc.slug}.`);
+    if (!pos) throw new Error("Reading has more cards than spread positions.");
     const orient = dc.reversed ? "Reversed" : "Upright";
     const meaning = dc.reversed ? card.meaning.inverted : card.meaning.upright;
     lines.push(`${i + 1}. ${pos.name} — ${pos.prompt}`);

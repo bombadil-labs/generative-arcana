@@ -1,8 +1,8 @@
 import type { Spread } from "../decks/spreads";
 
-/** An index is local UI state only; new share links use card slugs. */
-export interface DealtCard {
-  index: number;
+/** Stable domain identity for a card placed in a reading. */
+export interface ReadingCard {
+  slug: string;
   reversed: boolean;
 }
 
@@ -32,5 +32,5 @@ export interface StableReadingToken {
 export type ReadingToken = LegacyReadingToken | StableReadingToken;
 
 export type ReadingResolution =
-  | { ok: true; dealt: DealtCard[]; spread: Spread; legacy: boolean }
+  | { ok: true; dealt: ReadingCard[]; spread: Spread; legacy: boolean }
   | { ok: false; error: string };

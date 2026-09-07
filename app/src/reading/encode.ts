@@ -1,6 +1,6 @@
 import { resolveSpread, type Spread } from "../decks/spreads";
 import type { DeckModule } from "../decks/types";
-import type { DealtCard, ReadingResolution, ReadingToken, StableReadingToken } from "./types";
+import type { ReadingCard, ReadingResolution, ReadingToken, StableReadingToken } from "./types";
 
 const MAX_TOKEN_LENGTH = 65_536;
 export const MAX_QUESTION_LENGTH = 4_000;
@@ -70,14 +70,20 @@ export async function encodeReading(
   deck: DeckModule,
   spread: string | Spread,
   question: string,
-  cards: DealtCard[],
+  cards: ReadingCard[],
 ): Promise<string> {
   const resolvedSpread = resolveSpread(spread, deck.spreads);
   if (!validSpread(resolvedSpread) || (resolvedSpread.deckId && resolvedSpread.deckId !== deck.id)) throw new Error("Unknown or invalid spread for this deck.");
   if (cards.length !== resolvedSpread.positions.length) throw new Error("Deal one card for every spread position.");
-  const tuples: StableReadingToken["c"] = cards.map(({ index, reversed }) => {
-    if (!Number.isSafeInteger(index) || index < 0 || index >= deck.cards.length || typeof reversed !== "boolean") throw new Error("Invalid dealt card.");
-    return [deck.cards[index].slug, reversed ? 1 : 0];
+  const deckSlugs = new Set(deck.cards.map((card) => card.slug));
+  if (deckSlugs.size !== deck.cards.length) throw new Error("The deck has duplicate card identities.");
+  const seen = new Set<string>();
+  const tuples: StableReadingToken["c"] = cards.map(({ slug, reversed }) => {
+    if (typeof slug !== "string" || !SLUG.test(slug) || !deckSlugs.has(slug) || seen.has(slug) || typeof reversed !== "boolean") {
+      throw new Error("Invalid dealt card.");
+    }
+    seen.add(slug);
+    return [slug, reversed ? 1 : 0];
   });
   const token: StableReadingToken = { v: 2, d: deck.id, h: await deckFingerprint(deck), s: resolvedSpread, q: question, c: tuples };
   if (!validToken(token)) throw new Error("Invalid reading or question too long.");
@@ -106,16 +112,15 @@ export async function resolveReading(token: ReadingToken, deck: DeckModule): Pro
   if (token.v === 1) {
     if (deck.custom) return { ok: false, error: "This legacy custom-deck link stores card positions, not identities. Its original order cannot be verified. Cast a new reading to create a stable link." };
     if (token.c.some(([i]) => i >= deck.cards.length)) return { ok: false, error: "This reading references a card outside the deck." };
-    return { ok: true, spread, legacy: true, dealt: token.c.map(([index, rev]) => ({ index, reversed: rev === 1 })) };
+    return { ok: true, spread, legacy: true, dealt: token.c.map(([index, rev]) => ({ slug: deck.cards[index].slug, reversed: rev === 1 })) };
   }
   if (token.h !== await deckFingerprint(deck)) return { ok: false, error: "This reading uses a different revision of the deck. Load the original deck JSON to view it; the current contents will not be substituted." };
-  const bySlug = new Map(deck.cards.map((card, index) => [card.slug, index]));
-  if (bySlug.size !== deck.cards.length) return { ok: false, error: "The loaded deck has duplicate card identities." };
-  const dealt: DealtCard[] = [];
+  const cardSlugs = new Set(deck.cards.map((card) => card.slug));
+  if (cardSlugs.size !== deck.cards.length) return { ok: false, error: "The loaded deck has duplicate card identities." };
+  const dealt: ReadingCard[] = [];
   for (const [slug, rev] of token.c) {
-    const index = bySlug.get(slug);
-    if (index === undefined) return { ok: false, error: `This reading references a missing card: ${slug}.` };
-    dealt.push({ index, reversed: rev === 1 });
+    if (!cardSlugs.has(slug)) return { ok: false, error: `This reading references a missing card: ${slug}.` };
+    dealt.push({ slug, reversed: rev === 1 });
   }
   return { ok: true, dealt, spread, legacy: false };
 }
