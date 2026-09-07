@@ -9,6 +9,7 @@
   },
   "include": [
     "src/decks/card.ts",
+    "src/decks/cardMeta.ts",
     "src/decks/types.ts",
     "src/decks/spreads.ts",
     "src/decks/registry.ts",
