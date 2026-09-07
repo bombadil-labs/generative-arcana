@@ -47,7 +47,10 @@ export class DeckRegistry {
     const spreads = normalizedSpreads === undefined
       ? undefined
       : immutableJsonSnapshot(normalizedSpreads, "spreads");
-    const cards = Object.freeze(canonicalCards(data));
+    // Freeze the concrete array in place while keeping DeckModule's existing mutable-array type.
+    // A broader readonly API migration is separate from this runtime immutability guarantee.
+    const cards = canonicalCards(data);
+    Object.freeze(cards);
     const deck: DeckModule = Object.freeze({
       id: data.slug,
       name: data.name,
