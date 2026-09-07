@@ -11,16 +11,9 @@
  */
 import deckJson from "@decks/finalfantasy/deck.json";
 import { registerDeck } from "../registry";
-import type { DeckDataFile, DeckModule } from "../types";
-import type { CardData } from "@/runtime/types";
 import "./cards"; // side effect: registers the "Pixel" chibi visual skin under "finalfantasy"
 
-const data = deckJson as unknown as DeckDataFile;
-
-export const finalFantasyDeck: DeckModule = registerDeck({
-  id: "finalfantasy",
-  name: data.name,
+export const finalFantasyDeck = registerDeck({
+  data: deckJson,
   tagline: "Crystals, creatures, and the cycle of light — the recurring myth as a deck.",
-  data,
-  cards: Object.values(data.cards) as CardData[],
 });

@@ -1,29 +1,21 @@
-import { resolveSpread, type Spread } from "../decks/spreads";
+import { isValidSpread, MAX_SPREAD_POSITIONS, resolveSpread, type Spread } from "../decks/spreads";
 import type { DeckModule } from "../decks/types";
 import type { ReadingCard, ReadingResolution, ReadingToken, StableReadingToken } from "./types";
 
 const MAX_TOKEN_LENGTH = 65_536;
 export const MAX_QUESTION_LENGTH = 4_000;
-const MAX_POSITIONS = 512;
 const SLUG = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
 const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === "object" && !Array.isArray(v);
 const text = (v: unknown): v is string => typeof v === "string";
 const nonempty = (v: unknown): v is string => text(v) && !!v.trim();
 
-function validSpread(value: unknown): value is Spread {
-  return isRecord(value) && nonempty(value.id) && nonempty(value.name) && text(value.description)
-    && (value.deckId === undefined || nonempty(value.deckId))
-    && Array.isArray(value.positions) && value.positions.length > 0 && value.positions.length <= MAX_POSITIONS
-    && value.positions.every((p) => isRecord(p) && nonempty(p.name) && text(p.prompt));
-}
-
 function validToken(value: unknown): value is ReadingToken {
   if (!isRecord(value) || (value.v !== 1 && value.v !== 2) || !nonempty(value.d)
     || !text(value.q) || value.q.length > MAX_QUESTION_LENGTH
-    || !Array.isArray(value.c) || !value.c.length || value.c.length > MAX_POSITIONS) return false;
+    || !Array.isArray(value.c) || !value.c.length || value.c.length > MAX_SPREAD_POSITIONS) return false;
   if (value.v === 2) {
-    if (!text(value.h) || !/^[a-f0-9]{64}$/.test(value.h) || !validSpread(value.s)) return false;
-  } else if (!nonempty(value.s) && !validSpread(value.s)) return false;
+    if (!text(value.h) || !/^[a-f0-9]{64}$/.test(value.h) || !isValidSpread(value.s)) return false;
+  } else if (!nonempty(value.s) && !isValidSpread(value.s)) return false;
   const ids = new Set<string | number>();
   for (const tuple of value.c) {
     if (!Array.isArray(tuple) || tuple.length !== 2 || (tuple[1] !== 0 && tuple[1] !== 1)) return false;
@@ -73,7 +65,7 @@ export async function encodeReading(
   cards: ReadingCard[],
 ): Promise<string> {
   const resolvedSpread = resolveSpread(spread, deck.spreads);
-  if (!validSpread(resolvedSpread) || (resolvedSpread.deckId && resolvedSpread.deckId !== deck.id)) throw new Error("Unknown or invalid spread for this deck.");
+  if (!isValidSpread(resolvedSpread) || (resolvedSpread.deckId && resolvedSpread.deckId !== deck.id)) throw new Error("Unknown or invalid spread for this deck.");
   if (cards.length !== resolvedSpread.positions.length) throw new Error("Deal one card for every spread position.");
   const deckSlugs = new Set(deck.cards.map((card) => card.slug));
   if (deckSlugs.size !== deck.cards.length) throw new Error("The deck has duplicate card identities.");
@@ -106,7 +98,7 @@ export async function resolveReading(token: ReadingToken, deck: DeckModule): Pro
   if (!validToken(token)) return { ok: false, error: "This reading link is malformed." };
   if (token.d !== deck.id) return { ok: false, error: "This reading belongs to a different deck than the link's route." };
   const spread = resolveSpread(token.s, deck.spreads);
-  if (!validSpread(spread)) return { ok: false, error: "Unknown or invalid spread in this reading." };
+  if (!isValidSpread(spread)) return { ok: false, error: "Unknown or invalid spread in this reading." };
   if (spread.deckId && spread.deckId !== deck.id) return { ok: false, error: "This spread belongs to a different deck." };
   if (spread.positions.length !== token.c.length) return { ok: false, error: "The card count does not match the spread." };
   if (token.v === 1) {

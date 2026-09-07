@@ -12,16 +12,9 @@
  */
 import deckJson from "@decks/ultima-octave/deck.json";
 import { registerDeck } from "../registry";
-import type { DeckDataFile, DeckModule } from "../types";
-import type { CardData } from "@/runtime/types";
 import "./cards"; // side effect: registers the "Cube" visual skin under "ultima-octave"
 
-const data = deckJson as unknown as DeckDataFile;
-
-export const ultimaOctaveDeck: DeckModule = registerDeck({
-  id: "ultima-octave",
-  name: data.name,
+export const ultimaOctaveDeck = registerDeck({
+  data: deckJson,
   tagline: "Eight virtues, eight octaves — Garriott's colour-cube of virtue as a lattice deck.",
-  data,
-  cards: Object.values(data.cards) as CardData[],
 });
