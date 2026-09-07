@@ -1,12 +1,10 @@
 /** Build a self-contained, LLM-ready interpretation prompt from a resolved reading. Grounded
  *  entirely in the deck's authored data — no backend, no tokens, works pasted into any model. */
-import type { DeckModule } from "@/decks/types";
+import type { DeckModule, DeckDataFile } from "@/decks/types";
 import type { Spread } from "@/decks/spreads";
 import type { ReadingCard } from "./types";
-import { rankLabel, suitLabel } from "@/components/cardMeta";
-import type { DeckDataFile } from "@/decks/types";
+import { rankLabel, suitLabel } from "@/decks/cardMeta";
 
-type Named = { name: string; description?: string };
 type Station = { name: string; description?: string };
 
 export function buildPrompt(deck: DeckModule, spread: Spread, dealt: ReadingCard[], question: string): string {

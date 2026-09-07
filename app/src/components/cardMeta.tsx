@@ -1,11 +1,22 @@
-/** Shared card-metadata helpers: suit/major glyphs and rank labels, used by the badge and the modal.
- *
- * Everything here resolves from the DECK DATA first (so any migrated/custom deck shows its own rank
- * names, suit names, and glyphs), falling back to the bundled Ultima maps only when a deck supplies
- * none. That fallback is what keeps a sparse pasted deck legible. */
+/** Presentation helpers for card metadata: glyph rendering plus compatibility re-exports of the
+ * renderer-independent label/factorization helpers from the deck domain. */
 import { useId } from "react";
 import type { DeckDataFile } from "@/decks/types";
-import type { CardData } from "@/runtime/types";
+import type { CardData } from "@/decks/card";
+import { majorGlyphSvg, suitGlyphSvg } from "@/decks/cardMeta";
+
+export {
+  RANK_ROMAN,
+  RANK_NAME,
+  SUIT_LABEL,
+  rankLabel,
+  rankBadge,
+  suitLabel,
+  omega,
+  facVar,
+  facWord,
+  stationName,
+} from "@/decks/cardMeta";
 
 /** The Ultima glyphs, inlined and currentColor-recolorable (fallback when a deck supplies no SVG). */
 export const GLYPHS: Record<string, string> = {
@@ -31,7 +42,7 @@ export function Glyph({ which, size = 16 }: { which: string; size?: number }) {
 const reEsc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** Per-instance-namespace any internal ids (mask/gradient/clip) so multiple copies of a deck SVG on
- *  one page don't collide on `url(#id)` (which otherwise resolves to a single, possibly-unmounted node). */
+ * one page don't collide on `url(#id)`. */
 function namespaceIds(svg: string, uid: string): string {
   const ids = Array.from(svg.matchAll(/id="([^"]+)"/g), (m) => m[1]);
   let out = svg;
@@ -45,9 +56,7 @@ function namespaceIds(svg: string, uid: string): string {
   return out;
 }
 
-/** Render a deck-supplied FULL <svg> string, sized and recolored via currentColor (ids namespaced).
- *  Only the ROOT <svg> tag's width/height are normalized — stripping them globally would also delete
- *  every <rect width=… height=…>, which silently destroys rect-built glyphs (towers, key shafts). */
+/** Render a deck-supplied FULL <svg> string, sized and recolored via currentColor (ids namespaced). */
 export function Svg({ svg, size = 16 }: { svg: string; size?: number }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
   const sized = svg.replace(/<svg([^>]*)>/, (_m, attrs: string) =>
@@ -61,83 +70,10 @@ export function Svg({ svg, size = 16 }: { svg: string; size?: number }) {
   );
 }
 
-/**
- * The right glyph for a card: the deck's own suit/major SVG when present, else the Ultima fallback
- * (suit-keyed for known suits, the ankh for anything else / majors without a symbol).
- */
+/** The right glyph for a card: deck-authored suit/major SVG when present, else the Ultima fallback. */
 export function AxisGlyph({ deck, card, size = 16 }: { deck?: DeckDataFile; card: CardData; size?: number }) {
   const isMajor = card.arcana === "major";
   const raw = isMajor ? majorGlyphSvg(deck) : suitGlyphSvg(deck, card.suit_slug);
   if (raw) return <Svg svg={raw} size={size} />;
   return <Glyph which={isMajor ? "major" : card.suit_slug ?? "major"} size={size} />;
-}
-
-// ── deck-data resolvers ──────────────────────────────────────────────────────
-
-type SuitInfo = { name?: string; symbol?: { svg?: string } };
-type RankInfo = { name?: string; symbol?: string };
-
-function suits(deck?: DeckDataFile) { return (deck?.suits ?? {}) as Record<string, SuitInfo>; }
-function ranks(deck?: DeckDataFile) { return (deck?.ranks ?? {}) as Record<string, RankInfo>; }
-
-function suitGlyphSvg(deck: DeckDataFile | undefined, slug?: string): string | undefined {
-  return slug ? suits(deck)[slug]?.symbol?.svg : undefined;
-}
-function majorGlyphSvg(deck?: DeckDataFile): string | undefined {
-  return (deck?.major_arcana as { symbol?: { svg?: string } } | undefined)?.symbol?.svg;
-}
-
-/** Full rank name for prose / detail table (e.g. "Two", "Homecoming"). */
-export function rankLabel(deck: DeckDataFile | undefined, slug?: string): string {
-  if (!slug) return "";
-  return ranks(deck)[slug]?.name ?? RANK_NAME[slug] ?? slug;
-}
-/** Compact rank badge token (e.g. "II", "A"); falls back to the card's number. */
-export function rankBadge(deck: DeckDataFile | undefined, slug?: string, fallback = ""): string {
-  if (!slug) return fallback;
-  return ranks(deck)[slug]?.symbol ?? RANK_ROMAN[slug] ?? fallback ?? slug;
-}
-/** Suit display name (e.g. "Crowns", "Structures"). */
-export function suitLabel(deck: DeckDataFile | undefined, slug?: string): string {
-  if (!slug) return "";
-  return suits(deck)[slug]?.name ?? SUIT_LABEL[slug] ?? slug;
-}
-
-// ── Ultima fallback maps (used only when the deck supplies nothing) ───────────
-
-/** Roman/initial form for the compact corner badge. */
-export const RANK_ROMAN: Record<string, string> = {
-  ace: "A", two: "II", three: "III", four: "IV", five: "V", six: "VI", seven: "VII",
-  eight: "VIII", nine: "IX", ten: "X", seeker: "S", knight: "K", oracle: "O", paragon: "P",
-};
-
-/** Full word form for prose / the detail table. */
-export const RANK_NAME: Record<string, string> = {
-  ace: "Ace", two: "Two", three: "Three", four: "Four", five: "Five", six: "Six", seven: "Seven",
-  eight: "Eight", nine: "Nine", ten: "Ten", seeker: "Seeker", knight: "Knight", oracle: "Oracle", paragon: "Paragon",
-};
-
-export const SUIT_LABEL: Record<string, string> = {
-  crowns: "Crowns", blades: "Blades", runes: "Runes", moongates: "Moongates",
-};
-
-// ── the fourth axis: Ω, the count of prime factors (invariant across every deck) ──
-/** Ω(n): prime factors with multiplicity. 0/1 → 0 (identity); a prime → 1; composites deepen. */
-export function omega(n: number): number {
-  if (!Number.isFinite(n) || n <= 1) return 0;
-  let c = 0, d = 2;
-  while (d * d <= n) { while (n % d === 0) { n /= d; c++; } d++; }
-  if (n > 1) c++;
-  return c;
-}
-const FAC_VARS = ["--fac-identity", "--fac-prime", "--fac-c2", "--fac-c3", "--fac-c4"];
-/** The CSS custom property for a card's Ω band, e.g. `var(facVar(omega(n)))`. */
-export function facVar(o: number): string { return FAC_VARS[Math.min(o, 4)]; }
-export function facWord(o: number): string { return o === 0 ? "identity" : o === 1 ? "prime" : "composite"; }
-
-/** A station's display name from the deck's transversal (falls back to the slug). */
-export function stationName(deck: DeckDataFile | undefined, slug?: string): string {
-  if (!slug) return "";
-  const tx = deck?.transversal as { stations?: Record<string, { name?: string }> } | undefined;
-  return tx?.stations?.[slug]?.name ?? slug;
 }
