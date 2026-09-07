@@ -1,6 +1,22 @@
 # Generative Arcana Schema
 
-The JSON shape of a finished deck. One principle governs it: **atomic at write, derived at read.** Every axis's contribution is stored once; a card stores only slugs plus the things it originates — its integrated meaning and its integrated visual description (a **major** additionally carries a factorization gloss; see below).
+The JSON shape of the **default four-suit tarot construction profile**. One principle governs it: **atomic at write, derived at read.** Every axis's contribution is stored once; a card stores only slugs plus the things it originates — its integrated meaning and its integrated visual description (a **major** additionally carries a factorization gloss; see below).
+
+## Profile scope and portable runtime
+
+The cardinalities below (four suits, fourteen ranks, twenty-two majors) and rank-originated minor
+numbers describe this authoring profile, not every deck the application can represent. Ulysses has
+21 majors; Ultima Octave has eight suits and eight ranks, suit-originated minor numbers, and authored
+minor factorization glosses. Those are deliberate constructions, not malformed conventional tarot.
+
+The app's portable card type uses deck-local string slugs, and its import validator checks fields,
+indices, and references without enforcing this profile's cardinalities, number origin, or walk.
+Do not infer a generation strategy from card count alone. The normalization rules below apply to the
+default profile; another profile must state where its numbers and glosses originate.
+
+Renderer independence does not mean absence of visual information: axis styles, SVG symbols, and
+integrated scene descriptions are authored **iconographic briefs**. Executable rendering and finished
+skins are a separate layer.
 
 ## Why this schema looks the way it does
 
@@ -164,11 +180,11 @@ The transversal touches every card, so station assignment is **deterministic and
 
 Resolve each `station_index` to a `station_slug` via the canonical order and write it to the card. (Materialized for self-description and querying, though recoverable from structure.)
 
-**Why `k`, and why not a plain continuous count.** Laying the 56 minors out as contiguous 14-rank suits and walking `station = (14·suit + rank) mod N` looks continuous and clean, but when `N` divides 14 — which the classic **7** does — it collapses: `14·suit ≡ 0 (mod 7)`, so `station = rank mod N`, identical in every suit, and the axis stops cross-cutting entirely. The escape is a per-suit kick `k` **coprime to N** (the suit stride): each suit's walk is shifted, so no two suits share a pattern. The major walk needs no kick: 22 ≡ 1 (mod 7), so a plain count never realigns.
+**Why `k`, and why not a plain continuous count.** Laying the 56 minors out as contiguous 14-rank suits and walking `station = (14·suit + rank) mod N` looks continuous and clean, but when `N` divides 14 — which the classic **7** does — it collapses: `14·suit ≡ 0 (mod 7)`, so `station = rank mod N`, identical in every suit, and the axis stops cross-cutting entirely. The escape is a per-suit kick `k` **coprime to N** (the suit stride): each suit's walk is shifted, so no two suits share a pattern. The major walk has no suit coordinate, so it needs no per-suit kick.
 
 **Choosing `k` — the fold.** `k` is the *chord* the four suits strike through the qualitative cycle. At a fixed rank they occupy `{r, r+k, r+2k, r+3k} mod N`: `k = 1` packs them onto four adjacent stations (a *close voicing* — suit-neighbors are quality-neighbors); larger `k` spreads them around the ring (an *open voicing* — adjacent suits draw on distant qualities), folding the grid-to-cycle map more and widening the surface for cross-suit correspondence. The choice is **N-relative** — you cannot hardcode a stride:
 
-- **Valid** iff `k` is coprime to `N` (else the four suits collapse onto fewer than four distinct stations; e.g. N = 6, k = 3 gives only two). `k` and `N−k` are mirror images, so the real choices are the coprime `k` in `1 … ⌊N/2⌋`.
+- **Full-cycle design rule:** choose `k` coprime to `N`. Repeated stride steps then visit all `N` stations. For `S` consecutive suits, distinct stations at a fixed rank require only `S ≤ N / gcd(N, k)`: coprimality is sufficient when `S ≤ N`, but is not necessary. For example, `N = 8`, `k = 2`, `S = 4` gives `0, 2, 4, 6`, all distinct; `N = 6`, `k = 3`, `S = 4` gives only two. If `S > N`, no stride avoids collisions. This profile deliberately retains the stronger coprime rule. `k` and `N−k` are mirror images, so the full-cycle choices are the coprime `k` in `1 … ⌊N/2⌋`.
 - **Default `k = 1`** — the cleanest, most legible diagonal. This is the explicit version of what traditional tarot achieves implicitly by scattering each suit across three non-adjacent zodiac triplicities (see `references/tarot_structure.md`).
 - **To unfold**, climb toward `⌊N/2⌋` for more fold; the maximal fold is the largest coprime ≤ `⌊N/2⌋`. For N = 7 the ladder is 1 → 2 → 3; N = 5 is 1 → 2; N = 9 is 1 → 2 → 4 (3 drops out — shared factor). Unfold when the theme wants denser correspondence and can carry the reduced legibility.
 

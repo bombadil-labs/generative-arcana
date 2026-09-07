@@ -8,7 +8,7 @@ Generative Arcana is three things that fit together:
    axes — **suit**, **rank**, a **transversal** substrate (the generalization of tarot's Chaldean/decan
    order), and the **prime/composite** character latent in every card's number. Packaged as a Claude skill.
 2. **A deck corpus** — the decks themselves, as portable, renderer-agnostic JSON. A `deck.json` carries
-   only *data* (meanings, structure, the four axes); it holds **no visual information**.
+   *authored data* (meanings, structure, the four axes, and iconographic briefs), but no executable renderer.
 3. **An app** that renders those decks and turns a reading into a shareable link any LLM can interpret.
    A static React/Vite site that builds to GitHub Pages.
 
@@ -49,8 +49,8 @@ Yew, *Role of Valor* is the Fighter — with the 3-bit Truth·Love·Courage valu
 
 ```
 skill/generative-arcana/      the method, as a Claude skill (SKILL.md + references/ + strategies/)
-generative-arcana-v2.0.zip    the same skill, packaged for one-click install
-decks/<id>/deck.json          the deck corpus — portable, renderer-agnostic data (no visuals)
+generative-arcana-v2.0.zip    the v2.0 release snapshot, packaged for one-click install
+decks/<id>/deck.json          the deck corpus — portable data and iconographic briefs (no renderer)
 app/                          the renderer (Vite + React + TypeScript)
 tools/pixel/                  Python pixel-art pipeline (Ulysses "Vico", Final Fantasy "chibi")
 tools/lumen/                  Python luminous-abstract pipeline (Evolution "Lumen")
@@ -73,7 +73,7 @@ and it renders.
 This is **v2.0**: the prime/composite axis is stored as an authored `factorization` gloss on the majors
 (a gloss that won't cohere signals a miscast slot); stations carry a concise `description` and optional
 `symbol`; numbered ranks carry a `{suit}`-placeholder `question`; suits may form a `dialectic`
-cross-product. The app reads the schema loosely, so structurally novel decks (the Octave's 8×8) work too.
+cross-product. The runtime contract is independent of the default tarot construction profile: it validates card data and references without requiring a particular card count or suit vocabulary. Structurally novel decks (the Octave's 8×8) work too.
 
 ## The app
 
@@ -83,6 +83,7 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # -> app/dist (static)
 npm run typecheck
+npm test           # import and reading-integrity regressions; includes the deck corpus
 ```
 
 - **[app/README.md](./app/README.md)** — architecture, the visual-skin system, adding a deck or skin.
@@ -109,6 +110,6 @@ app/src/
 
 ## Deploy (GitHub Pages)
 
-Pushing to `main` runs [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml), which builds
+Pushing to `main` runs [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml), which typechecks, tests, and builds
 `app/` (Vite reads `../decks` for deck data) and publishes it. Enable Pages with **Source: GitHub
 Actions**. The build uses a relative base, so it works under `https://<user>.github.io/generative-arcana/`.
