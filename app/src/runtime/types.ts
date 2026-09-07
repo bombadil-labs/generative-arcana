@@ -18,20 +18,9 @@ export type SuitSlug = "crowns" | "blades" | "runes" | "moongates";
 /** The register key: a suit, or "major" for the Major Arcana superset register. */
 export type RegisterKey = SuitSlug | "major";
 
-/** The slice of the deck JSON a sketch is allowed to read. Mirrors ultima-tarot.json card shape. */
-export interface CardData {
-  slug: string;
-  name: string;
-  number: string;
-  arcana: "major" | "minor";
-  station_slug: StationSlug;
-  suit_slug?: SuitSlug;
-  rank_slug?: string;
-  /** the prime/composite character; majors carry an authored gloss (v2 schema). */
-  factorization?: { character: "identity" | "prime" | "composite"; factors?: number[]; gloss: string };
-  meaning: { upright: string; inverted: string };
-  visuals: { detailed_description: string };
-}
+// Compatibility export for existing sketches; the data contract no longer depends on p5.
+import type { CardData } from "../decks/card";
+export type { CardData } from "../decks/card";
 
 export interface Palette {
   /** Base ground / paper of the suit. */
