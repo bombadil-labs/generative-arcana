@@ -1,20 +1,36 @@
-import type { Spread } from "@/decks/spreads";
+import type { Spread } from "../decks/spreads";
 
-/** One dealt card: an index into the deck's ordered card list, plus orientation. */
+/** An index is local UI state only; new share links use card slugs. */
 export interface DealtCard {
   index: number;
   reversed: boolean;
 }
 
-/** The compact, URL-encodable reading payload (kept in the # fragment, never sent to a server). */
-export interface ReadingToken {
+/** Historical payload. It cannot establish the identity of the original deck revision. */
+export interface LegacyReadingToken {
   v: 1;
-  /** deck id */
   d: string;
-  /** spread id (generic/per-deck) OR an inline custom Spread */
   s: string | Spread;
-  /** question text */
   q: string;
-  /** dealt cards: [cardIndex, reversed(0|1)] */
   c: [number, 0 | 1][];
 }
+
+/** A content-bound reading, stored entirely in the URL fragment. */
+export interface StableReadingToken {
+  v: 2;
+  /** Deck id, also checked against the route. */
+  d: string;
+  /** SHA-256 of canonical deck JSON (identity, not author authentication). */
+  h: string;
+  /** Snapshot the spread so later changes to position prompts cannot reinterpret the reading. */
+  s: Spread;
+  q: string;
+  /** Ordered [cardSlug, reversed(0|1)] tuples. */
+  c: [string, 0 | 1][];
+}
+
+export type ReadingToken = LegacyReadingToken | StableReadingToken;
+
+export type ReadingResolution =
+  | { ok: true; dealt: DealtCard[]; spread: Spread; legacy: boolean }
+  | { ok: false; error: string };

@@ -2,6 +2,19 @@
 
 The JSON shape of a finished deck. One principle governs it: **atomic at write, derived at read.** Every axis's contribution is stored once; a card stores only slugs plus the things it originates — its integrated meaning and its integrated visual description (a **major** additionally carries a factorization gloss; see below).
 
+## Authoring profile versus runtime contract
+
+The interfaces below describe the **default 78-card tarot authoring profile**: four suits, fourteen
+ranks, and twenty-two majors, with the minor number originating at rank. They are not universal
+runtime cardinality or numeric-origin constraints. Ultima Octave is an existing alternate profile:
+eight suits × eight ranks plus twenty-two majors (86 cards), with suit-originating numbers and authored
+minor glosses. Do not force that deck back into the default profile.
+
+The app's runtime import validator checks field shapes, ordered axes, every card, and referential
+integrity. It permits incomplete decks and variant cardinalities and does not enforce the default
+walk or numeric-origin rules. Profile-specific generation/quality checks are a separate concern;
+explicit machine-readable profile selection is still future work. See `docs/contracts-and-readings.md`.
+
 ## Why this schema looks the way it does
 
 A card is an integration over four axes. Three are stored entities the card references by slug (suit, rank, station); the fourth (prime/composite) is derived from the number, and its *gloss* is stored only where the number is originated. So:
@@ -168,7 +181,7 @@ Resolve each `station_index` to a `station_slug` via the canonical order and wri
 
 **Choosing `k` — the fold.** `k` is the *chord* the four suits strike through the qualitative cycle. At a fixed rank they occupy `{r, r+k, r+2k, r+3k} mod N`: `k = 1` packs them onto four adjacent stations (a *close voicing* — suit-neighbors are quality-neighbors); larger `k` spreads them around the ring (an *open voicing* — adjacent suits draw on distant qualities), folding the grid-to-cycle map more and widening the surface for cross-suit correspondence. The choice is **N-relative** — you cannot hardcode a stride:
 
-- **Valid** iff `k` is coprime to `N` (else the four suits collapse onto fewer than four distinct stations; e.g. N = 6, k = 3 gives only two). `k` and `N−k` are mirror images, so the real choices are the coprime `k` in `1 … ⌊N/2⌋`.
+- **Full-cycle design rule:** choose `k` coprime to `N`. This is sufficient, not necessary, for distinct suit offsets. With `S` consecutive suit indices, the exact noncollision condition is `S ≤ N / gcd(N, k)`, because repeated stride steps have period `N / gcd(N, k)`. For example, `N = 8, k = 2, S = 4` gives four distinct offsets `0, 2, 4, 6`, despite a shared factor; `N = 6, k = 3, S = 4` gives only two. Coprimality additionally makes stride steps traverse the whole station cycle and guarantees noncollision when `S ≤ N`. `k` and `N−k` are mirror images, so this profile chooses the coprime `k` in `1 … ⌊N/2⌋`.
 - **Default `k = 1`** — the cleanest, most legible diagonal. This is the explicit version of what traditional tarot achieves implicitly by scattering each suit across three non-adjacent zodiac triplicities (see `references/tarot_structure.md`).
 - **To unfold**, climb toward `⌊N/2⌋` for more fold; the maximal fold is the largest coprime ≤ `⌊N/2⌋`. For N = 7 the ladder is 1 → 2 → 3; N = 5 is 1 → 2; N = 9 is 1 → 2 → 4 (3 drops out — shared factor). Unfold when the theme wants denser correspondence and can carry the reduced legibility.
 
@@ -184,7 +197,7 @@ Resolve each `station_index` to a `station_slug` via the canonical order and wri
 
 **The prime/composite gloss lives on the major (and optionally the rank), never on a minor card.** The factorization is always derived from the number. The authored *gloss* is stored only where the number is originated: on each **major** (`MajorArcanaCard.factorization.gloss`, required — the trumps are the prime structure's home), and optionally **once per rank** (`Rank.factorization`, mainly under `ranks/prime_scaffold`; usually not worth authoring otherwise). A **minor card stores no factorization** — its character is its rank's, recovered by reference. The gloss is authored like `meaning` and can be done well or badly: one that won't follow from the factors is a generative signal, not a field to fill mechanically. See `references/numeric_axis.md`.
 
-**Canonical card order is derived, not key order.** `cards` stays keyed by slug for O(1) lookup, and is emitted in canonical order (22 majors by number, then minors by suit then rank). But consumers that need the order — anything that sorts, paginates, or references a card by position — must *derive* it (majors first by `number`; minors by `suit.index` then `rank.index`), not rely on JSON object key order, which no spec guarantees.
+**Canonical card order is derived, not key order.** `cards` stays keyed by slug for O(1) lookup, and is emitted in canonical order (22 majors by number, then minors by suit then rank). But consumers that need the order — anything that sorts, paginates, or references a card by position — must *derive* it (majors first by `number`; minors by `suit.index` then `rank.index`), not rely on JSON object key order, which is not semantic card order.
 
 **Majors carry no rank.** A major's `number` is its position 0–21; its meaning and visuals come straight from the chosen `strategies/majors/` method, integrated with `major_arcana.visual_style` (declared), its `station_slug` (sublimated), and its prime character (latent).
 

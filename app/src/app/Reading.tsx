@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { getDeck } from "@/decks";
-import { spreadsForDeck, resolveSpread, type Spread } from "@/decks/spreads";
+import { spreadsForDeck } from "@/decks/spreads";
 import { CardFrame } from "@/components/CardFrame";
 import { CardModal } from "@/components/CardModal";
 import { deal } from "@/reading/deal";
-import { encodeReading, decodeReading, tokenToDealt } from "@/reading/encode";
+import { encodeReading, decodeReading, resolveReading, MAX_QUESTION_LENGTH } from "@/reading/encode";
 import { buildPrompt } from "@/reading/prompt";
-import type { DealtCard } from "@/reading/types";
+import type { ReadingResolution } from "@/reading/types";
 import type { DeckModule } from "@/decks/types";
 import { navigate } from "./router";
 import { getPackId } from "./packPref";
@@ -17,7 +17,7 @@ export function Reading({ deckId, token }: { deckId: string; token?: string }) {
   if (!deck) {
     return (
       <div style={{ padding: "var(--s-5)" }}>
-        <p style={{ color: "var(--ink)", font: "400 16px/1.5 var(--font-body)" }}>Unknown deck “{deckId}”.</p>
+        <p style={{ color: "var(--ink)", font: "400 16px/1.5 var(--font-body)" }}>Unknown deck “{deckId}”. Custom decks are session-local: import the original deck JSON, then reopen this link.</p>
         <button onClick={() => navigate("/")} style={link}>← all decks</button>
       </div>
     );
@@ -32,13 +32,24 @@ export function Reading({ deckId, token }: { deckId: string; token?: string }) {
 function ReadingComposer({ deck }: { deck: DeckModule }) {
   const spreads = useMemo(() => spreadsForDeck(deck.spreads), [deck]);
   const [question, setQuestion] = useState("");
+  const [casting, setCasting] = useState(false);
+  const [castError, setCastError] = useState<string | null>(null);
   const [spreadId, setSpreadId] = useState(spreads[1]?.id ?? spreads[0].id);
   const spread = spreads.find((s) => s.id === spreadId)!;
 
-  function castReading() {
-    const dealt = deal(spread, deck.cards.length);
-    const tk = encodeReading(deck.id, spread.id, question.trim(), dealt);
-    navigate(`/deck/${deck.id}/r/${tk}`);
+  async function castReading() {
+    if (casting) return;
+    setCasting(true);
+    setCastError(null);
+    try {
+      const dealt = deal(spread, deck.cards.length);
+      const tk = await encodeReading(deck, spread, question.trim(), dealt);
+      navigate(`/deck/${deck.id}/r/${tk}`);
+    } catch (error) {
+      setCastError(error instanceof Error ? error.message : "Unable to create the reading link.");
+    } finally {
+      setCasting(false);
+    }
   }
 
   const n = spread.positions.length;
@@ -51,6 +62,7 @@ function ReadingComposer({ deck }: { deck: DeckModule }) {
 
       <label style={fieldLabel}>Your question <span style={{ color: "var(--ink-3)" }}>(optional)</span></label>
       <textarea
+        maxLength={MAX_QUESTION_LENGTH}
         value={question}
         onChange={(e) => setQuestion(e.target.value)}
         placeholder="What should I focus on right now?"
@@ -93,7 +105,9 @@ function ReadingComposer({ deck }: { deck: DeckModule }) {
       </div>
 
       <div style={{ marginTop: "var(--s-4)" }}>
-        <button onClick={castReading} style={dealBtn}>Deal {n} card{n > 1 ? "s" : ""} →</button>
+        <button disabled={casting || n > deck.cards.length} onClick={castReading} style={{ ...dealBtn, opacity: casting || n > deck.cards.length ? 0.5 : 1 }}>{casting ? "Creating reading…" : `Deal ${n} card${n > 1 ? "s" : ""} →`}</button>
+        {n > deck.cards.length && <p role="alert" style={errorText}>This spread needs {n} cards; this deck has {deck.cards.length}. Choose a smaller spread.</p>}
+        {castError && <p role="alert" style={errorText}>{castError}</p>}
       </div>
     </div>
   );
@@ -102,16 +116,28 @@ function ReadingComposer({ deck }: { deck: DeckModule }) {
 function ReadingResult({ deck, token }: { deck: DeckModule; token: string }) {
   const decoded = useMemo(() => decodeReading(token), [token]);
   const [copied, setCopied] = useState<string | null>(null);
+  const [resolution, setResolution] = useState<{ token: string; deck: DeckModule; result: ReadingResolution } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (decoded) {
+      resolveReading(decoded, deck).then((result) => {
+        if (!cancelled) setResolution({ token, deck, result });
+      }).catch(() => {
+        if (!cancelled) setResolution({ token, deck, result: { ok: false, error: "Unable to verify this deck's revision. Reopen the app over HTTPS or localhost." } });
+      });
+    }
+    return () => { cancelled = true; };
+  }, [decoded, deck, token]);
   // modal walks the dealt order, so prev/next moves through the spread itself.
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   useEffect(() => { setCopied(null); setOpenIndex(null); }, [token]);
 
   if (!decoded) return <p style={errorText}>This reading link is malformed.</p>;
-  const spread: Spread | undefined = resolveSpread(decoded.s, deck.spreads);
-  if (!spread) return <p style={errorText}>Unknown spread in this reading.</p>;
-
-  const dealt: DealtCard[] = tokenToDealt(decoded);
+  if (!resolution || resolution.token !== token || resolution.deck !== deck) return <p role="status" style={lede}>Verifying reading…</p>;
+  if (!resolution.result.ok) return <p role="alert" style={errorText}>{resolution.result.error}</p>;
+  const { spread, dealt, legacy } = resolution.result;
   const seqCards = dealt.map((dc) => deck.cards[dc.index]); // aligned 1:1 with the dealt order
   const prompt = buildPrompt(deck, spread, dealt, decoded.q);
   const packs = listPacks(deck.id);
@@ -130,6 +156,9 @@ function ReadingResult({ deck, token }: { deck: DeckModule; token: string }) {
         </div>
         <button onClick={() => navigate(`/deck/${deck.id}/read`)} style={secondaryBtn}>↺ New reading</button>
       </div>
+
+      {legacy && <p role="status" style={lede}>Legacy reading: this link uses card positions and has no deck fingerprint. The original deck revision cannot be verified.</p>}
+      {deck.custom && <p style={lede}>To open this reading elsewhere, import the same deck JSON first. The link identifies the deck but does not contain its contents.</p>}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: "var(--s-4)", marginTop: "var(--s-4)" }}>
         {dealt.map((dc, i) => {

@@ -5,7 +5,7 @@
  * time, and pointer each frame. Sketches receive the same kit object every frame (cheap, no churn).
  */
 import type p5 from "p5";
-import type { CardData, PointerState, RegisterKey, SketchKit } from "./types";
+import type { CardData, PointerState, RegisterKey, StationSlug, SketchKit } from "./types";
 import { STATION_TOKENS, REGISTER_TOKENS } from "./tokens";
 import { buildStationLight } from "./lighting";
 import { buildRegister } from "./registers";
@@ -34,7 +34,11 @@ function mulberry32(seed: number): () => number {
 }
 
 export function registerKeyFor(data: CardData): RegisterKey {
-  return data.arcana === "major" ? "major" : (data.suit_slug ?? "major");
+  const key = data.arcana === "major" ? "major" : data.suit_slug;
+  if (!key || !Object.prototype.hasOwnProperty.call(REGISTER_TOKENS, key)) {
+    throw new Error(`The Ultima SketchKit does not support suit “${key}”. Use a deck-native renderer.`);
+  }
+  return key as RegisterKey;
 }
 
 export interface BuildKitOpts {
@@ -50,7 +54,10 @@ export function buildKit(p: p5, data: CardData, opts: BuildKitOpts): SketchKit {
   p.noiseSeed(seed);
 
   const register = buildRegister(REGISTER_TOKENS[registerKeyFor(data)]);
-  const light = buildStationLight(STATION_TOKENS[data.station_slug]);
+  if (!Object.prototype.hasOwnProperty.call(STATION_TOKENS, data.station_slug)) {
+    throw new Error(`The Ultima SketchKit does not support station “${data.station_slug}”. Use a deck-native renderer.`);
+  }
+  const light = buildStationLight(STATION_TOKENS[data.station_slug as StationSlug]);
   const fig = buildFigures(register);
 
   const pointer: PointerState = { x: 0.5, y: 0.5, inside: false, down: false, pressed: false };
