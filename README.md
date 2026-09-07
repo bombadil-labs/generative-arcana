@@ -8,7 +8,8 @@ Generative Arcana is three things that fit together:
    axes — **suit**, **rank**, a **transversal** substrate (the generalization of tarot's Chaldean/decan
    order), and the **prime/composite** character latent in every card's number. Packaged as a Claude skill.
 2. **A deck corpus** — the decks themselves, as portable, renderer-agnostic JSON. A `deck.json` carries
-   only *data* (meanings, structure, the four axes); it holds **no visual information**.
+   renderer-independent *data*: meanings, structure, the four axes, and an authored iconographic brief.
+   It contains **no executable rendering implementation**; skins supply the rendered treatment.
 3. **An app** that renders those decks and turns a reading into a shareable link any LLM can interpret.
    A static React/Vite site that builds to GitHub Pages.
 
@@ -50,7 +51,7 @@ Yew, *Role of Valor* is the Fighter — with the 3-bit Truth·Love·Courage valu
 ```
 skill/generative-arcana/      the method, as a Claude skill (SKILL.md + references/ + strategies/)
 generative-arcana-v2.0.zip    the same skill, packaged for one-click install
-decks/<id>/deck.json          the deck corpus — portable, renderer-agnostic data (no visuals)
+decks/<id>/deck.json          the deck corpus — portable meanings, structure, and iconographic briefs (no renderer code)
 app/                          the renderer (Vite + React + TypeScript)
 tools/pixel/                  Python pixel-art pipeline (Ulysses "Vico", Final Fantasy "chibi")
 tools/lumen/                  Python luminous-abstract pipeline (Evolution "Lumen")
@@ -73,7 +74,8 @@ and it renders.
 This is **v2.0**: the prime/composite axis is stored as an authored `factorization` gloss on the majors
 (a gloss that won't cohere signals a miscast slot); stations carry a concise `description` and optional
 `symbol`; numbered ranks carry a `{suit}`-placeholder `question`; suits may form a `dialectic`
-cross-product. The app reads the schema loosely, so structurally novel decks (the Octave's 8×8) work too.
+cross-product. The app validates its runtime contract independently of the default 78-card authoring profile,
+so structurally novel decks (the Octave's 8×8) work too. See [contracts and reading links](docs/contracts-and-readings.md).
 
 ## The app
 
@@ -83,6 +85,7 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # -> app/dist (static)
 npm run typecheck
+npm test           # data/import/reading regression tests; includes the full deck corpus
 ```
 
 - **[app/README.md](./app/README.md)** — architecture, the visual-skin system, adding a deck or skin.
