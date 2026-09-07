@@ -101,11 +101,9 @@ export interface DeckDataFile {
 }
 
 /**
- * A registered deck. A deck folder under src/decks/<id>/ provides:
- *   - deck.json   (the data)
- *   - cards/      (p5 sketches; importing them registers each via registerCard)
- *   - index.ts    (calls registerDeck with this manifest)
- * Spreads (generic + deck-native) attach here in the next pass.
+ * A registered runtime deck. `registerDeck` constructs this only after validating raw deck data,
+ * deriving identity/name from that data, canonicalizing card order, and normalizing native spreads.
+ * Visual packs are registered independently and meet the deck by stable deck/card identity.
  */
 export interface DeckModule {
   id: string;
@@ -114,7 +112,7 @@ export interface DeckModule {
   data: DeckDataFile;
   /** ordered card list for the browser (majors first, then minors by suit/rank). */
   cards: CardData[];
-  /** spreads native to this deck, offered alongside the generic ones. */
+  /** validated, deck-owned spread snapshots, offered alongside the generic ones. */
   spreads?: Spread[];
   /** true for decks loaded from pasted JSON (not bundled). */
   custom?: boolean;

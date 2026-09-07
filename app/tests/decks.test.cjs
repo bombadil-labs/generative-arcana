@@ -5,7 +5,7 @@ const { resolve } = require("node:path");
 const { validateDeck, canonicalCards } = require("../.test-build/decks/validate.js");
 const { loadCustomDeck } = require("../.test-build/decks/custom.js");
 const { getDeck, registerDeck, listDecks } = require("../.test-build/decks/registry.js");
-const { rawDeck, moduleFor } = require("./fixtures.cjs");
+const { rawDeck } = require("./fixtures.cjs");
 
 for (const id of readdirSync(resolve(__dirname, "../../decks"), { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name)) {
   test(`bundled corpus validates: ${id}`, () => {
@@ -93,7 +93,7 @@ test("extension metadata is retained", () => {
 });
 test("custom imports cannot overwrite a bundled deck", () => {
   const d = rawDeck(); d.slug = "protected-builtin";
-  const built = registerDeck(moduleFor(d));
+  const built = registerDeck({ data: d, tagline: "Bundled test deck" });
   const result = loadCustomDeck(JSON.stringify(d));
   assert.equal(result.ok, false);
   assert.equal(getDeck(d.slug), built);
@@ -105,4 +105,69 @@ test("failed re-import leaves the registered custom deck untouched", () => {
   d.cards["major-1"].meaning = null;
   assert.equal(loadCustomDeck(JSON.stringify(d)).ok, false);
   assert.equal(getDeck(d.slug), result.deck);
+});
+
+test("registration derives identity and canonical card order from validated data", () => {
+  const d = rawDeck();
+  d.slug = "registry-derived-domain";
+  d.name = "Registry Derived Domain";
+  for (const k of ["cards", "ranks", "suits"]) d[k] = Object.fromEntries(Object.entries(d[k]).reverse());
+  const expected = canonicalCards(d).map((c) => c.slug);
+  const deck = registerDeck({ data: d, tagline: "A registry boundary test." });
+  assert.equal(deck.id, d.slug);
+  assert.equal(deck.name, d.name);
+  assert.deepEqual(deck.cards.map((c) => c.slug), expected);
+});
+
+test("invalid registration is transactional and never enters the registry", () => {
+  const d = rawDeck();
+  d.slug = "registry-invalid-transaction";
+  d.cards["major-1"].meaning = null;
+  const before = listDecks().length;
+  assert.throws(() => registerDeck({ data: d, tagline: "Invalid" }), /meaning/);
+  assert.equal(getDeck(d.slug), undefined);
+  assert.equal(listDecks().length, before);
+});
+
+test("native spreads acquire deck ownership at registration", () => {
+  const d = rawDeck();
+  d.slug = "registry-native-spread";
+  const source = {
+    id: "native-test",
+    name: "Native Test",
+    description: "A native spread.",
+    positions: [{ name: "Position", prompt: "what is here" }],
+  };
+  const deck = registerDeck({ data: d, tagline: "Spread test", spreads: [source] });
+  assert.equal(deck.spreads[0].deckId, d.slug);
+  assert.notEqual(deck.spreads[0], source);
+  assert.notEqual(deck.spreads[0].positions, source.positions);
+});
+
+test("registration rejects foreign, duplicate, and generic-shadowing native spreads", () => {
+  const base = (suffix) => {
+    const d = rawDeck();
+    d.slug = `registry-spread-${suffix}`;
+    return d;
+  };
+  const native = (id, extra = {}) => ({
+    id,
+    name: "Native",
+    description: "A native spread.",
+    positions: [{ name: "One", prompt: "one" }],
+    ...extra,
+  });
+  assert.throws(() => registerDeck({ data: base("foreign"), tagline: "Test", spreads: [native("foreign", { deckId: "another-deck" })] }), /deckId/);
+  const duplicateData = base("duplicate");
+  assert.throws(() => registerDeck({ data: duplicateData, tagline: "Test", spreads: [native("same"), native("same")] }), /duplicates/);
+  assert.throws(() => registerDeck({ data: base("generic"), tagline: "Test", spreads: [native("single")] }), /generic spread/);
+});
+
+test("custom registration derives a fallback tagline after validation", () => {
+  const d = rawDeck();
+  d.slug = "registry-custom-tagline";
+  d.theme.description = "First sentence. Second sentence.";
+  const result = loadCustomDeck(JSON.stringify(d));
+  assert.equal(result.ok, true, result.error);
+  assert.equal(result.deck.tagline, "First sentence.");
 });
