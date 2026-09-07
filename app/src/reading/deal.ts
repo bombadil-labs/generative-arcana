@@ -1,4 +1,4 @@
-import type { Spread } from "@/decks/spreads";
+import type { Spread } from "../decks/spreads";
 import type { DealtCard } from "./types";
 
 function rnd(): number {
@@ -13,7 +13,13 @@ function rnd(): number {
  * so a given reading is reproducible/shareable.
  */
 export function deal(spread: Spread, deckCardCount: number, reversalRate = 0.5): DealtCard[] {
-  const n = Math.min(spread.positions.length, deckCardCount);
+  const n = spread.positions.length;
+  if (!Number.isSafeInteger(deckCardCount) || deckCardCount < 1 || n < 1 || n > deckCardCount) {
+    throw new Error("The deck must have enough cards to fill every spread position.");
+  }
+  if (!Number.isFinite(reversalRate) || reversalRate < 0 || reversalRate > 1) {
+    throw new Error("The reversal rate must be between zero and one.");
+  }
   const pool = Array.from({ length: deckCardCount }, (_, i) => i);
   for (let i = 0; i < n; i++) {
     const j = i + Math.floor(rnd() * (pool.length - i));

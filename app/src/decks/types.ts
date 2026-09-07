@@ -1,4 +1,4 @@
-import type { CardData } from "@/runtime/types";
+import type { CardData } from "./card";
 import type { Spread } from "./spreads";
 
 /** One pole-pair axis of the suit cross-product, e.g. { name: "Realm", poles: ["World","Soul"] }. */

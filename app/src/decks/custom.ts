@@ -1,38 +1,30 @@
-/** Load a deck from pasted JSON (a generative-arcana deck file). Cards render as placeholders
- *  (no p5 sketches), but full data, browsing, and readings work. */
-import { registerDeck } from "./registry";
-import type { DeckDataFile, DeckModule } from "./types";
-import type { CardData } from "@/runtime/types";
+/** Import renderer-independent deck JSON. No registration occurs until validation succeeds. */
+import { getDeck, registerDeck } from "./registry";
+import { canonicalCards, validateDeck } from "./validate";
+import type { DeckModule } from "./types";
 
 type Result = { ok: true; deck: DeckModule } | { ok: false; error: string };
 
 export function loadCustomDeck(jsonText: string): Result {
-  let data: Record<string, unknown>;
+  let value: unknown;
   try {
-    data = JSON.parse(jsonText);
+    value = JSON.parse(jsonText);
   } catch {
     return { ok: false, error: "That isn't valid JSON." };
   }
-
-  const required = ["name", "theme", "suits", "ranks", "transversal", "cards"];
-  const missing = required.filter((k) => data[k] == null);
-  if (missing.length) return { ok: false, error: `Missing required field(s): ${missing.join(", ")}.` };
-  if (typeof data.cards !== "object") return { ok: false, error: "`cards` must be an object keyed by slug." };
-
-  const cards = Object.values(data.cards as Record<string, CardData>);
-  if (!cards.length) return { ok: false, error: "The deck has no cards." };
-  if (!cards[0]?.meaning || !cards[0]?.station_slug) return { ok: false, error: "Cards don't match the expected schema (need meaning, station_slug, …)." };
-
-  const slug = (data.slug as string) || (data.name as string) || "custom";
-  const id = slug.toString().replace(/[^a-z0-9-]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase() || "custom";
-  const theme = data.theme as { description?: string; creator?: string };
-
+  const result = validateDeck(value);
+  if (!result.ok) return result;
+  const data = result.data;
+  const existing = getDeck(data.slug);
+  if (existing && !existing.custom) {
+    return { ok: false, error: `The slug “${data.slug}” belongs to a bundled deck. Choose a different slug to import a custom version.` };
+  }
   const deck = registerDeck({
-    id,
-    name: data.name as string,
-    tagline: theme?.description ? firstSentence(theme.description) : "A custom deck.",
-    data: data as unknown as DeckDataFile,
-    cards,
+    id: data.slug,
+    name: data.name,
+    tagline: firstSentence(data.theme.description) || "A custom deck.",
+    data,
+    cards: canonicalCards(data),
     custom: true,
   });
   return { ok: true, deck };
