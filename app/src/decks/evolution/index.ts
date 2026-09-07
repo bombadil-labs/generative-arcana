@@ -13,16 +13,9 @@
  */
 import deckJson from "@decks/evolution/deck.json";
 import { registerDeck } from "../registry";
-import type { DeckDataFile, DeckModule } from "../types";
-import type { CardData } from "@/runtime/types";
 import "./cards"; // side effect: registers the "Lumen" luminous-abstract visual skin under "evolution"
 
-const data = deckJson as unknown as DeckDataFile;
-
-export const evolutionDeck: DeckModule = registerDeck({
-  id: "evolution",
-  name: data.name,
+export const evolutionDeck = registerDeck({
+  data: deckJson,
   tagline: "How speech bootstraps consciousness — Dewart's involution as a deck.",
-  data,
-  cards: Object.values(data.cards) as CardData[],
 });

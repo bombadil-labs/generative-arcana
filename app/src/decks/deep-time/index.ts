@@ -18,25 +18,17 @@
  */
 import deckJson from "@decks/deep-time/deck.json";
 import { registerDeck } from "../registry";
-import type { DeckDataFile, DeckModule } from "../types";
-import type { CardData } from "@/runtime/types";
 import "./cards"; // side effect: registers the "Core Sample" generative visual skin under "deep-time"
 
-const data = deckJson as unknown as DeckDataFile;
-
-export const deepTimeDeck: DeckModule = registerDeck({
-  id: "deep-time",
-  name: data.name,
+export const deepTimeDeck = registerDeck({
+  data: deckJson,
   tagline: "The Earth as an archive that writes itself — a reading is a core sample of the present.",
-  data,
-  cards: Object.values(data.cards) as CardData[],
   spreads: [
     {
       id: "core-sample",
       name: "The Core Sample",
       description:
         "Five cards read as a drill core, bottom to top: the situation as a stratigraphic column.",
-      deckId: "deep-time",
       positions: [
         { name: "The Basement", prompt: "the oldest layer — the foundation nothing negotiates with" },
         { name: "The Buried Bed", prompt: "what was laid down long ago and sealed; still bearing weight" },

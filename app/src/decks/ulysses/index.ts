@@ -7,16 +7,9 @@
  */
 import deckJson from "@decks/ulysses/deck.json";
 import { registerDeck } from "../registry";
-import type { DeckDataFile, DeckModule } from "../types";
-import type { CardData } from "@/runtime/types";
 import "./cards"; // side effect: registers the migrated raw-p5 visual pack under "ulysses"
 
-const data = deckJson as unknown as DeckDataFile;
-
-export const ulyssesDeck: DeckModule = registerDeck({
-  id: "ulysses",
-  name: data.name,
+export const ulyssesDeck = registerDeck({
+  data: deckJson,
   tagline: "One Dublin day as odyssey — wisdom in one's relationship to the ordinary.",
-  data,
-  cards: Object.values(data.cards) as CardData[],
 });
