@@ -35,9 +35,27 @@ Environment:
 - `MCP_ALLOWED_HOSTS` — comma-separated hostnames, required when binding non-loopback
 - `MCP_ALLOWED_ORIGINS` — comma-separated origin hostnames; defaults to the host allowlist
 
-The HTTP entry is stateless at the MCP-server layer, matching the current MCP v2 `createMcpHandler` model. It shares the immutable bundled Arcana corpus across requests but intentionally omits `import_deck`, because a custom import cannot honestly persist to the next request without a caller/session persistence model.
+The HTTP entry is stateless at the MCP-server layer. It shares the immutable bundled Arcana corpus across requests but intentionally omits `import_deck`, because a custom import cannot honestly persist to the next request without a caller/session persistence model.
 
-The HTTP transport is intentionally unauthenticated at this stage. A public deployment should add authentication in front of `/mcp`; do not expose it merely by setting `HOST=0.0.0.0` without an explicit host allowlist and auth plan.
+## Container
+
+Build from the repository root so the image can include the shared engine and deck corpus:
+
+```bash
+docker build -f mcp/Dockerfile -t generative-arcana-mcp .
+```
+
+Run with an explicit public host allowlist:
+
+```bash
+docker run --rm -p 3000:3000 \
+  -e MCP_ALLOWED_HOSTS=localhost \
+  generative-arcana-mcp
+```
+
+The image binds `0.0.0.0:3000` for container platforms but intentionally **fails to start** unless `MCP_ALLOWED_HOSTS` is supplied. Configure `MCP_ALLOWED_ORIGINS` separately when browser-origin requests are expected.
+
+The HTTP transport is intentionally unauthenticated at this stage. A public deployment should add authentication in front of `/mcp`; do not expose it merely by setting a permissive host allowlist.
 
 ## Tools
 
