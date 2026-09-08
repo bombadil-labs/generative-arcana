@@ -23,11 +23,7 @@ export interface ArcanaRequestAccess {
   principal: ArcanaPrincipal | null;
 }
 
-/**
- * Resolve one request onto either the anonymous stateless host or a principal-scoped persistent host.
- * Authentication policy stays outside Arcana; this function only translates an already-resolved
- * principal into the correct host/state lifetime.
- */
+/** Resolve one request onto either the anonymous stateless host or a principal-scoped persistent host. */
 export async function resolveArcanaRequestAccess(
   request: PrincipalRequest,
   anonymousAdapter: ArcanaToolAdapter,
@@ -37,7 +33,7 @@ export async function resolveArcanaRequestAccess(
   const principal = resolver ? await resolver.resolve(request) : null;
   if (!principal) return { adapter: anonymousAdapter, includeStatefulTools: false, principal: null };
   const id = requirePrincipalId(principal.id);
-  return { adapter: hosts.get(id), includeStatefulTools: true, principal: { id } };
+  return { adapter: await hosts.get(id), includeStatefulTools: true, principal: { id } };
 }
 
 function requirePrincipalId(value: string): string {

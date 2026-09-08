@@ -2,12 +2,13 @@ import { DeckRegistry } from "../../app/src/decks/registry";
 import { registerBundledDecks } from "../../app/src/decks/bundled";
 import { ArcanaEngine } from "../../app/src/engine/ArcanaEngine";
 import { ArcanaToolAdapter } from "../../app/src/mcp/ArcanaToolAdapter";
+import { PersistingArcanaToolAdapter, restoreArcanaHostState, type ArcanaHostStateRepository } from "./hostState";
 
 export type ArcanaHostFactory = () => ArcanaToolAdapter;
 
 export interface ArcanaHostStore {
-  get(scopeId: string): ArcanaToolAdapter;
-  delete(scopeId: string): boolean;
+  get(scopeId: string): ArcanaToolAdapter | Promise<ArcanaToolAdapter>;
+  delete(scopeId: string): boolean | Promise<boolean>;
 }
 
 /** New isolated host containing the shipped symbolic corpus. */
@@ -17,14 +18,7 @@ export function createBundledArcanaAdapter(): ArcanaToolAdapter {
   return new ArcanaToolAdapter(new ArcanaEngine(registry));
 }
 
-/**
- * Process-lifetime host store keyed by an authenticated/session scope supplied by the caller.
- *
- * This deliberately does not define authentication or durable persistence. Its contract is narrower:
- * one stable scope gets one isolated Arcana host; different scopes never share imported deck state.
- * A future OAuth/session layer can resolve a principal and then delegate to this interface, while a
- * durable implementation can replace this in-memory store without changing ArcanaEngine semantics.
- */
+/** Process-lifetime host store keyed by an authenticated/session scope supplied by the caller. */
 export class InMemoryArcanaHostStore implements ArcanaHostStore {
   private readonly hosts = new Map<string, ArcanaToolAdapter>();
 
@@ -49,6 +43,56 @@ export class InMemoryArcanaHostStore implements ArcanaHostStore {
 
   get size(): number {
     return this.hosts.size;
+  }
+}
+
+/**
+ * Durable principal-scoped host store.
+ *
+ * Hosts are cached in-process, but their custom deck manifests are restored from an external
+ * repository when first accessed and persisted after successful `import_deck` calls.
+ */
+export class PersistentArcanaHostStore implements ArcanaHostStore {
+  private readonly hosts = new Map<string, Promise<ArcanaToolAdapter>>();
+
+  constructor(
+    private readonly repository: ArcanaHostStateRepository,
+    private readonly createHost: ArcanaHostFactory = createBundledArcanaAdapter,
+  ) {}
+
+  get(scopeId: string): Promise<ArcanaToolAdapter> {
+    const key = requireScopeId(scopeId);
+    const existing = this.hosts.get(key);
+    if (existing) return existing;
+
+    const loading = this.loadHost(key).catch((error) => {
+      this.hosts.delete(key);
+      throw error;
+    });
+    this.hosts.set(key, loading);
+    return loading;
+  }
+
+  async delete(scopeId: string): Promise<boolean> {
+    const key = requireScopeId(scopeId);
+    const hadCached = this.hosts.delete(key);
+    const hadPersisted = await this.repository.delete(key);
+    return hadCached || hadPersisted;
+  }
+
+  clearCache(): void {
+    this.hosts.clear();
+  }
+
+  get size(): number {
+    return this.hosts.size;
+  }
+
+  private async loadHost(scopeId: string): Promise<ArcanaToolAdapter> {
+    const adapter = this.createHost();
+    const persisted = await this.repository.load(scopeId);
+    if (persisted !== null) restoreArcanaHostState(adapter, persisted);
+    return new PersistingArcanaToolAdapter(adapter, scopeId, this.repository);
   }
 }
 
