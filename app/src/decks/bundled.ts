@@ -62,7 +62,7 @@ export const BUNDLED_DECK_MANIFESTS = {
       },
     ],
   },
-} as const;
+};
 
 export type BundledDeckId = keyof typeof BUNDLED_DECK_MANIFESTS;
 
