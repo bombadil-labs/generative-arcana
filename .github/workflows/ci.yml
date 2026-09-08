@@ -9,10 +9,20 @@ permissions:
   contents: read
 
 jobs:
-  validate:
-    name: App + domain suite
+  app:
+    name: App ${{ matrix.check }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - check: tests
+            command: npm test
+          - check: typecheck
+            command: npm run typecheck
+          - check: build
+            command: npm run build
     defaults:
       run:
         working-directory: app
@@ -24,9 +34,7 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
       - run: npm ci
-      - run: npm test
-      - run: npm run typecheck
-      - run: npm run build
+      - run: ${{ matrix.command }}
 
   mcp:
     name: MCP typecheck + container
