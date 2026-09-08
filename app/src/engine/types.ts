@@ -8,6 +8,23 @@ export interface DialecticCoordinate {
   pole: string;
 }
 
+export interface DialecticQuery {
+  pole: string;
+  /** Optional axis name; omit to match the pole on either dialectic axis. */
+  axis?: string;
+}
+
+/** Exact structural filters over the factorized card space. */
+export interface CardQuery {
+  arcana?: CardData["arcana"];
+  suit?: string;
+  rank?: string;
+  station?: string;
+  omega?: number;
+  factorizationCharacter?: NonNullable<CardData["factorization"]>["character"];
+  dialectic?: DialecticQuery;
+}
+
 export interface CardAnalysis {
   deckId: string;
   card: CardData;
