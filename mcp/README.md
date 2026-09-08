@@ -100,6 +100,59 @@ docker run --rm -p 3000:3000 \
 
 The image binds `0.0.0.0:3000` for container platforms but intentionally **fails to start** unless `MCP_ALLOWED_HOSTS` is supplied. Configure `MCP_ALLOWED_ORIGINS` separately when browser-origin requests are expected.
 
+## Remote alpha on Vercel
+
+Vercel is the preferred private-alpha target. The repository root is a Vercel project with:
+
+- `/mcp` → `api/mcp.ts` (Web-standard Streamable HTTP MCP handler)
+- `/healthz` → `api/healthz.ts`
+- Neon-backed `ArcanaHostStateRepository` for authenticated custom-deck persistence
+- anonymous requests remaining stateless and read/cast/query-only
+
+The Vercel Function does **not** rely on process memory for authenticated state. Each authenticated request reconstructs that principal's Arcana host from Neon; successful `import_deck` calls persist the versioned custom-deck snapshot back to Postgres.
+
+### Vercel setup
+
+1. Import `bombadil-labs/generative-arcana` into Vercel with the repository root as the project root.
+2. Add the Neon integration from the Vercel Marketplace. Vercel/Neon will provide `DATABASE_URL`.
+3. Add environment variables:
+
+```text
+MCP_ALPHA_TOKEN=<long random secret>
+MCP_ALPHA_PRINCIPAL_ID=alpha-user-v1   # optional
+DATABASE_URL=<provided by Neon>
+```
+
+4. Deploy.
+
+The resulting endpoints are:
+
+```text
+https://YOUR_PROJECT.vercel.app/mcp
+https://YOUR_PROJECT.vercel.app/healthz
+```
+
+`/healthz` reports `runtime: "vercel-functions"` and whether auth/state are configured. If `MCP_ALPHA_TOKEN` is present without `DATABASE_URL`, authenticated requests fail with 503 rather than pretending ephemeral Function memory is durable.
+
+Anonymous MCP clients receive the nine stateless tools. A valid `Authorization: Bearer <MCP_ALPHA_TOKEN>` request receives the principal-scoped stateful surface including `import_deck`. Invalid credentials fail closed with 401.
+
+The Neon adapter lazily creates one table:
+
+```sql
+arcana_host_state(scope_id text primary key, state jsonb, updated_at timestamptz)
+```
+
+The stored JSON remains the same versioned `ArcanaHostState` envelope used by the filesystem alpha repository; bundled decks and runtime/session objects are never persisted.
+
+For local verification of the Vercel function graph:
+
+```bash
+npm install
+npm run typecheck:vercel
+```
+
+Vercel Functions are per-request/serverless, so production request-rate policy should eventually move to Vercel Firewall or another shared limiter rather than relying on the standalone Node server's in-process limiter.
+
 ## Remote alpha on Fly.io
 
 The repository includes `mcp/fly.toml.example` for a small private-alpha deployment. It uses the existing Dockerfile, HTTPS, auto-start/auto-stop Machines, a persistent volume, and `/healthz` service checks.
