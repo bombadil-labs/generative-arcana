@@ -1,19 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { getDeck } from "@/decks";
-import { spreadsForDeck } from "@/decks/spreads";
 import { CardFrame } from "@/components/CardFrame";
 import { CardModal } from "@/components/CardModal";
-import { deal } from "@/reading/deal";
-import { encodeReading, decodeReading, resolveReading, MAX_QUESTION_LENGTH } from "@/reading/encode";
-import { buildPrompt } from "@/reading/prompt";
-import type { ReadingResolution } from "@/reading/types";
+import { MAX_QUESTION_LENGTH } from "@/reading/encode";
+import { arcanaEngine } from "@/engine";
+import type { ArcanaReading } from "@/engine";
 import type { DeckModule } from "@/decks/types";
 import { navigate } from "./router";
 import { getPackId } from "./packPref";
 import { listPacks } from "@/runtime/defineCard";
 
 export function Reading({ deckId, token }: { deckId: string; token?: string }) {
-  const deck = getDeck(deckId);
+  const deck = arcanaEngine.getDeck(deckId);
   if (!deck) {
     return (
       <div style={{ padding: "var(--s-5)" }}>
@@ -30,7 +27,7 @@ export function Reading({ deckId, token }: { deckId: string; token?: string }) {
 }
 
 function ReadingComposer({ deck }: { deck: DeckModule }) {
-  const spreads = useMemo(() => spreadsForDeck(deck.spreads), [deck]);
+  const spreads = useMemo(() => arcanaEngine.listSpreads(deck.id), [deck]);
   const [question, setQuestion] = useState("");
   const [casting, setCasting] = useState(false);
   const [castError, setCastError] = useState<string | null>(null);
@@ -42,9 +39,8 @@ function ReadingComposer({ deck }: { deck: DeckModule }) {
     setCasting(true);
     setCastError(null);
     try {
-      const dealt = deal(spread, deck.cards.map((card) => card.slug));
-      const tk = await encodeReading(deck, spread, question.trim(), dealt);
-      navigate(`/deck/${deck.id}/r/${tk}`);
+      const reading = await arcanaEngine.castReading(deck.id, spread, question.trim());
+      navigate(`/deck/${deck.id}/r/${reading.token}`);
     } catch (error) {
       setCastError(error instanceof Error ? error.message : "Unable to create the reading link.");
     } finally {
@@ -114,33 +110,34 @@ function ReadingComposer({ deck }: { deck: DeckModule }) {
 }
 
 function ReadingResult({ deck, token }: { deck: DeckModule; token: string }) {
-  const decoded = useMemo(() => decodeReading(token), [token]);
   const [copied, setCopied] = useState<string | null>(null);
-  const [resolution, setResolution] = useState<{ token: string; deck: DeckModule; result: ReadingResolution } | null>(null);
+  const [resolution, setResolution] = useState<{ token: string; deck: DeckModule; reading?: ArcanaReading; error?: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    if (decoded) {
-      resolveReading(decoded, deck).then((result) => {
-        if (!cancelled) setResolution({ token, deck, result });
-      }).catch(() => {
-        if (!cancelled) setResolution({ token, deck, result: { ok: false, error: "Unable to verify this deck's revision. Reopen the app over HTTPS or localhost." } });
+    arcanaEngine.resolveReading(token, deck.id).then((reading) => {
+      if (!cancelled) setResolution({ token, deck, reading });
+    }).catch((error) => {
+      if (!cancelled) setResolution({
+        token,
+        deck,
+        error: error instanceof Error ? error.message : "Unable to verify this reading.",
       });
-    }
+    });
     return () => { cancelled = true; };
-  }, [decoded, deck, token]);
+  }, [deck, token]);
   // modal walks the dealt order, so prev/next moves through the spread itself.
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   useEffect(() => { setCopied(null); setOpenIndex(null); }, [token]);
 
-  if (!decoded) return <p style={errorText}>This reading link is malformed.</p>;
   if (!resolution || resolution.token !== token || resolution.deck !== deck) return <p role="status" style={lede}>Verifying reading…</p>;
-  if (!resolution.result.ok) return <p role="alert" style={errorText}>{resolution.result.error}</p>;
-  const { spread, dealt, legacy } = resolution.result;
-  const cardsBySlug = new Map(deck.cards.map((card) => [card.slug, card]));
-  const seqCards = dealt.map((dc) => cardsBySlug.get(dc.slug)!); // resolution guarantees every identity exists
-  const prompt = buildPrompt(deck, spread, dealt, decoded.q);
+  if (resolution.error) return <p role="alert" style={errorText}>{resolution.error}</p>;
+  if (!resolution.reading) return <p role="alert" style={errorText}>Unable to resolve this reading.</p>;
+  const reading = resolution.reading;
+  const { spread, placements, legacy, question } = reading;
+  const seqCards = placements.map((placement) => placement.card);
+  const prompt = arcanaEngine.buildInterpretationContext(reading);
   const packs = listPacks(deck.id);
   const prefer = (packs.find((p) => p.id === getPackId(deck.id, packs[0]?.id ?? "")) ?? packs[0])?.id;
 
@@ -153,7 +150,7 @@ function ReadingResult({ deck, token }: { deck: DeckModule; token: string }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "var(--s-2)" }}>
         <div>
           <div style={kicker}>{spread.name} · {deck.name}</div>
-          {decoded.q && <p style={{ margin: "var(--s-1) 0 0", color: "var(--ink)", font: "400 22px/1.3 var(--font-display)" }}>“{decoded.q}”</p>}
+          {question && <p style={{ margin: "var(--s-1) 0 0", color: "var(--ink)", font: "400 22px/1.3 var(--font-display)" }}>“{question}”</p>}
         </div>
         <button onClick={() => navigate(`/deck/${deck.id}/read`)} style={secondaryBtn}>↺ New reading</button>
       </div>
@@ -162,21 +159,18 @@ function ReadingResult({ deck, token }: { deck: DeckModule; token: string }) {
       {deck.custom && <p style={lede}>To open this reading elsewhere, import the same deck JSON first. The link identifies the deck but does not contain its contents.</p>}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: "var(--s-4)", marginTop: "var(--s-4)" }}>
-        {dealt.map((dc, i) => {
-          const card = cardsBySlug.get(dc.slug);
-          const pos = spread.positions[i];
-          if (!card || !pos) return null;
-          const meaning = dc.reversed ? card.meaning.inverted : card.meaning.upright;
+        {placements.map((placement, i) => {
+          const { card, position: pos, reversed, meaning } = placement;
           return (
             <div key={i}>
               <div style={positionLabel}>{i + 1}. {pos.name}</div>
               <div style={{ color: "var(--ink-2)", font: "italic 400 11.5px/1.35 var(--font-body)", margin: "var(--s-1) 0 var(--s-2)" }}>{pos.prompt}</div>
-              <div style={{ transform: dc.reversed ? "rotate(180deg)" : "none" }}>
+              <div style={{ transform: reversed ? "rotate(180deg)" : "none" }}>
                 <CardFrame card={card} deckId={deck.id} prefer={prefer} deck={deck.data} showBanner={false} mode="poster" onOpen={() => setOpenIndex(i)} />
               </div>
               <div style={{ marginTop: "var(--s-2)", font: "400 16px/1.25 var(--font-display)", color: "var(--ink)" }}>
                 {card.name}{" "}
-                {dc.reversed && <span style={reversedTag}>· Reversed</span>}
+                {reversed && <span style={reversedTag}>· Reversed</span>}
               </div>
               {card.factorization?.gloss && <div style={{ marginTop: "var(--s-1)", color: "var(--ink-3)", font: "400 11px/1.4 var(--font-mono)" }}>Number — {card.factorization.gloss}</div>}
               <p style={{ margin: "var(--s-1) 0 0", color: "var(--ink)", font: "400 12.5px/1.45 var(--font-body)" }}>{meaning}</p>
