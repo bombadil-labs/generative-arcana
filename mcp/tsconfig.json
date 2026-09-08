@@ -10,5 +10,25 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["src/**/*.ts", "../app/src/engine/**/*.ts", "../app/src/mcp/**/*.ts", "../app/src/decks/**/*.ts", "../app/src/reading/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "../app/src/decks/card.ts",
+    "../app/src/decks/cardMeta.ts",
+    "../app/src/decks/jsonSnapshot.ts",
+    "../app/src/decks/types.ts",
+    "../app/src/decks/spreads.ts",
+    "../app/src/decks/registry.ts",
+    "../app/src/decks/custom.ts",
+    "../app/src/decks/validate.ts",
+    "../app/src/decks/bundled.ts",
+    "../app/src/reading/types.ts",
+    "../app/src/reading/deal.ts",
+    "../app/src/reading/encode.ts",
+    "../app/src/reading/prompt.ts",
+    "../app/src/engine/types.ts",
+    "../app/src/engine/ArcanaEngine.ts",
+    "../app/src/engine/index.ts",
+    "../app/src/mcp/ArcanaToolAdapter.ts",
+    "../app/src/mcp/index.ts"
+  ]
 }
