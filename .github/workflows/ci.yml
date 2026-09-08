@@ -1,4 +1,4 @@
-name: Validate app
+name: Validate app and MCP
 
 on:
   pull_request:
@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   validate:
+    name: App + domain suite
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -26,3 +27,16 @@ jobs:
       - run: npm test
       - run: npm run typecheck
       - run: npm run build
+
+  mcp:
+    name: MCP typecheck + container
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --prefix mcp
+      - run: npm run typecheck --prefix mcp
+      - run: docker build -f mcp/Dockerfile -t generative-arcana-mcp:test .
