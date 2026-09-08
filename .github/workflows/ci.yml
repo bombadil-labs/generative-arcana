@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   app:
@@ -36,27 +35,7 @@ jobs:
           cache-dependency-path: app/package-lock.json
       - run: npm ci
       - name: Run validation
-        id: validation
-        shell: bash
-        run: |
-          set +e
-          ${{ matrix.command }} 2>&1 | tee /tmp/validation.log
-          code=${PIPESTATUS[0]}
-          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
-          exit "$code"
-      - name: Post typecheck diagnostics
-        if: failure() && matrix.check == 'typecheck' && github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          {
-            echo '### Strict TypeScript diagnostics'
-            echo '```text'
-            tail -c 12000 /tmp/validation.log
-            echo '```'
-          } > /tmp/comment.md
-          gh pr comment "$PR_NUMBER" --body-file /tmp/comment.md
+        run: ${{ matrix.command }}
 
   mcp:
     name: MCP typecheck + container
