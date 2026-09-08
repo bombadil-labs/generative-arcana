@@ -83,3 +83,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build -f mcp/Dockerfile -t generative-arcana-mcp:test .
+
+  vercel:
+    name: Vercel function typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm run typecheck:vercel
