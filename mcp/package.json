@@ -8,7 +8,9 @@
     "dev": "tsx src/stdio.ts",
     "start": "tsx src/stdio.ts",
     "http": "tsx src/http.ts",
-    "smoke": "tsx test/smoke.ts",
+    "smoke": "npm run smoke:stdio && npm run smoke:http",
+    "smoke:stdio": "tsx test/smoke.ts",
+    "smoke:http": "tsx test/http-smoke.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
