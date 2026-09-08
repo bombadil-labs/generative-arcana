@@ -106,9 +106,12 @@ export class ArcanaEngine {
     return this.hydrateReading(token, deck, spread, question, cards, false);
   }
 
-  async resolveReading(token: string): Promise<ArcanaReading> {
+  async resolveReading(token: string, expectedDeckId?: string): Promise<ArcanaReading> {
     const decoded = decodeReading(token);
     if (!decoded) throw new Error("This reading token is malformed.");
+    if (expectedDeckId !== undefined && decoded.d !== expectedDeckId) {
+      throw new Error("This reading belongs to a different deck than the route.");
+    }
     const deck = this.decks.getDeck(decoded.d);
     if (!deck) throw new Error(`This reading references an unknown deck: ${decoded.d}.`);
     const resolution = await resolveReadingTokenData(decoded, deck);
