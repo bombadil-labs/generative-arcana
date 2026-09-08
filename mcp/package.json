@@ -11,6 +11,7 @@
     "smoke": "npm run smoke:stdio && npm run smoke:http",
     "smoke:stdio": "tsx test/smoke.ts",
     "smoke:http": "tsx test/http-smoke.ts",
+    "test:host-store": "tsx test/host-store.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
