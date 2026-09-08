@@ -1,7 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 import type { ArcanaHostState, ArcanaHostStateRepository } from "./hostState";
 
-type NeonSql = ReturnType<typeof neon>;
+type NeonSql = (strings: TemplateStringsArray, ...params: unknown[]) => Promise<Array<Record<string, unknown>>>;
 
 export class NeonArcanaHostStateRepository implements ArcanaHostStateRepository {
   private readonly sql: NeonSql;
@@ -9,7 +9,7 @@ export class NeonArcanaHostStateRepository implements ArcanaHostStateRepository 
 
   constructor(connectionString: string, sql?: NeonSql) {
     if (!connectionString.trim()) throw new Error("DATABASE_URL must be non-empty.");
-    this.sql = sql ?? neon(connectionString);
+    this.sql = sql ?? (neon(connectionString) as unknown as NeonSql);
   }
 
   async load(scopeId: string): Promise<unknown | null> {
