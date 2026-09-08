@@ -14,6 +14,6 @@
     "typescript": "^5.9.0"
   },
   "scripts": {
-    "typecheck:vercel": "tsc -p tsconfig.vercel.json --noEmit"
+    "typecheck:vercel": "tsc -p tsconfig.json --noEmit"
   }
 }
