@@ -47,8 +47,10 @@ jobs:
         include:
           - check: typecheck
             command: npm run typecheck --prefix mcp
-          - check: protocol smoke
-            command: npm run smoke --prefix mcp
+          - check: stdio protocol
+            command: npm run smoke:stdio --prefix mcp
+          - check: HTTP protocol
+            command: npm run smoke:http --prefix mcp
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
