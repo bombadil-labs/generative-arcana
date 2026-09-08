@@ -7,5 +7,12 @@
     "@modelcontextprotocol/server": "^2.0.0",
     "@neondatabase/serverless": "^1.0.0",
     "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  },
+  "scripts": {
+    "typecheck:vercel": "tsc -p tsconfig.vercel.json --noEmit"
   }
 }

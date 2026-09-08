@@ -1,11 +1,13 @@
-import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
+import { neon } from "@neondatabase/serverless";
 import type { ArcanaHostState, ArcanaHostStateRepository } from "./hostState";
 
+type NeonSql = ReturnType<typeof neon>;
+
 export class NeonArcanaHostStateRepository implements ArcanaHostStateRepository {
-  private readonly sql: NeonQueryFunction<false, false>;
+  private readonly sql: NeonSql;
   private ready?: Promise<void>;
 
-  constructor(connectionString: string, sql?: NeonQueryFunction<false, false>) {
+  constructor(connectionString: string, sql?: NeonSql) {
     if (!connectionString.trim()) throw new Error("DATABASE_URL must be non-empty.");
     this.sql = sql ?? neon(connectionString);
   }

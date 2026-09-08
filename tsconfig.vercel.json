@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": [
+    "api/**/*.ts",
+    "mcp/src/**/*.ts",
+    "app/src/decks/**/*.ts",
+    "app/src/reading/**/*.ts",
+    "app/src/engine/**/*.ts",
+    "app/src/mcp/**/*.ts"
+  ]
+}
