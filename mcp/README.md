@@ -34,21 +34,29 @@ Environment:
 - `HOST` — default `127.0.0.1`
 - `MCP_ALLOWED_HOSTS` — comma-separated hostnames, required when binding non-loopback
 - `MCP_ALLOWED_ORIGINS` — comma-separated origin hostnames; defaults to the host allowlist
+- `MCP_ALPHA_TOKEN` — optional private-alpha bearer token; when absent HTTP remains anonymous/stateless
+- `MCP_ALPHA_PRINCIPAL_ID` — stable opaque scope id for the alpha token, default `alpha-user-v1`
+- `MCP_STATE_DIR` — optional durable filesystem root for authenticated custom deck state
 
-The HTTP entry is stateless at the MCP-server layer. It shares the immutable bundled Arcana corpus across requests but intentionally omits `import_deck`, because a custom import cannot honestly persist to the next request without a caller/session persistence model.
+Anonymous HTTP exposes only the nine stateless/read-oriented tools. When `MCP_ALPHA_TOKEN` is configured, requests with `Authorization: Bearer <token>` resolve to one isolated principal host and expose `import_deck`. A supplied invalid credential fails closed with HTTP 401 rather than downgrading to anonymous.
+
+If `MCP_STATE_DIR` is also configured, authenticated custom deck manifests are restored across process restarts. The persisted format contains only versioned custom deck manifests; bundled decks and engine/session objects are reconstructed from code on every process start. Files are written atomically and principal ids are hashed before filesystem use.
+
+The static bearer resolver is deliberately an **alpha/testing adapter**, not the final account system. The provider-neutral `PrincipalResolver` and `ArcanaHostStateRepository` boundaries are intended to accept OAuth and database adapters later without changing Arcana semantics.
 
 ## Protocol smoke tests
 
-Both supported transports are exercised with the official MCP v2 client:
+Supported paths are exercised with the official MCP v2 client:
 
 ```bash
 npm --prefix mcp run smoke:stdio
 npm --prefix mcp run smoke:http
-# or both
+npm --prefix mcp run smoke:http-auth
+# or all three
 npm --prefix mcp run smoke
 ```
 
-CI keeps stdio and Streamable HTTP as separate checks so transport regressions are immediately attributable.
+The authenticated HTTP smoke launches the real server with a temporary durable state directory, connects anonymously and authenticated, imports a custom deck, kills/restarts the server, reconnects, and proves that the deck survives only in the authenticated principal's host.
 
 ## Container
 
@@ -58,7 +66,7 @@ Build from the repository root so the image can include the shared engine and de
 docker build -f mcp/Dockerfile -t generative-arcana-mcp .
 ```
 
-Run with an explicit public host allowlist:
+Anonymous run:
 
 ```bash
 docker run --rm -p 3000:3000 \
@@ -66,11 +74,23 @@ docker run --rm -p 3000:3000 \
   generative-arcana-mcp
 ```
 
+Private alpha with durable custom decks:
+
+```bash
+mkdir -p .arcana-state
+docker run --rm -p 3000:3000 \
+  -e MCP_ALLOWED_HOSTS=localhost \
+  -e MCP_ALPHA_TOKEN='replace-with-a-long-random-secret' \
+  -e MCP_STATE_DIR=/data/arcana \
+  -v "$PWD/.arcana-state:/data" \
+  generative-arcana-mcp
+```
+
 The image binds `0.0.0.0:3000` for container platforms but intentionally **fails to start** unless `MCP_ALLOWED_HOSTS` is supplied. Configure `MCP_ALLOWED_ORIGINS` separately when browser-origin requests are expected.
 
 ## Remote alpha on Fly.io
 
-The repository includes `mcp/fly.toml.example` for a small stateless alpha deployment. It uses the existing Dockerfile, HTTPS, auto-start/auto-stop Machines, and `/healthz` service checks.
+The repository includes `mcp/fly.toml.example` for a small private-alpha deployment. It uses the existing Dockerfile, HTTPS, auto-start/auto-stop Machines, a persistent volume, and `/healthz` service checks.
 
 From the repository root:
 
@@ -78,28 +98,25 @@ From the repository root:
 cp mcp/fly.toml.example mcp/fly.toml
 # edit mcp/fly.toml and replace every YOUR_APP_NAME
 fly apps create YOUR_APP_NAME
+fly volumes create arcana_state --region iad --size 1
+fly secrets set MCP_ALPHA_TOKEN='replace-with-a-long-random-secret'
 fly deploy . --config mcp/fly.toml
 ```
 
-The resulting MCP endpoint is:
+Endpoints:
 
 ```text
 https://YOUR_APP_NAME.fly.dev/mcp
-```
-
-Check health independently at:
-
-```text
 https://YOUR_APP_NAME.fly.dev/healthz
 ```
 
-For the current alpha, the HTTP transport is deliberately unauthenticated and exposes only stateless/read-oriented Arcana tools. Do **not** publish the endpoint broadly or use it for private custom decks. Authentication plus account/session persistence is the next boundary required before remote `import_deck`, saved readings, or user history can be honest features.
+Anonymous MCP clients can use the nine stateless tools. Clients capable of sending the configured bearer credential receive the principal-scoped stateful surface as well. Do not treat the static bearer adapter as a public multi-user auth system; it exists to make private dogfooding and restart-persistence testing honest before OAuth lands.
 
-When adding this alpha to an MCP host, configure the remote `/mcp` endpoint and choose no authentication for this deployment. If a host sends an `Origin` header that is rejected, add that origin explicitly via `MCP_ALLOWED_ORIGINS` rather than weakening Host validation.
+If a host sends an `Origin` header that is rejected, add that origin explicitly via `MCP_ALLOWED_ORIGINS` rather than weakening Host validation.
 
 ## Tools
 
-Available over both transports:
+Available anonymously over HTTP and over stdio:
 
 - `list_decks`
 - `get_deck`
@@ -111,8 +128,8 @@ Available over both transports:
 - `resolve_reading`
 - `interpretation_context`
 
-Additionally available over persistent stdio:
+Additionally available over stdio and authenticated HTTP:
 
 - `import_deck`
 
-Both transports wrap the same `createArcanaMcpServer()` factory and therefore cannot drift into separate symbolic semantics.
+All transports delegate to the same `ArcanaEngine` and `ArcanaToolAdapter`; auth and persistence select host state but do not redefine symbolic behavior.

@@ -2,22 +2,38 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { createMcpHandler } from "@modelcontextprotocol/server";
 import { hostHeaderValidation, originValidation, toNodeHandler } from "@modelcontextprotocol/node";
 import { createArcanaMcpServer } from "./server";
-import { createBundledArcanaAdapter, InMemoryArcanaHostStore } from "./hostStore";
+import { StaticBearerPrincipalResolver } from "./alphaAuth";
+import { FileArcanaHostStateRepository } from "./fileHostStateRepository";
+import {
+  createBundledArcanaAdapter,
+  InMemoryArcanaHostStore,
+  PersistentArcanaHostStore,
+  type ArcanaHostStore,
+} from "./hostStore";
 import { resolveArcanaRequestAccess, type PrincipalRequest, type PrincipalResolver } from "./principal";
 
 const port = envPort(process.env.PORT, 3000);
 const host = process.env.HOST?.trim() || "127.0.0.1";
 const allowedHosts = csv(process.env.MCP_ALLOWED_HOSTS) ?? loopbackAllowlist(host);
 const allowedOrigins = csv(process.env.MCP_ALLOWED_ORIGINS) ?? allowedHosts;
+const alphaToken = optionalEnv(process.env.MCP_ALPHA_TOKEN);
+const alphaPrincipalId = optionalEnv(process.env.MCP_ALPHA_PRINCIPAL_ID) ?? "alpha-user-v1";
+const stateDir = optionalEnv(process.env.MCP_STATE_DIR);
 
 if (!allowedHosts.length) {
   throw new Error("Public MCP HTTP binding requires MCP_ALLOWED_HOSTS (comma-separated hostnames).");
 }
 
-// Anonymous HTTP remains the proven stateless/read-oriented surface. A future auth integration can
-// provide a PrincipalResolver and scoped host store to createArcanaHttpRequestHandler without changing
-// tool semantics. The executable alpha intentionally supplies no resolver yet.
-const requestHandler = createArcanaHttpRequestHandler();
+const principalResolver = alphaToken ? new StaticBearerPrincipalResolver(alphaToken, alphaPrincipalId) : undefined;
+const hosts: ArcanaHostStore = stateDir
+  ? new PersistentArcanaHostStore(new FileArcanaHostStateRepository(stateDir))
+  : new InMemoryArcanaHostStore();
+
+if (alphaToken && !stateDir) {
+  console.error("[generative-arcana-mcp] MCP_ALPHA_TOKEN enabled without MCP_STATE_DIR; authenticated imports are process-lifetime only");
+}
+
+const requestHandler = createArcanaHttpRequestHandler({ principalResolver, hosts });
 const validateHost = hostHeaderValidation(allowedHosts);
 const validateOrigin = originValidation(allowedOrigins);
 
@@ -26,7 +42,12 @@ const http = createServer((req, res) => {
 
   if (url.pathname === "/healthz") {
     res.writeHead(200, { "content-type": "application/json" });
-    res.end(JSON.stringify({ ok: true, service: "generative-arcana-mcp" }));
+    res.end(JSON.stringify({
+      ok: true,
+      service: "generative-arcana-mcp",
+      auth: principalResolver ? "alpha-bearer" : "anonymous",
+      state: stateDir ? "durable" : "memory",
+    }));
     return;
   }
 
@@ -54,17 +75,10 @@ process.once("SIGTERM", () => void shutdown("SIGTERM"));
 
 export interface ArcanaHttpRequestHandlerOptions {
   principalResolver?: PrincipalResolver;
-  hosts?: InMemoryArcanaHostStore;
+  hosts?: ArcanaHostStore;
 }
 
-/**
- * Node request handler whose state policy is selected per request.
- *
- * Anonymous requests get a shared immutable bundled adapter with stateful tools omitted. Authenticated
- * principals get a stable isolated host and therefore may use stateful tools such as `import_deck`.
- * Each MCP protocol handler still creates fresh McpServer objects per request, as required by the v2
- * stateless HTTP model; persistent state lives only in the Arcana host selected underneath it.
- */
+/** Node request handler whose state policy is selected per request. */
 export function createArcanaHttpRequestHandler(options: ArcanaHttpRequestHandlerOptions = {}) {
   const anonymousAdapter = createBundledArcanaAdapter();
   const hosts = options.hosts ?? new InMemoryArcanaHostStore();
@@ -112,6 +126,11 @@ function toPrincipalRequest(req: IncomingMessage): PrincipalRequest {
 function csv(value: string | undefined): string[] | undefined {
   if (value === undefined) return undefined;
   return value.split(",").map((part) => part.trim()).filter(Boolean);
+}
+
+function optionalEnv(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
 }
 
 function loopbackAllowlist(bindHost: string): string[] {
