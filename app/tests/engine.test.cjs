@@ -73,3 +73,9 @@ test("reading tokens cannot resolve against a host that lacks their deck", async
   const empty = new ArcanaEngine(new DeckRegistry());
   await assert.rejects(empty.resolveReading(reading.token), /unknown deck/i);
 });
+
+test("routed resolution rejects a token for a different expected deck", async () => {
+  const { engine, deck } = engineWithDeck();
+  const reading = await engine.castReading(deck.id, "single", "", { reversalRate: 0 });
+  await assert.rejects(engine.resolveReading(reading.token, "different-deck"), /different deck than the route/i);
+});
