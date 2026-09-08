@@ -1,9 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
-import { DeckRegistry } from "../../app/src/decks/registry";
-import { registerBundledDecks } from "../../app/src/decks/bundled";
-import { ArcanaEngine } from "../../app/src/engine/ArcanaEngine";
 import { ArcanaToolAdapter, type ArcanaToolName } from "../../app/src/mcp/ArcanaToolAdapter";
+import { createBundledArcanaAdapter } from "./hostStore";
+
+export { createBundledArcanaAdapter } from "./hostStore";
 
 const spreadPosition = z.object({ name: z.string(), prompt: z.string() });
 const spread = z.object({
@@ -55,13 +55,6 @@ export interface ArcanaMcpServerOptions {
   adapter?: ArcanaToolAdapter;
   /** Stateless transports must disable tools whose semantics require persistence across calls. */
   includeStatefulTools?: boolean;
-}
-
-/** New isolated host containing the shipped symbolic corpus. */
-export function createBundledArcanaAdapter(): ArcanaToolAdapter {
-  const registry = new DeckRegistry();
-  registerBundledDecks(registry);
-  return new ArcanaToolAdapter(new ArcanaEngine(registry));
 }
 
 export function createArcanaMcpServer(options: ArcanaMcpServerOptions = {}): McpServer {
