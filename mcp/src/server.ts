@@ -50,20 +50,34 @@ const schemas: Record<ArcanaToolName, z.ZodTypeAny> = {
   }),
 };
 
-export function createArcanaMcpServer(): McpServer {
+export interface ArcanaMcpServerOptions {
+  /** Reuse an adapter when the transport provides an appropriate state lifetime. */
+  adapter?: ArcanaToolAdapter;
+  /** Stateless transports must disable tools whose semantics require persistence across calls. */
+  includeStatefulTools?: boolean;
+}
+
+/** New isolated host containing the shipped symbolic corpus. */
+export function createBundledArcanaAdapter(): ArcanaToolAdapter {
   const registry = new DeckRegistry();
   registerBundledDecks(registry);
-  const adapter = new ArcanaToolAdapter(new ArcanaEngine(registry));
+  return new ArcanaToolAdapter(new ArcanaEngine(registry));
+}
+
+export function createArcanaMcpServer(options: ArcanaMcpServerOptions = {}): McpServer {
+  const adapter = options.adapter ?? createBundledArcanaAdapter();
+  const includeStatefulTools = options.includeStatefulTools ?? true;
   const server = new McpServer({ name: "generative-arcana", version: "0.1.0" });
 
   for (const definition of adapter.definitions()) {
+    if (definition.name === "import_deck" && !includeStatefulTools) continue;
     server.registerTool(
       definition.name,
       {
         description: definition.description,
         inputSchema: schemas[definition.name],
         annotations: {
-          readOnlyHint: definition.readOnly,
+          readOnlyHint: definition.name === "cast_reading" ? true : definition.readOnly,
           destructiveHint: false,
           idempotentHint: definition.name !== "cast_reading",
           openWorldHint: false,
