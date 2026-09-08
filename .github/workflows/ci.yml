@@ -38,7 +38,7 @@ jobs:
         run: ${{ matrix.command }}
 
   mcp:
-    name: MCP typecheck + container
+    name: MCP typecheck + protocol + container
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -48,4 +48,5 @@ jobs:
           node-version: 22
       - run: npm install --prefix mcp
       - run: npm run typecheck --prefix mcp
+      - run: npm run smoke --prefix mcp
       - run: docker build -f mcp/Dockerfile -t generative-arcana-mcp:test .

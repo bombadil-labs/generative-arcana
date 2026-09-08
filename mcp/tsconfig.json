@@ -12,6 +12,7 @@
   },
   "include": [
     "src/**/*.ts",
+    "test/**/*.ts",
     "../app/src/decks/card.ts",
     "../app/src/decks/cardMeta.ts",
     "../app/src/decks/jsonSnapshot.ts",

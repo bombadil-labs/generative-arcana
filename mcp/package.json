@@ -8,6 +8,7 @@
     "dev": "tsx src/stdio.ts",
     "start": "tsx src/stdio.ts",
     "http": "tsx src/http.ts",
+    "smoke": "tsx test/smoke.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -17,6 +18,7 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "^2.0.0",
     "typescript": "^5.9.0",
     "@types/node": "^24.0.0"
   }
