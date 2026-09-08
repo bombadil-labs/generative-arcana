@@ -10,6 +10,7 @@
   "include": [
     "src/decks/card.ts",
     "src/decks/cardMeta.ts",
+    "src/decks/jsonSnapshot.ts",
     "src/decks/types.ts",
     "src/decks/spreads.ts",
     "src/decks/registry.ts",
@@ -18,6 +19,9 @@
     "src/reading/types.ts",
     "src/reading/deal.ts",
     "src/reading/encode.ts",
+    "src/reading/prompt.ts",
+    "src/engine/types.ts",
+    "src/engine/ArcanaEngine.ts",
     "src/runtime/defineCard.ts"
   ]
 }
