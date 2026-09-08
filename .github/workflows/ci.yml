@@ -55,12 +55,18 @@ jobs:
             command: npm run test:principal --prefix mcp
           - check: alpha auth
             command: npm run test:alpha-auth --prefix mcp
+          - check: hardening
+            command: npm run test:hardening --prefix mcp
+          - check: golden eval
+            command: npm run eval:golden --prefix mcp
           - check: stdio protocol
             command: npm run smoke:stdio --prefix mcp
           - check: HTTP protocol
             command: npm run smoke:http --prefix mcp
           - check: authenticated HTTP persistence
             command: npm run smoke:http-auth --prefix mcp
+          - check: HTTP guardrails
+            command: npm run smoke:http-guardrails --prefix mcp
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
