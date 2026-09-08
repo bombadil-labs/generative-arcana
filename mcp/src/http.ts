@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { createMcpHandler } from "@modelcontextprotocol/server";
 import { hostHeaderValidation, originValidation, toNodeHandler } from "@modelcontextprotocol/node";
-import { createArcanaMcpServer } from "./server";
+import { createArcanaMcpServer, createBundledArcanaAdapter } from "./server";
 
 const port = envPort(process.env.PORT, 3000);
 const host = process.env.HOST?.trim() || "127.0.0.1";
@@ -12,7 +12,11 @@ if (!allowedHosts.length) {
   throw new Error("Public MCP HTTP binding requires MCP_ALLOWED_HOSTS (comma-separated hostnames).");
 }
 
-const handler = createMcpHandler(() => createArcanaMcpServer());
+// Modern createMcpHandler builds a fresh McpServer per request. Share only the immutable bundled
+// Arcana host underneath it, and omit tools (currently import_deck) whose semantics require state to
+// persist between tool calls. Stateful custom-deck import remains available over stdio.
+const adapter = createBundledArcanaAdapter();
+const handler = createMcpHandler(() => createArcanaMcpServer({ adapter, includeStatefulTools: false }));
 const nodeHandler = toNodeHandler(handler);
 const validateHost = hostHeaderValidation(allowedHosts);
 const validateOrigin = originValidation(allowedOrigins);
