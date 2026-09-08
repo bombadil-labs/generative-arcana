@@ -1,4 +1,4 @@
-name: Validate app
+name: Validate app and MCP
 
 on:
   pull_request:
@@ -9,9 +9,20 @@ permissions:
   contents: read
 
 jobs:
-  validate:
+  app:
+    name: App ${{ matrix.check }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - check: tests
+            command: npm test
+          - check: typecheck
+            command: npm run typecheck
+          - check: build
+            command: npm run build
     defaults:
       run:
         working-directory: app
@@ -23,6 +34,18 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
       - run: npm ci
-      - run: npm test
-      - run: npm run typecheck
-      - run: npm run build
+      - name: Run validation
+        run: ${{ matrix.command }}
+
+  mcp:
+    name: MCP typecheck + container
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --prefix mcp
+      - run: npm run typecheck --prefix mcp
+      - run: docker build -f mcp/Dockerfile -t generative-arcana-mcp:test .
