@@ -2,6 +2,7 @@ import type { Spread } from "./spreads";
 import { normalizeDeckSpreads } from "./spreads";
 import type { DeckModule } from "./types";
 import { canonicalCards, validateDeck } from "./validate";
+import { immutableJsonSnapshot } from "./jsonSnapshot";
 
 /**
  * Untrusted registration input. The registry is the construction boundary: data is validated,
@@ -33,22 +34,32 @@ export class DeckRegistry {
   registerDeck(registration: DeckRegistration, options: RegisterDeckOptions = {}): DeckModule {
     const validation = validateDeck(registration.data);
     if (!validation.ok) throw new Error(validation.error);
-    const data = validation.data;
+
+    // Validation must remain true after this call. Detach from caller ownership and reject extension
+    // metadata that is not actually JSON before constructing any registered domain objects.
+    const data = immutableJsonSnapshot(validation.data, "deck");
 
     if (registration.tagline !== undefined && (typeof registration.tagline !== "string" || !registration.tagline.trim())) {
       throw new Error("tagline: must be a string with content.");
     }
 
-    const spreads = normalizeDeckSpreads(registration.spreads, data.slug);
-    const deck: DeckModule = {
+    const normalizedSpreads = normalizeDeckSpreads(registration.spreads, data.slug);
+    const spreads = normalizedSpreads === undefined
+      ? undefined
+      : immutableJsonSnapshot(normalizedSpreads, "spreads");
+    // Freeze the concrete array in place while keeping DeckModule's existing mutable-array type.
+    // A broader readonly API migration is separate from this runtime immutability guarantee.
+    const cards = canonicalCards(data);
+    Object.freeze(cards);
+    const deck: DeckModule = Object.freeze({
       id: data.slug,
       name: data.name,
       tagline: registration.tagline ?? (firstSentence(data.theme.description) || "A custom deck."),
       data,
-      cards: canonicalCards(data),
+      cards,
       ...(spreads ? { spreads } : {}),
       ...(registration.custom ? { custom: true } : {}),
-    };
+    });
 
     const existing = this.decks.get(deck.id);
     if (existing && deck.custom && !existing.custom) {
