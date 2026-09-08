@@ -8,7 +8,7 @@ import { deal } from "../reading/deal";
 import { decodeReading, encodeReading, resolveReading as resolveReadingTokenData } from "../reading/encode";
 import { buildPrompt } from "../reading/prompt";
 import type { ReadingCard } from "../reading/types";
-import type { ArcanaReading, CardAnalysis, CastReadingOptions, ImportDeckOptions, ReadingPlacement } from "./types";
+import type { ArcanaReading, CardAnalysis, CardQuery, CastReadingOptions, ImportDeckOptions, ReadingPlacement } from "./types";
 
 /**
  * Renderer- and transport-independent application service for Generative Arcana.
@@ -51,6 +51,33 @@ export class ArcanaEngine {
       throw new Error("Deck JSON could not be parsed.");
     }
     return this.importDeck(data, options);
+  }
+
+  queryCards(deckId: string, query: CardQuery = {}): readonly CardAnalysis[] {
+    if (query.omega !== undefined && (!Number.isSafeInteger(query.omega) || query.omega < 0)) {
+      throw new Error("Card query Ω must be a non-negative integer.");
+    }
+    const deck = this.requireDeck(deckId);
+    const results = deck.cards
+      .map((card) => this.analyzeCard(deckId, card.slug))
+      .filter((analysis) => {
+        if (query.arcana !== undefined && analysis.card.arcana !== query.arcana) return false;
+        if (query.suit !== undefined && analysis.card.suit_slug !== query.suit) return false;
+        if (query.rank !== undefined && analysis.card.rank_slug !== query.rank) return false;
+        if (query.station !== undefined && analysis.card.station_slug !== query.station) return false;
+        if (query.omega !== undefined && analysis.number.omega !== query.omega) return false;
+        if (query.factorizationCharacter !== undefined
+          && analysis.number.factorization?.character !== query.factorizationCharacter) return false;
+        if (query.dialectic !== undefined) {
+          const coordinates = analysis.axes.dialectic ?? [];
+          const matched = coordinates.some((coordinate) =>
+            coordinate.pole === query.dialectic?.pole
+            && (query.dialectic.axis === undefined || coordinate.axis === query.dialectic.axis));
+          if (!matched) return false;
+        }
+        return true;
+      });
+    return Object.freeze(results);
   }
 
   analyzeCard(deckId: string, cardSlug: string): CardAnalysis {

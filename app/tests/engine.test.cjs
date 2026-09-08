@@ -79,3 +79,37 @@ test("routed resolution rejects a token for a different expected deck", async ()
   const reading = await engine.castReading(deck.id, "single", "", { reversalRate: 0 });
   await assert.rejects(engine.resolveReading(reading.token, "different-deck"), /different deck than the route/i);
 });
+
+test("card queries address exact intersections in the symbolic space", () => {
+  const { engine, deck } = engineWithDeck();
+  const card = deck.cards.find((candidate) => candidate.arcana === "minor");
+  assert.ok(card, "fixture should contain a minor card");
+  const analysis = engine.analyzeCard(deck.id, card.slug);
+  const results = engine.queryCards(deck.id, {
+    arcana: "minor",
+    suit: card.suit_slug,
+    rank: card.rank_slug,
+    station: card.station_slug,
+  });
+  assert.ok(results.some((candidate) => candidate.card.slug === card.slug));
+  assert.ok(Object.isFrozen(results));
+
+  if (analysis.number.omega !== undefined) {
+    assert.ok(engine.queryCards(deck.id, { omega: analysis.number.omega }).some((candidate) => candidate.card.slug === card.slug));
+  }
+});
+
+test("dialectic queries follow authored pole coordinates when the deck defines them", () => {
+  const { engine, deck } = engineWithDeck();
+  const analysis = deck.cards.map((card) => engine.analyzeCard(deck.id, card.slug)).find((candidate) => candidate.axes.dialectic);
+  if (!analysis) return;
+  const coordinate = analysis.axes.dialectic[0];
+  const results = engine.queryCards(deck.id, { dialectic: { axis: coordinate.axis, pole: coordinate.pole } });
+  assert.ok(results.some((candidate) => candidate.card.slug === analysis.card.slug));
+});
+
+test("card queries reject nonsensical Ω coordinates", () => {
+  const { engine, deck } = engineWithDeck();
+  assert.throws(() => engine.queryCards(deck.id, { omega: -1 }), /non-negative integer/);
+  assert.throws(() => engine.queryCards(deck.id, { omega: 1.5 }), /non-negative integer/);
+});
