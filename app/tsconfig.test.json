@@ -16,6 +16,7 @@
     "src/decks/registry.ts",
     "src/decks/custom.ts",
     "src/decks/validate.ts",
+    "src/decks/bundled.ts",
     "src/reading/types.ts",
     "src/reading/deal.ts",
     "src/reading/encode.ts",
