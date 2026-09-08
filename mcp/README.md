@@ -37,12 +37,16 @@ Environment:
 - `MCP_ALPHA_TOKEN` — optional private-alpha bearer token; when absent HTTP remains anonymous/stateless
 - `MCP_ALPHA_PRINCIPAL_ID` — stable opaque scope id for the alpha token, default `alpha-user-v1`
 - `MCP_STATE_DIR` — optional durable filesystem root for authenticated custom deck state
+- `MCP_MAX_REQUEST_BYTES` — declared HTTP request-size cap, default `4000000`
+- `MCP_RATE_LIMIT_PER_MINUTE` — in-process per-remote-address request budget, default `120`
 
 Anonymous HTTP exposes only the nine stateless/read-oriented tools. When `MCP_ALPHA_TOKEN` is configured, requests with `Authorization: Bearer <token>` resolve to one isolated principal host and expose `import_deck`. A supplied invalid credential fails closed with HTTP 401 rather than downgrading to anonymous.
 
 If `MCP_STATE_DIR` is also configured, authenticated custom deck manifests are restored across process restarts. The persisted format contains only versioned custom deck manifests; bundled decks and engine/session objects are reconstructed from code on every process start. Files are written atomically and principal ids are hashed before filesystem use.
 
 The static bearer resolver is deliberately an **alpha/testing adapter**, not the final account system. The provider-neutral `PrincipalResolver` and `ArcanaHostStateRepository` boundaries are intended to accept OAuth and database adapters later without changing Arcana semantics.
+
+`/healthz` reports the MCP version plus the active auth/state/limit modes so bug reports can identify the deployed contract. Tool-call diagnostics are JSON lines on stderr containing only tool name, success/failure, duration, transport, and an opaque principal hash; tool arguments, questions, tokens, and custom deck payloads are never logged by this layer.
 
 ## Protocol smoke tests
 
@@ -56,7 +60,15 @@ npm --prefix mcp run smoke:http-auth
 npm --prefix mcp run smoke
 ```
 
-The authenticated HTTP smoke launches the real server with a temporary durable state directory, connects anonymously and authenticated, imports a custom deck, kills/restarts the server, reconnects, and proves that the deck survives only in the authenticated principal's host.
+The authenticated HTTP smoke launches the real server with a temporary durable state directory, connects anonymously and authenticated, imports a custom deck, kills/restarts the server, reconnects, and proves that the deck survives only in the authenticated principal's host. HTTP guardrail smoke separately proves versioned health metadata, 413 request rejection, and 429 + `Retry-After` rate limiting.
+
+For the deterministic semantic baseline used before live dogfooding:
+
+```bash
+npm --prefix mcp run eval:golden
+```
+
+See `mcp/TESTING.md` for the private-alpha conversational test plan and bug-capture rules.
 
 ## Container
 
