@@ -8,12 +8,14 @@
     "dev": "tsx src/stdio.ts",
     "start": "tsx src/stdio.ts",
     "http": "tsx src/http.ts",
-    "smoke": "npm run smoke:stdio && npm run smoke:http",
+    "smoke": "npm run smoke:stdio && npm run smoke:http && npm run smoke:http-auth",
     "smoke:stdio": "tsx test/smoke.ts",
     "smoke:http": "tsx test/http-smoke.ts",
+    "smoke:http-auth": "tsx test/http-auth-smoke.ts",
     "test:host-store": "tsx test/host-store.ts",
     "test:durable-state": "tsx test/durable-host-state.ts",
     "test:principal": "tsx test/principal.ts",
+    "test:alpha-auth": "tsx test/alpha-auth.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
