@@ -15,6 +15,16 @@ const REQUIRED_TOOLS = [
   "import_deck",
 ];
 
+const BUNDLED_DECK_IDS = [
+  "byrne-journey-tarot",
+  "deep-time",
+  "evolution-and-consciousness",
+  "final-fantasy-tarot",
+  "ultima-octave",
+  "ultima-tarot",
+  "ulysses-tarot",
+];
+
 async function main(): Promise<void> {
   const client = new Client({ name: "generative-arcana-smoke", version: "0.1.0" });
   const transport = new StdioClientTransport({ command: "npx", args: ["tsx", "src/stdio.ts"] });
@@ -32,11 +42,8 @@ async function main(): Promise<void> {
     assert.ok(text && text.type === "text", "list_decks returned no text content");
 
     const decks = JSON.parse(text.text) as Array<{ id: string }>;
-    assert.equal(decks.length, 7, `expected seven bundled decks, got ${decks.length}`);
-    assert.deepEqual(
-      new Set(decks.map((deck) => deck.id)),
-      new Set(["byrne", "deep-time", "evolution", "finalfantasy", "ultima-octave", "ultima", "ulysses"]),
-    );
+    assert.equal(decks.length, BUNDLED_DECK_IDS.length);
+    assert.deepEqual(new Set(decks.map((deck) => deck.id)), new Set(BUNDLED_DECK_IDS));
   } finally {
     await client.close();
   }

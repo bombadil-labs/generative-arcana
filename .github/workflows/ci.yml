@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   app:
@@ -57,26 +56,7 @@ jobs:
           node-version: 22
       - run: npm install --prefix mcp
       - name: Run validation
-        id: validation
-        shell: bash
-        run: |
-          set +e
-          ${{ matrix.command }} 2>&1 | tee /tmp/mcp-validation.log
-          code=${PIPESTATUS[0]}
-          exit "$code"
-      - name: Post protocol diagnostics
-        if: failure() && matrix.check == 'protocol smoke' && github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          {
-            echo '### MCP protocol smoke diagnostics'
-            echo '```text'
-            tail -c 12000 /tmp/mcp-validation.log
-            echo '```'
-          } > /tmp/comment.md
-          gh pr comment "$PR_NUMBER" --body-file /tmp/comment.md
+        run: ${{ matrix.command }}
 
   mcp-container:
     name: MCP container
