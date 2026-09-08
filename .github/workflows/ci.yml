@@ -49,6 +49,8 @@ jobs:
             command: npm run typecheck --prefix mcp
           - check: host store
             command: npm run test:host-store --prefix mcp
+          - check: durable state
+            command: npm run test:durable-state --prefix mcp
           - check: principal resolver
             command: npm run test:principal --prefix mcp
           - check: stdio protocol
