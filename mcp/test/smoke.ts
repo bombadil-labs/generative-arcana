@@ -27,16 +27,19 @@ const BUNDLED_DECK_IDS = [
 
 async function main(): Promise<void> {
   const client = new Client({ name: "generative-arcana-smoke", version: "0.1.0" });
-  const transport = new StdioClientTransport({ command: "npx", args: ["tsx", "src/stdio.ts"] });
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: ["--import", "tsx", "src/stdio.ts"],
+  });
 
   try {
-    await client.connect(transport);
+    await withTimeout(client.connect(transport), 10_000, "stdio MCP connect");
 
-    const listed = await client.listTools();
+    const listed = await withTimeout(client.listTools(), 5_000, "stdio tools/list");
     const names = new Set(listed.tools.map((tool) => tool.name));
     for (const name of REQUIRED_TOOLS) assert.ok(names.has(name), `missing MCP tool: ${name}`);
 
-    const result = await client.callTool({ name: "list_decks", arguments: {} });
+    const result = await withTimeout(client.callTool({ name: "list_decks", arguments: {} }), 5_000, "stdio list_decks");
     assert.equal(result.isError, undefined);
     const text = result.content.find((part) => part.type === "text");
     assert.ok(text && text.type === "text", "list_decks returned no text content");
@@ -45,8 +48,15 @@ async function main(): Promise<void> {
     assert.equal(decks.length, BUNDLED_DECK_IDS.length);
     assert.deepEqual(new Set(decks.map((deck) => deck.id)), new Set(BUNDLED_DECK_IDS));
   } finally {
-    await client.close();
+    await withTimeout(client.close(), 3_000, "stdio client close").catch(() => undefined);
   }
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)),
+  ]);
 }
 
 main().catch((error) => {
