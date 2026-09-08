@@ -1,4 +1,4 @@
-import { createServer, type IncomingMessage } from "node:http";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createMcpHandler } from "@modelcontextprotocol/server";
 import { hostHeaderValidation, originValidation, toNodeHandler } from "@modelcontextprotocol/node";
 import { createArcanaMcpServer } from "./server";
@@ -69,7 +69,7 @@ export function createArcanaHttpRequestHandler(options: ArcanaHttpRequestHandler
   const anonymousAdapter = createBundledArcanaAdapter();
   const hosts = options.hosts ?? new InMemoryArcanaHostStore();
 
-  return async (req: IncomingMessage, res: Parameters<ReturnType<typeof toNodeHandler>>[1]) => {
+  return async (req: IncomingMessage, res: ServerResponse) => {
     try {
       const access = await resolveArcanaRequestAccess(
         toPrincipalRequest(req),
