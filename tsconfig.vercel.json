@@ -10,12 +10,5 @@
     "types": ["node"],
     "noEmit": true
   },
-  "include": [
-    "api/**/*.ts",
-    "mcp/src/**/*.ts",
-    "app/src/decks/**/*.ts",
-    "app/src/reading/**/*.ts",
-    "app/src/engine/**/*.ts",
-    "app/src/mcp/**/*.ts"
-  ]
+  "include": ["api/**/*.ts"]
 }
