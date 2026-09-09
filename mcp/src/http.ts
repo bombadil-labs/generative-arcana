@@ -4,6 +4,7 @@ import { hostHeaderValidation, originValidation, toNodeHandler } from "@modelcon
 import { createArcanaMcpServer } from "./server";
 import { StaticBearerPrincipalResolver } from "./alphaAuth";
 import { FileArcanaHostStateRepository } from "./fileHostStateRepository";
+import { NeonArcanaHostStateRepository } from "./neonHostStateRepository";
 import {
   createBundledArcanaAdapter,
   InMemoryArcanaHostStore,
@@ -17,26 +18,25 @@ import { ARCANA_MCP_VERSION } from "./version";
 
 const port = envPort(process.env.PORT, 3000);
 const host = process.env.HOST?.trim() || "127.0.0.1";
-const allowedHosts = csv(process.env.MCP_ALLOWED_HOSTS) ?? loopbackAllowlist(host);
+const allowedHosts = csv(process.env.MCP_ALLOWED_HOSTS) ?? deploymentAllowlist(host);
 const allowedOrigins = csv(process.env.MCP_ALLOWED_ORIGINS) ?? allowedHosts;
 const alphaToken = optionalEnv(process.env.MCP_ALPHA_TOKEN);
 const alphaPrincipalId = optionalEnv(process.env.MCP_ALPHA_PRINCIPAL_ID) ?? "alpha-user-v1";
 const stateDir = optionalEnv(process.env.MCP_STATE_DIR);
+const databaseUrl = optionalEnv(process.env.DATABASE_URL);
 const maxRequestBytes = positiveIntEnv(process.env.MCP_MAX_REQUEST_BYTES, 4_000_000, "MCP_MAX_REQUEST_BYTES");
 const requestsPerMinute = positiveIntEnv(process.env.MCP_RATE_LIMIT_PER_MINUTE, 120, "MCP_RATE_LIMIT_PER_MINUTE");
 const rateLimiter = new FixedWindowRateLimiter(requestsPerMinute);
 
 if (!allowedHosts.length) {
-  throw new Error("Public MCP HTTP binding requires MCP_ALLOWED_HOSTS (comma-separated hostnames).");
+  throw new Error("Public MCP HTTP binding requires MCP_ALLOWED_HOSTS or a recognized Vercel deployment hostname.");
 }
 
 const principalResolver = alphaToken ? new StaticBearerPrincipalResolver(alphaToken, alphaPrincipalId) : undefined;
-const hosts: ArcanaHostStore = stateDir
-  ? new PersistentArcanaHostStore(new FileArcanaHostStateRepository(stateDir))
-  : new InMemoryArcanaHostStore();
+const { hosts, stateMode } = createHostStore({ databaseUrl, stateDir });
 
-if (alphaToken && !stateDir) {
-  console.error("[generative-arcana-mcp] MCP_ALPHA_TOKEN enabled without MCP_STATE_DIR; authenticated imports are process-lifetime only");
+if (alphaToken && stateMode === "memory") {
+  console.error("[generative-arcana-mcp] MCP_ALPHA_TOKEN enabled without durable storage; authenticated imports are process-lifetime only");
 }
 
 const requestHandler = createArcanaHttpRequestHandler({ principalResolver, hosts });
@@ -52,8 +52,9 @@ const http = createServer((req, res) => {
       ok: true,
       service: "generative-arcana-mcp",
       version: ARCANA_MCP_VERSION,
+      runtime: process.env.VERCEL ? "vercel-container" : "node-http",
       auth: principalResolver ? "alpha-bearer" : "anonymous",
-      state: stateDir ? "durable" : "memory",
+      state: stateMode,
       limits: { maxRequestBytes, requestsPerMinute },
     }));
     return;
@@ -137,6 +138,22 @@ export function createArcanaHttpRequestHandler(options: ArcanaHttpRequestHandler
   };
 }
 
+function createHostStore(options: { databaseUrl?: string; stateDir?: string }): { hosts: ArcanaHostStore; stateMode: "neon" | "filesystem" | "memory" } {
+  if (options.databaseUrl) {
+    return {
+      hosts: new PersistentArcanaHostStore(new NeonArcanaHostStateRepository(options.databaseUrl)),
+      stateMode: "neon",
+    };
+  }
+  if (options.stateDir) {
+    return {
+      hosts: new PersistentArcanaHostStore(new FileArcanaHostStateRepository(options.stateDir)),
+      stateMode: "filesystem",
+    };
+  }
+  return { hosts: new InMemoryArcanaHostStore(), stateMode: "memory" };
+}
+
 function toPrincipalRequest(req: IncomingMessage): PrincipalRequest {
   const headers = new Headers();
   for (const [name, value] of Object.entries(req.headers)) {
@@ -160,11 +177,18 @@ function optionalEnv(value: string | undefined): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
-function loopbackAllowlist(bindHost: string): string[] {
+function deploymentAllowlist(bindHost: string): string[] {
+  const hosts = new Set<string>();
   if (["127.0.0.1", "localhost", "::1", "[::1]"].includes(bindHost)) {
-    return ["localhost", "127.0.0.1", "[::1]"];
+    hosts.add("localhost");
+    hosts.add("127.0.0.1");
+    hosts.add("[::1]");
   }
-  return [];
+  for (const value of [process.env.VERCEL_URL, process.env.VERCEL_PROJECT_PRODUCTION_URL, process.env.VERCEL_BRANCH_URL]) {
+    const hostname = value?.trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+    if (hostname) hosts.add(hostname);
+  }
+  return [...hosts];
 }
 
 function envPort(value: string | undefined, fallback: number): number {

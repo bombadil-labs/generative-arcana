@@ -1,0 +1,17 @@
+FROM node:24-alpine
+
+WORKDIR /srv
+
+COPY mcp/package.json ./mcp/package.json
+RUN cd mcp && npm install --omit=dev
+
+COPY app/src ./app/src
+COPY decks ./decks
+COPY mcp/src ./mcp/src
+COPY mcp/tsconfig.json ./mcp/tsconfig.json
+
+WORKDIR /srv/mcp
+ENV NODE_ENV=production
+ENV HOST=0.0.0.0
+
+CMD ["npm", "run", "http"]
