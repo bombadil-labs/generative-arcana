@@ -4,7 +4,7 @@
  */
 export * from "./registry";
 export * from "./manifest";
-export type { DeckManifest, DeckVisibility, UserDeckManifest, UserDeckRecord } from "./catalog";
+export type { DeckVisibility, UserDeckManifest, UserDeckRecord } from "./catalog";
 export type { DeckModule, DeckDataFile } from "./types";
 
 import "./ultima"; // registers the Ultima deck (+ its sketches)
