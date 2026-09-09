@@ -57,6 +57,8 @@ jobs:
             command: npm run test:catalog-tools --prefix mcp
           - check: web catalog API
             command: npm run test:web-catalog-api --prefix mcp
+          - check: web app static serving
+            command: npm run test:web-app-static --prefix mcp
           - check: shared decks
             command: npm run test:shared-decks --prefix mcp
           - check: principal resolver

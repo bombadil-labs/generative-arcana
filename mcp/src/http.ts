@@ -34,6 +34,7 @@ import { jsonToolCallObserver } from "./observability";
 import { resolveArcanaRequestAccess, type PrincipalRequest, type PrincipalResolver } from "./principal";
 import { ARCANA_MCP_VERSION } from "./version";
 import { createArcanaWebCatalogRequestHandler, isArcanaWebCatalogPath } from "./webCatalogApi";
+import { serveArcanaWebApp } from "./webAppStatic";
 
 const port = envPort(process.env.PORT, 3000);
 const host = process.env.HOST?.trim() || "127.0.0.1";
@@ -43,6 +44,7 @@ const alphaToken = optionalEnv(process.env.MCP_ALPHA_TOKEN);
 const alphaPrincipalId = optionalEnv(process.env.MCP_ALPHA_PRINCIPAL_ID) ?? "alpha-user-v1";
 const stateDir = optionalEnv(process.env.MCP_STATE_DIR);
 const databaseUrl = optionalEnv(process.env.DATABASE_URL);
+const webAppDistDir = optionalEnv(process.env.ARCANA_WEB_DIST_DIR);
 const oauth = oauthRuntimeConfiguration({
   issuer: optionalEnv(process.env.MCP_OAUTH_ISSUER),
   resource: optionalEnv(process.env.MCP_OAUTH_RESOURCE),
@@ -139,6 +141,8 @@ const http = createServer((req, res) => {
 
   const isWebCatalogRequest = isArcanaWebCatalogPath(url.pathname);
   if (url.pathname !== "/mcp" && !isWebCatalogRequest) {
+    if (webAppDistDir && validateHost(req, res) && serveArcanaWebApp(req, res, webAppDistDir)) return;
+    if (res.headersSent) return;
     res.writeHead(404, { "content-type": "application/json" });
     res.end(JSON.stringify({ error: "not_found" }));
     return;
