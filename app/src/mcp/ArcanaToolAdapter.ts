@@ -241,4 +241,5 @@ function arrayArg(value: unknown, key: string): unknown[] {
 function requireDeck(engine: ArcanaEngine, deckId: string) {
   const deck = engine.getDeck(deckId);
   if (!deck) throw new Error(`Unknown deck: ${deckId}.`);
+  return deck;
 }
