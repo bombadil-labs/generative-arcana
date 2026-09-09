@@ -22,7 +22,8 @@
     "test:visuals": "tsx test/visuals.ts",
     "eval:golden": "tsx eval/golden.ts",
     "typecheck": "tsc --noEmit",
-    "test:oauth-identity": "tsx test/oauth-identity.ts"
+    "test:oauth-identity": "tsx test/oauth-identity.ts",
+    "test:catalog-tools": "tsx test/catalog-tools.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",
