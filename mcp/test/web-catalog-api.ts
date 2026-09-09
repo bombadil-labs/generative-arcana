@@ -15,6 +15,11 @@ async function main(): Promise<void> {
     catalog,
     hosts,
     principalResolver: new StaticBearerPrincipalResolver("secret", "usr_test"),
+    browserPrincipalResolver: {
+      async resolve(req) {
+        return req.headers.cookie?.includes("arcana-session=test-browser") ? { id: "usr_test" } : null;
+      },
+    },
   });
   const server = createServer((req, res) => void handler(req, res));
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -50,6 +55,16 @@ async function main(): Promise<void> {
     assert.equal(response.status, 200);
     const mine = await response.json() as Array<{ id: string }>;
     assert.equal(mine.some((deck) => deck.id === created.id), true);
+
+    response = await fetch(`${base}/api/me/decks`, { headers: { cookie: "arcana-session=test-browser" } });
+    assert.equal(response.status, 200, "browser session resolver reaches the same owned catalog without exposing a bearer token");
+    const browserMine = await response.json() as Array<{ id: string }>;
+    assert.equal(browserMine.some((deck) => deck.id === created.id), true);
+
+    response = await fetch(`${base}/api/me/decks`, {
+      headers: { authorization: "Bearer wrong", cookie: "arcana-session=test-browser" },
+    });
+    assert.notEqual(response.status, 200, "an invalid bearer credential must not downgrade to a valid browser cookie");
 
     response = await fetch(`${base}/api/decks/${created.id}`);
     assert.equal(response.status, 404, "private deck existence must remain hidden from anonymous callers");

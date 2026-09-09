@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import type { BrowserPrincipalResolver } from "./browserSession.js";
 import { canResolveUserDeck, type DeckVisibility, type UserDeckRecord } from "../../app/src/decks/catalog.js";
 import { createBundledArcanaAdapter, type ArcanaHostStore } from "./hostStore.js";
 import { bearerChallenge } from "./oauthResource.js";
@@ -8,6 +9,7 @@ import {
 import {
   principalHasScopes,
   resolveArcanaRequestAccess,
+  type ArcanaRequestAccess,
   type PrincipalRequest,
   type PrincipalResolver,
 } from "./principal.js";
@@ -23,6 +25,7 @@ export interface ArcanaWebCatalogHandlerOptions {
   catalog: UserDeckCatalogRepository;
   hosts: ArcanaHostStore;
   principalResolver?: PrincipalResolver;
+  browserPrincipalResolver?: BrowserPrincipalResolver;
   oauth?: ArcanaWebCatalogOAuthOptions;
   maxRequestBytes?: number;
 }
@@ -49,13 +52,13 @@ export function createArcanaWebCatalogRequestHandler(options: ArcanaWebCatalogHa
         const deckId = decodeURIComponent(url.pathname.slice("/api/decks/".length));
         if (!deckId) return json(res, 404, { error: "not_found" });
         const record = await options.catalog.get(deckId);
-        const principal = await optionalPrincipal(req, options, anonymousAdapter);
+        const principal = (await resolveWebAccess(req, res, options, anonymousAdapter)).principal;
         const viewerId = principal && (!options.oauth || principalHasScopes(principal, options.oauth.readScopes)) ? principal.id : null;
         if (!record || !canResolveUserDeck(record, viewerId)) return json(res, 404, { error: "not_found" });
         return json(res, 200, sharedDeck(record));
       }
 
-      const access = await resolveArcanaRequestAccess(toPrincipalRequest(req), anonymousAdapter, options.hosts, options.principalResolver);
+      const access = await resolveWebAccess(req, res, options, anonymousAdapter);
       if (!access.principal) return unauthorized(res, options.oauth, options.oauth?.readScopes ?? [], "Sign in to access your deck library.");
 
       if (req.method === "GET" && url.pathname === "/api/me/decks") {
@@ -112,10 +115,29 @@ export function createArcanaWebCatalogRequestHandler(options: ArcanaWebCatalogHa
   };
 }
 
-async function optionalPrincipal(req: IncomingMessage, options: ArcanaWebCatalogHandlerOptions, anonymousAdapter: ReturnType<typeof createBundledArcanaAdapter>) {
-  if (!req.headers.authorization || !options.principalResolver) return null;
-  const access = await resolveArcanaRequestAccess(toPrincipalRequest(req), anonymousAdapter, options.hosts, options.principalResolver);
-  return access.principal;
+async function resolveWebAccess(
+  req: IncomingMessage,
+  res: ServerResponse,
+  options: ArcanaWebCatalogHandlerOptions,
+  anonymousAdapter: ReturnType<typeof createBundledArcanaAdapter>,
+): Promise<ArcanaRequestAccess> {
+  // Bearer credentials retain priority. An invalid/malformed Authorization header throws and must
+  // never silently fall back to a browser cookie.
+  const bearerAccess = await resolveArcanaRequestAccess(
+    toPrincipalRequest(req),
+    anonymousAdapter,
+    options.hosts,
+    options.principalResolver,
+  );
+  if (bearerAccess.principal) return bearerAccess;
+
+  const browserPrincipal = await options.browserPrincipalResolver?.resolve(req, res);
+  if (!browserPrincipal) return bearerAccess;
+  return {
+    adapter: await options.hosts.get(browserPrincipal.id),
+    includeStatefulTools: true,
+    principal: browserPrincipal,
+  };
 }
 
 function deckSummary(record: UserDeckRecord) {

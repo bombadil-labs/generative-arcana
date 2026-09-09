@@ -41,6 +41,12 @@ Environment:
 - `MCP_OAUTH_JWKS_URI` — optional explicit JWKS URL; otherwise discovered from the issuer
 - `MCP_OAUTH_READ_SCOPES` — comma-separated personal-deck read scopes, default `decks:read`
 - `MCP_OAUTH_WRITE_SCOPES` — comma-separated deck mutation scopes, default `decks:write`
+- `WORKOS_API_KEY` — optional AuthKit server API key for first-party browser sessions
+- `WORKOS_CLIENT_ID` — AuthKit application client id for browser sign-in
+- `WORKOS_COOKIE_PASSWORD` — at least 32 characters; seals the app-owned browser session cookie
+- `WORKOS_REDIRECT_URI` — configured AuthKit callback URL, e.g. `https://arcana.example/auth/callback`
+- `WORKOS_IDENTITY_ISSUER` — optional explicit browser identity issuer; defaults to `MCP_OAUTH_ISSUER` and must match it when both are set
+- `ARCANA_SESSION_COOKIE` — optional browser session cookie name, default `arcana-session`
 - `MCP_STATE_DIR` — optional durable filesystem root for authenticated custom deck state
 - `MCP_MAX_REQUEST_BYTES` — declared HTTP request-size cap, default `4000000`
 - `MCP_RATE_LIMIT_PER_MINUTE` — in-process per-remote-address request budget, default `120`
@@ -52,6 +58,10 @@ OAuth mode publishes RFC 9728 Protected Resource Metadata at the path-specific w
 If `MCP_STATE_DIR` is also configured, authenticated custom deck manifests are restored across process restarts. The persisted format contains only versioned custom deck manifests; bundled decks and engine/session objects are reconstructed from code on every process start. Files are written atomically and principal ids are hashed before filesystem use.
 
 The static bearer resolver is deliberately an **alpha/testing adapter**. Production OAuth stays provider-neutral: an upstream authorization server owns login/consent/token issuance, `OidcJwtBearerIdentityVerifier` validates issuer + audience + signature, and `NeonExternalIdentityRepository` supplies the stable internal principal. The chosen identity provider is therefore deployment configuration rather than an Arcana domain dependency.
+
+Browser sign-in is a separate first-party session boundary. When the `WORKOS_*` settings are present, `/auth/login` and `/auth/callback` use AuthKit Hosted UI, the resulting session is kept in an HttpOnly/SameSite sealed cookie, `/auth/session` validates and refreshes it server-side, and POST `/auth/logout` ends the upstream session. The browser adapter proves an external `(issuer, subject)` identity and sends it through the **same** `NeonExternalIdentityRepository` used by MCP bearer tokens, so both transports converge on one opaque `usr_*` owner.
+
+The browser never receives or stores the MCP resource bearer token. AuthKit is therefore deployment glue for the web session, not an `ArcanaEngine`, manifest, or ownership dependency; MCP audience/resource-indicator semantics remain independent.
 
 `/healthz` reports the MCP version plus the active auth/state/limit modes so bug reports can identify the deployed contract. Tool-call diagnostics are JSON lines on stderr containing only tool name, success/failure, duration, transport, and an opaque principal hash; tool arguments, questions, tokens, and custom deck payloads are never logged by this layer.
 
@@ -131,6 +141,16 @@ The container does **not** rely on ephemeral process memory for authenticated st
 ```text
 MCP_ALPHA_TOKEN=<long random secret>
 MCP_ALPHA_PRINCIPAL_ID=alpha-user-v1   # optional
+```
+
+For browser account sessions, also configure the AuthKit adapter (alongside `DATABASE_URL`):
+
+```text
+WORKOS_API_KEY=<server API key>
+WORKOS_CLIENT_ID=<AuthKit client id>
+WORKOS_COOKIE_PASSWORD=<32+ character secret>
+WORKOS_REDIRECT_URI=https://YOUR_PROJECT.vercel.app/auth/callback
+# WORKOS_IDENTITY_ISSUER=https://...   # optional when MCP_OAUTH_ISSUER is configured
 ```
 
 5. Deploy. Vercel supplies the serving `PORT`; `mcp/src/http.ts` derives the deployment Host allowlist from Vercel's hostname environment variables.

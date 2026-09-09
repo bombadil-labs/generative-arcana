@@ -34,6 +34,13 @@ import { jsonToolCallObserver } from "./observability";
 import { resolveArcanaRequestAccess, type PrincipalRequest, type PrincipalResolver } from "./principal";
 import { ARCANA_MCP_VERSION } from "./version";
 import { createArcanaWebCatalogRequestHandler, isArcanaWebCatalogPath } from "./webCatalogApi";
+import { ExternalIdentityBrowserPrincipalResolver } from "./browserSession";
+import {
+  createWorkOSBrowserAuthRequestHandler,
+  isArcanaBrowserAuthPath,
+  WorkOSBrowserAuthAdapter,
+  type WorkOSBrowserAuthConfiguration,
+} from "./workosBrowserAuth";
 import { serveArcanaWebApp } from "./webAppStatic";
 
 const port = envPort(process.env.PORT, 3000);
@@ -52,6 +59,15 @@ const oauth = oauthRuntimeConfiguration({
   readScopes: csv(process.env.MCP_OAUTH_READ_SCOPES) ?? [...DEFAULT_DECK_READ_SCOPES],
   writeScopes: csv(process.env.MCP_OAUTH_WRITE_SCOPES) ?? [...DEFAULT_DECK_WRITE_SCOPES],
 });
+const browserAuthConfig = workosBrowserAuthConfiguration({
+  apiKey: optionalEnv(process.env.WORKOS_API_KEY),
+  clientId: optionalEnv(process.env.WORKOS_CLIENT_ID),
+  cookiePassword: optionalEnv(process.env.WORKOS_COOKIE_PASSWORD),
+  redirectUri: optionalEnv(process.env.WORKOS_REDIRECT_URI),
+  identityIssuer: optionalEnv(process.env.WORKOS_IDENTITY_ISSUER),
+  oauthIssuer: oauth?.issuer,
+  cookieName: optionalEnv(process.env.ARCANA_SESSION_COOKIE),
+});
 const maxRequestBytes = positiveIntEnv(process.env.MCP_MAX_REQUEST_BYTES, 4_000_000, "MCP_MAX_REQUEST_BYTES");
 const requestsPerMinute = positiveIntEnv(process.env.MCP_RATE_LIMIT_PER_MINUTE, 120, "MCP_RATE_LIMIT_PER_MINUTE");
 const rateLimiter = new FixedWindowRateLimiter(requestsPerMinute);
@@ -65,16 +81,25 @@ if (alphaToken && oauth) {
 if (oauth && !databaseUrl) {
   throw new Error("OAuth identity requires DATABASE_URL so external identities map to durable Arcana principals.");
 }
+if (browserAuthConfig && !databaseUrl) {
+  throw new Error("Browser account sessions require DATABASE_URL so external identities map to durable Arcana principals.");
+}
 
+const identities = databaseUrl ? new NeonExternalIdentityRepository(databaseUrl) : undefined;
 const principalResolver = oauth
   ? new OAuthPrincipalResolver(
       new OidcJwtBearerIdentityVerifier(oauth.issuer, oauth.resource, oauth.jwksUri),
-      new NeonExternalIdentityRepository(databaseUrl!),
+      identities!,
       oauth.readScopes,
     )
   : alphaToken
     ? new StaticBearerPrincipalResolver(alphaToken, alphaPrincipalId)
     : undefined;
+const browserAuth = browserAuthConfig ? new WorkOSBrowserAuthAdapter(browserAuthConfig) : undefined;
+const browserPrincipalResolver = browserAuth && identities
+  ? new ExternalIdentityBrowserPrincipalResolver(browserAuth, identities)
+  : undefined;
+const browserAuthHandler = browserAuth ? createWorkOSBrowserAuthRequestHandler(browserAuth) : undefined;
 const { hosts, catalog, stateMode } = createHostStore({ databaseUrl, stateDir });
 
 if (alphaToken && stateMode === "memory") {
@@ -97,6 +122,7 @@ const webCatalogHandler = catalog ? createArcanaWebCatalogRequestHandler({
   catalog,
   hosts,
   principalResolver,
+  browserPrincipalResolver,
   ...(oauth ? { oauth: { resourceMetadataUrl: oauth.resourceMetadataUrl, readScopes: oauth.readScopes, writeScopes: oauth.writeScopes } } : {}),
   maxRequestBytes,
 }) : undefined;
@@ -114,6 +140,7 @@ const http = createServer((req, res) => {
       version: ARCANA_MCP_VERSION,
       runtime: process.env.VERCEL ? "vercel-container" : "node-http",
       auth: oauth ? "oauth-oidc" : principalResolver ? "alpha-bearer" : "anonymous",
+      browserAuth: browserAuth ? "workos-authkit" : "disabled",
       state: stateMode,
       limits: { maxRequestBytes, requestsPerMinute },
     }));
@@ -140,7 +167,8 @@ const http = createServer((req, res) => {
   }
 
   const isWebCatalogRequest = isArcanaWebCatalogPath(url.pathname);
-  if (url.pathname !== "/mcp" && !isWebCatalogRequest) {
+  const isBrowserAuthRequest = isArcanaBrowserAuthPath(url.pathname);
+  if (url.pathname !== "/mcp" && !isWebCatalogRequest && !isBrowserAuthRequest) {
     if (webAppDistDir && validateHost(req, res) && serveArcanaWebApp(req, res, webAppDistDir)) return;
     if (res.headersSent) return;
     res.writeHead(404, { "content-type": "application/json" });
@@ -148,7 +176,11 @@ const http = createServer((req, res) => {
     return;
   }
 
-  if (!validateHost(req, res) || !validateOrigin(req, res)) return;
+  if (!validateHost(req, res)) return;
+  const requiresOrigin = url.pathname === "/mcp"
+    || isWebCatalogRequest
+    || (isBrowserAuthRequest && req.method === "POST");
+  if (requiresOrigin && !validateOrigin(req, res)) return;
 
   const contentLength = parseContentLength(req.headers["content-length"]);
   if (contentLength !== undefined && contentLength > maxRequestBytes) {
@@ -164,6 +196,16 @@ const http = createServer((req, res) => {
       "retry-after": String(decision.retryAfterSeconds),
     });
     res.end(JSON.stringify({ error: "rate_limited" }));
+    return;
+  }
+
+  if (isBrowserAuthRequest) {
+    if (!browserAuthHandler) {
+      res.writeHead(503, { "content-type": "application/json", "cache-control": "no-store" });
+      res.end(JSON.stringify({ error: "browser_auth_unavailable" }));
+      return;
+    }
+    void browserAuthHandler(req, res);
     return;
   }
 
@@ -382,6 +424,44 @@ function deploymentAllowlist(bindHost: string): string[] {
     if (hostname) hosts.add(hostname);
   }
   return [...hosts];
+}
+
+function workosBrowserAuthConfiguration(input: {
+  apiKey?: string;
+  clientId?: string;
+  cookiePassword?: string;
+  redirectUri?: string;
+  identityIssuer?: string;
+  oauthIssuer?: string;
+  cookieName?: string;
+}): WorkOSBrowserAuthConfiguration | undefined {
+  const configured = [input.apiKey, input.clientId, input.cookiePassword, input.redirectUri, input.identityIssuer]
+    .some((value) => value !== undefined);
+  if (!configured) return undefined;
+
+  const apiKey = requireConfigValue(input.apiKey, "WORKOS_API_KEY");
+  const clientId = requireConfigValue(input.clientId, "WORKOS_CLIENT_ID");
+  const cookiePassword = requireConfigValue(input.cookiePassword, "WORKOS_COOKIE_PASSWORD");
+  const redirectUri = requireConfigValue(input.redirectUri, "WORKOS_REDIRECT_URI");
+  const issuer = requireConfigValue(input.identityIssuer ?? input.oauthIssuer, "WORKOS_IDENTITY_ISSUER or MCP_OAUTH_ISSUER");
+
+  if (input.identityIssuer && input.oauthIssuer && new URL(input.identityIssuer).href !== new URL(input.oauthIssuer).href) {
+    throw new Error("WORKOS_IDENTITY_ISSUER must match MCP_OAUTH_ISSUER so browser and MCP sessions resolve the same account.");
+  }
+
+  return {
+    apiKey,
+    clientId,
+    cookiePassword,
+    redirectUri,
+    issuer,
+    ...(input.cookieName ? { cookieName: input.cookieName } : {}),
+  };
+}
+
+function requireConfigValue(value: string | undefined, label: string): string {
+  if (!value) throw new Error(`${label} is required when browser AuthKit sessions are configured.`);
+  return value;
 }
 
 function envPort(value: string | undefined, fallback: number): number {
