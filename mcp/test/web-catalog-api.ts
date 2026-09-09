@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import deepTime from "../../decks/deep-time/deck.json";
+import type { DeckDataFile } from "../../app/src/decks/types";
 import type { ArcanaHostState, ArcanaHostStateRepository } from "../src/hostState";
 import { PersistentArcanaHostStore } from "../src/hostStore";
 import { StaticBearerPrincipalResolver } from "../src/alphaAuth";
@@ -29,7 +30,7 @@ async function main(): Promise<void> {
     response = await fetch(`${base}/api/me/decks`);
     assert.equal(response.status, 401);
 
-    const data = structuredClone(deepTime) as typeof deepTime;
+    const data = structuredClone(deepTime) as unknown as DeckDataFile;
     data.slug = "web-import";
     data.name = "Web Import";
     response = await fetch(`${base}/api/me/decks`, {

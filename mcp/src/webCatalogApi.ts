@@ -167,7 +167,7 @@ function unauthorized(
   oauth: ArcanaWebCatalogOAuthOptions | undefined,
   scopes: readonly string[],
   description: string,
-  error = "invalid_token",
+  error: "invalid_request" | "invalid_token" | "insufficient_scope" = "invalid_token",
   status = error === "insufficient_scope" ? 403 : 401,
 ) {
   const headers: Record<string, string> = { "content-type": "application/json" };
