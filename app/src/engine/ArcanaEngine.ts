@@ -1,14 +1,14 @@
-import type { CardData } from "../decks/card";
-import { omega } from "../decks/cardMeta";
-import { DeckRegistry, deckRegistry } from "../decks/registry";
-import { immutableJsonSnapshot } from "../decks/jsonSnapshot";
-import { isValidSpread, resolveSpread, spreadsForDeck, type Spread } from "../decks/spreads";
-import type { DeckModule } from "../decks/types";
-import { deal } from "../reading/deal";
-import { decodeReading, encodeReading, resolveReading as resolveReadingTokenData } from "../reading/encode";
-import { buildPrompt } from "../reading/prompt";
-import type { ReadingCard } from "../reading/types";
-import type { ArcanaReading, CardAnalysis, CardQuery, CastReadingOptions, ImportDeckOptions, ReadingPlacement } from "./types";
+import type { CardData } from "../decks/card.js";
+import { omega } from "../decks/cardMeta.js";
+import { DeckRegistry, deckRegistry } from "../decks/registry.js";
+import { immutableJsonSnapshot } from "../decks/jsonSnapshot.js";
+import { isValidSpread, resolveSpread, spreadsForDeck, type Spread } from "../decks/spreads.js";
+import type { DeckModule } from "../decks/types.js";
+import { deal } from "../reading/deal.js";
+import { decodeReading, encodeReading, resolveReading as resolveReadingTokenData } from "../reading/encode.js";
+import { buildPrompt } from "../reading/prompt.js";
+import type { ReadingCard } from "../reading/types.js";
+import type { ArcanaReading, CardAnalysis, CardQuery, CastReadingOptions, ImportDeckOptions, ReadingPlacement } from "./types.js";
 
 /**
  * Renderer- and transport-independent application service for Generative Arcana.
