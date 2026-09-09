@@ -25,6 +25,19 @@ interface DeckManifest {
   tagline: string  // required, concise human-facing summary
   spreads?: Spread[]
 }
+
+interface SpreadPosition {
+  name: string
+  prompt: string
+}
+
+interface Spread {
+  id: string
+  name: string
+  description: string
+  positions: SpreadPosition[]
+  deckId?: string  // normalized by the platform; new authoring should normally omit it
+}
 ```
 
 The `Deck` interface below is therefore `manifest.data`. Existing import surfaces may still accept a bare `Deck` as compatibility input and normalize it into a manifest, but new producers should write the canonical envelope directly.
