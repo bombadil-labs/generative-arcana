@@ -57,6 +57,8 @@ jobs:
             command: npm run test:principal --prefix mcp
           - check: alpha auth
             command: npm run test:alpha-auth --prefix mcp
+          - check: OAuth identity
+            command: npm run test:oauth-identity --prefix mcp
           - check: hardening
             command: npm run test:hardening --prefix mcp
           - check: visual assets
