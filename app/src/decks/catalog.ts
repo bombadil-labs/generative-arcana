@@ -10,12 +10,24 @@ import type { DeckDataFile } from "./types";
  */
 export type DeckVisibility = "private" | "unlisted" | "public";
 
-/** Declarative content owned by a user. Renderer implementations remain a separate concern. */
-export interface UserDeckManifest {
+/**
+ * Canonical renderer-, host-, auth-, and catalog-independent authored artifact.
+ *
+ * Every authoring route (manual upload, LLM-assisted creation, future editors/importers) should
+ * terminate in this shape before persistence. Resource identity, owner, revision, visibility, and
+ * provider/session metadata are catalog concerns and never belong inside the manifest.
+ *
+ * `data.slug` is authored metadata. It is not the globally stable resource identity assigned when
+ * a manifest enters a Generative Arcana catalog.
+ */
+export interface DeckManifest {
   data: DeckDataFile;
   tagline: string;
   spreads?: Spread[];
 }
+
+/** Compatibility name retained while older catalog/MCP code migrates to the canonical term. */
+export type UserDeckManifest = DeckManifest;
 
 /**
  * Durable identity for a user-authored deck.
@@ -27,7 +39,7 @@ export interface UserDeckRecord {
   id: string;
   ownerId: string;
   slug: string;
-  manifest: UserDeckManifest;
+  manifest: DeckManifest;
   visibility: DeckVisibility;
   revision: number;
   createdAt: string;
