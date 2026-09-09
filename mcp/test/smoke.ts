@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 
+const SPREAD_WIDGET_URI = "ui://arcana/spread/v1.html";
+
 const REQUIRED_TOOLS = [
   "list_decks",
   "get_deck",
@@ -41,6 +43,17 @@ async function main(): Promise<void> {
     const listed = await withTimeout(client.listTools(), 5_000, "stdio tools/list");
     const names = new Set(listed.tools.map((tool) => tool.name));
     for (const name of REQUIRED_TOOLS) assert.ok(names.has(name), `missing MCP tool: ${name}`);
+    const renderTool = listed.tools.find((tool) => tool.name === "render_reading");
+    const renderMeta = renderTool?._meta as { ui?: { resourceUri?: string } } | undefined;
+    assert.equal(renderMeta?.ui?.resourceUri, SPREAD_WIDGET_URI, "render_reading must advertise the spread UI resource");
+
+    const resources = await withTimeout(client.listResources(), 5_000, "stdio resources/list");
+    assert.ok(resources.resources.some((resource) => resource.uri === SPREAD_WIDGET_URI), "spread UI resource is not discoverable");
+    const widget = await withTimeout(client.readResource({ uri: SPREAD_WIDGET_URI }), 5_000, "stdio resources/read spread widget");
+    const widgetContent = widget.contents.find((content) => content.uri === SPREAD_WIDGET_URI);
+    assert.ok(widgetContent && "text" in widgetContent, "spread UI resource returned no HTML text");
+    assert.equal(widgetContent.mimeType, "text/html;profile=mcp-app");
+    assert.match(widgetContent.text, /spread-grid/, "spread UI resource is missing its layout surface");
 
     const result = await withTimeout(client.callTool({ name: "list_decks", arguments: {} }), 5_000, "stdio list_decks");
     assert.equal(result.isError, undefined);
@@ -94,6 +107,12 @@ async function main(): Promise<void> {
       assert.equal(image.mimeType, "image/png");
       assert.ok(image.data.startsWith("iVBORw0KGgo"), "rendered reading image is not PNG data");
     }
+    const structured = rendered.structuredContent as {
+      result?: { layout?: { kind?: string }; placements?: Array<{ positionPrompt?: string }> };
+    } | undefined;
+    assert.equal(structured?.result?.layout?.kind, "flow");
+    assert.equal(structured?.result?.placements?.length, 3);
+    assert.ok(structured?.result?.placements?.every((placement) => !!placement.positionPrompt), "rendered positions should carry their authored prompts");
   } finally {
     await withTimeout(client.close(), 3_000, "stdio client close").catch(() => undefined);
   }

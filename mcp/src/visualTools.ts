@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import type { ArcanaToolAdapter } from "../../app/src/mcp/ArcanaToolAdapter";
 import type { ArcanaToolCallObserver } from "./observability";
+import { ARCANA_SPREAD_WIDGET_URI, registerArcanaSpreadWidget } from "./spreadWidget";
 import type { ServerVisualStore } from "./staticVisuals";
 
 export const ARCANA_VISUAL_TOOL_NAMES = [
@@ -28,6 +29,7 @@ const readOnlyAnnotations = {
 /** Register Node-host visual capabilities without coupling ArcanaEngine to a renderer. */
 export function registerArcanaVisualTools(server: McpServer, options: RegisterArcanaVisualToolsOptions): void {
   const { adapter, visuals, onToolCall } = options;
+  registerArcanaSpreadWidget(server);
 
   server.registerTool(
     "list_visual_packs",
@@ -87,13 +89,20 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
   server.registerTool(
     "render_reading",
     {
-      description: "Render an existing Arcana reading token as actual MCP card images when this host can render the deck. This never recasts the reading.",
+      title: "Render Arcana spread",
+      description: "Render an existing Arcana reading token as one responsive visual spread. Positions are labeled, their prompts are available on hover/focus, and reversed cards are shown inverted. This never recasts the reading.",
       inputSchema: z.object({
         token: z.string().min(1),
         deckId: z.string().min(1).optional(),
         packId: z.string().min(1).optional(),
       }),
       annotations: readOnlyAnnotations,
+      _meta: {
+        ui: { resourceUri: ARCANA_SPREAD_WIDGET_URI },
+        "openai/outputTemplate": ARCANA_SPREAD_WIDGET_URI,
+        "openai/toolInvocation/invoking": "Laying out the spread…",
+        "openai/toolInvocation/invoked": "Spread ready",
+      },
     },
     async (input: unknown) => observed("render_reading", onToolCall, async () => {
       const { token, deckId, packId } = input as { token: string; deckId?: string; packId?: string };
@@ -109,6 +118,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
       }];
       const placements: Array<{
         position: string;
+        positionPrompt: string;
         cardSlug: string;
         cardName: string;
         reversed: boolean;
@@ -128,6 +138,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
         content.push({ type: "image", data: art.data.toString("base64"), mimeType: art.mimeType });
         placements.push({
           position: placement.position.name,
+          positionPrompt: placement.position.prompt,
           cardSlug: placement.card.slug,
           cardName: placement.card.name,
           reversed: placement.reversed,
@@ -145,6 +156,8 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
             deckName: reading.deck.name,
             spreadId: reading.spread.id,
             spreadName: reading.spread.name,
+            question: reading.question,
+            layout: { kind: "flow" },
             placements,
           },
         },
