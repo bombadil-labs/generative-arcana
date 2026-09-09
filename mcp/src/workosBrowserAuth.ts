@@ -5,7 +5,9 @@ import type { BrowserSessionAuthenticator, BrowserSessionUser } from "./browserS
 
 const DEFAULT_COOKIE_NAME = "arcana-session";
 const DEFAULT_RETURN_TO = "/#/my-decks";
+const AUTH_STATE_COOKIE_SUFFIX = "-auth-state";
 const STATE_TTL_MS = 10 * 60 * 1000;
+const STATE_TTL_SECONDS = Math.ceil(STATE_TTL_MS / 1000);
 
 export interface WorkOSBrowserAuthConfiguration {
   apiKey: string;
@@ -57,6 +59,7 @@ export function isArcanaBrowserAuthPath(pathname: string): boolean {
 
 export class WorkOSBrowserAuthAdapter implements BrowserSessionAuthenticator {
   readonly cookieName: string;
+  readonly authStateCookieName: string;
   private readonly secureCookies: boolean;
   private readonly identityIssuer: string;
 
@@ -72,19 +75,35 @@ export class WorkOSBrowserAuthAdapter implements BrowserSessionAuthenticator {
     requireHttpsUrl(config.redirectUri, "WORKOS_REDIRECT_URI");
     this.identityIssuer = requireHttpsUrl(config.issuer, "WorkOS identity issuer");
     this.cookieName = requireCookieName(config.cookieName?.trim() || DEFAULT_COOKIE_NAME);
+    this.authStateCookieName = requireCookieName(`${this.cookieName}${AUTH_STATE_COOKIE_SUFFIX}`);
     this.secureCookies = config.secureCookies ?? new URL(config.redirectUri).protocol === "https:";
   }
 
-  authorizationUrl(returnTo?: string): string {
-    return this.client.getAuthorizationUrl({ state: this.signState(safeReturnTo(returnTo)) });
+  beginLogin(res: ServerResponse, returnTo?: string): string {
+    const nonce = randomBytes(16).toString("base64url");
+    appendSetCookie(res, serializeCookie(this.authStateCookieName, nonce, this.secureCookies, {
+      path: "/auth",
+      maxAge: STATE_TTL_SECONDS,
+    }));
+    return this.client.getAuthorizationUrl({ state: this.signState(safeReturnTo(returnTo), nonce) });
   }
 
-  async completeLogin(code: string, state: string, res: ServerResponse): Promise<string> {
+  async completeLogin(code: string, state: string, req: IncomingMessage, res: ServerResponse): Promise<string> {
     if (!code.trim()) throw new Error("Authentication callback is missing code.");
-    const returnTo = this.verifyState(state);
+    const expectedNonce = cookieValue(req, this.authStateCookieName);
+    this.clearLoginState(res);
+    if (!expectedNonce) throw new Error("Authentication state is not bound to this browser.");
+    const verified = this.verifyState(state);
+    if (!timingSafeTextEqual(verified.nonce, expectedNonce)) {
+      throw new Error("Authentication state is not bound to this browser.");
+    }
     const result = await this.client.authenticateWithCode({ code: code.trim() });
     this.setSessionCookie(res, result.sealedSession);
-    return returnTo;
+    return verified.returnTo;
+  }
+
+  clearLoginState(res: ServerResponse): void {
+    appendSetCookie(res, serializeCookie(this.authStateCookieName, "", this.secureCookies, { path: "/auth", maxAge: 0 }));
   }
 
   async authenticate(req: IncomingMessage, res: ServerResponse): Promise<BrowserSessionUser | null> {
@@ -127,24 +146,24 @@ export class WorkOSBrowserAuthAdapter implements BrowserSessionAuthenticator {
 
   private setSessionCookie(res: ServerResponse, value: string): void {
     if (typeof value !== "string" || !value) throw new Error("AuthKit did not return a sealed session.");
-    res.setHeader("set-cookie", serializeCookie(this.cookieName, value, this.secureCookies));
+    appendSetCookie(res, serializeCookie(this.cookieName, value, this.secureCookies));
   }
 
   private clearSessionCookie(res: ServerResponse): void {
-    res.setHeader("set-cookie", serializeCookie(this.cookieName, "", this.secureCookies, 0));
+    appendSetCookie(res, serializeCookie(this.cookieName, "", this.secureCookies, { maxAge: 0 }));
   }
 
-  private signState(returnTo: string): string {
+  private signState(returnTo: string, nonce: string): string {
     const payload = Buffer.from(JSON.stringify({
       returnTo,
       expiresAt: Date.now() + STATE_TTL_MS,
-      nonce: randomBytes(16).toString("base64url"),
+      nonce,
     }), "utf8").toString("base64url");
     const signature = this.stateSignature(payload);
     return `${payload}.${signature}`;
   }
 
-  private verifyState(state: string): string {
+  private verifyState(state: string): { returnTo: string; nonce: string } {
     const [payload, signature, extra] = state.split(".");
     if (!payload || !signature || extra) throw new Error("Authentication state is invalid.");
     const expected = Buffer.from(this.stateSignature(payload));
@@ -159,8 +178,10 @@ export class WorkOSBrowserAuthAdapter implements BrowserSessionAuthenticator {
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Authentication state is invalid.");
     const record = parsed as Record<string, unknown>;
     if (typeof record.expiresAt !== "number" || record.expiresAt < Date.now()) throw new Error("Authentication state has expired.");
-    if (typeof record.returnTo !== "string") throw new Error("Authentication state is invalid.");
-    return safeReturnTo(record.returnTo);
+    if (typeof record.returnTo !== "string" || typeof record.nonce !== "string" || !record.nonce) {
+      throw new Error("Authentication state is invalid.");
+    }
+    return { returnTo: safeReturnTo(record.returnTo), nonce: record.nonce };
   }
 
   private stateSignature(payload: string): string {
@@ -173,7 +194,7 @@ export function createWorkOSBrowserAuthRequestHandler(adapter: WorkOSBrowserAuth
     const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
     try {
       if (req.method === "GET" && url.pathname === "/auth/login") {
-        res.writeHead(302, { location: adapter.authorizationUrl(url.searchParams.get("returnTo") ?? undefined), "cache-control": "no-store" });
+        res.writeHead(302, { location: adapter.beginLogin(res, url.searchParams.get("returnTo") ?? undefined), "cache-control": "no-store" });
         res.end();
         return;
       }
@@ -181,12 +202,13 @@ export function createWorkOSBrowserAuthRequestHandler(adapter: WorkOSBrowserAuth
       if (req.method === "GET" && url.pathname === "/auth/callback") {
         const providerError = url.searchParams.get("error");
         if (providerError) {
+          adapter.clearLoginState(res);
           json(res, 400, { error: "authentication_failed", message: url.searchParams.get("error_description") ?? providerError });
           return;
         }
         const code = url.searchParams.get("code") ?? "";
         const state = url.searchParams.get("state") ?? "";
-        const returnTo = await adapter.completeLogin(code, state, res);
+        const returnTo = await adapter.completeLogin(code, state, req, res);
         res.writeHead(303, { location: returnTo, "cache-control": "no-store" });
         res.end();
         return;
@@ -282,16 +304,38 @@ function cookieValue(req: IncomingMessage, name: string): string | null {
   return null;
 }
 
-function serializeCookie(name: string, value: string, secure: boolean, maxAge?: number): string {
+function serializeCookie(
+  name: string,
+  value: string,
+  secure: boolean,
+  options: { path?: string; maxAge?: number } = {},
+): string {
   const pieces = [
     `${name}=${encodeURIComponent(value)}`,
-    "Path=/",
+    `Path=${options.path ?? "/"}`,
     "HttpOnly",
     "SameSite=Lax",
     ...(secure ? ["Secure"] : []),
-    ...(maxAge === undefined ? [] : [`Max-Age=${maxAge}`]),
+    ...(options.maxAge === undefined ? [] : [`Max-Age=${options.maxAge}`]),
   ];
   return pieces.join("; ");
+}
+
+function appendSetCookie(res: ServerResponse, value: string): void {
+  const existing = res.getHeader("set-cookie");
+  if (existing === undefined) {
+    res.setHeader("set-cookie", value);
+  } else if (Array.isArray(existing)) {
+    res.setHeader("set-cookie", [...existing, value]);
+  } else {
+    res.setHeader("set-cookie", [String(existing), value]);
+  }
+}
+
+function timingSafeTextEqual(left: string, right: string): boolean {
+  const a = Buffer.from(left, "utf8");
+  const b = Buffer.from(right, "utf8");
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 function safeReturnTo(value: string | undefined): string {
