@@ -1,8 +1,8 @@
-import type { Spread } from "./spreads";
-import { normalizeDeckSpreads } from "./spreads";
-import type { DeckModule } from "./types";
-import { canonicalCards, validateDeck } from "./validate";
-import { immutableJsonSnapshot } from "./jsonSnapshot";
+import type { Spread } from "./spreads.js";
+import { normalizeDeckSpreads } from "./spreads.js";
+import type { DeckModule } from "./types.js";
+import { canonicalCards, validateDeck } from "./validate.js";
+import { immutableJsonSnapshot } from "./jsonSnapshot.js";
 
 /**
  * Untrusted registration input. The registry is the construction boundary: data is validated,
