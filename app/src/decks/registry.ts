@@ -15,6 +15,10 @@ export interface DeckRegistration {
   spreads?: Spread[];
   /** true for decks loaded dynamically rather than bundled with the app. */
   custom?: boolean;
+  /** Canonical runtime/resource identity. Defaults to the authored manifest slug. */
+  runtimeId?: string;
+  /** Extra compatibility identities accepted for lookup/token resolution. */
+  aliases?: readonly string[];
 }
 
 export interface RegisterDeckOptions {
@@ -30,6 +34,8 @@ export interface RegisterDeckOptions {
  */
 export class DeckRegistry {
   private readonly decks = new Map<string, DeckModule>();
+  /** alias -> canonical id; null means the alias is ambiguous and must not resolve. */
+  private readonly aliases = new Map<string, string | null>();
 
   registerDeck(registration: DeckRegistration, options: RegisterDeckOptions = {}): DeckModule {
     const validation = validateDeck(registration.data);
@@ -43,7 +49,9 @@ export class DeckRegistry {
       throw new Error("tagline: must be a string with content.");
     }
 
-    const normalizedSpreads = normalizeDeckSpreads(registration.spreads, data.slug);
+    const id = runtimeId(registration.runtimeId ?? data.slug);
+    const compatibilityIds = compatibilityAliases(id, data.slug, registration.aliases);
+    const normalizedSpreads = normalizeDeckSpreads(registration.spreads, id, [data.slug, ...compatibilityIds]);
     const spreads = normalizedSpreads === undefined
       ? undefined
       : immutableJsonSnapshot(normalizedSpreads, "spreads");
@@ -51,8 +59,10 @@ export class DeckRegistry {
     // A broader readonly API migration is separate from this runtime immutability guarantee.
     const cards = canonicalCards(data);
     Object.freeze(cards);
+    const aliases = compatibilityIds.length ? Object.freeze([...compatibilityIds]) : undefined;
     const deck: DeckModule = Object.freeze({
-      id: data.slug,
+      id,
+      ...(aliases ? { aliases } : {}),
       name: data.name,
       tagline: registration.tagline ?? (firstSentence(data.theme.description) || "A custom deck."),
       data,
@@ -62,22 +72,44 @@ export class DeckRegistry {
     });
 
     const existing = this.decks.get(deck.id);
+    if (!existing && this.aliases.has(deck.id)) {
+      throw new Error(`The runtime id “${deck.id}” collides with another deck's compatibility identity.`);
+    }
     if (existing && deck.custom && !existing.custom) {
-      throw new Error(`The slug “${deck.id}” belongs to a bundled deck. Choose a different slug to import a custom version.`);
+      throw new Error(`The id “${deck.id}” belongs to a bundled deck. Choose a different runtime id for this custom deck.`);
     }
     if (existing && !options.replaceExisting) {
       throw new Error(`A deck with id “${deck.id}” is already registered.`);
     }
     this.decks.set(deck.id, deck);
+    this.rebuildAliases();
     return deck;
   }
 
   getDeck(id: string): DeckModule | undefined {
-    return this.decks.get(id);
+    const direct = this.decks.get(id);
+    if (direct) return direct;
+    const canonical = this.aliases.get(id);
+    return typeof canonical === "string" ? this.decks.get(canonical) : undefined;
   }
 
   listDecks(): DeckModule[] {
     return [...this.decks.values()];
+  }
+
+  private rebuildAliases(): void {
+    this.aliases.clear();
+    for (const deck of this.decks.values()) {
+      for (const alias of deck.aliases ?? []) {
+        // Canonical ids always win direct lookup. The alias remains non-resolving in that case.
+        if (this.decks.has(alias)) continue;
+        if (!this.aliases.has(alias)) {
+          this.aliases.set(alias, deck.id);
+        } else if (this.aliases.get(alias) !== deck.id) {
+          this.aliases.set(alias, null);
+        }
+      }
+    }
   }
 }
 
@@ -95,6 +127,22 @@ export function getDeck(id: string): DeckModule | undefined {
 
 export function listDecks(): DeckModule[] {
   return deckRegistry.listDecks();
+}
+
+function runtimeId(value: string): string {
+  if (typeof value !== "string" || !value.trim()) throw new Error("runtimeId: must be a non-empty string.");
+  return value.trim();
+}
+
+function compatibilityAliases(id: string, authoredSlug: string, aliases: readonly string[] | undefined): string[] {
+  const values = id === authoredSlug ? [...(aliases ?? [])] : [authoredSlug, ...(aliases ?? [])];
+  const unique = new Set<string>();
+  for (const value of values) {
+    if (typeof value !== "string" || !value.trim()) throw new Error("aliases: entries must be non-empty strings.");
+    const normalized = value.trim();
+    if (normalized !== id) unique.add(normalized);
+  }
+  return [...unique];
 }
 
 function firstSentence(text: string): string {

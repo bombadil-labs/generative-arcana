@@ -42,13 +42,18 @@ export function isValidSpread(value: unknown): value is Spread {
  * Validate and normalize deck-native spreads at the deck construction boundary.
  * Ownership is explicit in the returned snapshots even when a manifest omits `deckId`.
  */
-export function normalizeDeckSpreads(value: unknown, deckId: string): Spread[] | undefined {
+export function normalizeDeckSpreads(
+  value: unknown,
+  deckId: string,
+  acceptedOwnerIds: readonly string[] = [deckId],
+): Spread[] | undefined {
   if (value === undefined) return undefined;
   if (!Array.isArray(value)) throw new Error("spreads: must be an array.");
+  const owners = new Set([deckId, ...acceptedOwnerIds]);
   const ids = new Set<string>();
   return value.map((raw, index) => {
     if (!isValidSpread(raw)) throw new Error(`spreads[${index}]: must be a valid spread.`);
-    if (raw.deckId !== undefined && raw.deckId !== deckId) {
+    if (raw.deckId !== undefined && !owners.has(raw.deckId)) {
       throw new Error(`spreads[${index}].deckId: must match the owning deck “${deckId}”.`);
     }
     if (GENERIC_BY_ID.has(raw.id)) throw new Error(`spreads[${index}].id: collides with a generic spread id.`);
