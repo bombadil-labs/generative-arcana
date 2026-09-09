@@ -2,15 +2,19 @@
 
 Headless MCP transports for the Generative Arcana engine. The MCP layer owns no symbolic semantics: it loads the shipped corpus into an isolated `DeckRegistry`, creates an `ArcanaEngine`, and delegates symbolic tool calls through `ArcanaToolAdapter`. Renderer capabilities remain host-owned beside the engine; static image-backed packs can be returned as real MCP image content without importing browser-only p5/kit renderers.
 
-## Run over stdio
+## Local stdio
 
 ```bash
 cd mcp
 npm install
-npm run dev
+npm start
 ```
 
-## Run over HTTP
+Use `npm --prefix /path/to/generative-arcana/mcp start` as a local MCP server command in a host that supports stdio servers.
+
+A stdio connection owns one persistent Arcana host, so `import_deck` is available there and imported custom decks remain available to later tool calls on that connection.
+
+## Streamable HTTP
 
 ```bash
 cd mcp
@@ -18,16 +22,18 @@ npm install
 npm run http
 ```
 
+Defaults:
+
+- endpoint: `http://127.0.0.1:3000/mcp`
+- health: `http://127.0.0.1:3000/healthz`
+- localhost Host/Origin allowlist is enforced
+
 Environment:
 
-- `PORT` — listen port, default `3000`
-- `HOST` — bind host, default `127.0.0.1`
-- `MCP_ALLOWED_HOSTS` — comma-separated Host-header allowlist; required when binding publicly unless the runtime provides a recognized Vercel deployment hostname
-- `MCP_ALLOWED_ORIGINS` — comma-separated Origin allowlist; defaults to the host allowlist
-- `MCP_MAX_REQUEST_BYTES` — maximum HTTP request body size, default `4000000`
-- `MCP_RATE_LIMIT_PER_MINUTE` — fixed-window per-source request limit, default `120`
-- `MCP_STATE_DIR` — optional directory for authenticated per-principal persisted host state
-- `DATABASE_URL` — optional Neon/Postgres connection string; when set, authenticated state uses the Neon-backed repository instead of filesystem/memory
+- `PORT` — default `3000`
+- `HOST` — default `127.0.0.1`
+- `MCP_ALLOWED_HOSTS` — comma-separated hostnames, required when binding non-loopback
+- `MCP_ALLOWED_ORIGINS` — comma-separated origin hostnames; defaults to the host allowlist
 - `MCP_ALPHA_TOKEN` — optional private-alpha bearer token; when absent HTTP remains anonymous/stateless
 - `MCP_ALPHA_PRINCIPAL_ID` — stable opaque scope id for the alpha token, default `alpha-user-v1`
 - `MCP_OAUTH_ISSUER` — upstream OAuth/OIDC issuer URL for real accounts
@@ -35,122 +41,77 @@ Environment:
 - `MCP_OAUTH_JWKS_URI` — optional explicit JWKS URL; otherwise discovered from the issuer
 - `MCP_OAUTH_READ_SCOPES` — comma-separated personal-deck read scopes, default `decks:read`
 - `MCP_OAUTH_WRITE_SCOPES` — comma-separated deck mutation scopes, default `decks:write`
-- `WORKOS_API_KEY` — optional AuthKit server API key for the browser account session adapter
+- `WORKOS_API_KEY` — optional AuthKit server API key for first-party browser sessions
 - `WORKOS_CLIENT_ID` — AuthKit application client id for browser sign-in
-- `WORKOS_COOKIE_PASSWORD` — at least 32 characters; encrypts the app-owned sealed browser session cookie
+- `WORKOS_COOKIE_PASSWORD` — at least 32 characters; seals the app-owned browser session cookie
 - `WORKOS_REDIRECT_URI` — configured AuthKit callback URL, e.g. `https://arcana.example/auth/callback`
 - `WORKOS_IDENTITY_ISSUER` — optional explicit browser identity issuer; defaults to `MCP_OAUTH_ISSUER` and must match it when both are set
 - `ARCANA_SESSION_COOKIE` — optional browser session cookie name, default `arcana-session`
-- `ARCANA_STATIC_VISUAL_BASE_URL` — optional HTTPS/loopback URL used to expose repository-backed visual assets to remote MCP hosts (for example `https://raw.githubusercontent.com/<owner>/<repo>/<commit>/`)
-- `ARCANA_STATIC_VISUAL_ROOT` — optional local repository/content root override used when returning image bytes; defaults to the repository root inferred from the MCP module location
-
-The endpoint is `POST /mcp` and uses MCP Streamable HTTP. Each HTTP request gets a fresh protocol server; anonymous requests use a fresh stateless Arcana adapter, while authenticated requests resolve through the configured principal store and may reuse a principal-scoped host.
+- `MCP_STATE_DIR` — optional durable filesystem root for authenticated custom deck state
+- `MCP_MAX_REQUEST_BYTES` — declared HTTP request-size cap, default `4000000`
+- `MCP_RATE_LIMIT_PER_MINUTE` — in-process per-remote-address request budget, default `120`
 
 Anonymous HTTP exposes the public/read-oriented symbolic + visual tools. `MCP_ALPHA_TOKEN` remains available for private dogfooding. For real accounts, configure `MCP_OAUTH_ISSUER` + `MCP_OAUTH_RESOURCE` with `DATABASE_URL`: Generative Arcana acts only as an OAuth resource server, validates OIDC JWT access tokens, and maps the token's `(issuer, subject)` pair onto a stable opaque `usr_*` principal stored in Neon. A supplied malformed/invalid credential fails closed instead of silently downgrading to anonymous.
 
 OAuth mode publishes RFC 9728 Protected Resource Metadata at the path-specific well-known URL (for `/mcp`, `/.well-known/oauth-protected-resource/mcp`) and at the root compatibility URL. Public tools advertise mixed anonymous/OAuth metadata; `import_deck` remains discoverable before login but returns the MCP `mcp/www_authenticate` challenge until the caller has both `decks:read` and `decks:write`.
 
-For client interoperability, the HTTP server also exposes a legacy RFC 8414 `/.well-known/oauth-authorization-server` compatibility route that fetches the configured issuer's authorization metadata, verifies that the returned `issuer` exactly matches `MCP_OAUTH_ISSUER`, and then relays it. The metadata fetch is bounded to five seconds, limited in size, and follows only safe HTTPS/loopback redirects. This lets clients that have not yet adopted RFC 9728 discover the same upstream authorization server without turning Generative Arcana into an authorization server or an open proxy.
+If `MCP_STATE_DIR` is also configured, authenticated custom deck manifests are restored across process restarts. The persisted format contains only versioned custom deck manifests; bundled decks and engine/session objects are reconstructed from code on every process start. Files are written atomically and principal ids are hashed before filesystem use.
 
 The static bearer resolver is deliberately an **alpha/testing adapter**. Production OAuth stays provider-neutral: an upstream authorization server owns login/consent/token issuance, `OidcJwtBearerIdentityVerifier` validates issuer + audience + signature, and `NeonExternalIdentityRepository` supplies the stable internal principal. The chosen identity provider is therefore deployment configuration rather than an Arcana domain dependency.
 
-Browser sign-in is a separate first-party session boundary. When the `WORKOS_*` browser settings are present, `/auth/login` and `/auth/callback` use AuthKit Hosted UI, the resulting access+refresh tokens stay encrypted inside an HttpOnly/SameSite `arcana-session` cookie, `/auth/session` refreshes that sealed session server-side when necessary, and `/auth/logout` terminates the upstream session. The browser adapter proves an external `(issuer, subject)` pair and feeds it through the **same** `NeonExternalIdentityRepository` used by MCP bearer tokens, so web, ChatGPT, Claude, and future hosts converge on one opaque `usr_*` owner without making WorkOS part of the deck/domain model.
+Browser sign-in is a separate first-party session boundary. When the `WORKOS_*` settings are present, `/auth/login` and `/auth/callback` use AuthKit Hosted UI, the resulting session is kept in an HttpOnly/SameSite sealed cookie, `/auth/session` validates and refreshes it server-side, and POST `/auth/logout` ends the upstream session. The browser adapter proves an external `(issuer, subject)` identity and sends it through the **same** `NeonExternalIdentityRepository` used by MCP bearer tokens, so both transports converge on one opaque `usr_*` owner.
 
-The browser app never needs the MCP bearer token. This keeps MCP resource-indicator/audience semantics independent from the ordinary web session while preserving account identity across both transports.
+The browser never receives or stores the MCP resource bearer token. AuthKit is therefore deployment glue for the web session, not an `ArcanaEngine`, manifest, or ownership dependency; MCP audience/resource-indicator semantics remain independent.
 
-The current recommended first provider is **WorkOS AuthKit** because its MCP support covers the pieces Generative Arcana needs now: OAuth 2.1/PKCE, resource indicators, current MCP Client ID Metadata Documents, Dynamic Client Registration fallback, hosted login, and first-party account UX. This is a deployment adapter choice, not a domain dependency. Configure the AuthKit MCP resource indicator to exactly match `MCP_OAUTH_RESOURCE`; enable CIMD and keep DCR enabled for older clients while ChatGPT/Claude interoperability is being verified. Other standards-compliant OAuth/OIDC providers can replace AuthKit later without changing `ArcanaEngine`, deck manifests, or ownership records.
+`/healthz` reports the MCP version plus the active auth/state/limit modes so bug reports can identify the deployed contract. Tool-call diagnostics are JSON lines on stderr containing only tool name, success/failure, duration, transport, and an opaque principal hash; tool arguments, questions, tokens, and custom deck payloads are never logged by this layer.
 
-## What it exposes
+## Protocol smoke tests
 
-- `list_decks` — current runtime decks (bundled plus the authenticated principal's owned/imported decks)
-- `get_deck` — validated deck data plus metadata
-- `get_card` — authored card data
-- `analyze_card` — factorized symbolic-axis projection for one card
-- `query_cards` — exact intersections over authored axes and numeric structure
-- `list_spreads` — generic + native spread definitions
-- `cast_reading` — fresh reading + compact reproducible token
-- `resolve_reading` — decode v2 and legacy v1 reading tokens; new readings use the deck's stable runtime/resource id while legacy slug tokens remain compatible when unambiguous
-- `interpretation_context` — LLM-ready authored context for a reading
-- `import_deck` — validate/import custom deck JSON into the authenticated principal's catalog-backed runtime; new imports are private and receive an opaque stable resource id independent from the authored manifest slug
-- `list_public_decks` — discover published public user decks without installing them
-- `get_shared_deck` — resolve a public/unlisted deck by stable resource id, or an owned private deck when authenticated
-- `list_my_decks` — list the authenticated principal's owned catalog resources and visibility state
-- `set_deck_visibility` — owner-only `private | unlisted | public` publication control
-- `delete_my_deck` — owner-only permanent deck deletion
-- `render_card` — visual card content when a host-readable visual source is available
-- `render_reading` — visual spread content for a resolved reading when every placed card can be rendered
-
-Shared deck ids also flow through the ordinary read-oriented symbolic and visual tools: visible public/unlisted catalog resources resolve read-through into isolated scratch engines without being copied into the caller's account or mutating the caller's owned runtime. They therefore do not appear in `list_decks`, but `get_deck`, card/query/spread operations, reading resolution, and visual rendering can operate on them directly by stable resource id. Private records stay owner-only and unauthorized callers receive the same unknown-resource behavior as missing ids.
-
-Visual tools return MCP image content (`type: "image"`) rather than browser HTML. The current resolver supports static image-backed packs in `app/src/decks/<deck>/...` and deliberately treats browser-only p5 sketches as unavailable in headless MCP. `ARCANA_STATIC_VISUAL_BASE_URL` is optional presentation glue for remote host URLs; symbolic tools work without it. A future renderer can be added behind the host-side visual resolver without changing the engine, registry, or symbolic tool contract.
-
-## Smoke test
+Supported paths are exercised with the official MCP v2 client:
 
 ```bash
-npm run smoke
-npm run test:host-store
-npm run test:durable-state
-npm run test:deck-catalog
-npm run test:principal
-npm run test:alpha-auth
-npm run test:oauth-identity
-npm run test:hardening
-npm run test:visuals
-npm run eval:golden
+npm --prefix mcp run smoke:stdio
+npm --prefix mcp run smoke:http
+npm --prefix mcp run smoke:http-auth
+# or all three
+npm --prefix mcp run smoke
 ```
 
-`smoke:http` starts the real Node listener on a random local port, initializes the official Streamable HTTP client transport, and asserts anonymous public tool behavior. `smoke:http-auth` additionally starts the server with a temporary `MCP_STATE_DIR`, proves unauthenticated imports are absent, imports a deck with the configured bearer token, restarts the whole process, and confirms that the same principal sees the persisted deck while anonymous callers still do not. The in-process persistence tests additionally verify immutable snapshotting on save/restore boundaries, and the hardening test covers host/origin rejection plus the configured request limit/rate limiter.
+The stdio and HTTP protocol smokes also verify that the visual tool surface can return real PNG `image` content blocks. The authenticated HTTP smoke launches the real server with a temporary durable state directory, connects anonymously and authenticated, imports a custom deck, kills/restarts the server, reconnects, and proves that the deck survives only in the authenticated principal's host. HTTP guardrail smoke separately proves versioned health metadata, 413 request rejection, and 429 + `Retry-After` rate limiting.
+
+For the deterministic semantic baseline used before live dogfooding:
+
+```bash
+npm --prefix mcp run eval:golden
+```
 
 See `mcp/TESTING.md` for the private-alpha conversational test plan and bug-capture rules.
 
-## MCP client config
+## Container
 
-Local stdio:
+Build from the repository root so the image can include the shared engine, deck corpus, and server-renderable static visual assets:
 
-```json
-{
-  "mcpServers": {
-    "generative-arcana": {
-      "command": "node",
-      "args": ["--import", "tsx", "/absolute/path/to/generative-arcana/mcp/src/stdio.ts"]
-    }
-  }
-}
+```bash
+docker build -f mcp/Dockerfile -t generative-arcana-mcp .
 ```
 
-Remote Streamable HTTP:
+Anonymous run:
 
-```json
-{
-  "mcpServers": {
-    "generative-arcana": {
-      "url": "https://your-arcana-host.example/mcp"
-    }
-  }
-}
+```bash
+docker run --rm -p 3000:3000 \
+  -e MCP_ALLOWED_HOSTS=localhost \
+  generative-arcana-mcp
 ```
 
 Private alpha with durable custom decks:
 
 ```bash
-export MCP_ALPHA_TOKEN='replace-with-a-long-random-secret'
-export MCP_ALPHA_PRINCIPAL_ID='alpha-user-v1'
-export MCP_STATE_DIR='/var/lib/generative-arcana'
-npm run http
-```
-
-Then point the client at `https://your-host.example/mcp` and configure it to send `Authorization: Bearer <MCP_ALPHA_TOKEN>`.
-
-## Container
-
-```bash
-docker build -f mcp/Dockerfile -t generative-arcana-mcp .
+mkdir -p .arcana-state
 docker run --rm -p 3000:3000 \
-  -e MCP_ALLOWED_HOSTS=localhost:3000 \
-  -e MCP_ALLOWED_ORIGINS=http://localhost:3000 \
-  -e MCP_ALPHA_TOKEN=replace-me \
-  -e MCP_STATE_DIR=/data \
-  -v "$PWD/.arcana-mcp:/data" \
+  -e MCP_ALLOWED_HOSTS=localhost \
+  -e MCP_ALPHA_TOKEN='replace-with-a-long-random-secret' \
+  -e MCP_STATE_DIR=/data/arcana \
+  -v "$PWD/.arcana-state:/data" \
   generative-arcana-mcp
 ```
 
@@ -160,43 +121,53 @@ The image binds `0.0.0.0:3000` for container platforms but intentionally **fails
 
 Vercel is the preferred private-alpha target. The project uses Vercel's **Container** runtime rather than per-file Functions, so the deployed server is the same Node HTTP process exercised by the local/container protocol tests.
 
-1. Import this repository into Vercel and keep the project root at the repository root.
-2. The checked-in root `vercel.json` points Vercel at `Dockerfile.vercel`; no framework preset is required.
-3. Set `MCP_ALLOWED_HOSTS` to the exact deployment hostnames that should reach `/mcp`, for example:
+The repository root contains:
 
-```text
-my-project.vercel.app,my-project-git-main-my-team.vercel.app
-```
+- `Dockerfile.vercel` — the production container entrypoint
+- `vercel.json` — an explicit catch-all rewrite into the container service
+- `/mcp` — Streamable HTTP MCP endpoint served by `mcp/src/http.ts`
+- `/healthz` — versioned runtime/auth/state metadata
+- Neon-backed `ArcanaHostStateRepository` whenever `DATABASE_URL` is present
 
-Vercel also provides `VERCEL_URL` / `VERCEL_PROJECT_PRODUCTION_URL` / `VERCEL_BRANCH_URL`; when explicit hosts are absent the server derives an allowlist from those recognized runtime values. Explicit configuration is still preferable for the stable production endpoint.
+The container does **not** rely on ephemeral process memory for authenticated state when Neon is configured. Each authenticated principal host restores its versioned custom-deck state from Neon, while anonymous requests receive a fresh bundled symbolic host.
 
+### Vercel setup
+
+1. Import `bombadil-labs/generative-arcana` with the repository root as the project root.
+2. Set **Framework Preset → Container**. Leave Build Command, Output Directory, and Install Command on their automatic/default values.
+3. Add the Neon integration from the Vercel Marketplace. Vercel/Neon will provide `DATABASE_URL` (and can create isolated preview branches for preview deployments).
 4. For private-alpha stateful access, add:
 
 ```text
-DATABASE_URL=postgresql://...
-MCP_ALPHA_TOKEN=<long-random-secret>
+MCP_ALPHA_TOKEN=<long random secret>
 MCP_ALPHA_PRINCIPAL_ID=alpha-user-v1   # optional
 ```
 
-The Vercel container does not persist a writable filesystem across instances, so `MCP_STATE_DIR` is not a production persistence mechanism there. When `DATABASE_URL` is present, authenticated host state is loaded/saved from Neon-compatible Postgres instead. The repository creates its `arcana_host_state` table lazily on first use; no separate migration command is required for this alpha.
-
-5. Deploy. Verify:
-
-```bash
-curl https://YOUR-DEPLOYMENT/healthz
-```
-
-The health payload reports `runtime: "vercel-container"`, `auth`, and `state`. A private-alpha deployment should report bearer auth plus `state: "neon"`.
-
-6. For OAuth production accounts, replace the private-alpha token with:
+For browser account sessions, also configure the AuthKit adapter (alongside `DATABASE_URL`):
 
 ```text
-DATABASE_URL=postgresql://...
-MCP_OAUTH_ISSUER=https://your-auth-domain.example/
-MCP_OAUTH_RESOURCE=https://your-deployment.example/mcp
-MCP_OAUTH_READ_SCOPES=decks:read
-MCP_OAUTH_WRITE_SCOPES=decks:write
-# MCP_OAUTH_JWKS_URI=https://...   # optional; issuer discovery is the default
+WORKOS_API_KEY=<server API key>
+WORKOS_CLIENT_ID=<AuthKit client id>
+WORKOS_COOKIE_PASSWORD=<32+ character secret>
+WORKOS_REDIRECT_URI=https://YOUR_PROJECT.vercel.app/auth/callback
+# WORKOS_IDENTITY_ISSUER=https://...   # optional when MCP_OAUTH_ISSUER is configured
+```
+
+5. Deploy. Vercel supplies the serving `PORT`; `mcp/src/http.ts` derives the deployment Host allowlist from Vercel's hostname environment variables.
+
+The resulting endpoints are:
+
+```text
+https://YOUR_PROJECT.vercel.app/mcp
+https://YOUR_PROJECT.vercel.app/healthz
+```
+
+`/healthz` reports `runtime: "vercel-container"` plus active auth/state/limit modes. With `DATABASE_URL`, state mode is `neon`. A valid `Authorization: Bearer <MCP_ALPHA_TOKEN>` request receives the principal-scoped surface including `import_deck`; invalid credentials fail closed with 401.
+
+The Neon adapter lazily creates one table:
+
+```sql
+arcana_host_state(scope_id text primary key, state jsonb, updated_at timestamptz)
 ```
 
 The stored JSON remains the same versioned `ArcanaHostState` envelope used by the filesystem repository; bundled decks and runtime/session objects are never persisted. Real account mode uses the same Neon deployment for the `arcana_external_identities` mapping table. The upstream OAuth/OIDC provider remains replaceable; it must support the MCP client authorization flow (OAuth 2.1 + PKCE/resource indicators and an interoperable client-registration approach).
@@ -205,60 +176,49 @@ The stored JSON remains the same versioned `ArcanaHostState` envelope used by th
 
 The repository includes `mcp/fly.toml.example` for a small private-alpha deployment. It uses the existing Dockerfile, HTTPS, auto-start/auto-stop Machines, a persistent volume, and `/healthz` service checks.
 
-1. Copy the example and replace the app name:
+From the repository root:
 
-   ```bash
-   cp mcp/fly.toml.example fly.toml
-   ```
-
-2. Create the app and volume:
-
-   ```bash
-   fly apps create your-arcana-app
-   fly volumes create arcana_data --region iad --size 1
-   ```
-
-3. Set the bearer token as a Fly secret:
-
-   ```bash
-   fly secrets set MCP_ALPHA_TOKEN='replace-with-a-long-random-secret'
-   ```
-
-4. Deploy from the repository root:
-
-   ```bash
-   fly deploy -c fly.toml
-   ```
-
-5. Verify `/healthz`, then point the MCP client at `https://your-arcana-app.fly.dev/mcp` with the bearer token.
-
-## Client examples
-
-### Claude Desktop
-
-Claude Desktop can launch the stdio server directly during local development. Add an entry like this to the Claude Desktop MCP config (use your actual repo path):
-
-```json
-{
-  "mcpServers": {
-    "generative-arcana": {
-      "command": "node",
-      "args": [
-        "--import",
-        "tsx",
-        "/Users/you/src/generative-arcana/mcp/src/stdio.ts"
-      ]
-    }
-  }
-}
+```bash
+cp mcp/fly.toml.example mcp/fly.toml
+# edit mcp/fly.toml and replace every YOUR_APP_NAME
+fly apps create YOUR_APP_NAME
+fly volumes create arcana_state --region iad --size 1
+fly secrets set MCP_ALPHA_TOKEN='replace-with-a-long-random-secret'
+fly deploy . --config mcp/fly.toml
 ```
 
-### Generic remote client
-
-For a client that supports Streamable HTTP, point it at:
+Endpoints:
 
 ```text
-https://your-arcana-host.example/mcp
+https://YOUR_APP_NAME.fly.dev/mcp
+https://YOUR_APP_NAME.fly.dev/healthz
 ```
 
-Anonymous clients receive the public stateless tool surface. During private alpha, authenticated clients also send the configured bearer token. In production OAuth mode the client should follow the protected-resource metadata/challenge to the configured authorization server instead of embedding a static secret.
+Anonymous MCP clients can use the twelve stateless symbolic + visual tools. Clients capable of sending the configured bearer credential receive the principal-scoped stateful surface as well. Do not treat the static bearer adapter as a public multi-user auth system; it exists to make private dogfooding and restart-persistence testing honest before OAuth lands.
+
+If a host sends an `Origin` header that is rejected, add that origin explicitly via `MCP_ALLOWED_ORIGINS` rather than weakening Host validation.
+
+## Tools
+
+Available anonymously over HTTP and over stdio:
+
+- `list_decks`
+- `get_deck`
+- `get_card`
+- `analyze_card`
+- `query_cards`
+- `list_spreads`
+- `cast_reading`
+- `resolve_reading`
+- `interpretation_context`
+- `list_visual_packs`
+- `get_card_art`
+- `render_reading`
+
+The visual tools are renderer-capability tools, not symbolic semantics. `Final Fantasy Tarot` currently ships the first complete server-renderable pack (`pixel`, 78 PNGs). `get_card_art` returns an MCP `image` content block for one card; `render_reading` resolves a reading token and returns its drawn cards as image blocks with position/orientation metadata. Browser-only kit/raw-p5 skins remain separate until a headless renderer is added.
+
+Additionally available over stdio and authenticated HTTP:
+
+- `import_deck`
+
+Symbolic tools delegate to the same `ArcanaEngine` and `ArcanaToolAdapter`; auth and persistence select host state but do not redefine symbolic behavior. Visual tools consume the same stable deck/card identities through a host-owned visual asset store.
