@@ -57,6 +57,7 @@ export async function loadAuthorizationServerMetadata(
 ): Promise<Record<string, unknown>> {
   const response = await fetcher(authorizationServerMetadataUrl(issuer), {
     headers: { accept: "application/json" },
+    signal: AbortSignal.timeout(5_000),
   });
   if (!response.ok) throw new Error(`Authorization-server metadata fetch failed with HTTP ${response.status}.`);
   const metadata = await response.json() as Record<string, unknown>;
