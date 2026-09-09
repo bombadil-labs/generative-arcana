@@ -8,5 +8,4 @@ app/src/components
 app/src/styles
 app/src/decks/*/cards
 app/src/decks/*/cube
-app/src/decks/*/pixel
 app/src/runtime
