@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { ARCANA_MCP_VERSION } from "../src/version";
+import { accountDeploymentReadiness } from "../src/deploymentReadiness";
 
 const port = 45000 + (process.pid % 1000);
 const endpoint = new URL(`http://127.0.0.1:${port}/mcp`);
 const health = new URL(`http://127.0.0.1:${port}/healthz`);
+const ready = new URL(`http://127.0.0.1:${port}/readyz`);
 
 async function main(): Promise<void> {
+  assert.equal(accountDeploymentReadiness({ durableCatalog: true, mcpOAuth: true, browserAuth: true, webApp: true, alphaAuth: false }).productionAccounts, true);
+  assert.equal(accountDeploymentReadiness({ durableCatalog: true, mcpOAuth: true, browserAuth: true, webApp: true, alphaAuth: true }).productionAccounts, false);
   const child = spawn(process.execPath, ["--import", "tsx", "src/http.ts"], {
     env: {
       ...process.env,
@@ -23,9 +27,23 @@ async function main(): Promise<void> {
   try {
     await waitForHealth(child, health, () => stderr);
     const healthResponse = await fetch(health);
-    const healthBody = await healthResponse.json() as { version?: string; limits?: { maxRequestBytes?: number; requestsPerMinute?: number } };
+    const healthBody = await healthResponse.json() as {
+      version?: string;
+      limits?: { maxRequestBytes?: number; requestsPerMinute?: number };
+      readiness?: { productionAccounts?: boolean; missing?: string[] };
+    };
     assert.equal(healthBody.version, ARCANA_MCP_VERSION);
     assert.deepEqual(healthBody.limits, { maxRequestBytes: 32, requestsPerMinute: 2 });
+    assert.equal(healthBody.readiness?.productionAccounts, false);
+    assert.ok(healthBody.readiness?.missing?.includes("durableCatalog"));
+    assert.ok(healthBody.readiness?.missing?.includes("mcpOAuth"));
+    assert.ok(healthBody.readiness?.missing?.includes("browserAuth"));
+
+    const readinessResponse = await fetch(ready);
+    assert.equal(readinessResponse.status, 503, "anonymous/local operation is healthy even when production accounts are not configured");
+    const readinessBody = await readinessResponse.json() as { ok?: boolean; readiness?: { productionAccounts?: boolean } };
+    assert.equal(readinessBody.ok, false);
+    assert.equal(readinessBody.readiness?.productionAccounts, false);
 
     const oversized = await fetch(endpoint, {
       method: "POST",
