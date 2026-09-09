@@ -14,6 +14,8 @@ import { principalHasScopes, type ArcanaPrincipal } from "./principal";
 import { ARCANA_MCP_VERSION } from "./version";
 import { createBundledStaticVisualStore, type ServerVisualStore } from "./staticVisuals";
 import { registerArcanaVisualTools } from "./visualTools";
+import { registerArcanaCatalogTools } from "./catalogTools";
+import type { UserDeckCatalogRepository } from "./userDeckCatalog";
 
 export { createBundledArcanaAdapter } from "./hostStore";
 
@@ -78,6 +80,10 @@ export interface ArcanaMcpServerOptions {
   adapter?: ArcanaToolAdapter;
   /** Stateless transports must disable tools whose semantics require persistence across calls. */
   includeStatefulTools?: boolean;
+  /** Authenticated principal for account-scoped catalog operations (OAuth or trusted alpha adapters). */
+  principal?: ArcanaPrincipal | null;
+  /** Optional first-class user deck catalog. When present, sharing/management tools are registered. */
+  catalog?: UserDeckCatalogRepository;
   /** Optional OAuth context for mixed public/personal HTTP tools. */
   oauth?: ArcanaOAuthToolContext;
   /** Payload-free observer for alpha diagnostics/metrics. */
@@ -153,6 +159,23 @@ export function createArcanaMcpServer(options: ArcanaMcpServerOptions = {}): Mcp
     onToolCall: options.onToolCall,
     securitySchemes: readSchemes as readonly ToolSecurityScheme[] | undefined,
   });
+
+  if (options.catalog) {
+    registerArcanaCatalogTools(server, {
+      adapter,
+      catalog: options.catalog,
+      principal: options.principal ?? options.oauth?.principal ?? null,
+      ...(options.oauth
+        ? {
+            oauth: {
+              resourceMetadataUrl: options.oauth.resourceMetadataUrl,
+              readScopes: options.oauth.readScopes,
+              writeScopes: options.oauth.writeScopes,
+            },
+          }
+        : {}),
+    });
+  }
 
   return server;
 }
