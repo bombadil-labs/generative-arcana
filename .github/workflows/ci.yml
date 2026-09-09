@@ -59,6 +59,8 @@ jobs:
             command: npm run test:web-catalog-api --prefix mcp
           - check: browser session auth
             command: npm run test:browser-session --prefix mcp
+          - check: cross-host account flow
+            command: npm run test:cross-host-account --prefix mcp
           - check: web app static serving
             command: npm run test:web-app-static --prefix mcp
           - check: shared decks
