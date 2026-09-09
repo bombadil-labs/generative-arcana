@@ -43,6 +43,7 @@ import {
 } from "./workosBrowserAuth";
 import { serveArcanaWebApp } from "./webAppStatic";
 import { accountDeploymentReadiness } from "./deploymentReadiness";
+import { createArcanaAuthoringRequestHandler, isArcanaAuthoringPath } from "./authoringApi";
 
 const port = envPort(process.env.PORT, 3000);
 const host = process.env.HOST?.trim() || "127.0.0.1";
@@ -126,6 +127,7 @@ const requestHandler = createArcanaHttpRequestHandler({
       }
     : undefined,
 });
+const authoringHandler = createArcanaAuthoringRequestHandler({ maxRequestBytes });
 const webCatalogHandler = catalog ? createArcanaWebCatalogRequestHandler({
   catalog,
   hosts,
@@ -184,9 +186,10 @@ const http = createServer((req, res) => {
     return;
   }
 
+  const isAuthoringRequest = isArcanaAuthoringPath(url.pathname);
   const isWebCatalogRequest = isArcanaWebCatalogPath(url.pathname);
   const isBrowserAuthRequest = isArcanaBrowserAuthPath(url.pathname);
-  if (url.pathname !== "/mcp" && !isWebCatalogRequest && !isBrowserAuthRequest) {
+  if (url.pathname !== "/mcp" && !isAuthoringRequest && !isWebCatalogRequest && !isBrowserAuthRequest) {
     if (webAppDistDir && validateHost(req, res) && serveArcanaWebApp(req, res, webAppDistDir)) return;
     if (res.headersSent) return;
     res.writeHead(404, { "content-type": "application/json" });
@@ -197,6 +200,7 @@ const http = createServer((req, res) => {
   if (!validateHost(req, res)) return;
   const requiresOrigin = url.pathname === "/mcp"
     || isWebCatalogRequest
+    || (isAuthoringRequest && req.method === "POST")
     || (isBrowserAuthRequest && req.method === "POST");
   if (requiresOrigin && !validateOrigin(req, res)) return;
 
@@ -214,6 +218,11 @@ const http = createServer((req, res) => {
       "retry-after": String(decision.retryAfterSeconds),
     });
     res.end(JSON.stringify({ error: "rate_limited" }));
+    return;
+  }
+
+  if (isAuthoringRequest) {
+    void authoringHandler(req, res);
     return;
   }
 
