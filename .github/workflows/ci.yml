@@ -57,6 +57,8 @@ jobs:
             command: npm run test:alpha-auth --prefix mcp
           - check: hardening
             command: npm run test:hardening --prefix mcp
+          - check: visual assets
+            command: npm run test:visuals --prefix mcp
           - check: golden eval
             command: npm run eval:golden --prefix mcp
           - check: stdio protocol

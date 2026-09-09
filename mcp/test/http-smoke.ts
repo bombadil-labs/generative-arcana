@@ -12,6 +12,9 @@ const REQUIRED_HTTP_TOOLS = [
   "cast_reading",
   "resolve_reading",
   "interpretation_context",
+  "list_visual_packs",
+  "get_card_art",
+  "render_reading",
 ];
 
 const port = 43000 + (process.pid % 1000);
@@ -29,7 +32,7 @@ async function main(): Promise<void> {
   try {
     await waitForHealth(child, health, () => stderr);
 
-    const client = new Client({ name: "generative-arcana-http-smoke", version: "0.1.0" });
+    const client = new Client({ name: "generative-arcana-http-smoke", version: "0.2.0" });
     const transport = new StreamableHTTPClientTransport(endpoint);
     try {
       await withTimeout(client.connect(transport), 10_000, "HTTP MCP connect");
@@ -45,6 +48,16 @@ async function main(): Promise<void> {
       assert.ok(text && text.type === "text", "list_decks returned no text content over HTTP");
       const decks = JSON.parse(text.text) as Array<{ id: string }>;
       assert.equal(decks.length, 7);
+
+      const art = await withTimeout(client.callTool({
+        name: "get_card_art",
+        arguments: { deckId: "final-fantasy-tarot", cardSlug: "major-0" },
+      }), 5_000, "HTTP get_card_art");
+      assert.equal(art.isError, undefined);
+      const image = art.content.find((part) => part.type === "image");
+      assert.ok(image && image.type === "image", "get_card_art returned no image content over HTTP");
+      assert.equal(image.mimeType, "image/png");
+      assert.ok(image.data.startsWith("iVBORw0KGgo"), "HTTP card art is not PNG data");
     } finally {
       await withTimeout(transport.terminateSession(), 2_000, "HTTP session termination").catch(() => undefined);
       await withTimeout(client.close(), 2_000, "HTTP client close").catch(() => undefined);

@@ -1,6 +1,6 @@
 # Generative Arcana MCP
 
-Headless MCP transports for the Generative Arcana engine. The MCP layer owns no symbolic semantics: it loads the shipped corpus into an isolated `DeckRegistry`, creates an `ArcanaEngine`, and delegates every tool call through `ArcanaToolAdapter`.
+Headless MCP transports for the Generative Arcana engine. The MCP layer owns no symbolic semantics: it loads the shipped corpus into an isolated `DeckRegistry`, creates an `ArcanaEngine`, and delegates symbolic tool calls through `ArcanaToolAdapter`. Renderer capabilities remain host-owned beside the engine; static image-backed packs can be returned as real MCP image content without importing browser-only p5/kit renderers.
 
 ## Local stdio
 
@@ -40,7 +40,7 @@ Environment:
 - `MCP_MAX_REQUEST_BYTES` — declared HTTP request-size cap, default `4000000`
 - `MCP_RATE_LIMIT_PER_MINUTE` — in-process per-remote-address request budget, default `120`
 
-Anonymous HTTP exposes only the nine stateless/read-oriented tools. When `MCP_ALPHA_TOKEN` is configured, requests with `Authorization: Bearer <token>` resolve to one isolated principal host and expose `import_deck`. A supplied invalid credential fails closed with HTTP 401 rather than downgrading to anonymous.
+Anonymous HTTP exposes the twelve stateless/read-oriented symbolic + visual tools. When `MCP_ALPHA_TOKEN` is configured, requests with `Authorization: Bearer <token>` resolve to one isolated principal host and expose `import_deck`. A supplied invalid credential fails closed with HTTP 401 rather than downgrading to anonymous.
 
 If `MCP_STATE_DIR` is also configured, authenticated custom deck manifests are restored across process restarts. The persisted format contains only versioned custom deck manifests; bundled decks and engine/session objects are reconstructed from code on every process start. Files are written atomically and principal ids are hashed before filesystem use.
 
@@ -60,7 +60,7 @@ npm --prefix mcp run smoke:http-auth
 npm --prefix mcp run smoke
 ```
 
-The authenticated HTTP smoke launches the real server with a temporary durable state directory, connects anonymously and authenticated, imports a custom deck, kills/restarts the server, reconnects, and proves that the deck survives only in the authenticated principal's host. HTTP guardrail smoke separately proves versioned health metadata, 413 request rejection, and 429 + `Retry-After` rate limiting.
+The stdio and HTTP protocol smokes also verify that the visual tool surface can return real PNG `image` content blocks. The authenticated HTTP smoke launches the real server with a temporary durable state directory, connects anonymously and authenticated, imports a custom deck, kills/restarts the server, reconnects, and proves that the deck survives only in the authenticated principal's host. HTTP guardrail smoke separately proves versioned health metadata, 413 request rejection, and 429 + `Retry-After` rate limiting.
 
 For the deterministic semantic baseline used before live dogfooding:
 
@@ -72,7 +72,7 @@ See `mcp/TESTING.md` for the private-alpha conversational test plan and bug-capt
 
 ## Container
 
-Build from the repository root so the image can include the shared engine and deck corpus:
+Build from the repository root so the image can include the shared engine, deck corpus, and server-renderable static visual assets:
 
 ```bash
 docker build -f mcp/Dockerfile -t generative-arcana-mcp .
@@ -102,28 +102,31 @@ The image binds `0.0.0.0:3000` for container platforms but intentionally **fails
 
 ## Remote alpha on Vercel
 
-Vercel is the preferred private-alpha target. The repository root is a Vercel project with:
+Vercel is the preferred private-alpha target. The project uses Vercel's **Container** runtime rather than per-file Functions, so the deployed server is the same Node HTTP process exercised by the local/container protocol tests.
 
-- `/mcp` → `api/mcp.ts` (Web-standard Streamable HTTP MCP handler)
-- `/healthz` → `api/healthz.ts`
-- Neon-backed `ArcanaHostStateRepository` for authenticated custom-deck persistence
-- anonymous requests remaining stateless and read/cast/query-only
+The repository root contains:
 
-The Vercel Function does **not** rely on process memory for authenticated state. Each authenticated request reconstructs that principal's Arcana host from Neon; successful `import_deck` calls persist the versioned custom-deck snapshot back to Postgres.
+- `Dockerfile.vercel` — the production container entrypoint
+- `vercel.json` — an explicit catch-all rewrite into the container service
+- `/mcp` — Streamable HTTP MCP endpoint served by `mcp/src/http.ts`
+- `/healthz` — versioned runtime/auth/state metadata
+- Neon-backed `ArcanaHostStateRepository` whenever `DATABASE_URL` is present
+
+The container does **not** rely on ephemeral process memory for authenticated state when Neon is configured. Each authenticated principal host restores its versioned custom-deck state from Neon, while anonymous requests receive a fresh bundled symbolic host.
 
 ### Vercel setup
 
-1. Import `bombadil-labs/generative-arcana` into Vercel with the repository root as the project root.
-2. Add the Neon integration from the Vercel Marketplace. Vercel/Neon will provide `DATABASE_URL`.
-3. Add environment variables:
+1. Import `bombadil-labs/generative-arcana` with the repository root as the project root.
+2. Set **Framework Preset → Container**. Leave Build Command, Output Directory, and Install Command on their automatic/default values.
+3. Add the Neon integration from the Vercel Marketplace. Vercel/Neon will provide `DATABASE_URL` (and can create isolated preview branches for preview deployments).
+4. For private-alpha stateful access, add:
 
 ```text
 MCP_ALPHA_TOKEN=<long random secret>
 MCP_ALPHA_PRINCIPAL_ID=alpha-user-v1   # optional
-DATABASE_URL=<provided by Neon>
 ```
 
-4. Deploy.
+5. Deploy. Vercel supplies the serving `PORT`; `mcp/src/http.ts` derives the deployment Host allowlist from Vercel's hostname environment variables.
 
 The resulting endpoints are:
 
@@ -132,9 +135,7 @@ https://YOUR_PROJECT.vercel.app/mcp
 https://YOUR_PROJECT.vercel.app/healthz
 ```
 
-`/healthz` reports `runtime: "vercel-functions"` and whether auth/state are configured. If `MCP_ALPHA_TOKEN` is present without `DATABASE_URL`, authenticated requests fail with 503 rather than pretending ephemeral Function memory is durable.
-
-Anonymous MCP clients receive the nine stateless tools. A valid `Authorization: Bearer <MCP_ALPHA_TOKEN>` request receives the principal-scoped stateful surface including `import_deck`. Invalid credentials fail closed with 401.
+`/healthz` reports `runtime: "vercel-container"` plus active auth/state/limit modes. With `DATABASE_URL`, state mode is `neon`. A valid `Authorization: Bearer <MCP_ALPHA_TOKEN>` request receives the principal-scoped surface including `import_deck`; invalid credentials fail closed with 401.
 
 The Neon adapter lazily creates one table:
 
@@ -142,16 +143,7 @@ The Neon adapter lazily creates one table:
 arcana_host_state(scope_id text primary key, state jsonb, updated_at timestamptz)
 ```
 
-The stored JSON remains the same versioned `ArcanaHostState` envelope used by the filesystem alpha repository; bundled decks and runtime/session objects are never persisted.
-
-For local verification of the Vercel function graph:
-
-```bash
-npm install
-npm run typecheck:vercel
-```
-
-Vercel Functions are per-request/serverless, so production request-rate policy should eventually move to Vercel Firewall or another shared limiter rather than relying on the standalone Node server's in-process limiter.
+The stored JSON remains the same versioned `ArcanaHostState` envelope used by the filesystem repository; bundled decks and runtime/session objects are never persisted. Neon Auth can provide the future upstream account identity, but the current MCP authentication adapter remains the deliberately simple private-alpha bearer resolver until OAuth is wired.
 
 ## Remote alpha on Fly.io
 
@@ -175,7 +167,7 @@ https://YOUR_APP_NAME.fly.dev/mcp
 https://YOUR_APP_NAME.fly.dev/healthz
 ```
 
-Anonymous MCP clients can use the nine stateless tools. Clients capable of sending the configured bearer credential receive the principal-scoped stateful surface as well. Do not treat the static bearer adapter as a public multi-user auth system; it exists to make private dogfooding and restart-persistence testing honest before OAuth lands.
+Anonymous MCP clients can use the twelve stateless symbolic + visual tools. Clients capable of sending the configured bearer credential receive the principal-scoped stateful surface as well. Do not treat the static bearer adapter as a public multi-user auth system; it exists to make private dogfooding and restart-persistence testing honest before OAuth lands.
 
 If a host sends an `Origin` header that is rejected, add that origin explicitly via `MCP_ALLOWED_ORIGINS` rather than weakening Host validation.
 
@@ -192,9 +184,14 @@ Available anonymously over HTTP and over stdio:
 - `cast_reading`
 - `resolve_reading`
 - `interpretation_context`
+- `list_visual_packs`
+- `get_card_art`
+- `render_reading`
+
+The visual tools are renderer-capability tools, not symbolic semantics. `Final Fantasy Tarot` currently ships the first complete server-renderable pack (`pixel`, 78 PNGs). `get_card_art` returns an MCP `image` content block for one card; `render_reading` resolves a reading token and returns its drawn cards as image blocks with position/orientation metadata. Browser-only kit/raw-p5 skins remain separate until a headless renderer is added.
 
 Additionally available over stdio and authenticated HTTP:
 
 - `import_deck`
 
-All transports delegate to the same `ArcanaEngine` and `ArcanaToolAdapter`; auth and persistence select host state but do not redefine symbolic behavior.
+Symbolic tools delegate to the same `ArcanaEngine` and `ArcanaToolAdapter`; auth and persistence select host state but do not redefine symbolic behavior. Visual tools consume the same stable deck/card identities through a host-owned visual asset store.

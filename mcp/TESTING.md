@@ -5,10 +5,10 @@ The private alpha is ready for testing when all CI gates are green and a deploye
 ## Preflight
 
 1. `GET /healthz` returns `ok: true`, the expected `version`, and the configured limits.
-2. Anonymous MCP connection lists nine tools and does **not** list `import_deck`.
-3. Authenticated private-alpha connection lists all ten tools.
+2. Anonymous MCP connection lists twelve tools and does **not** list `import_deck`.
+3. Authenticated private-alpha connection lists all thirteen tools.
 4. Bad bearer credentials receive HTTP 401.
-5. CI is green for app tests/typecheck/build, MCP typecheck, persistence/auth, both protocol transports, golden eval, guardrails, and container build.
+5. CI is green for app tests/typecheck/build, MCP typecheck, persistence/auth, both protocol transports, golden eval, guardrails, visual assets, and container builds.
 
 ## Core dogfood journeys
 
@@ -33,6 +33,14 @@ Run these as natural conversations rather than scripted JSON calls. Record which
 - Follow with: “Don’t recast. Explain why *that exact card* appears structurally.”
 - Follow with: “Now give me the interpretation.”
 - Follow with: “Resolve the reading again from its token and verify we are discussing the same card.”
+
+### Visual reading flow
+
+- “What visual packs can you actually render for Final Fantasy Tarot?” → expect the complete `pixel` pack.
+- “Show me the art for Final Fantasy major-0.” → expect a real PNG image content block, not a prose description.
+- “Cast a three-card Final Fantasy reading and show me the drawn cards.” → expect one immutable reading token and three image blocks from `render_reading`; the model must not recast merely to obtain art.
+- Ask which cards are reversed → orientation metadata must agree with the original reading even though the first static-image slice does not yet rotate the PNG bytes.
+- Ask for images from Deep Time → expect an explicit “no server-renderable visual pack yet” tool error while symbolic reading remains available.
 
 ### Cross-system reasoning
 
@@ -78,6 +86,7 @@ Run before and after any semantic/tool change:
 npm --prefix mcp run eval:golden
 npm --prefix mcp run smoke
 npm --prefix mcp run smoke:http-guardrails
+npm --prefix mcp run test:visuals
 ```
 
 The golden suite is deterministic infrastructure/semantic coverage. As real dogfood sessions reveal model-behavior failures, promote minimal reproducible conversations into a separate agent-eval corpus rather than making the deterministic suite fuzzy.

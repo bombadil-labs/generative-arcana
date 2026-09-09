@@ -9,6 +9,7 @@ COPY app/src ./app/src
 COPY decks ./decks
 COPY mcp/src ./mcp/src
 COPY mcp/tsconfig.json ./mcp/tsconfig.json
+RUN test -f ./app/src/decks/finalfantasy/pixel/major-0.png
 
 WORKDIR /srv/mcp
 ENV NODE_ENV=production
