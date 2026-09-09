@@ -1,7 +1,9 @@
 import { useEffect, type CSSProperties } from "react";
+import { useBrowserSession } from "@/auth/session";
 import { useHashRoute, navigate } from "./router";
 import { Landing } from "./Landing";
 import { Community } from "./Community";
+import { MyDecks } from "./MyDecks";
 import { DeckHome } from "./DeckHome";
 import { CardBrowser } from "./CardBrowser";
 import { Reading } from "./Reading";
@@ -16,12 +18,14 @@ type Tab = "about" | "browse" | "read";
 
 export function App() {
   const route = useHashRoute();
+  const { session } = useBrowserSession();
 
   let content: React.ReactNode;
   let m: RegExpMatchArray | null;
   let deckId: string | null = null;
   let tab: Tab | null = null;
   if (route.match(/^\/community\/?$/)) content = <Community />;
+  else if (route.match(/^\/my-decks\/?$/)) content = <MyDecks />;
   else if ((m = route.match(/^\/deck\/([^/]+)\/browse\/?$/))) { deckId = m[1]; tab = "browse"; content = <RemoteDeckBoundary deckId={deckId}><CardBrowser deckId={deckId} /></RemoteDeckBoundary>; }
   else if ((m = route.match(/^\/deck\/([^/]+)\/read\/?$/))) { deckId = m[1]; tab = "read"; content = <RemoteDeckBoundary deckId={deckId}><Reading deckId={deckId} /></RemoteDeckBoundary>; }
   else if ((m = route.match(/^\/deck\/([^/]+)\/r\/(.+)$/))) { deckId = m[1]; tab = "read"; content = <RemoteDeckBoundary deckId={deckId}><Reading deckId={deckId} token={m[2]} /></RemoteDeckBoundary>; }
@@ -38,6 +42,10 @@ export function App() {
     { key: "read", label: "Reading", path: `/deck/${deckId}/read` },
   ] : [];
 
+  const accountLabel = session.status === "authenticated"
+    ? session.user.displayName || "My Decks"
+    : "My Decks";
+
   return (
     <div style={{ minHeight: "100vh" }}>
       <header style={header}>
@@ -47,6 +55,7 @@ export function App() {
             <span style={{ font: "400 19px/1 var(--font-display)", letterSpacing: "0.01em" }}>Generative Arcana</span>
           </button>
           {!deckId && <button onClick={() => navigate("/community")} style={libraryLink} aria-current={route.match(/^\/community\/?$/) ? "page" : undefined}>Community</button>}
+          <button onClick={() => navigate("/my-decks")} style={libraryLink} aria-current={route.match(/^\/my-decks\/?$/) ? "page" : undefined}>{accountLabel}</button>
         </div>
         {tabs.length > 0 && (
           <nav aria-label="Deck sections" style={{ display: "flex", gap: 4 }}>
@@ -68,5 +77,5 @@ function BrandMark() {
 
 const header: CSSProperties = { position: "sticky", top: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px clamp(16px, 4vw, 28px)", borderBottom: "1px solid var(--line)", background: "color-mix(in srgb, var(--paper) 82%, transparent)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", flexWrap: "wrap" };
 const brand: CSSProperties = { all: "unset", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 9, color: "var(--ink)" };
-const libraryLink: CSSProperties = { all: "unset", cursor: "pointer", padding: "7px 10px", borderRadius: 999, font: "600 12px/1 var(--font-body)", color: "var(--ink-2)" };
+const libraryLink: CSSProperties = { all: "unset", cursor: "pointer", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "7px 10px", borderRadius: 999, font: "600 12px/1 var(--font-body)", color: "var(--ink-2)" };
 function tabPill(on: boolean): CSSProperties { return { all: "unset", cursor: "pointer", padding: "7px 13px", borderRadius: 999, font: "600 13px/1 var(--font-body)", color: on ? "var(--accent)" : "var(--ink-2)", background: on ? "var(--accent-wash)" : "transparent" }; }

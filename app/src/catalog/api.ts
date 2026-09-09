@@ -16,6 +16,13 @@ export interface SharedCatalogDeck extends CatalogDeckSummary {
   manifest: UserDeckManifest;
 }
 
+export interface ImportMyDeckRequest {
+  data: unknown;
+  tagline?: string;
+  spreads?: unknown[];
+  replaceExisting?: boolean;
+}
+
 export async function listPublicDecks(signal?: AbortSignal): Promise<CatalogDeckSummary[]> {
   return requestJson<CatalogDeckSummary[]>("/api/decks/public", { signal });
 }
@@ -24,8 +31,47 @@ export async function getSharedDeck(id: string, signal?: AbortSignal): Promise<S
   return requestJson<SharedCatalogDeck>(`/api/decks/${encodeURIComponent(id)}`, { signal });
 }
 
+export async function listMyDecks(signal?: AbortSignal): Promise<CatalogDeckSummary[]> {
+  return requestJson<CatalogDeckSummary[]>("/api/me/decks", { signal, credentials: "same-origin" });
+}
+
+export async function importMyDeck(input: ImportMyDeckRequest): Promise<CatalogDeckSummary> {
+  return requestJson<CatalogDeckSummary>("/api/me/decks", jsonRequest("POST", input));
+}
+
+export async function setMyDeckVisibility(
+  id: string,
+  visibility: CatalogDeckSummary["visibility"],
+): Promise<CatalogDeckSummary> {
+  return requestJson<CatalogDeckSummary>(`/api/me/decks/${encodeURIComponent(id)}`, jsonRequest("PATCH", { visibility }));
+}
+
+export async function deleteMyDeck(id: string): Promise<{ id: string; deleted: true }> {
+  return requestJson<{ id: string; deleted: true }>(`/api/me/decks/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    credentials: "same-origin",
+  });
+}
+
+/** Accept the canonical manifest directly while preserving raw deck JSON as a compatibility path. */
+export function importRequestFromJson(value: unknown, replaceExisting = false): ImportMyDeckRequest {
+  if (isRecord(value) && isRecord(value.data) && typeof value.tagline === "string") {
+    if (value.spreads !== undefined && !Array.isArray(value.spreads)) {
+      throw new Error("Manifest spreads must be an array when provided.");
+    }
+    return {
+      data: value.data,
+      tagline: value.tagline,
+      ...(value.spreads === undefined ? {} : { spreads: value.spreads }),
+      ...(replaceExisting ? { replaceExisting: true } : {}),
+    };
+  }
+  return { data: value, ...(replaceExisting ? { replaceExisting: true } : {}) };
+}
+
 async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
   const response = await fetch(input, {
+    credentials: "same-origin",
     ...init,
     headers: { accept: "application/json", ...init?.headers },
   });
@@ -38,6 +84,19 @@ async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
     throw new CatalogApiError(response.status, message);
   }
   return await response.json() as T;
+}
+
+function jsonRequest(method: "POST" | "PATCH", body: unknown): RequestInit {
+  return {
+    method,
+    credentials: "same-origin",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
 export class CatalogApiError extends Error {
