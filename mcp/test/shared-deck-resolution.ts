@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import deepTime from "../../decks/deep-time/deck.json";
+import { DeckRegistry } from "../../app/src/decks/registry";
 import type { DeckDataFile } from "../../app/src/decks/types";
+import { ArcanaEngine } from "../../app/src/engine/ArcanaEngine";
+import { ArcanaToolAdapter } from "../../app/src/mcp/ArcanaToolAdapter";
 import { createBundledArcanaAdapter } from "../src/hostStore";
 import { createArcanaMcpServer, type ArcanaMcpServerOptions } from "../src/server";
 import { InMemoryUserDeckCatalogRepository } from "../src/userDeckCatalog";
@@ -88,6 +91,33 @@ async function main(): Promise<void> {
     assert.equal(rendered.isError, true);
     assert.match(textContent(rendered), /no server-renderable visual pack yet/i,
       "visual rendering recognizes the shared deck before reporting missing art");
+
+    // Readings minted before catalog runtime identity used the authored slug in token.d. A stable
+    // resource route can safely disambiguate that legacy token; the slug alone cannot be treated as
+    // a globally unique shared resource id.
+    const legacyEngine = new ArcanaEngine(new DeckRegistry());
+    legacyEngine.importDeck(publicDeck.manifest.data, { tagline: publicDeck.manifest.tagline });
+    const legacyAdapter = new ArcanaToolAdapter(legacyEngine);
+    const legacyReading = await legacyAdapter.call("cast_reading", {
+      deckId: publicDeck.slug,
+      spread: "single",
+      question: "Old shared link",
+      reversalRate: 0,
+    }) as { token: string; deckId: string };
+    assert.equal(legacyReading.deckId, publicDeck.slug);
+
+    const migratedLegacy = result<{ deckId: string }>(await anonymous.client.callTool({
+      name: "resolve_reading",
+      arguments: { token: legacyReading.token, deckId: publicDeck.id },
+    }));
+    assert.equal(migratedLegacy.deckId, publicDeck.id);
+
+    const ambiguousLegacy = await anonymous.client.callTool({
+      name: "resolve_reading",
+      arguments: { token: legacyReading.token },
+    });
+    assert.equal(ambiguousLegacy.isError, true,
+      "legacy slug-only shared tokens fail closed because authored slugs are not globally unique");
 
     assert.equal(local.engine.getDeck(publicDeck.id), undefined,
       "shared calls must not install the resource into the caller's runtime");
