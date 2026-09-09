@@ -36,15 +36,22 @@ Environment:
 - `MCP_ALLOWED_ORIGINS` — comma-separated origin hostnames; defaults to the host allowlist
 - `MCP_ALPHA_TOKEN` — optional private-alpha bearer token; when absent HTTP remains anonymous/stateless
 - `MCP_ALPHA_PRINCIPAL_ID` — stable opaque scope id for the alpha token, default `alpha-user-v1`
+- `MCP_OAUTH_ISSUER` — upstream OAuth/OIDC issuer URL for real accounts
+- `MCP_OAUTH_RESOURCE` — canonical MCP resource/audience URL, e.g. `https://arcana.example/mcp`
+- `MCP_OAUTH_JWKS_URI` — optional explicit JWKS URL; otherwise discovered from the issuer
+- `MCP_OAUTH_READ_SCOPES` — comma-separated personal-deck read scopes, default `decks:read`
+- `MCP_OAUTH_WRITE_SCOPES` — comma-separated deck mutation scopes, default `decks:write`
 - `MCP_STATE_DIR` — optional durable filesystem root for authenticated custom deck state
 - `MCP_MAX_REQUEST_BYTES` — declared HTTP request-size cap, default `4000000`
 - `MCP_RATE_LIMIT_PER_MINUTE` — in-process per-remote-address request budget, default `120`
 
-Anonymous HTTP exposes the twelve stateless/read-oriented symbolic + visual tools. When `MCP_ALPHA_TOKEN` is configured, requests with `Authorization: Bearer <token>` resolve to one isolated principal host and expose `import_deck`. A supplied invalid credential fails closed with HTTP 401 rather than downgrading to anonymous.
+Anonymous HTTP exposes the public/read-oriented symbolic + visual tools. `MCP_ALPHA_TOKEN` remains available for private dogfooding. For real accounts, configure `MCP_OAUTH_ISSUER` + `MCP_OAUTH_RESOURCE` with `DATABASE_URL`: Generative Arcana acts only as an OAuth resource server, validates OIDC JWT access tokens, and maps the token's `(issuer, subject)` pair onto a stable opaque `usr_*` principal stored in Neon. A supplied malformed/invalid credential fails closed instead of silently downgrading to anonymous.
+
+OAuth mode publishes RFC 9728 Protected Resource Metadata at the path-specific well-known URL (for `/mcp`, `/.well-known/oauth-protected-resource/mcp`) and at the root compatibility URL. Public tools advertise mixed anonymous/OAuth metadata; `import_deck` remains discoverable before login but returns the MCP `mcp/www_authenticate` challenge until the caller has both `decks:read` and `decks:write`.
 
 If `MCP_STATE_DIR` is also configured, authenticated custom deck manifests are restored across process restarts. The persisted format contains only versioned custom deck manifests; bundled decks and engine/session objects are reconstructed from code on every process start. Files are written atomically and principal ids are hashed before filesystem use.
 
-The static bearer resolver is deliberately an **alpha/testing adapter**, not the final account system. The provider-neutral `PrincipalResolver` and `ArcanaHostStateRepository` boundaries are intended to accept OAuth and database adapters later without changing Arcana semantics.
+The static bearer resolver is deliberately an **alpha/testing adapter**. Production OAuth stays provider-neutral: an upstream authorization server owns login/consent/token issuance, `OidcJwtBearerIdentityVerifier` validates issuer + audience + signature, and `NeonExternalIdentityRepository` supplies the stable internal principal. The chosen identity provider is therefore deployment configuration rather than an Arcana domain dependency.
 
 `/healthz` reports the MCP version plus the active auth/state/limit modes so bug reports can identify the deployed contract. Tool-call diagnostics are JSON lines on stderr containing only tool name, success/failure, duration, transport, and an opaque principal hash; tool arguments, questions, tokens, and custom deck payloads are never logged by this layer.
 
@@ -143,7 +150,7 @@ The Neon adapter lazily creates one table:
 arcana_host_state(scope_id text primary key, state jsonb, updated_at timestamptz)
 ```
 
-The stored JSON remains the same versioned `ArcanaHostState` envelope used by the filesystem repository; bundled decks and runtime/session objects are never persisted. Neon Auth can provide the future upstream account identity, but the current MCP authentication adapter remains the deliberately simple private-alpha bearer resolver until OAuth is wired.
+The stored JSON remains the same versioned `ArcanaHostState` envelope used by the filesystem repository; bundled decks and runtime/session objects are never persisted. Real account mode uses the same Neon deployment for the `arcana_external_identities` mapping table. The upstream OAuth/OIDC provider remains replaceable; it must support the MCP client authorization flow (OAuth 2.1 + PKCE/resource indicators and an interoperable client-registration approach).
 
 ## Remote alpha on Fly.io
 

@@ -4,6 +4,8 @@ import type { ArcanaHostStore } from "./hostStore";
 export interface ArcanaPrincipal {
   /** Stable, opaque scope key. Do not use display names or bearer tokens directly. */
   id: string;
+  /** OAuth scopes granted to this principal when the auth adapter exposes them. */
+  scopes?: readonly string[];
 }
 
 export interface PrincipalRequest {
@@ -33,7 +35,23 @@ export async function resolveArcanaRequestAccess(
   const principal = resolver ? await resolver.resolve(request) : null;
   if (!principal) return { adapter: anonymousAdapter, includeStatefulTools: false, principal: null };
   const id = requirePrincipalId(principal.id);
-  return { adapter: await hosts.get(id), includeStatefulTools: true, principal: { id } };
+  const normalized: ArcanaPrincipal = {
+    id,
+    ...(principal.scopes ? { scopes: normalizeScopes(principal.scopes) } : {}),
+  };
+  return { adapter: await hosts.get(id), includeStatefulTools: true, principal: normalized };
+}
+
+export function principalHasScopes(principal: ArcanaPrincipal | null | undefined, required: readonly string[]): boolean {
+  if (!principal) return false;
+  if (!required.length) return true;
+  if (!principal.scopes) return true; // Non-OAuth adapters (stdio/private alpha) retain their existing trusted semantics.
+  const granted = new Set(principal.scopes);
+  return required.every((scope) => granted.has(scope));
+}
+
+function normalizeScopes(scopes: readonly string[]): string[] {
+  return [...new Set(scopes.map((scope) => scope.trim()).filter(Boolean))].sort();
 }
 
 function requirePrincipalId(value: string): string {

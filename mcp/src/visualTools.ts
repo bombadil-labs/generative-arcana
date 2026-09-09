@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import type { ArcanaToolAdapter } from "../../app/src/mcp/ArcanaToolAdapter";
 import type { ArcanaToolCallObserver } from "./observability";
+import type { ToolSecurityScheme } from "./oauthResource";
 import { ARCANA_SPREAD_WIDGET_URI, registerArcanaSpreadWidget } from "./spreadWidget";
 import type { ServerVisualStore } from "./staticVisuals";
 
@@ -17,6 +18,7 @@ export interface RegisterArcanaVisualToolsOptions {
   adapter: ArcanaToolAdapter;
   visuals: ServerVisualStore;
   onToolCall?: ArcanaToolCallObserver;
+  securitySchemes?: readonly ToolSecurityScheme[];
 }
 
 const readOnlyAnnotations = {
@@ -29,6 +31,7 @@ const readOnlyAnnotations = {
 /** Register Node-host visual capabilities without coupling ArcanaEngine to a renderer. */
 export function registerArcanaVisualTools(server: McpServer, options: RegisterArcanaVisualToolsOptions): void {
   const { adapter, visuals, onToolCall } = options;
+  const authMeta = options.securitySchemes ? { securitySchemes: options.securitySchemes } : undefined;
   registerArcanaSpreadWidget(server);
 
   server.registerTool(
@@ -37,6 +40,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
       description: "List server-renderable visual packs available for one deck.",
       inputSchema: z.object({ deckId: z.string().min(1) }),
       annotations: readOnlyAnnotations,
+      ...(authMeta ? { _meta: authMeta } : {}),
     },
     async (input: unknown) => observed("list_visual_packs", onToolCall, async () => {
       const { deckId } = input as { deckId: string };
@@ -59,6 +63,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
         packId: z.string().min(1).optional(),
       }),
       annotations: readOnlyAnnotations,
+      ...(authMeta ? { _meta: authMeta } : {}),
     },
     async (input: unknown) => observed("get_card_art", onToolCall, async () => {
       const { deckId, cardSlug, packId } = input as { deckId: string; cardSlug: string; packId?: string };
@@ -98,6 +103,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
       }),
       annotations: readOnlyAnnotations,
       _meta: {
+        ...(authMeta ?? {}),
         ui: { resourceUri: ARCANA_SPREAD_WIDGET_URI },
         "openai/outputTemplate": ARCANA_SPREAD_WIDGET_URI,
         "openai/toolInvocation/invoking": "Laying out the spread…",

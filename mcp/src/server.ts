@@ -4,6 +4,13 @@ import { ArcanaToolAdapter, type ArcanaToolName } from "../../app/src/mcp/Arcana
 import { MAX_QUESTION_LENGTH } from "../../app/src/reading/encode";
 import { createBundledArcanaAdapter } from "./hostStore";
 import type { ArcanaToolCallObserver } from "./observability";
+import {
+  oauthToolError,
+  optionalOAuthSecuritySchemes,
+  requiredOAuthSecuritySchemes,
+  type ToolSecurityScheme,
+} from "./oauthResource";
+import { principalHasScopes, type ArcanaPrincipal } from "./principal";
 import { ARCANA_MCP_VERSION } from "./version";
 import { createBundledStaticVisualStore, type ServerVisualStore } from "./staticVisuals";
 import { registerArcanaVisualTools } from "./visualTools";
@@ -59,11 +66,20 @@ const schemas: Record<ArcanaToolName, z.ZodTypeAny> = {
   }),
 };
 
+export interface ArcanaOAuthToolContext {
+  principal: ArcanaPrincipal | null;
+  resourceMetadataUrl: string;
+  readScopes: readonly string[];
+  writeScopes: readonly string[];
+}
+
 export interface ArcanaMcpServerOptions {
   /** Reuse an adapter when the transport provides an appropriate state lifetime. */
   adapter?: ArcanaToolAdapter;
   /** Stateless transports must disable tools whose semantics require persistence across calls. */
   includeStatefulTools?: boolean;
+  /** Optional OAuth context for mixed public/personal HTTP tools. */
+  oauth?: ArcanaOAuthToolContext;
   /** Payload-free observer for alpha diagnostics/metrics. */
   onToolCall?: ArcanaToolCallObserver;
   /** Server-renderable visual assets. Defaults to the shipped static visual corpus. */
@@ -75,9 +91,19 @@ export function createArcanaMcpServer(options: ArcanaMcpServerOptions = {}): Mcp
   const includeStatefulTools = options.includeStatefulTools ?? true;
   const visuals = options.visuals ?? createBundledStaticVisualStore();
   const server = new McpServer({ name: "generative-arcana", version: ARCANA_MCP_VERSION });
+  const readSchemes = options.oauth ? optionalOAuthSecuritySchemes(options.oauth.readScopes) : undefined;
 
   for (const definition of adapter.definitions()) {
-    if (definition.name === "import_deck" && !includeStatefulTools) continue;
+    const isImport = definition.name === "import_deck";
+    if (isImport && !includeStatefulTools && !options.oauth) continue;
+
+    const requiredImportScopes = options.oauth
+      ? [...new Set([...options.oauth.readScopes, ...options.oauth.writeScopes])]
+      : [];
+    const securitySchemes = options.oauth
+      ? (isImport ? requiredOAuthSecuritySchemes(requiredImportScopes) : readSchemes)
+      : undefined;
+
     server.registerTool(
       definition.name,
       {
@@ -89,8 +115,19 @@ export function createArcanaMcpServer(options: ArcanaMcpServerOptions = {}): Mcp
           idempotentHint: definition.name !== "cast_reading",
           openWorldHint: false,
         },
+        ...(securitySchemes ? { _meta: { securitySchemes } } : {}),
       },
       async (input: unknown) => {
+        if (isImport && options.oauth && !principalHasScopes(options.oauth.principal, requiredImportScopes)) {
+          return oauthToolError({
+            resourceMetadataUrl: options.oauth.resourceMetadataUrl,
+            scopes: requiredImportScopes,
+            description: options.oauth.principal
+              ? "Importing a deck requires additional deck write permission."
+              : "Sign in to import a deck into your Generative Arcana account.",
+          });
+        }
+
         const startedAt = Date.now();
         let ok = false;
         try {
@@ -110,7 +147,12 @@ export function createArcanaMcpServer(options: ArcanaMcpServerOptions = {}): Mcp
     );
   }
 
-  registerArcanaVisualTools(server, { adapter, visuals, onToolCall: options.onToolCall });
+  registerArcanaVisualTools(server, {
+    adapter,
+    visuals,
+    onToolCall: options.onToolCall,
+    securitySchemes: readSchemes as readonly ToolSecurityScheme[] | undefined,
+  });
 
   return server;
 }
