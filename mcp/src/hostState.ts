@@ -1,7 +1,7 @@
-import type { Spread } from "../../app/src/decks/spreads";
-import type { DeckDataFile } from "../../app/src/decks/types";
-import { immutableJsonSnapshot } from "../../app/src/decks/jsonSnapshot";
-import { ArcanaToolAdapter, type ArcanaToolName } from "../../app/src/mcp/ArcanaToolAdapter";
+import type { Spread } from "../../app/src/decks/spreads.js";
+import type { DeckDataFile } from "../../app/src/decks/types.js";
+import { immutableJsonSnapshot } from "../../app/src/decks/jsonSnapshot.js";
+import { ArcanaToolAdapter, type ArcanaToolName } from "../../app/src/mcp/ArcanaToolAdapter.js";
 
 export interface PersistedCustomDeckManifest {
   data: DeckDataFile;
