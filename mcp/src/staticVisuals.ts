@@ -11,13 +11,18 @@ export interface StaticVisualPackSummary {
   cardCount?: number;
 }
 
-export interface StaticCardArt {
+export interface ServerCardArt {
   deckId: string;
   cardSlug: string;
   packId: string;
   packLabel: string;
   mimeType: string;
   data: Buffer;
+}
+
+export interface ServerVisualStore {
+  listPacks(deckId: string): StaticVisualPackSummary[];
+  loadCardArt(deckId: string, cardSlug: string, preferPackId?: string): Promise<ServerCardArt | null>;
 }
 
 interface StaticVisualPackDefinition {
@@ -40,7 +45,7 @@ const SAFE_CARD_SLUG = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
  * This deliberately does not import the browser VisualRegistry: kit/raw-p5 packs require a browser
  * renderer, while these assets can be returned directly as MCP image content from any Node host.
  */
-export class StaticVisualStore {
+export class StaticVisualStore implements ServerVisualStore {
   private readonly byDeck = new Map<string, StaticVisualPackDefinition[]>();
 
   constructor(packs: readonly StaticVisualPackDefinition[]) {
@@ -70,7 +75,7 @@ export class StaticVisualStore {
     }));
   }
 
-  async loadCardArt(deckId: string, cardSlug: string, preferPackId?: string): Promise<StaticCardArt | null> {
+  async loadCardArt(deckId: string, cardSlug: string, preferPackId?: string): Promise<ServerCardArt | null> {
     if (!SAFE_CARD_SLUG.test(cardSlug)) throw new Error(`Card slug is not safe for static asset lookup: ${cardSlug}.`);
 
     const packs = this.byDeck.get(deckId) ?? [];

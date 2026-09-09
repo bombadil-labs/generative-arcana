@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import type { ArcanaToolAdapter } from "../../app/src/mcp/ArcanaToolAdapter";
 import type { ArcanaToolCallObserver } from "./observability";
-import { StaticVisualStore } from "./staticVisuals";
+import type { ServerVisualStore } from "./staticVisuals";
 
 export const ARCANA_VISUAL_TOOL_NAMES = [
   "list_visual_packs",
@@ -14,7 +14,7 @@ export type ArcanaVisualToolName = typeof ARCANA_VISUAL_TOOL_NAMES[number];
 
 export interface RegisterArcanaVisualToolsOptions {
   adapter: ArcanaToolAdapter;
-  visuals: StaticVisualStore;
+  visuals: ServerVisualStore;
   onToolCall?: ArcanaToolCallObserver;
 }
 
@@ -64,7 +64,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
       if (!card) throw new Error(`Unknown card “${cardSlug}” in deck “${deckId}”.`);
 
       const art = await visuals.loadCardArt(deckId, cardSlug, packId);
-      if (!art) throw noVisualError(deckId);
+      if (!art) throw visualLookupError(deckId, visuals);
 
       const result = {
         deckId,
@@ -87,7 +87,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
   server.registerTool(
     "render_reading",
     {
-      description: "Render the cards in a resolved Arcana reading as actual MCP image content when visual assets are available.",
+      description: "Render an existing Arcana reading token as actual MCP card images when this host can render the deck. This never recasts the reading.",
       inputSchema: z.object({
         token: z.string().min(1),
         deckId: z.string().min(1).optional(),
@@ -178,4 +178,9 @@ function requireDeck(adapter: ArcanaToolAdapter, deckId: string): void {
 
 function noVisualError(deckId: string): Error {
   return new Error(`Deck “${deckId}” has no server-renderable visual pack yet. Its symbolic reading tools remain available.`);
+}
+
+function visualLookupError(deckId: string, visuals: ServerVisualStore): Error {
+  if (!visuals.listPacks(deckId).length) return noVisualError(deckId);
+  return new Error(`No card art was found in the server-renderable visual packs for deck “${deckId}”.`);
 }

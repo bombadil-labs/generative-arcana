@@ -5,7 +5,7 @@ import { MAX_QUESTION_LENGTH } from "../../app/src/reading/encode";
 import { createBundledArcanaAdapter } from "./hostStore";
 import type { ArcanaToolCallObserver } from "./observability";
 import { ARCANA_MCP_VERSION } from "./version";
-import { createBundledStaticVisualStore, type StaticVisualStore } from "./staticVisuals";
+import { createBundledStaticVisualStore, type ServerVisualStore } from "./staticVisuals";
 import { registerArcanaVisualTools } from "./visualTools";
 
 export { createBundledArcanaAdapter } from "./hostStore";
@@ -67,7 +67,7 @@ export interface ArcanaMcpServerOptions {
   /** Payload-free observer for alpha diagnostics/metrics. */
   onToolCall?: ArcanaToolCallObserver;
   /** Server-renderable visual assets. Defaults to the shipped static visual corpus. */
-  visuals?: StaticVisualStore;
+  visuals?: ServerVisualStore;
 }
 
 export function createArcanaMcpServer(options: ArcanaMcpServerOptions = {}): McpServer {
