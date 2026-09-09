@@ -1,4 +1,4 @@
-import type { DeckManifest } from "@/decks";
+import type { DeckManifest } from "@/decks/manifest";
 
 export interface CatalogDeckSummary {
   id: string;
