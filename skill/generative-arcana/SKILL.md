@@ -1,9 +1,11 @@
 ---
 name: generative-arcana
-description: Design thematically coherent custom tarot decks woven from four symbolic axes — suit, rank, a required transversal substrate (the generalization of tarot's Chaldean/decan order), and the latent prime/composite character of each card's number. Use when the user asks to create, design, or generate a custom tarot deck for a theme (e.g. "design a cyberpunk tarot deck", "make a tarot deck about ocean mythology"). The skill is a router: it proposes a per-stage generation plan, loads the chosen strategy modules, and emits a single canonical `DeckManifest` JSON artifact.
+description: Design thematically coherent custom tarot decks woven from four symbolic axes — suit, rank, a required transversal substrate (the generalization of tarot's Chaldean/decan order), and the latent prime/composite character of each card's number. Use when the user asks to create, design, or generate a custom tarot deck for a theme (e.g. "design a cyberpunk tarot deck", "make a tarot deck about ocean mythology"). This portable skill routes a per-stage generation plan and emits one canonical DeckManifest artifact.
 ---
 
 # Generative Arcana
+
+This is the **portable, host-neutral authoring workflow** for Generative Arcana. ChatGPT, Claude, the web product, and future hosts may provide different intelligence or UX around it; they do not get different deck semantics.
 
 A custom tarot designer built on one idea: **a tarot deck is a small semantic space woven from a few axes, and every card is an integration over those axes.** Traditional tarot wove two (suit, rank), laid a third across them (the planets, in Chaldean order, as decan rulers), and carried a fourth silently in its numbering (the prime/composite structure of the trumps). Generative Arcana makes all four explicit, lets you re-instantiate each for any theme, and stores only what each card genuinely adds.
 
@@ -44,6 +46,13 @@ Hold across every theme and strategy; never duplicate their contents into strate
 - `references/numeric_axis.md` — the prime/composite fourth quantum number and its resonance with the transversal.
 - `references/svg_symbols.md` — glyph constraints (suit glyphs; optional major glyph; optional station symbol).
 - `references/tarot_structure.md` — traditional tarot as a reference point, including the Chaldean decan order the transversal generalizes and the prime/composite structure the fourth axis generalizes.
+- `references/validation.md` — how a connected host uses Generative Arcana's executable spec/validator without making authoring depend on MCP availability.
+
+## Platform contract when available
+
+This bundle is usable without a connected Generative Arcana service. When the host **does** expose Generative Arcana authoring tools, follow `references/validation.md`: call `get_deck_authoring_spec` before generation, and validate the final artifact with `validate_deck_manifest` until it returns both `valid: true` and `canonical: true`.
+
+The platform validator owns runtime correctness. This skill owns generative quality and thematic coherence. Do not recreate server validation rules inside a ChatGPT-, Claude-, or other host-specific wrapper.
 
 ## Workflow: plan, then execute
 
@@ -96,7 +105,7 @@ Face ranks: four roles, distinct initials (for glyph abbreviation), an encoded p
 
 Generate the 56 minor cards. Each integrates its **suit** (style, declared) × **rank** (content, declared) × its **station** (motif, sublimated — from the minor walk) × its **numeric character** (latent — derived from its rank's number; not stored per-card). Follow `references/integration.md` exactly. Overrides only where a card genuinely refines a parent axis.
 
-### Stage 6 — Emit the canonical DeckManifest
+### Stage 6 — Emit and validate the canonical DeckManifest
 
 Assemble the full `Deck` payload per `references/schema.md` (theme, 4 ordered suits, 14 ranks, transversal, major_arcana, 78 cards), write a concise explicit `tagline`, and wrap them in the canonical host-neutral artifact:
 
@@ -110,6 +119,8 @@ Assemble the full `Deck` payload per `references/schema.md` (theme, 4 ordered su
 
 `spreads` is optional; omit it when the deck has no authored native spreads. Do **not** emit a catalog resource ID, owner/principal, visibility, revision/timestamps, OAuth/provider/session data, or renderer/MCP host metadata. `data.slug` remains authored metadata; the platform assigns stable resource identity when the manifest is imported.
 
+When `validate_deck_manifest` is available, validate this exact envelope before delivery. Repair any `valid: false` result and re-run; if the result says `canonical: false`, convert the artifact to the canonical manifest envelope and re-run. Finish only on `valid: true, canonical: true`. Validation does not itself import or publish anything.
+
 Save the artifact:
 
 ```bash
@@ -118,7 +129,7 @@ cat > /mnt/user-data/outputs/[deck-slug].manifest.json << 'EOF'
 EOF
 ```
 
-Confirm the save and report the path. (No renderer is part of this skill yet — the canonical JSON manifest is the deliverable.)
+Confirm the save and report the path. If the user also asked to import it into a connected account, follow `references/validation.md` and treat that as a separate explicit mutation after validation. (No renderer is part of this skill yet — the canonical JSON manifest is the authoring deliverable.)
 
 ## Working with feedback
 
@@ -128,6 +139,7 @@ Confirm the save and report the path. (No renderer is part of this skill yet —
 
 ## Quality checks
 
+- **Platform-valid when available?** If the executable validator is connected, did the final artifact reach `valid: true, canonical: true` before delivery/import?
 - **Canonical envelope?** Is the final artifact exactly the authored `DeckManifest` concern — `data`, explicit non-empty `tagline`, and optional `spreads` — with no catalog/account/host identity metadata?
 - **Axes orthogonal?** Do suit, rank, and transversal each carve the space differently? (If the transversal aligns with the suits, N or the walk is wrong.)
 - **No denormalization?** Does any card restate an axis (a suit's style, a rank's content, a station's motif) instead of overriding it? It shouldn't. (The factorization *gloss* IS stored — intentionally; the factorization is not.)
