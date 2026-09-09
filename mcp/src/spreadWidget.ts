@@ -264,6 +264,7 @@ const SPREAD_WIDGET_HTML = String.raw`<!doctype html>
           label.tabIndex = 0;
           label.appendChild(element("span", "", placement.position));
           if (placement.positionPrompt) {
+            label.setAttribute("aria-label", placement.position + ": " + placement.positionPrompt);
             label.appendChild(element("span", "position-hint", "?"));
             var tooltip = element("div", "position-tooltip", placement.positionPrompt);
             tooltip.setAttribute("role", "tooltip");
