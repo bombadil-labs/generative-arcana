@@ -16,6 +16,7 @@ import {
   bearerChallenge,
   DEFAULT_DECK_READ_SCOPES,
   DEFAULT_DECK_WRITE_SCOPES,
+  loadAuthorizationServerMetadata,
   protectedResourceMetadata,
   protectedResourceMetadataPaths,
   protectedResourceMetadataUrl,
@@ -117,6 +118,15 @@ const http = createServer((req, res) => {
     return;
   }
 
+  // Compatibility for MCP clients that still look for authorization-server metadata on the
+  // resource server instead of following RFC 9728 protected-resource metadata. The upstream
+  // issuer remains the source of truth; we validate its exact issuer before proxying the document.
+  if (oauth && req.method === "GET" && url.pathname === "/.well-known/oauth-authorization-server") {
+    if (!validateHost(req, res)) return;
+    void proxyAuthorizationServerMetadata(oauth.issuer, res);
+    return;
+  }
+
   if (url.pathname !== "/mcp") {
     res.writeHead(404, { "content-type": "application/json" });
     res.end(JSON.stringify({ error: "not_found" }));
@@ -148,6 +158,25 @@ const http = createServer((req, res) => {
 http.listen(port, host, () => {
   console.error(`[generative-arcana-mcp] v${ARCANA_MCP_VERSION} listening on http://${host}:${port}/mcp`);
 });
+
+async function proxyAuthorizationServerMetadata(issuer: string, res: ServerResponse): Promise<void> {
+  try {
+    const metadata = await loadAuthorizationServerMetadata(issuer);
+    if (res.headersSent || res.destroyed) return;
+    res.writeHead(200, {
+      "content-type": "application/json",
+      "cache-control": "public, max-age=300",
+    });
+    res.end(JSON.stringify(metadata));
+  } catch (error) {
+    if (res.headersSent || res.destroyed) return;
+    res.writeHead(502, { "content-type": "application/json" });
+    res.end(JSON.stringify({
+      error: "authorization_metadata_unavailable",
+      message: error instanceof Error ? error.message : "Authorization metadata unavailable.",
+    }));
+  }
+}
 
 async function shutdown(signal: string) {
   console.error(`[generative-arcana-mcp] ${signal}; shutting down`);

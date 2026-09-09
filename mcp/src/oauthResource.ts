@@ -37,6 +37,35 @@ export function protectedResourceMetadataPaths(resource: string): string[] {
   return [...new Set([canonical, "/.well-known/oauth-protected-resource"])];
 }
 
+/** RFC 8414 authorization-server metadata URL derived from an issuer identifier. */
+export function authorizationServerMetadataUrl(issuer: string): string {
+  const url = new URL(issuer);
+  const suffix = url.pathname === "/" ? "" : url.pathname.replace(/^\/+|\/+$/g, "");
+  url.pathname = `/.well-known/oauth-authorization-server${suffix ? `/${suffix}` : ""}`;
+  url.search = "";
+  url.hash = "";
+  return url.href;
+}
+
+/**
+ * Fetch and validate upstream authorization-server metadata for legacy MCP discovery clients.
+ * The issuer is deployment configuration, not request input, so this is not an open proxy.
+ */
+export async function loadAuthorizationServerMetadata(
+  issuer: string,
+  fetcher: typeof fetch = fetch,
+): Promise<Record<string, unknown>> {
+  const response = await fetcher(authorizationServerMetadataUrl(issuer), {
+    headers: { accept: "application/json" },
+  });
+  if (!response.ok) throw new Error(`Authorization-server metadata fetch failed with HTTP ${response.status}.`);
+  const metadata = await response.json() as Record<string, unknown>;
+  if (metadata.issuer !== issuer) {
+    throw new Error("Authorization-server metadata issuer does not exactly match MCP_OAUTH_ISSUER.");
+  }
+  return metadata;
+}
+
 export function optionalOAuthSecuritySchemes(readScopes: readonly string[]): ToolSecurityScheme[] {
   return [
     { type: "noauth" },
