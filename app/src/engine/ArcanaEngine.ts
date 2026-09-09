@@ -60,6 +60,14 @@ export class ArcanaEngine {
     return this.importDeck(data, options);
   }
 
+  /** Remove a runtime custom deck immediately after its durable catalog resource is deleted. */
+  removeCustomDeck(deckId: string): boolean {
+    const deck = this.decks.getDeck(deckId);
+    if (!deck) return false;
+    if (!deck.custom) throw new Error(`Bundled deck “${deck.id}” cannot be removed from the runtime.`);
+    return !!this.decks.unregisterDeck(deck.id);
+  }
+
   queryCards(deckId: string, query: CardQuery = {}): readonly CardAnalysis[] {
     if (query.omega !== undefined && (!Number.isSafeInteger(query.omega) || query.omega < 0)) {
       throw new Error("Card query Ω must be a non-negative integer.");

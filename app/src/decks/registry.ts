@@ -94,6 +94,15 @@ export class DeckRegistry {
     return [...this.decks.values()];
   }
 
+  /** Remove a registered deck by canonical id or an unambiguous compatibility alias. */
+  unregisterDeck(id: string): DeckModule | undefined {
+    const deck = this.getDeck(id);
+    if (!deck) return undefined;
+    if (!this.decks.delete(deck.id)) return undefined;
+    this.rebuildAliases();
+    return deck;
+  }
+
   private rebuildAliases(): void {
     this.aliases.clear();
     for (const deck of this.decks.values()) {
