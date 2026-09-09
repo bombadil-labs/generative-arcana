@@ -2,13 +2,12 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { importRequestFromJson } = require("../.test-build/catalog/api.js");
 
-test("canonical manifest imports preserve manifest metadata", () => {
+test("canonical manifest imports stay intact as the native import payload", () => {
   const data = { slug: "my-deck" };
   const spreads = [{ id: "three" }];
-  assert.deepEqual(importRequestFromJson({ data, tagline: "hello", spreads }, true), {
-    data,
-    tagline: "hello",
-    spreads,
+  const manifest = { data, tagline: "hello", spreads };
+  assert.deepEqual(importRequestFromJson(manifest, true), {
+    manifest,
     replaceExisting: true,
   });
 });

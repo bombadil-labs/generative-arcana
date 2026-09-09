@@ -35,6 +35,22 @@ Two read-only tools are available in every MCP host:
 
 Invalid authored content is returned as structured repair data rather than as a failed MCP tool call. Malformed tool input (for example supplying both `manifest` and `json`) is still a tool error.
 
+### Importing the validated artifact
+
+When a connected host should persist the deck, the preferred stateful call accepts the canonical artifact directly:
+
+```text
+import_deck({ manifest })
+```
+
+`replaceExisting` is operation metadata and may accompany the manifest explicitly:
+
+```text
+import_deck({ manifest, replaceExisting: true })
+```
+
+A manifest import rejects top-level `tagline` or `spreads` overrides; those authored fields must come from the manifest itself. Legacy `{ data, tagline, spreads }` and raw `json` import forms remain available for compatibility.
+
 ## HTTP
 
 The same account-independent surface is available beside the web app and MCP endpoint:

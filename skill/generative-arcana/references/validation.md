@@ -31,16 +31,18 @@ Validation is stateless. It does not save, publish, or import the deck.
 
 Only import when the user actually wants the deck added to the connected Generative Arcana account/host and the relevant stateful tool is available. Validation success alone is not permission to mutate account state.
 
-The current `import_deck` compatibility tool accepts the manifest fields separately, so pass:
+Pass the exact validated authored artifact as the preferred import payload:
 
 ```text
-import_deck({
-  data: manifest.data,
-  tagline: manifest.tagline,
-  spreads: manifest.spreads
-})
+import_deck({ manifest })
 ```
 
-Omit `spreads` when absent. Do not invent catalog IDs, owner IDs, visibility, revisions, or provider metadata inside the manifest before import; the platform owns those concerns.
+If replacement of an existing same-slug owned deck is intended, keep that operation policy outside the manifest:
 
-If replacement of an existing same-slug owned deck is intended, make that explicit with `replaceExisting: true`. Never silently turn a create into a replacement.
+```text
+import_deck({ manifest, replaceExisting: true })
+```
+
+Do not add catalog IDs, owner IDs, visibility, revisions, provider metadata, or replacement policy to the manifest; the platform owns those concerns.
+
+Legacy callers may still send raw `data` or `json` plus top-level `tagline`/`spreads`. New authoring workflows should not unpack a canonical manifest into that compatibility form. When `manifest` is supplied, top-level `tagline` and `spreads` overrides are rejected so there is exactly one authored source of truth. Never silently turn a create into a replacement.
