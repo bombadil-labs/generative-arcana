@@ -113,3 +113,28 @@ test("card queries reject nonsensical Ω coordinates", () => {
   assert.throws(() => engine.queryCards(deck.id, { omega: -1 }), /non-negative integer/);
   assert.throws(() => engine.queryCards(deck.id, { omega: 1.5 }), /non-negative integer/);
 });
+
+test("catalog-backed decks cast with resource ids while legacy slug routes remain resolvable", async () => {
+  const registry = new DeckRegistry();
+  const engine = new ArcanaEngine(registry);
+  const data = rawDeck();
+  data.slug = "legacy-custom-slug";
+  const deck = engine.importDeck(data, {
+    runtimeId: "catalog-resource-id",
+    spreads: [{
+      id: "native",
+      name: "Native",
+      description: "Native spread",
+      deckId: data.slug,
+      positions: [{ name: "Card", prompt: "the card" }],
+    }],
+  });
+
+  assert.equal(deck.id, "catalog-resource-id");
+  assert.equal(engine.getDeck(data.slug), deck);
+  const reading = await engine.castReading(data.slug, "native", "", { reversalRate: 0 });
+  assert.equal(reading.deck.id, "catalog-resource-id");
+  assert.equal(reading.spread.deckId, "catalog-resource-id");
+  assert.equal((await engine.resolveReading(reading.token, data.slug)).deck, deck);
+  assert.equal((await engine.resolveReading(reading.token, deck.id)).deck, deck);
+});

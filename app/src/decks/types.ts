@@ -102,11 +102,14 @@ export interface DeckDataFile {
 
 /**
  * A registered runtime deck. `registerDeck` constructs this only after validating raw deck data,
- * deriving identity/name from that data, canonicalizing card order, and normalizing native spreads.
+ * choosing a runtime identity, canonicalizing card order, and normalizing native spreads. `id` is the
+ * canonical identity for readings and host APIs; `data.slug` remains authored deck metadata.
  * Visual packs are registered independently and meet the deck by stable deck/card identity.
  */
 export interface DeckModule {
   id: string;
+  /** Resolution-only compatibility ids (for example a pre-catalog custom deck slug). */
+  aliases?: readonly string[];
   name: string;
   tagline: string;
   data: DeckDataFile;
@@ -116,4 +119,9 @@ export interface DeckModule {
   spreads?: Spread[];
   /** true for decks loaded from pasted JSON (not bundled). */
   custom?: boolean;
+}
+
+/** True when `id` is either the canonical runtime identity or one of its compatibility aliases. */
+export function deckHasIdentity(deck: DeckModule, id: string): boolean {
+  return deck.id === id || !!deck.aliases?.includes(id);
 }

@@ -1,5 +1,5 @@
 import { isValidSpread, MAX_SPREAD_POSITIONS, resolveSpread, type Spread } from "../decks/spreads";
-import type { DeckModule } from "../decks/types";
+import { deckHasIdentity, type DeckModule } from "../decks/types";
 import type { ReadingCard, ReadingResolution, ReadingToken, StableReadingToken } from "./types";
 
 const MAX_TOKEN_LENGTH = 65_536;
@@ -65,7 +65,7 @@ export async function encodeReading(
   cards: ReadingCard[],
 ): Promise<string> {
   const resolvedSpread = resolveSpread(spread, deck.spreads);
-  if (!isValidSpread(resolvedSpread) || (resolvedSpread.deckId && resolvedSpread.deckId !== deck.id)) throw new Error("Unknown or invalid spread for this deck.");
+  if (!isValidSpread(resolvedSpread) || (resolvedSpread.deckId && !deckHasIdentity(deck, resolvedSpread.deckId))) throw new Error("Unknown or invalid spread for this deck.");
   if (cards.length !== resolvedSpread.positions.length) throw new Error("Deal one card for every spread position.");
   const deckSlugs = new Set(deck.cards.map((card) => card.slug));
   if (deckSlugs.size !== deck.cards.length) throw new Error("The deck has duplicate card identities.");
@@ -96,10 +96,10 @@ export function decodeReading(encoded: string): ReadingToken | null {
 /** Resolve before rendering anything. Failure must never silently produce a different/partial reading. */
 export async function resolveReading(token: ReadingToken, deck: DeckModule): Promise<ReadingResolution> {
   if (!validToken(token)) return { ok: false, error: "This reading link is malformed." };
-  if (token.d !== deck.id) return { ok: false, error: "This reading belongs to a different deck than the link's route." };
+  if (!deckHasIdentity(deck, token.d)) return { ok: false, error: "This reading belongs to a different deck than the link's route." };
   const spread = resolveSpread(token.s, deck.spreads);
   if (!isValidSpread(spread)) return { ok: false, error: "Unknown or invalid spread in this reading." };
-  if (spread.deckId && spread.deckId !== deck.id) return { ok: false, error: "This spread belongs to a different deck." };
+  if (spread.deckId && !deckHasIdentity(deck, spread.deckId)) return { ok: false, error: "This spread belongs to a different deck." };
   if (spread.positions.length !== token.c.length) return { ok: false, error: "The card count does not match the spread." };
   if (token.v === 1) {
     if (deck.custom) return { ok: false, error: "This legacy custom-deck link stores card positions, not identities. Its original order cannot be verified. Cast a new reading to create a stable link." };

@@ -142,3 +142,25 @@ test("small or identity-invalid decks fail instead of creating partial readings"
   assert.throws(() => deal(GENERIC_SPREADS[0], [""]));
   for (const rate of [-1, 2, NaN]) assert.throws(() => deal(GENERIC_SPREADS[0], ["a"], rate));
 });
+
+test("catalog runtime ids preserve old slug-based v2 reading links", async () => {
+  const oldDeck = moduleFor(rawDeck(), true);
+  oldDeck.spreads = [{
+    id: "native-old-id",
+    name: "Native",
+    description: "Legacy ownership identity",
+    deckId: oldDeck.id,
+    positions: [{ name: "Card", prompt: "the card" }],
+  }];
+  const token = decodeReading(await encodeReading(oldDeck, "native-old-id", "", [{ slug: oldDeck.cards[0].slug, reversed: false }]));
+
+  const migrated = {
+    ...oldDeck,
+    id: "resource-stable-id",
+    aliases: [oldDeck.id],
+    spreads: oldDeck.spreads.map((spread) => ({ ...spread, deckId: "resource-stable-id" })),
+  };
+  const resolved = await resolveReading(token, migrated);
+  assert.equal(resolved.ok, true, resolved.error);
+  assert.equal(resolved.spread.deckId, oldDeck.id, "the token keeps its original embedded spread snapshot");
+});

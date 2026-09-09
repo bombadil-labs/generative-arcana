@@ -75,6 +75,24 @@ export class NeonUserDeckCatalogRepository implements UserDeckCatalogRepository 
     return parseRow(existing[0]!);
   }
 
+  async createImported(ownerId: string, manifest: UserDeckManifest): Promise<UserDeckRecord> {
+    await this.ensureSchema();
+    const owner = requireText(ownerId, "ownerId");
+    const clean = snapshotManifest(manifest);
+    const id = randomUUID();
+    const json = JSON.stringify(clean);
+    const rows = await this.sql`
+      INSERT INTO arcana_user_decks (id, owner_id, slug, manifest, visibility, revision, created_at, updated_at)
+      VALUES (${id}, ${owner}, ${clean.data.slug}, ${json}::jsonb, 'private', 1, now(), now())
+      ON CONFLICT (owner_id, slug) DO NOTHING
+      RETURNING id, owner_id, slug, manifest, visibility, revision, created_at, updated_at, published_at
+    `;
+    if (!rows.length) {
+      throw new Error(`A deck with slug “${clean.data.slug}” is already owned by this account.`);
+    }
+    return parseRow(rows[0]!);
+  }
+
   async upsertImported(ownerId: string, manifest: UserDeckManifest): Promise<UserDeckRecord> {
     await this.ensureSchema();
     const owner = requireText(ownerId, "ownerId");
