@@ -44,6 +44,7 @@ function adapterForRecord(record: UserDeckRecord): ArcanaToolAdapter {
     tagline: record.manifest.tagline,
     ...(record.manifest.spreads ? { spreads: record.manifest.spreads } : {}),
     runtimeId: record.id,
+    aliases: [record.slug],
   });
   return new ArcanaToolAdapter(engine);
 }
