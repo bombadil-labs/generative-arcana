@@ -28,7 +28,8 @@
     "test:web-catalog-api": "tsx test/web-catalog-api.ts",
     "test:web-app-static": "tsx test/web-app-static.ts",
     "test:browser-session": "tsx test/browser-session.ts",
-    "test:cross-host-account": "tsx test/cross-host-account-flow.ts"
+    "test:cross-host-account": "tsx test/cross-host-account-flow.ts",
+    "test:authoring-api": "tsx test/authoring-api.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",

@@ -1,6 +1,7 @@
 import type { ArcanaEngine } from "../engine/ArcanaEngine";
 import type { ArcanaReading, CardQuery, ImportDeckOptions } from "../engine/types";
 import type { Spread } from "../decks/spreads";
+import { DECK_MANIFEST_SPEC, inspectDeckAuthoringArtifact, invalidDeckAuthoringArtifact } from "../decks/authoring";
 
 export const ARCANA_TOOL_NAMES = [
   "list_decks",
@@ -12,6 +13,8 @@ export const ARCANA_TOOL_NAMES = [
   "cast_reading",
   "resolve_reading",
   "interpretation_context",
+  "get_deck_authoring_spec",
+  "validate_deck_manifest",
   "import_deck",
 ] as const;
 
@@ -33,6 +36,8 @@ export const ARCANA_TOOL_DEFINITIONS: readonly ArcanaToolDefinition[] = Object.f
   { name: "cast_reading", description: "Cast a new reading using stable card identities and return its reproducible token.", readOnly: false },
   { name: "resolve_reading", description: "Resolve a reading token into its deck, spread, and placements.", readOnly: true },
   { name: "interpretation_context", description: "Project a resolved reading into authored LLM-ready interpretation context.", readOnly: true },
+  { name: "get_deck_authoring_spec", description: "Get the machine-readable canonical DeckManifest authoring contract.", readOnly: true },
+  { name: "validate_deck_manifest", description: "Validate a canonical DeckManifest without importing it; legacy raw deck JSON is identified as compatibility input.", readOnly: true },
   { name: "import_deck", description: "Import validated custom deck JSON into this host's isolated deck registry.", readOnly: false },
 ]);
 
@@ -89,6 +94,24 @@ export class ArcanaToolAdapter {
       case "interpretation_context": {
         const reading = await this.engine.resolveReading(stringArg(args, "token"), optionalString(args.deckId));
         return { token: reading.token, deckId: reading.deck.id, context: this.engine.buildInterpretationContext(reading) };
+      }
+      case "get_deck_authoring_spec":
+        return DECK_MANIFEST_SPEC;
+      case "validate_deck_manifest": {
+        const includeNormalizedManifest = args.includeNormalizedManifest === undefined
+          ? false
+          : booleanArg(args.includeNormalizedManifest, "includeNormalizedManifest");
+        if (args.manifest !== undefined && args.json !== undefined) throw new Error("Provide either manifest or json, not both.");
+        if (args.manifest === undefined && args.json === undefined) throw new Error("Provide either manifest or json.");
+        if (args.json !== undefined) {
+          if (typeof args.json !== "string") throw new Error("json must be a string.");
+          try {
+            return inspectDeckAuthoringArtifact(JSON.parse(args.json), { includeNormalizedManifest });
+          } catch {
+            return invalidDeckAuthoringArtifact("Manifest JSON could not be parsed.");
+          }
+        }
+        return inspectDeckAuthoringArtifact(args.manifest, { includeNormalizedManifest });
       }
       case "import_deck": {
         const request = parseImportDeckInput(args);

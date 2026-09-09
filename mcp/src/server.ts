@@ -58,6 +58,14 @@ const schemas: Record<ArcanaToolName, z.ZodTypeAny> = {
   }),
   resolve_reading: z.object({ token: z.string().min(1), deckId: z.string().min(1).optional() }),
   interpretation_context: z.object({ token: z.string().min(1), deckId: z.string().min(1).optional() }),
+  get_deck_authoring_spec: z.object({}),
+  validate_deck_manifest: z.object({
+    manifest: z.unknown().optional(),
+    json: z.string().max(MAX_IMPORT_JSON_CHARS).optional(),
+    includeNormalizedManifest: z.boolean().optional(),
+  }).refine((value) => (value.manifest !== undefined) !== (value.json !== undefined), {
+    message: "Provide exactly one of manifest or json.",
+  }),
   import_deck: z.object({
     data: z.unknown().optional(),
     json: z.string().max(MAX_IMPORT_JSON_CHARS).optional(),
