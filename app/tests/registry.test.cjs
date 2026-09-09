@@ -71,4 +71,11 @@ test("canonical ids win over aliases and duplicate aliases never resolve ambiguo
   assert.equal(ambiguous.getDeck("resource-a"), deckA);
   assert.equal(ambiguous.getDeck("resource-b"), deckB);
   assert.equal(ambiguous.getDeck("same-authored-slug"), undefined, "ambiguous compatibility aliases fail closed");
+
+  const canonicalAfterAliases = rawDeck();
+  canonicalAfterAliases.slug = "same-authored-slug";
+  const canonicalLate = ambiguous.registerDeck({ data: canonicalAfterAliases, tagline: "Canonical late" });
+  assert.equal(ambiguous.getDeck("same-authored-slug"), canonicalLate, "canonical ids win even when registered after ambiguous aliases");
+  assert.equal(ambiguous.getDeck("resource-a"), deckA);
+  assert.equal(ambiguous.getDeck("resource-b"), deckB);
 });

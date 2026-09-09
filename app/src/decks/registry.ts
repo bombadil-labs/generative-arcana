@@ -72,9 +72,6 @@ export class DeckRegistry {
     });
 
     const existing = this.decks.get(deck.id);
-    if (!existing && this.aliases.has(deck.id)) {
-      throw new Error(`The runtime id “${deck.id}” collides with another deck's compatibility identity.`);
-    }
     if (existing && deck.custom && !existing.custom) {
       throw new Error(`The id “${deck.id}” belongs to a bundled deck. Choose a different runtime id for this custom deck.`);
     }
