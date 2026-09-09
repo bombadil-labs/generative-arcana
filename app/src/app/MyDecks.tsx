@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useBrowserSession } from "@/auth/session";
+import { validateAuthoringArtifact } from "@/authoring/api";
+import type { DeckAuthoringValidation } from "@/decks/authoring";
 import { unregisterDeck } from "@/decks";
 import {
   deleteMyDeck,
@@ -42,6 +44,9 @@ function AuthenticatedLibrary({ user }: { user: { displayName?: string; email?: 
   const [sourceName, setSourceName] = useState<string | null>(null);
   const [replaceExisting, setReplaceExisting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [validating, setValidating] = useState(false);
+  const [validation, setValidation] = useState<DeckAuthoringValidation | null>(null);
+  const [validatedText, setValidatedText] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [importNotice, setImportNotice] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -68,12 +73,42 @@ function AuthenticatedLibrary({ user }: { user: { displayName?: string; email?: 
   async function handleFile(file: File | undefined) {
     if (!file) return;
     try {
-      setSourceText(await file.text());
+      const text = await file.text();
+      setSourceText(text);
       setSourceName(file.name);
+      clearPreflight();
       setImportError(null);
       setImportNotice(null);
+      void preflight(text);
     } catch (reason) {
       setImportError(reason instanceof Error ? reason.message : "Unable to read that file.");
+    }
+  }
+
+  function clearPreflight() {
+    setValidation(null);
+    setValidatedText(null);
+  }
+
+  async function preflight(text = sourceText): Promise<DeckAuthoringValidation | null> {
+    if (!text.trim()) return null;
+    setValidating(true);
+    setImportError(null);
+    setImportNotice(null);
+    try {
+      let parsed: unknown;
+      try { parsed = JSON.parse(text); }
+      catch { throw new Error("That file or pasted text is not valid JSON."); }
+      const result = await validateAuthoringArtifact(parsed);
+      setValidation(result);
+      setValidatedText(text);
+      return result;
+    } catch (reason) {
+      clearPreflight();
+      setImportError(reason instanceof Error ? reason.message : "Deck validation failed.");
+      return null;
+    } finally {
+      setValidating(false);
     }
   }
 
@@ -86,10 +121,16 @@ function AuthenticatedLibrary({ user }: { user: { displayName?: string; email?: 
       let parsed: unknown;
       try { parsed = JSON.parse(sourceText); }
       catch { throw new Error("That file or pasted text is not valid JSON."); }
+
+      const currentValidation = validatedText === sourceText ? validation : null;
+      const checked = currentValidation ?? await preflight(sourceText);
+      if (!checked?.valid) return;
+
       const created = await importMyDeck(importRequestFromJson(parsed, replaceExisting));
       setSourceText("");
       setSourceName(null);
       setReplaceExisting(false);
+      clearPreflight();
       if (fileRef.current) fileRef.current.value = "";
       setImportNotice(`${created.name} is now in your library (${created.visibility}).`);
       await loadDecks();
@@ -139,6 +180,9 @@ function AuthenticatedLibrary({ user }: { user: { displayName?: string; email?: 
     }
   }
 
+  const currentValidation = validatedText === sourceText ? validation : null;
+  const canImport = !!currentValidation?.valid && !validating && !importing;
+
   return (
     <div style={page}>
       <header style={hero}>
@@ -172,7 +216,7 @@ function AuthenticatedLibrary({ user }: { user: { displayName?: string; email?: 
         {sourceName && <div style={fileBadge}>{sourceName}</div>}
         <textarea
           value={sourceText}
-          onChange={(event) => { setSourceText(event.target.value); setSourceName(null); setImportError(null); setImportNotice(null); }}
+          onChange={(event) => { setSourceText(event.target.value); setSourceName(null); clearPreflight(); setImportError(null); setImportNotice(null); }}
           placeholder="Paste a canonical manifest or raw deck JSON…"
           spellCheck={false}
           style={textarea}
@@ -182,11 +226,18 @@ function AuthenticatedLibrary({ user }: { user: { displayName?: string; email?: 
             <input type="checkbox" checked={replaceExisting} onChange={(event) => setReplaceExisting(event.target.checked)} />
             Replace my existing deck with the same authored slug
           </label>
-          <button disabled={!sourceText.trim() || importing} onClick={() => void submitImport()} style={primaryButtonDisabled(!sourceText.trim() || importing)}>
-            {importing ? "Importing…" : "Import deck"}
-          </button>
+          <div style={buttonGroup}>
+            <button disabled={!sourceText.trim() || validating || importing} onClick={() => void preflight()} style={secondaryButtonDisabled(!sourceText.trim() || validating || importing)}>
+              {validating ? "Validating…" : currentValidation ? "Validate again" : "Validate deck"}
+            </button>
+            <button disabled={!canImport} onClick={() => void submitImport()} style={primaryButtonDisabled(!canImport)}>
+              {importing ? "Importing…" : "Import deck"}
+            </button>
+          </div>
         </div>
         {replaceExisting && <p style={hint}>Replacement preserves the existing stable resource ID and publication state; it creates a new revision rather than a new identity.</p>}
+        {!currentValidation && sourceText.trim() && !validating && !importError && <p style={hint}>Validate this exact JSON before import. Validation is stateless and does not change your library.</p>}
+        {currentValidation && <ValidationResult result={currentValidation} />}
         {importError && <Notice kind="error">{importError}</Notice>}
         {importNotice && <Notice kind="ok">{importNotice}</Notice>}
       </section>
@@ -213,6 +264,30 @@ function AuthenticatedLibrary({ user }: { user: { displayName?: string; email?: 
           />
         ))}</div>}
       </section>
+    </div>
+  );
+}
+
+function ValidationResult({ result }: { result: DeckAuthoringValidation }) {
+  if (!result.valid) return <Notice kind="error">{result.error}</Notice>;
+  const { summary } = result;
+  return (
+    <div role="status" style={validationCard}>
+      <div style={validationHeader}>
+        <span style={result.canonical ? canonicalBadge : compatibilityBadge}>
+          {result.canonical ? "Canonical manifest" : "Compatibility input"}
+        </span>
+        <span style={validationName}>{summary.name}</span>
+      </div>
+      <div style={validationStats}>
+        <span>slug {summary.slug}</span>
+        <span>{summary.cardCount} cards</span>
+        <span>{summary.suitCount} suits</span>
+        <span>{summary.rankCount} ranks</span>
+        <span>{summary.stationCount} stations</span>
+        <span>{summary.spreadCount} native spreads</span>
+      </div>
+      {result.warning && <p style={validationWarning}>{result.warning}</p>}
     </div>
   );
 }
@@ -296,6 +371,14 @@ const sectionCopy: React.CSSProperties = { font: "400 14px/1.6 var(--font-body)"
 const textarea: React.CSSProperties = { width: "100%", minHeight: 180, boxSizing: "border-box", resize: "vertical", padding: 14, border: "1px solid var(--line-2)", borderRadius: "var(--r-2)", background: "var(--paper-2)", color: "var(--ink)", font: "400 12px/1.5 var(--font-mono)" };
 const fileBadge: React.CSSProperties = { display: "inline-block", marginBottom: 10, padding: "6px 9px", borderRadius: 999, background: "var(--accent-wash)", color: "var(--accent)", font: "600 11px/1 var(--font-mono)" };
 const importActions: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginTop: 12 };
+const buttonGroup: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" };
+const validationCard: React.CSSProperties = { marginTop: 12, padding: 14, border: "1px solid var(--line-2)", borderRadius: "var(--r-2)", background: "var(--paper-2)" };
+const validationHeader: React.CSSProperties = { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" };
+const validationName: React.CSSProperties = { font: "600 14px/1.35 var(--font-body)", color: "var(--ink)" };
+const validationStats: React.CSSProperties = { display: "flex", flexWrap: "wrap", gap: "6px 12px", marginTop: 10, font: "400 10.5px/1.4 var(--font-mono)", color: "var(--ink-3)", textTransform: "uppercase", letterSpacing: "0.04em" };
+const canonicalBadge: React.CSSProperties = { display: "inline-block", padding: "5px 8px", borderRadius: 999, background: "var(--accent-wash)", color: "var(--accent)", font: "600 10px/1 var(--font-mono)", textTransform: "uppercase", letterSpacing: "0.05em" };
+const compatibilityBadge: React.CSSProperties = { ...canonicalBadge, background: "var(--paper)", color: "var(--ink-2)", border: "1px solid var(--line-2)" };
+const validationWarning: React.CSSProperties = { margin: "10px 0 0", font: "400 12px/1.5 var(--font-body)", color: "var(--ink-2)" };
 const checkboxLabel: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 8, font: "400 13px/1.4 var(--font-body)", color: "var(--ink-2)" };
 const hint: React.CSSProperties = { margin: "10px 0 0", font: "400 12px/1.55 var(--font-body)", color: "var(--ink-3)" };
 const deckList: React.CSSProperties = { display: "grid", gap: 12, marginTop: 16 };
@@ -320,3 +403,4 @@ const secondaryButton: React.CSSProperties = { ...primaryButton, background: "tr
 const quietButton: React.CSSProperties = { all: "unset", cursor: "pointer", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line)", color: "var(--ink-2)", font: "600 11px/1 var(--font-body)" };
 const dangerButton: React.CSSProperties = { ...quietButton, color: "var(--error)" };
 function primaryButtonDisabled(disabled: boolean): React.CSSProperties { return { ...primaryButton, cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.45 : 1 }; }
+function secondaryButtonDisabled(disabled: boolean): React.CSSProperties { return { ...secondaryButton, cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.45 : 1 }; }
