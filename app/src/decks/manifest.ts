@@ -1,8 +1,23 @@
-import type { DeckManifest } from "./catalog";
 import { immutableJsonSnapshot } from "./jsonSnapshot";
 import { DeckRegistry } from "./registry";
 import type { Spread } from "./spreads";
-import type { DeckModule } from "./types";
+import type { DeckDataFile, DeckModule } from "./types";
+
+/**
+ * Canonical renderer-, host-, auth-, and catalog-independent authored artifact.
+ *
+ * Every authoring route (manual upload, LLM-assisted creation, future editors/importers) should
+ * terminate in this shape before persistence. Resource identity, owner, revision, visibility, and
+ * provider/session metadata are catalog concerns and never belong inside the manifest.
+ *
+ * `data.slug` is authored metadata. It is not the globally stable resource identity assigned when
+ * a manifest enters a Generative Arcana catalog.
+ */
+export interface DeckManifest {
+  data: DeckDataFile;
+  tagline: string;
+  spreads?: Spread[];
+}
 
 export interface DeckManifestOptions {
   tagline?: string;
