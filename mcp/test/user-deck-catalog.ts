@@ -67,7 +67,7 @@ async function hostMigrationAndPersistence(): Promise<void> {
   const owned = await catalog.listOwned("alice");
   assert.equal(owned.length, 2);
   const persisted = owned.find((deck) => deck.manifest.data.slug === importedData.slug);
-  assert.ok(persisted);
+  if (!persisted) throw new Error("Imported catalog deck was not persisted.");
   assert.equal(persisted.visibility, "private", "new imports start private");
 
   // Simulate a new process: runtime state is reconstructed only from first-class catalog rows.
@@ -89,7 +89,7 @@ async function hostMigrationAndPersistence(): Promise<void> {
 }
 
 function manifest(slug: string, tagline: string): UserDeckManifest {
-  const data = structuredClone(deepTime) as DeckDataFile;
+  const data = structuredClone(deepTime) as unknown as DeckDataFile;
   data.slug = slug;
   data.name = slug;
   return { data, tagline };
