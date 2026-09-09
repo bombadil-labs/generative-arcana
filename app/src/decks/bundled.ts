@@ -5,7 +5,7 @@ import finalFantasyJson from "../../../decks/finalfantasy/deck.json";
 import evolutionJson from "../../../decks/evolution/deck.json";
 import ultimaOctaveJson from "../../../decks/ultima-octave/deck.json";
 import deepTimeJson from "../../../decks/deep-time/deck.json";
-import { DeckRegistry, deckRegistry } from "./registry";
+import { DeckRegistry, deckRegistry } from "./registry.js";
 
 export const BUNDLED_DECK_MANIFESTS = {
   ultima: {
