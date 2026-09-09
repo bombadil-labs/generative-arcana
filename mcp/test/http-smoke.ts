@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 
+const SPREAD_WIDGET_URI = "ui://arcana/spread/v1.html";
+
 const REQUIRED_HTTP_TOOLS = [
   "list_decks",
   "get_deck",
@@ -41,6 +43,16 @@ async function main(): Promise<void> {
       const names = new Set(listed.tools.map((tool) => tool.name));
       for (const name of REQUIRED_HTTP_TOOLS) assert.ok(names.has(name), `missing HTTP MCP tool: ${name}`);
       assert.equal(names.has("import_deck"), false, "stateless HTTP must not expose persistent import_deck");
+      const renderTool = listed.tools.find((tool) => tool.name === "render_reading");
+      assert.equal(renderTool?._meta?.ui?.resourceUri, SPREAD_WIDGET_URI, "HTTP render_reading must advertise the spread UI resource");
+
+      const resources = await withTimeout(client.listResources(), 5_000, "HTTP resources/list");
+      assert.ok(resources.resources.some((resource) => resource.uri === SPREAD_WIDGET_URI), "HTTP spread UI resource is not discoverable");
+      const widget = await withTimeout(client.readResource({ uri: SPREAD_WIDGET_URI }), 5_000, "HTTP resources/read spread widget");
+      const widgetContent = widget.contents.find((content) => content.uri === SPREAD_WIDGET_URI);
+      assert.ok(widgetContent && "text" in widgetContent, "HTTP spread UI resource returned no HTML text");
+      assert.equal(widgetContent.mimeType, "text/html;profile=mcp-app");
+      assert.match(widgetContent.text, /spread-grid/, "HTTP spread UI resource is missing its layout surface");
 
       const result = await withTimeout(client.callTool({ name: "list_decks", arguments: {} }), 5_000, "HTTP list_decks");
       assert.equal(result.isError, undefined);
