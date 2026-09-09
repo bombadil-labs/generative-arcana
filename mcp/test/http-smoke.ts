@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 
-const SPREAD_WIDGET_URI = "ui://arcana/spread/v1.html";
+const SPREAD_WIDGET_URI = "ui://arcana/spread/v2.html";
 
 const REQUIRED_HTTP_TOOLS = [
   "list_decks",
@@ -54,6 +54,11 @@ async function main(): Promise<void> {
       assert.ok(widgetContent && "text" in widgetContent, "HTTP spread UI resource returned no HTML text");
       assert.equal(widgetContent.mimeType, "text/html;profile=mcp-app");
       assert.match(widgetContent.text, /spread-grid/, "HTTP spread UI resource is missing its layout surface");
+      assert.match(widgetContent.text, /ui\/initialize/, "HTTP spread UI resource must perform the MCP Apps initialization handshake");
+      assert.match(widgetContent.text, /ui\/notifications\/initialized/, "HTTP spread UI resource must signal initialization completion");
+      const widgetMeta = widgetContent._meta as { ui?: { csp?: { connectDomains?: string[]; resourceDomains?: string[] } } } | undefined;
+      assert.deepEqual(widgetMeta?.ui?.csp?.connectDomains, []);
+      assert.deepEqual(widgetMeta?.ui?.csp?.resourceDomains, []);
 
       const result = await withTimeout(client.callTool({ name: "list_decks", arguments: {} }), 5_000, "HTTP list_decks");
       assert.equal(result.isError, undefined);
