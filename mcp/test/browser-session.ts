@@ -74,12 +74,27 @@ async function main(): Promise<void> {
     assert.equal(authUrl.origin, "https://login.example.test");
     const state = authUrl.searchParams.get("state");
     assert.ok(state);
+    const loginSetCookie = response.headers.get("set-cookie") ?? "";
+    const authStateCookie = cookiePair(loginSetCookie, "arcana-session-auth-state");
+    assert.ok(authStateCookie, "login must bind OAuth state to an HttpOnly browser cookie");
+    assert.match(loginSetCookie, /Path=\/auth/);
+    assert.match(loginSetCookie, /HttpOnly/);
+    assert.match(loginSetCookie, /SameSite=Lax/);
+    assert.match(loginSetCookie, /Max-Age=600/);
 
     response = await fetch(`${base}/auth/callback?code=good-code&state=${encodeURIComponent(state!)}`, { redirect: "manual" });
+    assert.equal(response.status, 400, "a valid signed state from another browser must not complete login");
+
+    response = await fetch(`${base}/auth/callback?code=good-code&state=${encodeURIComponent(state!)}`, {
+      headers: { cookie: authStateCookie! },
+      redirect: "manual",
+    });
     assert.equal(response.status, 303);
     assert.equal(response.headers.get("location"), "/#/my-decks");
     const setCookie = response.headers.get("set-cookie") ?? "";
-    assert.match(setCookie, /^arcana-session=sealed-1;/);
+    assert.match(setCookie, /arcana-session-auth-state=;/);
+    assert.match(setCookie, /Max-Age=0/);
+    assert.match(setCookie, /arcana-session=sealed-1;/);
     assert.match(setCookie, /HttpOnly/);
     assert.match(setCookie, /SameSite=Lax/);
     assert.doesNotMatch(setCookie, /Secure/);
@@ -104,8 +119,16 @@ async function main(): Promise<void> {
     assert.equal((await response.json() as { authenticated: boolean }).authenticated, true);
     assert.match(response.headers.get("set-cookie") ?? "", /^arcana-session=sealed-2;/);
 
-    const tampered = `${state!.slice(0, -1)}x`;
-    response = await fetch(`${base}/auth/callback?code=good-code&state=${encodeURIComponent(tampered)}`, { redirect: "manual" });
+    response = await fetch(`${base}/auth/login`, { redirect: "manual" });
+    const secondAuthUrl = new URL(response.headers.get("location")!);
+    const secondState = secondAuthUrl.searchParams.get("state");
+    const secondStateCookie = cookiePair(response.headers.get("set-cookie") ?? "", "arcana-session-auth-state");
+    assert.ok(secondState && secondStateCookie);
+    const tampered = `${secondState!.slice(0, -1)}x`;
+    response = await fetch(`${base}/auth/callback?code=good-code&state=${encodeURIComponent(tampered)}`, {
+      headers: { cookie: secondStateCookie! },
+      redirect: "manual",
+    });
     assert.equal(response.status, 400);
 
     response = await fetch(`${base}/auth/logout`, {
@@ -119,6 +142,11 @@ async function main(): Promise<void> {
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
+}
+
+function cookiePair(setCookie: string, name: string): string | null {
+  const match = new RegExp(`(?:^|,\\s*)${name}=([^;]*)`).exec(setCookie);
+  return match ? `${name}=${match[1]}` : null;
 }
 
 main().catch((error) => {
