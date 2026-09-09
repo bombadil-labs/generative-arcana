@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import deepTime from "../../decks/deep-time/deck.json";
+import type { DeckDataFile } from "../../app/src/decks/types";
 import type { ArcanaHostState, ArcanaHostStateRepository } from "../src/hostState";
 import { PersistentArcanaHostStore } from "../src/hostStore";
 import { InMemoryUserDeckCatalogRepository } from "../src/userDeckCatalog";
@@ -88,7 +89,7 @@ async function hostMigrationAndPersistence(): Promise<void> {
 }
 
 function manifest(slug: string, tagline: string): UserDeckManifest {
-  const data = structuredClone(deepTime);
+  const data = structuredClone(deepTime) as DeckDataFile;
   data.slug = slug;
   data.name = slug;
   return { data, tagline };

@@ -154,8 +154,9 @@ export class InMemoryUserDeckCatalogRepository implements UserDeckCatalogReposit
       visibility: nextVisibility,
       revision: existing.revision + 1,
       updatedAt: now,
-      ...(nextVisibility === "public" ? { publishedAt: now } : { publishedAt: undefined }),
     };
+    if (nextVisibility === "public") updated.publishedAt = now;
+    else delete updated.publishedAt;
     this.records.set(id, updated);
     return snapshot(updated);
   }
