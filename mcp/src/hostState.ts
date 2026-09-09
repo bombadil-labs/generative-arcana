@@ -70,7 +70,7 @@ export class PersistingArcanaToolAdapter extends ArcanaToolAdapter {
   }
 }
 
-function parseArcanaHostState(raw: unknown): ArcanaHostState {
+export function parseArcanaHostState(raw: unknown): ArcanaHostState {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("Persisted Arcana host state must be an object.");
   const record = raw as Record<string, unknown>;
   if (record.v !== 1) throw new Error("Unsupported persisted Arcana host state version.");

@@ -15,6 +15,7 @@
     "smoke:http-guardrails": "tsx test/http-guardrails.ts",
     "test:host-store": "tsx test/host-store.ts",
     "test:durable-state": "tsx test/durable-host-state.ts",
+    "test:deck-catalog": "tsx test/user-deck-catalog.ts",
     "test:principal": "tsx test/principal.ts",
     "test:alpha-auth": "tsx test/alpha-auth.ts",
     "test:hardening": "tsx test/hardening.ts",

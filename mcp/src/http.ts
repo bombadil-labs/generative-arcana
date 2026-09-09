@@ -5,6 +5,7 @@ import { createArcanaMcpServer } from "./server";
 import { StaticBearerPrincipalResolver } from "./alphaAuth";
 import { FileArcanaHostStateRepository } from "./fileHostStateRepository";
 import { NeonArcanaHostStateRepository } from "./neonHostStateRepository";
+import { NeonUserDeckCatalogRepository } from "./neonUserDeckCatalog";
 import {
   createBundledArcanaAdapter,
   InMemoryArcanaHostStore,
@@ -141,7 +142,11 @@ export function createArcanaHttpRequestHandler(options: ArcanaHttpRequestHandler
 function createHostStore(options: { databaseUrl?: string; stateDir?: string }): { hosts: ArcanaHostStore; stateMode: "neon" | "filesystem" | "memory" } {
   if (options.databaseUrl) {
     return {
-      hosts: new PersistentArcanaHostStore(new NeonArcanaHostStateRepository(options.databaseUrl)),
+      hosts: new PersistentArcanaHostStore(
+        new NeonArcanaHostStateRepository(options.databaseUrl),
+        createBundledArcanaAdapter,
+        new NeonUserDeckCatalogRepository(options.databaseUrl),
+      ),
       stateMode: "neon",
     };
   }
