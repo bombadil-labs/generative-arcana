@@ -1,8 +1,7 @@
 import { createHash } from "node:crypto";
-import type { ArcanaToolName } from "../../app/src/mcp/ArcanaToolAdapter";
 
 export interface ArcanaToolCallEvent {
-  tool: ArcanaToolName;
+  tool: string;
   ok: boolean;
   durationMs: number;
 }
