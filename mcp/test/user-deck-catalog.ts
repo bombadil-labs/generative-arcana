@@ -14,6 +14,11 @@ async function main(): Promise<void> {
 async function repositoryContract(): Promise<void> {
   const catalog = new InMemoryUserDeckCatalogRepository();
   const firstManifest = manifest("shared-slug", "first");
+  await assert.rejects(
+    catalog.createImported("alice", { ...firstManifest, tagline: "" }),
+    /manifest\.tagline.*non-empty/i,
+    "catalog repositories must enforce the shared canonical manifest contract even for direct callers",
+  );
   const created = await catalog.createImported("alice", firstManifest);
   assert.equal(created.visibility, "private");
   assert.equal(created.revision, 1);
