@@ -7,6 +7,7 @@ import { FileArcanaHostStateRepository } from "./fileHostStateRepository";
 import { NeonArcanaHostStateRepository } from "./neonHostStateRepository";
 import { NeonExternalIdentityRepository } from "./neonExternalIdentityRepository";
 import { NeonUserDeckCatalogRepository } from "./neonUserDeckCatalog";
+import type { UserDeckCatalogRepository } from "./userDeckCatalog";
 import {
   OAuthPrincipalError,
   OAuthPrincipalResolver,
@@ -71,7 +72,7 @@ const principalResolver = oauth
   : alphaToken
     ? new StaticBearerPrincipalResolver(alphaToken, alphaPrincipalId)
     : undefined;
-const { hosts, stateMode } = createHostStore({ databaseUrl, stateDir });
+const { hosts, catalog, stateMode } = createHostStore({ databaseUrl, stateDir });
 
 if (alphaToken && stateMode === "memory") {
   console.error("[generative-arcana-mcp] MCP_ALPHA_TOKEN enabled without durable storage; authenticated imports are process-lifetime only");
@@ -80,6 +81,7 @@ if (alphaToken && stateMode === "memory") {
 const requestHandler = createArcanaHttpRequestHandler({
   principalResolver,
   hosts,
+  ...(catalog ? { catalog } : {}),
   oauth: oauth
     ? {
         resourceMetadataUrl: oauth.resourceMetadataUrl,
@@ -195,6 +197,7 @@ export interface ArcanaHttpOAuthOptions {
 export interface ArcanaHttpRequestHandlerOptions {
   principalResolver?: PrincipalResolver;
   hosts?: ArcanaHostStore;
+  catalog?: UserDeckCatalogRepository;
   oauth?: ArcanaHttpOAuthOptions;
 }
 
@@ -214,6 +217,8 @@ export function createArcanaHttpRequestHandler(options: ArcanaHttpRequestHandler
       const handler = createMcpHandler(() => createArcanaMcpServer({
         adapter: access.adapter,
         includeStatefulTools: access.includeStatefulTools,
+        principal: access.principal,
+        ...(options.catalog ? { catalog: options.catalog } : {}),
         oauth: options.oauth
           ? {
               principal: access.principal,
@@ -257,14 +262,20 @@ export function createArcanaHttpRequestHandler(options: ArcanaHttpRequestHandler
   };
 }
 
-function createHostStore(options: { databaseUrl?: string; stateDir?: string }): { hosts: ArcanaHostStore; stateMode: "neon" | "filesystem" | "memory" } {
+function createHostStore(options: { databaseUrl?: string; stateDir?: string }): {
+  hosts: ArcanaHostStore;
+  catalog?: UserDeckCatalogRepository;
+  stateMode: "neon" | "filesystem" | "memory";
+} {
   if (options.databaseUrl) {
+    const catalog = new NeonUserDeckCatalogRepository(options.databaseUrl);
     return {
       hosts: new PersistentArcanaHostStore(
         new NeonArcanaHostStateRepository(options.databaseUrl),
         createBundledArcanaAdapter,
-        new NeonUserDeckCatalogRepository(options.databaseUrl),
+        catalog,
       ),
+      catalog,
       stateMode: "neon",
     };
   }
