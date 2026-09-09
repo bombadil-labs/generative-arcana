@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
+import { ARCANA_MCP_VERSION } from "../src/version";
 
 const port = 45000 + (process.pid % 1000);
 const endpoint = new URL(`http://127.0.0.1:${port}/mcp`);
@@ -23,7 +24,7 @@ async function main(): Promise<void> {
     await waitForHealth(child, health, () => stderr);
     const healthResponse = await fetch(health);
     const healthBody = await healthResponse.json() as { version?: string; limits?: { maxRequestBytes?: number; requestsPerMinute?: number } };
-    assert.equal(healthBody.version, "0.1.0");
+    assert.equal(healthBody.version, ARCANA_MCP_VERSION);
     assert.deepEqual(healthBody.limits, { maxRequestBytes: 32, requestsPerMinute: 2 });
 
     const oversized = await fetch(endpoint, {
