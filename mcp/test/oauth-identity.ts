@@ -8,7 +8,9 @@ import {
   type BearerIdentityVerifier,
 } from "../src/oauthIdentity";
 import {
+  authorizationServerMetadataUrl,
   bearerChallenge,
+  loadAuthorizationServerMetadata,
   protectedResourceMetadata,
   protectedResourceMetadataPaths,
   protectedResourceMetadataUrl,
@@ -21,7 +23,7 @@ const METADATA_URL = "https://arcana.example/.well-known/oauth-protected-resourc
 
 async function main(): Promise<void> {
   await identityResolution();
-  metadataContract();
+  await metadataContract();
   await toolAuthContract();
 }
 
@@ -75,8 +77,12 @@ async function identityResolution(): Promise<void> {
   );
 }
 
-function metadataContract(): void {
+async function metadataContract(): Promise<void> {
   assert.equal(protectedResourceMetadataUrl(RESOURCE), METADATA_URL);
+  assert.equal(
+    authorizationServerMetadataUrl("https://identity.example/tenant"),
+    "https://identity.example/.well-known/oauth-authorization-server/tenant",
+  );
   assert.deepEqual(
     protectedResourceMetadataPaths(RESOURCE),
     ["/.well-known/oauth-protected-resource/mcp", "/.well-known/oauth-protected-resource"],
@@ -92,6 +98,24 @@ function metadataContract(): void {
     scopes_supported: ["decks:read", "decks:write"],
     bearer_methods_supported: ["header"],
   });
+
+  const proxied = await loadAuthorizationServerMetadata("https://identity.example/", async (input) => {
+    assert.equal(String(input), "https://identity.example/.well-known/oauth-authorization-server");
+    return new Response(JSON.stringify({
+      issuer: "https://identity.example/",
+      authorization_endpoint: "https://identity.example/oauth2/authorize",
+      token_endpoint: "https://identity.example/oauth2/token",
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  });
+  assert.equal(proxied.issuer, "https://identity.example/");
+
+  await assert.rejects(
+    loadAuthorizationServerMetadata("https://identity.example/", async () => new Response(
+      JSON.stringify({ issuer: "https://evil.example/" }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    )),
+    /issuer does not exactly match/,
+  );
 
   const challenge = bearerChallenge({
     resourceMetadataUrl: METADATA_URL,
