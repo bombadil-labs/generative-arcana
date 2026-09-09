@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { ArcanaToolAdapter, type ArcanaToolName } from "../../app/src/mcp/ArcanaToolAdapter";
 import { MAX_QUESTION_LENGTH } from "../../app/src/reading/encode";
+import { CatalogResolvingArcanaToolAdapter } from "./catalogResolvingAdapter";
 import { createBundledArcanaAdapter } from "./hostStore";
 import type { ArcanaToolCallObserver } from "./observability";
 import {
@@ -93,7 +94,11 @@ export interface ArcanaMcpServerOptions {
 }
 
 export function createArcanaMcpServer(options: ArcanaMcpServerOptions = {}): McpServer {
-  const adapter = options.adapter ?? createBundledArcanaAdapter();
+  const localAdapter = options.adapter ?? createBundledArcanaAdapter();
+  const principal = options.principal ?? options.oauth?.principal ?? null;
+  const adapter = options.catalog
+    ? new CatalogResolvingArcanaToolAdapter(localAdapter, options.catalog, principal?.id ?? null)
+    : localAdapter;
   const includeStatefulTools = options.includeStatefulTools ?? true;
   const visuals = options.visuals ?? createBundledStaticVisualStore();
   const server = new McpServer({ name: "generative-arcana", version: ARCANA_MCP_VERSION });
@@ -162,9 +167,9 @@ export function createArcanaMcpServer(options: ArcanaMcpServerOptions = {}): Mcp
 
   if (options.catalog) {
     registerArcanaCatalogTools(server, {
-      adapter,
+      adapter: localAdapter,
       catalog: options.catalog,
-      principal: options.principal ?? options.oauth?.principal ?? null,
+      principal,
       ...(options.oauth
         ? {
             oauth: {

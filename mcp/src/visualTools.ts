@@ -1,5 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
+import type { CardData } from "../../app/src/decks/card";
+import type { Spread } from "../../app/src/decks/spreads";
 import type { ArcanaToolAdapter } from "../../app/src/mcp/ArcanaToolAdapter";
 import type { ArcanaToolCallObserver } from "./observability";
 import type { ToolSecurityScheme } from "./oauthResource";
@@ -21,6 +23,19 @@ export interface RegisterArcanaVisualToolsOptions {
   securitySchemes?: readonly ToolSecurityScheme[];
 }
 
+interface ResolvedReadingView {
+  token: string;
+  deckId: string;
+  deckName: string;
+  spread: Spread;
+  question: string;
+  placements: Array<{
+    position: { name: string; prompt: string };
+    card: CardData;
+    reversed: boolean;
+  }>;
+}
+
 const readOnlyAnnotations = {
   readOnlyHint: true,
   destructiveHint: false,
@@ -28,7 +43,7 @@ const readOnlyAnnotations = {
   openWorldHint: false,
 } as const;
 
-/** Register Node-host visual capabilities without coupling ArcanaEngine to a renderer. */
+/** Register Node-host visual capabilities without coupling presentation to ArcanaEngine internals. */
 export function registerArcanaVisualTools(server: McpServer, options: RegisterArcanaVisualToolsOptions): void {
   const { adapter, visuals, onToolCall } = options;
   const authMeta = options.securitySchemes ? { securitySchemes: options.securitySchemes } : undefined;
@@ -44,7 +59,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
     },
     async (input: unknown) => observed("list_visual_packs", onToolCall, async () => {
       const { deckId } = input as { deckId: string };
-      requireDeck(adapter, deckId);
+      await adapter.call("get_deck", { deckId });
       const result = visuals.listPacks(deckId);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
@@ -67,8 +82,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
     },
     async (input: unknown) => observed("get_card_art", onToolCall, async () => {
       const { deckId, cardSlug, packId } = input as { deckId: string; cardSlug: string; packId?: string };
-      const card = adapter.engine.getCard(deckId, cardSlug);
-      if (!card) throw new Error(`Unknown card “${cardSlug}” in deck “${deckId}”.`);
+      const card = await adapter.call("get_card", { deckId, cardSlug }) as CardData;
 
       const art = await visuals.loadCardArt(deckId, cardSlug, packId);
       if (!art) throw visualLookupError(deckId, visuals);
@@ -112,15 +126,18 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
     },
     async (input: unknown) => observed("render_reading", onToolCall, async () => {
       const { token, deckId, packId } = input as { token: string; deckId?: string; packId?: string };
-      const reading = await adapter.engine.resolveReading(token, deckId);
-      if (!visuals.listPacks(reading.deck.id).length) throw noVisualError(reading.deck.id);
+      const reading = await adapter.call("resolve_reading", {
+        token,
+        ...(deckId ? { deckId } : {}),
+      }) as ResolvedReadingView;
+      if (!visuals.listPacks(reading.deckId).length) throw noVisualError(reading.deckId);
 
       const content: Array<
         | { type: "text"; text: string }
         | { type: "image"; data: string; mimeType: string }
       > = [{
         type: "text",
-        text: `${reading.deck.name} · ${reading.spread.name}${reading.question ? `\n${reading.question}` : ""}`,
+        text: `${reading.deckName} · ${reading.spread.name}${reading.question ? `\n${reading.question}` : ""}`,
       }];
       const placements: Array<{
         position: string;
@@ -133,9 +150,9 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
       }> = [];
 
       for (const [index, placement] of reading.placements.entries()) {
-        const art = await visuals.loadCardArt(reading.deck.id, placement.card.slug, packId);
+        const art = await visuals.loadCardArt(reading.deckId, placement.card.slug, packId);
         if (!art) {
-          throw new Error(`Visual pack for deck “${reading.deck.id}” is missing art for card “${placement.card.slug}”.`);
+          throw new Error(`Visual pack for deck “${reading.deckId}” is missing art for card “${placement.card.slug}”.`);
         }
         content.push({
           type: "text",
@@ -158,8 +175,8 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
         structuredContent: {
           result: {
             token: reading.token,
-            deckId: reading.deck.id,
-            deckName: reading.deck.name,
+            deckId: reading.deckId,
+            deckName: reading.deckName,
             spreadId: reading.spread.id,
             spreadName: reading.spread.name,
             question: reading.question,
@@ -189,10 +206,6 @@ async function observed<T>(
   } finally {
     observer?.({ tool, ok, durationMs: Date.now() - startedAt });
   }
-}
-
-function requireDeck(adapter: ArcanaToolAdapter, deckId: string): void {
-  if (!adapter.engine.getDeck(deckId)) throw new Error(`Unknown deck: ${deckId}.`);
 }
 
 function noVisualError(deckId: string): Error {
