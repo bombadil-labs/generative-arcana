@@ -35,6 +35,24 @@ Visibility semantics:
 
 This makes "share my deck" a domain operation rather than an MCP-specific feature.
 
+## Creation paths
+
+Uploading/importing a deck is a core platform capability and must not require an LLM. A user should be able to
+submit a supported deck manifest/package, have it validated, and receive a normal owned `UserDeckRecord`. From that
+point onward it has exactly the same privacy, sharing, publication, revision, and reading behavior as any other deck.
+
+LLM-assisted deck creation is a separate authoring path that converges on the same canonical manifest:
+
+1. the Generative Arcana skill teaches the host model the deck grammar and authoring process;
+2. the model produces a candidate renderer-neutral manifest;
+3. the MCP validates the candidate and returns actionable validation errors when needed;
+4. once valid, the MCP persists it as an ordinary user-owned deck.
+
+For ChatGPT/plugin creation, the host model can do the synthesis work, so Generative Arcana does not need to pay for
+a second inference merely to create the deck. A future web-only "generate a deck for me" flow may call a hosted model
+and can be metered or premium because it incurs platform cost. Entitlements should live on the user/account and be
+client-agnostic; the deck format and upload/import path remain universal.
+
 ## Bundled decks and launch content
 
 The historical decks in this repository are development/reference fixtures, not implicitly launch catalog content.
