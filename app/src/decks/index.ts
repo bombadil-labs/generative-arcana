@@ -4,6 +4,7 @@
  */
 export * from "./registry";
 export * from "./manifest";
+export * from "./authoring";
 export type { DeckVisibility, UserDeckManifest, UserDeckRecord } from "./catalog";
 export type { DeckModule, DeckDataFile } from "./types";
 
