@@ -1,5 +1,4 @@
-import type { Spread } from "./spreads";
-import type { DeckDataFile } from "./types";
+import type { DeckManifest } from "./manifest";
 
 /**
  * Visibility is intentionally orthogonal to ownership.
@@ -10,12 +9,8 @@ import type { DeckDataFile } from "./types";
  */
 export type DeckVisibility = "private" | "unlisted" | "public";
 
-/** Declarative content owned by a user. Renderer implementations remain a separate concern. */
-export interface UserDeckManifest {
-  data: DeckDataFile;
-  tagline: string;
-  spreads?: Spread[];
-}
+/** Compatibility name retained while older catalog/MCP code migrates to the canonical term. */
+export type UserDeckManifest = DeckManifest;
 
 /**
  * Durable identity for a user-authored deck.
@@ -27,7 +22,7 @@ export interface UserDeckRecord {
   id: string;
   ownerId: string;
   slug: string;
-  manifest: UserDeckManifest;
+  manifest: DeckManifest;
   visibility: DeckVisibility;
   revision: number;
   createdAt: string;

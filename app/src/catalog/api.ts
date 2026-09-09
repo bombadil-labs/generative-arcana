@@ -1,4 +1,4 @@
-import type { UserDeckManifest } from "@/decks/catalog";
+import type { DeckManifest } from "@/decks/manifest";
 
 export interface CatalogDeckSummary {
   id: string;
@@ -13,7 +13,7 @@ export interface CatalogDeckSummary {
 }
 
 export interface SharedCatalogDeck extends CatalogDeckSummary {
-  manifest: UserDeckManifest;
+  manifest: DeckManifest;
 }
 
 export interface ImportMyDeckRequest {

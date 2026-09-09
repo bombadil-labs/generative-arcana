@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { DeckRegistry } from "../../app/src/decks/registry.js";
 import type { DeckModule } from "../../app/src/decks/types.js";
+import { createDeckManifest, snapshotDeckManifest, validateDeckManifest } from "../../app/src/decks/manifest.js";
 import type { ImportDeckOptions } from "../../app/src/engine/types.js";
 import type { DeckVisibility, UserDeckManifest, UserDeckRecord } from "../../app/src/decks/catalog.js";
 import { immutableJsonSnapshot } from "../../app/src/decks/jsonSnapshot.js";
@@ -22,25 +22,17 @@ export interface UserDeckCatalogRepository {
   deleteAllOwned(ownerId: string): Promise<number>;
 }
 
-/** Snapshot one validated runtime custom deck into the renderer-neutral platform manifest. */
+/** Compatibility facade for older catalog callers; canonical implementation lives in the deck domain. */
 export function snapshotUserDeckManifest(deck: DeckModule): UserDeckManifest {
-  return immutableJsonSnapshot({
-    data: deck.data,
-    tagline: deck.tagline,
-    ...(deck.spreads ? { spreads: deck.spreads } : {}),
-  }, "User deck manifest");
+  return snapshotDeckManifest(deck);
 }
 
-/** Validate untrusted import input without mutating the caller's runtime registry. */
+/** Compatibility facade for raw-deck import callers; canonical construction lives in the deck domain. */
 export function validateUserDeckManifest(data: unknown, options: ImportDeckOptions = {}): UserDeckManifest {
-  const scratch = new DeckRegistry();
-  const deck = scratch.registerDeck({
-    data,
+  return createDeckManifest(data, {
     tagline: options.tagline,
     spreads: options.spreads,
-    custom: true,
   });
-  return snapshotUserDeckManifest(deck);
 }
 
 /** Restore catalog rows through the ordinary validated import boundary. */
@@ -237,12 +229,9 @@ export class InMemoryUserDeckCatalogRepository implements UserDeckCatalogReposit
 }
 
 function snapshotManifest(manifest: UserDeckManifest): UserDeckManifest {
-  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) throw new Error("User deck manifest must be an object.");
-  if (!manifest.data || typeof manifest.data !== "object" || Array.isArray(manifest.data)) throw new Error("User deck manifest data must be an object.");
-  if (typeof manifest.data.slug !== "string" || !manifest.data.slug.trim()) throw new Error("User deck manifest slug must be non-empty.");
-  if (typeof manifest.tagline !== "string") throw new Error("User deck manifest tagline must be a string.");
-  if (manifest.spreads !== undefined && !Array.isArray(manifest.spreads)) throw new Error("User deck manifest spreads must be an array.");
-  return immutableJsonSnapshot(manifest, "User deck manifest");
+  const validation = validateDeckManifest(manifest);
+  if (!validation.ok) throw new Error(validation.error);
+  return validation.manifest;
 }
 
 function snapshot(record: UserDeckRecord): UserDeckRecord {

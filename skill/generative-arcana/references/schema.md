@@ -1,6 +1,6 @@
 # Generative Arcana Schema
 
-The JSON shape of a finished deck. One principle governs it: **atomic at write, derived at read.** Every axis's contribution is stored once; a card stores only slugs plus the things it originates — its integrated meaning and its integrated visual description (a **major** additionally carries a factorization gloss; see below).
+The normalized symbolic payload inside a canonical Generative Arcana `DeckManifest`. One principle governs it: **atomic at write, derived at read.** Every axis's contribution is stored once; a card stores only slugs plus the things it originates — its integrated meaning and its integrated visual description (a **major** additionally carries a factorization gloss; see below).
 
 ## Authoring profile versus runtime contract
 
@@ -14,6 +14,37 @@ The app's runtime import validator checks field shapes, ordered axes, every card
 integrity. It permits incomplete decks and variant cardinalities and does not enforce the default
 walk or numeric-origin rules. Profile-specific generation/quality checks are a separate concern;
 explicit machine-readable profile selection is still future work. See `docs/contracts-and-readings.md`.
+
+## Canonical authored artifact
+
+New authoring workflows emit a **`DeckManifest`**, not a bare deck payload and not a catalog/account record:
+
+```typescript
+interface DeckManifest {
+  data: Deck       // the symbolic payload defined below
+  tagline: string  // required, concise human-facing summary
+  spreads?: Spread[]
+}
+
+interface SpreadPosition {
+  name: string
+  prompt: string
+}
+
+interface Spread {
+  id: string
+  name: string
+  description: string
+  positions: SpreadPosition[]
+  deckId?: string  // normalized by the platform; new authoring should normally omit it
+}
+```
+
+The `Deck` interface below is therefore `manifest.data`. Existing import surfaces may still accept a bare `Deck` as compatibility input and normalize it into a manifest, but new producers should write the canonical envelope directly.
+
+`manifest.data.slug` is authored metadata. It is **not** Generative Arcana's durable resource identity; the catalog assigns an opaque stable ID after import. Likewise, do not put owner IDs, visibility, revisions/timestamps, OAuth/provider/session data, MCP metadata, or renderer implementation objects into the manifest. Those are host/catalog concerns layered around the authored artifact.
+
+In the repository, `docs/deck-manifest.md` is the normative platform contract. This reference describes the authoring payload used by the skill.
 
 ## Why this schema looks the way it does
 
