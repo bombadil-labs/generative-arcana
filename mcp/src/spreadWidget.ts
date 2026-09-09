@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/server";
 
-export const ARCANA_SPREAD_WIDGET_URI = "ui://arcana/spread/v1.html";
+export const ARCANA_SPREAD_WIDGET_URI = "ui://arcana/spread/v2.html";
 
 const SPREAD_WIDGET_HTML = String.raw`<!doctype html>
 <html lang="en">
@@ -297,17 +297,102 @@ const SPREAD_WIDGET_HTML = String.raw`<!doctype html>
         root.replaceWith(shell);
         root = shell;
 
-        if (window.openai && typeof window.openai.notifyIntrinsicHeight === "function") {
-          requestAnimationFrame(function () { window.openai.notifyIntrinsicHeight(); });
+      }
+
+      var pendingRequests = new Map();
+      var nextRequestId = 1;
+      var initialized = false;
+
+      function post(message) {
+        window.parent.postMessage(message, "*");
+      }
+
+      function request(method, params) {
+        var id = nextRequestId++;
+        return new Promise(function (resolve, reject) {
+          pendingRequests.set(id, { resolve: resolve, reject: reject });
+          post({ jsonrpc: "2.0", id: id, method: method, params: params });
+        });
+      }
+
+      function notify(method, params) {
+        post({ jsonrpc: "2.0", method: method, params: params || {} });
+      }
+
+      function renderChatGptCompatibilityOutput() {
+        var bridge = window.openai;
+        if (!bridge) return false;
+
+        // ChatGPT keeps the full MCP result envelope in widget-only metadata.
+        // Prefer it when available so image content reaches the widget too.
+        var metadata = bridge.toolResponseMetadata;
+        var fullResult = metadata && metadata.mcp_tool_result;
+        if (fullResult && fullResult.structuredContent) {
+          renderToolResult(fullResult);
+          return true;
         }
+
+        if (!bridge.toolOutput) return false;
+
+        // window.openai.toolOutput is the tool's structuredContent.
+        renderToolResult({ structuredContent: bridge.toolOutput, content: [] });
+        return true;
+      }
+
+      function reportSize() {
+        requestAnimationFrame(function () {
+          notify("ui/notifications/size-changed", {
+            height: Math.ceil(document.documentElement.scrollHeight),
+          });
+
+          if (window.openai && typeof window.openai.notifyIntrinsicHeight === "function") {
+            window.openai.notifyIntrinsicHeight();
+          }
+        });
       }
 
       window.addEventListener("message", function (event) {
         if (event.source !== window.parent) return;
         var message = event.data;
         if (!message || message.jsonrpc !== "2.0") return;
-        if (message.method === "ui/notifications/tool-result") renderToolResult(message.params);
+
+        if (message.id !== undefined && pendingRequests.has(message.id)) {
+          var pending = pendingRequests.get(message.id);
+          pendingRequests.delete(message.id);
+          if (message.error) pending.reject(message.error);
+          else pending.resolve(message.result);
+          return;
+        }
+
+        if (message.method === "ui/notifications/tool-result") {
+          renderToolResult(message.params);
+          reportSize();
+        }
       }, { passive: true });
+
+      request("ui/initialize", {
+        appInfo: { name: "Generative Arcana Spread", version: "2.0.0" },
+        appCapabilities: { availableDisplayModes: ["inline"] },
+        protocolVersion: "2026-01-26",
+      }).then(function () {
+        initialized = true;
+        notify("ui/notifications/initialized", {});
+
+        // Some ChatGPT surfaces materialize the result on the compatibility
+        // bridge as well. If it is already there, render it rather than wait.
+        if (renderChatGptCompatibilityOutput()) reportSize();
+      }).catch(function (error) {
+        root.textContent = "Unable to initialize spread.";
+        root.title = error && error.message
+          ? error.message
+          : String(error || "Unknown initialization error");
+      });
+
+      setTimeout(function () {
+        if (!initialized && root && root.classList && root.classList.contains("waiting")) {
+          root.textContent = "Still waiting for the host to initialize this spread…";
+        }
+      }, 8000);
     })();
   </script>
 </body>
@@ -321,7 +406,13 @@ export function registerArcanaSpreadWidget(server: McpServer): void {
         mimeType: "text/html;profile=mcp-app",
         text: SPREAD_WIDGET_HTML,
         _meta: {
-          ui: { prefersBorder: true },
+          ui: {
+            prefersBorder: true,
+            csp: {
+              connectDomains: [],
+              resourceDomains: [],
+            },
+          },
           "openai/widgetDescription": "A responsive visual Arcana spread with labeled positions and hover/focus explanations.",
           "openai/widgetPrefersBorder": true,
         },
