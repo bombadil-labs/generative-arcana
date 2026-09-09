@@ -1,3 +1,12 @@
+FROM node:24-alpine AS web-build
+
+WORKDIR /srv
+COPY app/package.json app/package-lock.json ./app/
+RUN cd app && npm ci
+COPY app ./app
+COPY decks ./decks
+RUN cd app && npm run build
+
 FROM node:24-alpine
 
 WORKDIR /srv
@@ -9,10 +18,12 @@ COPY app/src ./app/src
 COPY decks ./decks
 COPY mcp/src ./mcp/src
 COPY mcp/tsconfig.json ./mcp/tsconfig.json
-RUN test -f ./app/src/decks/finalfantasy/pixel/major-0.png
+COPY --from=web-build /srv/app/dist ./app/dist
+RUN test -f ./app/src/decks/finalfantasy/pixel/major-0.png && test -f ./app/dist/index.html
 
 WORKDIR /srv/mcp
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
+ENV ARCANA_WEB_DIST_DIR=/srv/app/dist
 
 CMD ["npm", "run", "http"]
