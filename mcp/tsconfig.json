@@ -21,6 +21,7 @@
     "../app/src/decks/spreads.ts",
     "../app/src/decks/registry.ts",
     "../app/src/decks/manifest.ts",
+    "../app/src/decks/authoring.ts",
     "../app/src/decks/custom.ts",
     "../app/src/decks/validate.ts",
     "../app/src/decks/bundled.ts",

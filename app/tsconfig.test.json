@@ -16,6 +16,7 @@
     "src/decks/spreads.ts",
     "src/decks/registry.ts",
     "src/decks/manifest.ts",
+    "src/decks/authoring.ts",
     "src/decks/custom.ts",
     "src/decks/validate.ts",
     "src/reading/types.ts",
