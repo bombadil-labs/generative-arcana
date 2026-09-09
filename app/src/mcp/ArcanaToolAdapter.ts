@@ -1,5 +1,5 @@
 import type { ArcanaEngine } from "../engine/ArcanaEngine";
-import type { ArcanaReading, CardQuery } from "../engine/types";
+import type { ArcanaReading, CardQuery, ImportDeckOptions } from "../engine/types";
 import type { Spread } from "../decks/spreads";
 
 export const ARCANA_TOOL_NAMES = [
@@ -91,14 +91,33 @@ export class ArcanaToolAdapter {
         return { token: reading.token, deckId: reading.deck.id, context: this.engine.buildInterpretationContext(reading) };
       }
       case "import_deck": {
-        const json = args.json;
-        const deck = typeof json === "string"
-          ? this.engine.importDeckJson(json, importOptions(args))
-          : this.engine.importDeck(args.data, importOptions(args));
-        return { id: deck.id, name: deck.name, cardCount: deck.cards.length, custom: true };
+        const request = parseImportDeckInput(args);
+        const deck = this.engine.importDeck(request.data, request.options);
+        return { id: deck.id, slug: deck.data.slug, name: deck.name, cardCount: deck.cards.length, custom: true };
       }
     }
   }
+}
+
+export interface ParsedImportDeckInput {
+  data: unknown;
+  options: ImportDeckOptions;
+}
+
+/** Parse transport-neutral import input without mutating a runtime registry. */
+export function parseImportDeckInput(input: unknown): ParsedImportDeckInput {
+  const args = record(input);
+  let data: unknown = args.data;
+  if (typeof args.json === "string") {
+    try {
+      data = JSON.parse(args.json);
+    } catch {
+      throw new Error("Deck JSON could not be parsed.");
+    }
+  } else if (args.json !== undefined) {
+    throw new Error("json must be a string.");
+  }
+  return { data, options: importOptions(args) };
 }
 
 function readingResult(reading: ArcanaReading) {

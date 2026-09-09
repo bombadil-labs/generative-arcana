@@ -1,15 +1,21 @@
 import { randomUUID } from "node:crypto";
+import { DeckRegistry } from "../../app/src/decks/registry.js";
 import type { DeckModule } from "../../app/src/decks/types.js";
+import type { ImportDeckOptions } from "../../app/src/engine/types.js";
 import type { DeckVisibility, UserDeckManifest, UserDeckRecord } from "../../app/src/decks/catalog.js";
 import { immutableJsonSnapshot } from "../../app/src/decks/jsonSnapshot.js";
-import { ArcanaToolAdapter, type ArcanaToolName } from "../../app/src/mcp/ArcanaToolAdapter.js";
+import { ArcanaToolAdapter, parseImportDeckInput, type ArcanaToolName } from "../../app/src/mcp/ArcanaToolAdapter.js";
 import { parseArcanaHostState, type ArcanaHostStateRepository } from "./hostState.js";
 
 export interface UserDeckCatalogRepository {
   listOwned(ownerId: string): Promise<UserDeckRecord[]>;
   get(deckId: string): Promise<UserDeckRecord | null>;
   listPublic(limit?: number): Promise<UserDeckRecord[]>;
+  /** Migration-only insert-if-absent: an existing row wins unchanged. */
   ensureImported(ownerId: string, manifest: UserDeckManifest): Promise<UserDeckRecord>;
+  /** User-facing create: duplicate owner+slug is an error. */
+  createImported(ownerId: string, manifest: UserDeckManifest): Promise<UserDeckRecord>;
+  /** User-facing replace/create: preserves an existing stable resource id and publication state. */
   upsertImported(ownerId: string, manifest: UserDeckManifest): Promise<UserDeckRecord>;
   setVisibility(ownerId: string, deckId: string, visibility: DeckVisibility): Promise<UserDeckRecord>;
   deleteOwned(ownerId: string, deckId: string): Promise<boolean>;
@@ -25,6 +31,18 @@ export function snapshotUserDeckManifest(deck: DeckModule): UserDeckManifest {
   }, "User deck manifest");
 }
 
+/** Validate untrusted import input without mutating the caller's runtime registry. */
+export function validateUserDeckManifest(data: unknown, options: ImportDeckOptions = {}): UserDeckManifest {
+  const scratch = new DeckRegistry();
+  const deck = scratch.registerDeck({
+    data,
+    tagline: options.tagline,
+    spreads: options.spreads,
+    custom: true,
+  });
+  return snapshotUserDeckManifest(deck);
+}
+
 /** Restore catalog rows through the ordinary validated import boundary. */
 export function restoreUserDeckRecords(adapter: ArcanaToolAdapter, ownerId: string, records: readonly UserDeckRecord[]): void {
   for (const record of records) {
@@ -32,6 +50,8 @@ export function restoreUserDeckRecords(adapter: ArcanaToolAdapter, ownerId: stri
     adapter.engine.importDeck(record.manifest.data, {
       tagline: record.manifest.tagline,
       ...(record.manifest.spreads ? { spreads: record.manifest.spreads } : {}),
+      runtimeId: record.id,
+      aliases: [record.slug],
     });
   }
 }
@@ -56,9 +76,12 @@ export async function migrateLegacyCustomDecks(
   return state.customDecks.length;
 }
 
-/** Persist only the imported deck touched by a successful mutation, rather than snapshotting a whole host. */
+/**
+ * Catalog-backed imports validate first, persist second, then enter the runtime under the catalog's
+ * stable resource id. This avoids briefly treating the mutable authored slug as canonical identity.
+ */
 export class CatalogPersistingArcanaToolAdapter extends ArcanaToolAdapter {
-  private saveTail: Promise<void> = Promise.resolve();
+  private importTail: Promise<void> = Promise.resolve();
 
   constructor(
     adapter: ArcanaToolAdapter,
@@ -69,16 +92,35 @@ export class CatalogPersistingArcanaToolAdapter extends ArcanaToolAdapter {
   }
 
   override async call(name: ArcanaToolName, input: unknown = {}): Promise<unknown> {
-    const result = await super.call(name, input);
-    if (name === "import_deck") {
-      const deckId = importedDeckId(result);
-      const deck = this.engine.getDeck(deckId);
-      if (!deck?.custom) throw new Error(`Imported custom deck “${deckId}” could not be resolved for persistence.`);
-      const manifest = snapshotUserDeckManifest(deck);
-      this.saveTail = this.saveTail.then(() => this.catalog.upsertImported(this.ownerId, manifest)).then(() => undefined);
-      await this.saveTail;
-    }
-    return result;
+    if (name !== "import_deck") return super.call(name, input);
+
+    const operation = this.importTail.then(() => this.importCatalogDeck(input));
+    // Keep later imports serialized even when one operation fails.
+    this.importTail = operation.then(() => undefined, () => undefined);
+    return operation;
+  }
+
+  private async importCatalogDeck(input: unknown): Promise<unknown> {
+    const request = parseImportDeckInput(input);
+    const manifest = validateUserDeckManifest(request.data, request.options);
+    const record = request.options.replaceExisting
+      ? await this.catalog.upsertImported(this.ownerId, manifest)
+      : await this.catalog.createImported(this.ownerId, manifest);
+
+    const deck = this.engine.importDeck(record.manifest.data, {
+      tagline: record.manifest.tagline,
+      ...(record.manifest.spreads ? { spreads: record.manifest.spreads } : {}),
+      runtimeId: record.id,
+      aliases: [record.slug],
+      replaceExisting: !!request.options.replaceExisting,
+    });
+    return {
+      id: deck.id,
+      slug: deck.data.slug,
+      name: deck.name,
+      cardCount: deck.cards.length,
+      custom: true,
+    };
   }
 }
 
@@ -124,6 +166,15 @@ export class InMemoryUserDeckCatalogRepository implements UserDeckCatalogReposit
     };
     this.records.set(record.id, record);
     return snapshot(record);
+  }
+
+  async createImported(ownerId: string, manifest: UserDeckManifest): Promise<UserDeckRecord> {
+    const owner = requireId(ownerId, "ownerId");
+    const clean = snapshotManifest(manifest);
+    if (this.findOwnedBySlug(owner, clean.data.slug)) {
+      throw new Error(`A deck with slug “${clean.data.slug}” is already owned by this account.`);
+    }
+    return this.ensureImported(owner, clean);
   }
 
   async upsertImported(ownerId: string, manifest: UserDeckManifest): Promise<UserDeckRecord> {
@@ -183,13 +234,6 @@ export class InMemoryUserDeckCatalogRepository implements UserDeckCatalogReposit
   private findOwnedBySlug(ownerId: string, slug: string): UserDeckRecord | undefined {
     return [...this.records.values()].find((record) => record.ownerId === ownerId && record.slug === slug);
   }
-}
-
-function importedDeckId(result: unknown): string {
-  if (!result || typeof result !== "object" || Array.isArray(result)) throw new Error("Import result must be an object.");
-  const id = (result as Record<string, unknown>).id;
-  if (typeof id !== "string" || !id.trim()) throw new Error("Import result is missing a deck id.");
-  return id;
 }
 
 function snapshotManifest(manifest: UserDeckManifest): UserDeckManifest {
