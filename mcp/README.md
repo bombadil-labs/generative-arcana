@@ -59,11 +59,11 @@ If `MCP_STATE_DIR` is also configured, authenticated custom deck manifests are r
 
 The static bearer resolver is deliberately an **alpha/testing adapter**. Production OAuth stays provider-neutral: an upstream authorization server owns login/consent/token issuance, `OidcJwtBearerIdentityVerifier` validates issuer + audience + signature, and `NeonExternalIdentityRepository` supplies the stable internal principal. The chosen identity provider is therefore deployment configuration rather than an Arcana domain dependency.
 
-Browser sign-in is a separate first-party session boundary. When the `WORKOS_*` settings are present, `/auth/login` and `/auth/callback` use AuthKit Hosted UI, the resulting session is kept in an HttpOnly/SameSite sealed cookie, `/auth/session` validates and refreshes it server-side, and POST `/auth/logout` ends the upstream session. The browser adapter proves an external `(issuer, subject)` identity and sends it through the **same** `NeonExternalIdentityRepository` used by MCP bearer tokens, so both transports converge on one opaque `usr_*` owner.
+Browser sign-in is a separate first-party session boundary. When the `WORKOS_*` settings are present, `/auth/login` and `/auth/callback` use AuthKit Hosted UI, the resulting session is kept in an HttpOnly/SameSite sealed cookie, `/auth/session` validates and refreshes it server-side, and POST `/auth/logout` ends the upstream session. Callback state is both HMAC-signed and bound to the browser that initiated login by a short-lived HttpOnly `/auth` nonce cookie, preventing a valid callback captured from another browser from being used to log a victim into the wrong account. The browser adapter proves an external `(issuer, subject)` identity and sends it through the **same** `NeonExternalIdentityRepository` used by MCP bearer tokens, so both transports converge on one opaque `usr_*` owner.
 
 The browser never receives or stores the MCP resource bearer token. AuthKit is therefore deployment glue for the web session, not an `ArcanaEngine`, manifest, or ownership dependency; MCP audience/resource-indicator semantics remain independent.
 
-`/healthz` reports the MCP version plus the active auth/state/limit modes so bug reports can identify the deployed contract. Tool-call diagnostics are JSON lines on stderr containing only tool name, success/failure, duration, transport, and an opaque principal hash; tool arguments, questions, tokens, and custom deck payloads are never logged by this layer.
+`/healthz` reports the MCP version plus the active auth/state/limit modes and a non-secret account-readiness summary so bug reports can identify the deployed contract. `/readyz` is stricter: it returns 200 only when the production web app, durable catalog, browser authentication, and MCP OAuth are all configured with private-alpha auth disabled; otherwise it returns 503 plus the missing capability names. This keeps liveness/public anonymous use separate from cross-host account readiness. Tool-call diagnostics are JSON lines on stderr containing only tool name, success/failure, duration, transport, and an opaque principal hash; tool arguments, questions, tokens, and custom deck payloads are never logged by this layer.
 
 ## Protocol smoke tests
 
@@ -126,7 +126,8 @@ The repository root contains:
 - `Dockerfile.vercel` — the production container entrypoint
 - `vercel.json` — an explicit catch-all rewrite into the container service
 - `/mcp` — Streamable HTTP MCP endpoint served by `mcp/src/http.ts`
-- `/healthz` — versioned runtime/auth/state metadata
+- `/healthz` — versioned runtime/auth/state metadata plus non-secret account-readiness state
+- `/readyz` — production account/cross-host readiness gate (200 ready, 503 with missing capability names)
 - Neon-backed `ArcanaHostStateRepository` whenever `DATABASE_URL` is present
 
 The container does **not** rely on ephemeral process memory for authenticated state when Neon is configured. Each authenticated principal host restores its versioned custom-deck state from Neon, while anonymous requests receive a fresh bundled symbolic host.
@@ -160,9 +161,10 @@ The resulting endpoints are:
 ```text
 https://YOUR_PROJECT.vercel.app/mcp
 https://YOUR_PROJECT.vercel.app/healthz
+https://YOUR_PROJECT.vercel.app/readyz
 ```
 
-`/healthz` reports `runtime: "vercel-container"` plus active auth/state/limit modes. With `DATABASE_URL`, state mode is `neon`. A valid `Authorization: Bearer <MCP_ALPHA_TOKEN>` request receives the principal-scoped surface including `import_deck`; invalid credentials fail closed with 401.
+`/healthz` reports `runtime: "vercel-container"` plus active auth/state/limit modes. With `DATABASE_URL`, state mode is `neon`. During private alpha, `/readyz` intentionally remains 503 because cross-host production accounts are not fully enabled. After the web app, Neon catalog, browser AuthKit session adapter, and MCP OAuth are configured and `MCP_ALPHA_TOKEN` is removed, `/readyz` should return 200 with `productionAccounts: true`. A valid private-alpha `Authorization: Bearer <MCP_ALPHA_TOKEN>` request receives the principal-scoped surface including `import_deck`; invalid credentials fail closed with 401.
 
 The Neon adapter lazily creates one table:
 

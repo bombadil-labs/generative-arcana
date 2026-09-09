@@ -42,6 +42,7 @@ import {
   type WorkOSBrowserAuthConfiguration,
 } from "./workosBrowserAuth";
 import { serveArcanaWebApp } from "./webAppStatic";
+import { accountDeploymentReadiness } from "./deploymentReadiness";
 
 const port = envPort(process.env.PORT, 3000);
 const host = process.env.HOST?.trim() || "127.0.0.1";
@@ -101,6 +102,13 @@ const browserPrincipalResolver = browserAuth && identities
   : undefined;
 const browserAuthHandler = browserAuth ? createWorkOSBrowserAuthRequestHandler(browserAuth) : undefined;
 const { hosts, catalog, stateMode } = createHostStore({ databaseUrl, stateDir });
+const readiness = accountDeploymentReadiness({
+  durableCatalog: stateMode === "neon" && !!catalog,
+  mcpOAuth: !!oauth,
+  browserAuth: !!browserAuth,
+  webApp: !!webAppDistDir,
+  alphaAuth: !!alphaToken,
+});
 
 if (alphaToken && stateMode === "memory") {
   console.error("[generative-arcana-mcp] MCP_ALPHA_TOKEN enabled without durable storage; authenticated imports are process-lifetime only");
@@ -142,8 +150,18 @@ const http = createServer((req, res) => {
       auth: oauth ? "oauth-oidc" : principalResolver ? "alpha-bearer" : "anonymous",
       browserAuth: browserAuth ? "workos-authkit" : "disabled",
       state: stateMode,
+      readiness,
       limits: { maxRequestBytes, requestsPerMinute },
     }));
+    return;
+  }
+
+  if (url.pathname === "/readyz") {
+    res.writeHead(readiness.productionAccounts ? 200 : 503, {
+      "content-type": "application/json",
+      "cache-control": "no-store",
+    });
+    res.end(JSON.stringify({ ok: readiness.productionAccounts, readiness }));
     return;
   }
 
