@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
+import { spawn, type ChildProcess } from "node:child_process";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import deepTime from "../../decks/deep-time/deck.json";
 import { createArcanaMcpServer } from "../src/server";
@@ -7,6 +8,7 @@ import { createArcanaAuthoringRequestHandler } from "../src/authoringApi";
 
 async function main(): Promise<void> {
   await httpContract();
+  await realHttpRoutingContract();
   await mcpContract();
 }
 
@@ -60,6 +62,59 @@ async function httpContract(): Promise<void> {
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
+}
+
+async function realHttpRoutingContract(): Promise<void> {
+  const port = 47000 + (process.pid % 1000);
+  const child = spawn(process.execPath, ["--import", "tsx", "src/http.ts"], {
+    env: {
+      ...process.env,
+      HOST: "127.0.0.1",
+      PORT: String(port),
+      MCP_RATE_LIMIT_PER_MINUTE: "100",
+    },
+    stdio: ["ignore", "ignore", "pipe"],
+  });
+  let stderr = "";
+  child.stderr?.on("data", (chunk) => { stderr += String(chunk); });
+  const base = `http://127.0.0.1:${port}`;
+  try {
+    await waitForHealth(child, `${base}/healthz`, () => stderr);
+    let response = await fetch(`${base}/api/authoring/spec`);
+    assert.equal(response.status, 200, "authoring spec is routed by the real account-free HTTP server");
+
+    response = await fetch(`${base}/api/authoring/validate`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ data: deepTime, tagline: "Real HTTP route" }),
+    });
+    assert.equal(response.status, 200);
+    assert.equal((await response.json() as { valid?: boolean }).valid, true);
+  } finally {
+    await stopChild(child);
+  }
+}
+
+async function waitForHealth(child: ChildProcess, url: string, stderr: () => string): Promise<void> {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    if (child.exitCode !== null) throw new Error(`HTTP MCP exited before health check.\n${stderr()}`);
+    try {
+      if ((await fetch(url)).ok) return;
+    } catch {
+      // still starting
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`Timed out waiting for HTTP MCP health check.\n${stderr()}`);
+}
+
+async function stopChild(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null) return;
+  const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
+  child.kill("SIGTERM");
+  await Promise.race([exited, new Promise<void>((resolve) => setTimeout(resolve, 1_000))]);
+  if (child.exitCode === null) child.kill("SIGKILL");
 }
 
 async function mcpContract(): Promise<void> {
