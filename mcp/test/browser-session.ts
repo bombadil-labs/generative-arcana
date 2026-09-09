@@ -32,7 +32,7 @@ async function main(): Promise<void> {
           if (sessionData === "expired") return { authenticated: true, user, sealedSession: "sealed-2" };
           return { authenticated: false, reason: "invalid_grant", retryable: false };
         },
-        async getLogOutUrl() {
+        async getLogoutUrl() {
           return "https://login.example.test/logout";
         },
       };
