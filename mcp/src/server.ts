@@ -1,12 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
-import { ArcanaToolAdapter, type ArcanaToolName } from "../../app/src/mcp/ArcanaToolAdapter";
-import { MAX_QUESTION_LENGTH } from "../../app/src/reading/encode";
-import { createBundledArcanaAdapter } from "./hostStore";
-import type { ArcanaToolCallObserver } from "./observability";
-import { ARCANA_MCP_VERSION } from "./version";
+import { ArcanaToolAdapter, type ArcanaToolName } from "../../app/src/mcp/ArcanaToolAdapter.js";
+import { MAX_QUESTION_LENGTH } from "../../app/src/reading/encode.js";
+import { createBundledArcanaAdapter } from "./hostStore.js";
+import type { ArcanaToolCallObserver } from "./observability.js";
+import { ARCANA_MCP_VERSION } from "./version.js";
 
-export { createBundledArcanaAdapter } from "./hostStore";
+export { createBundledArcanaAdapter } from "./hostStore.js";
 
 const MAX_IMPORT_JSON_CHARS = 2_000_000;
 const MAX_SPREADS = 64;
