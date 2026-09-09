@@ -33,6 +33,7 @@ import { FixedWindowRateLimiter, parseContentLength, positiveIntEnv } from "./li
 import { jsonToolCallObserver } from "./observability";
 import { resolveArcanaRequestAccess, type PrincipalRequest, type PrincipalResolver } from "./principal";
 import { ARCANA_MCP_VERSION } from "./version";
+import { createArcanaWebCatalogRequestHandler, isArcanaWebCatalogPath } from "./webCatalogApi";
 
 const port = envPort(process.env.PORT, 3000);
 const host = process.env.HOST?.trim() || "127.0.0.1";
@@ -90,6 +91,13 @@ const requestHandler = createArcanaHttpRequestHandler({
       }
     : undefined,
 });
+const webCatalogHandler = catalog ? createArcanaWebCatalogRequestHandler({
+  catalog,
+  hosts,
+  principalResolver,
+  ...(oauth ? { oauth: { resourceMetadataUrl: oauth.resourceMetadataUrl, readScopes: oauth.readScopes, writeScopes: oauth.writeScopes } } : {}),
+  maxRequestBytes,
+}) : undefined;
 const validateHost = hostHeaderValidation(allowedHosts);
 const validateOrigin = originValidation(allowedOrigins);
 
@@ -129,7 +137,8 @@ const http = createServer((req, res) => {
     return;
   }
 
-  if (url.pathname !== "/mcp") {
+  const isWebCatalogRequest = isArcanaWebCatalogPath(url.pathname);
+  if (url.pathname !== "/mcp" && !isWebCatalogRequest) {
     res.writeHead(404, { "content-type": "application/json" });
     res.end(JSON.stringify({ error: "not_found" }));
     return;
@@ -151,6 +160,16 @@ const http = createServer((req, res) => {
       "retry-after": String(decision.retryAfterSeconds),
     });
     res.end(JSON.stringify({ error: "rate_limited" }));
+    return;
+  }
+
+  if (isWebCatalogRequest) {
+    if (!webCatalogHandler) {
+      res.writeHead(503, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "catalog_unavailable" }));
+      return;
+    }
+    void webCatalogHandler(req, res);
     return;
   }
 
