@@ -5,7 +5,22 @@ import { createArcanaMcpServer } from "./server";
 import { StaticBearerPrincipalResolver } from "./alphaAuth";
 import { FileArcanaHostStateRepository } from "./fileHostStateRepository";
 import { NeonArcanaHostStateRepository } from "./neonHostStateRepository";
+import { NeonExternalIdentityRepository } from "./neonExternalIdentityRepository";
 import { NeonUserDeckCatalogRepository } from "./neonUserDeckCatalog";
+import {
+  OAuthPrincipalError,
+  OAuthPrincipalResolver,
+  OidcJwtBearerIdentityVerifier,
+} from "./oauthIdentity";
+import {
+  bearerChallenge,
+  DEFAULT_DECK_READ_SCOPES,
+  DEFAULT_DECK_WRITE_SCOPES,
+  protectedResourceMetadata,
+  protectedResourceMetadataPaths,
+  protectedResourceMetadataUrl,
+  type OAuthResourceConfiguration,
+} from "./oauthResource";
 import {
   createBundledArcanaAdapter,
   InMemoryArcanaHostStore,
@@ -25,6 +40,13 @@ const alphaToken = optionalEnv(process.env.MCP_ALPHA_TOKEN);
 const alphaPrincipalId = optionalEnv(process.env.MCP_ALPHA_PRINCIPAL_ID) ?? "alpha-user-v1";
 const stateDir = optionalEnv(process.env.MCP_STATE_DIR);
 const databaseUrl = optionalEnv(process.env.DATABASE_URL);
+const oauth = oauthRuntimeConfiguration({
+  issuer: optionalEnv(process.env.MCP_OAUTH_ISSUER),
+  resource: optionalEnv(process.env.MCP_OAUTH_RESOURCE),
+  jwksUri: optionalEnv(process.env.MCP_OAUTH_JWKS_URI),
+  readScopes: csv(process.env.MCP_OAUTH_READ_SCOPES) ?? [...DEFAULT_DECK_READ_SCOPES],
+  writeScopes: csv(process.env.MCP_OAUTH_WRITE_SCOPES) ?? [...DEFAULT_DECK_WRITE_SCOPES],
+});
 const maxRequestBytes = positiveIntEnv(process.env.MCP_MAX_REQUEST_BYTES, 4_000_000, "MCP_MAX_REQUEST_BYTES");
 const requestsPerMinute = positiveIntEnv(process.env.MCP_RATE_LIMIT_PER_MINUTE, 120, "MCP_RATE_LIMIT_PER_MINUTE");
 const rateLimiter = new FixedWindowRateLimiter(requestsPerMinute);
@@ -32,15 +54,39 @@ const rateLimiter = new FixedWindowRateLimiter(requestsPerMinute);
 if (!allowedHosts.length) {
   throw new Error("Public MCP HTTP binding requires MCP_ALLOWED_HOSTS or a recognized Vercel deployment hostname.");
 }
+if (alphaToken && oauth) {
+  throw new Error("Configure either MCP_ALPHA_TOKEN or MCP_OAUTH_ISSUER/MCP_OAUTH_RESOURCE, not both.");
+}
+if (oauth && !databaseUrl) {
+  throw new Error("OAuth identity requires DATABASE_URL so external identities map to durable Arcana principals.");
+}
 
-const principalResolver = alphaToken ? new StaticBearerPrincipalResolver(alphaToken, alphaPrincipalId) : undefined;
+const principalResolver = oauth
+  ? new OAuthPrincipalResolver(
+      new OidcJwtBearerIdentityVerifier(oauth.issuer, oauth.resource, oauth.jwksUri),
+      new NeonExternalIdentityRepository(databaseUrl!),
+      oauth.readScopes,
+    )
+  : alphaToken
+    ? new StaticBearerPrincipalResolver(alphaToken, alphaPrincipalId)
+    : undefined;
 const { hosts, stateMode } = createHostStore({ databaseUrl, stateDir });
 
 if (alphaToken && stateMode === "memory") {
   console.error("[generative-arcana-mcp] MCP_ALPHA_TOKEN enabled without durable storage; authenticated imports are process-lifetime only");
 }
 
-const requestHandler = createArcanaHttpRequestHandler({ principalResolver, hosts });
+const requestHandler = createArcanaHttpRequestHandler({
+  principalResolver,
+  hosts,
+  oauth: oauth
+    ? {
+        resourceMetadataUrl: oauth.resourceMetadataUrl,
+        readScopes: oauth.readScopes,
+        writeScopes: oauth.writeScopes,
+      }
+    : undefined,
+});
 const validateHost = hostHeaderValidation(allowedHosts);
 const validateOrigin = originValidation(allowedOrigins);
 
@@ -54,10 +100,20 @@ const http = createServer((req, res) => {
       service: "generative-arcana-mcp",
       version: ARCANA_MCP_VERSION,
       runtime: process.env.VERCEL ? "vercel-container" : "node-http",
-      auth: principalResolver ? "alpha-bearer" : "anonymous",
+      auth: oauth ? "oauth-oidc" : principalResolver ? "alpha-bearer" : "anonymous",
       state: stateMode,
       limits: { maxRequestBytes, requestsPerMinute },
     }));
+    return;
+  }
+
+  if (oauth && req.method === "GET" && oauth.metadataPaths.includes(url.pathname)) {
+    if (!validateHost(req, res)) return;
+    res.writeHead(200, {
+      "content-type": "application/json",
+      "cache-control": "public, max-age=300",
+    });
+    res.end(JSON.stringify(protectedResourceMetadata(oauth)));
     return;
   }
 
@@ -101,9 +157,16 @@ async function shutdown(signal: string) {
 process.once("SIGINT", () => void shutdown("SIGINT"));
 process.once("SIGTERM", () => void shutdown("SIGTERM"));
 
+export interface ArcanaHttpOAuthOptions {
+  resourceMetadataUrl: string;
+  readScopes: readonly string[];
+  writeScopes: readonly string[];
+}
+
 export interface ArcanaHttpRequestHandlerOptions {
   principalResolver?: PrincipalResolver;
   hosts?: ArcanaHostStore;
+  oauth?: ArcanaHttpOAuthOptions;
 }
 
 /** Node request handler whose state policy is selected per request. */
@@ -122,6 +185,14 @@ export function createArcanaHttpRequestHandler(options: ArcanaHttpRequestHandler
       const handler = createMcpHandler(() => createArcanaMcpServer({
         adapter: access.adapter,
         includeStatefulTools: access.includeStatefulTools,
+        oauth: options.oauth
+          ? {
+              principal: access.principal,
+              resourceMetadataUrl: options.oauth.resourceMetadataUrl,
+              readScopes: options.oauth.readScopes,
+              writeScopes: options.oauth.writeScopes,
+            }
+          : undefined,
         onToolCall: jsonToolCallObserver({ transport: "http", principalId: access.principal?.id }),
       }));
       const nodeHandler = toNodeHandler(handler);
@@ -133,6 +204,24 @@ export function createArcanaHttpRequestHandler(options: ArcanaHttpRequestHandler
         res.end();
         return;
       }
+
+      if (error instanceof OAuthPrincipalError && options.oauth) {
+        res.writeHead(error.statusCode, {
+          "content-type": "application/json",
+          "www-authenticate": bearerChallenge({
+            resourceMetadataUrl: options.oauth.resourceMetadataUrl,
+            scopes: error.scopes,
+            error: error.oauthError,
+            description: error.message,
+          }),
+        });
+        res.end(JSON.stringify({
+          error: error.oauthError,
+          message: error.message,
+        }));
+        return;
+      }
+
       res.writeHead(401, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: "principal_resolution_failed", message: error instanceof Error ? error.message : "Unauthorized" }));
     }
@@ -157,6 +246,42 @@ function createHostStore(options: { databaseUrl?: string; stateDir?: string }): 
     };
   }
   return { hosts: new InMemoryArcanaHostStore(), stateMode: "memory" };
+}
+
+interface OAuthRuntimeConfiguration extends OAuthResourceConfiguration {
+  jwksUri?: string;
+  resourceMetadataUrl: string;
+  metadataPaths: string[];
+}
+
+function oauthRuntimeConfiguration(input: {
+  issuer?: string;
+  resource?: string;
+  jwksUri?: string;
+  readScopes: string[];
+  writeScopes: string[];
+}): OAuthRuntimeConfiguration | undefined {
+  if (!input.issuer && !input.resource && !input.jwksUri) return undefined;
+  if (!input.issuer || !input.resource) {
+    throw new Error("OAuth requires both MCP_OAUTH_ISSUER and MCP_OAUTH_RESOURCE.");
+  }
+  const readScopes = requireScopes(input.readScopes, "MCP_OAUTH_READ_SCOPES");
+  const writeScopes = requireScopes(input.writeScopes, "MCP_OAUTH_WRITE_SCOPES");
+  return {
+    issuer: input.issuer,
+    resource: input.resource,
+    ...(input.jwksUri ? { jwksUri: input.jwksUri } : {}),
+    readScopes,
+    writeScopes,
+    resourceMetadataUrl: protectedResourceMetadataUrl(input.resource),
+    metadataPaths: protectedResourceMetadataPaths(input.resource),
+  };
+}
+
+function requireScopes(scopes: readonly string[], label: string): string[] {
+  const normalized = [...new Set(scopes.map((scope) => scope.trim()).filter(Boolean))].sort();
+  if (!normalized.length) throw new Error(`${label} must contain at least one scope.`);
+  return normalized;
 }
 
 function toPrincipalRequest(req: IncomingMessage): PrincipalRequest {
