@@ -39,7 +39,7 @@ interface WorkOSRefreshResult extends WorkOSAuthResult {
 interface WorkOSLoadedSession {
   authenticate(): Promise<WorkOSAuthResult>;
   refresh(): Promise<WorkOSRefreshResult>;
-  getLogOutUrl(): Promise<string>;
+  getLogoutUrl(): Promise<string>;
 }
 
 export interface WorkOSBrowserClient {
@@ -111,7 +111,7 @@ export class WorkOSBrowserAuthAdapter implements BrowserSessionAuthenticator {
     this.clearSessionCookie(res);
     if (!sealed) return null;
     const session = await this.client.loadSealedSession({ sessionData: sealed });
-    return await session.getLogOutUrl();
+    return await session.getLogoutUrl();
   }
 
   private browserUser(user: WorkOSBrowserUser): BrowserSessionUser {
@@ -260,8 +260,8 @@ export function createWorkOSBrowserClient(config: WorkOSBrowserAuthConfiguration
         async refresh() {
           return await session.refresh() as WorkOSRefreshResult;
         },
-        async getLogOutUrl() {
-          return await session.getLogOutUrl();
+        async getLogoutUrl() {
+          return await session.getLogoutUrl();
         },
       };
     },
