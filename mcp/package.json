@@ -24,7 +24,8 @@
     "typecheck": "tsc --noEmit",
     "test:oauth-identity": "tsx test/oauth-identity.ts",
     "test:catalog-tools": "tsx test/catalog-tools.ts",
-    "test:shared-decks": "tsx test/shared-deck-resolution.ts"
+    "test:shared-decks": "tsx test/shared-deck-resolution.ts",
+    "test:web-catalog-api": "tsx test/web-catalog-api.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",
