@@ -1,10 +1,10 @@
 import { createMcpHandler } from "@modelcontextprotocol/server";
-import { StaticBearerPrincipalResolver } from "../mcp/src/alphaAuth";
-import { createBundledArcanaAdapter } from "../mcp/src/hostStore";
-import { NeonArcanaHostStateRepository } from "../mcp/src/neonHostStateRepository";
-import { PersistingArcanaToolAdapter, restoreArcanaHostState } from "../mcp/src/hostState";
-import { jsonToolCallObserver } from "../mcp/src/observability";
-import { createArcanaMcpServer } from "../mcp/src/server";
+import { StaticBearerPrincipalResolver } from "../mcp/src/alphaAuth.js";
+import { createBundledArcanaAdapter } from "../mcp/src/hostStore.js";
+import { NeonArcanaHostStateRepository } from "../mcp/src/neonHostStateRepository.js";
+import { PersistingArcanaToolAdapter, restoreArcanaHostState } from "../mcp/src/hostState.js";
+import { jsonToolCallObserver } from "../mcp/src/observability.js";
+import { createArcanaMcpServer } from "../mcp/src/server.js";
 
 const alphaToken = optionalEnv(process.env.MCP_ALPHA_TOKEN);
 const alphaPrincipalId = optionalEnv(process.env.MCP_ALPHA_PRINCIPAL_ID) ?? "alpha-user-v1";
