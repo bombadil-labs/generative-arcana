@@ -47,6 +47,35 @@ test("custom import mutates only the adapter engine registry", async () => {
   assert.equal(registry.getDeck("imported-tool-deck").custom, true);
 });
 
+test("canonical DeckManifest is a first-class import payload", async () => {
+  const registry = new DeckRegistry();
+  const tools = new ArcanaToolAdapter(new ArcanaEngine(registry));
+  const data = rawDeck();
+  data.slug = "manifest-native-import";
+  data.name = "Manifest Native Import";
+  const manifest = { data, tagline: "Imported as one canonical artifact" };
+  const imported = await tools.call("import_deck", { manifest });
+  assert.equal(imported.id, "manifest-native-import");
+  assert.equal(registry.getDeck("manifest-native-import").tagline, manifest.tagline);
+});
+
+test("manifest import keeps authored envelope fields inside the manifest", async () => {
+  const registry = new DeckRegistry();
+  const tools = new ArcanaToolAdapter(new ArcanaEngine(registry));
+  const data = rawDeck();
+  data.slug = "manifest-no-overrides";
+  const manifest = { data, tagline: "Canonical" };
+
+  await assert.rejects(
+    tools.call("import_deck", { manifest, tagline: "override" }),
+    /tagline and spreads must be authored inside the manifest/i,
+  );
+  await assert.rejects(
+    tools.call("import_deck", { manifest, data }),
+    /exactly one of manifest, data, or json/i,
+  );
+});
+
 test("adapter rejects malformed transport inputs before reaching domain calls", async () => {
   const { tools } = adapter();
   await assert.rejects(tools.call("get_card", { deckId: "", cardSlug: "x" }), /deckId/);
