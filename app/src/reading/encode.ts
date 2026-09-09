@@ -1,6 +1,6 @@
-import { isValidSpread, MAX_SPREAD_POSITIONS, resolveSpread, type Spread } from "../decks/spreads";
-import type { DeckModule } from "../decks/types";
-import type { ReadingCard, ReadingResolution, ReadingToken, StableReadingToken } from "./types";
+import { isValidSpread, MAX_SPREAD_POSITIONS, resolveSpread, type Spread } from "../decks/spreads.js";
+import type { DeckModule } from "../decks/types.js";
+import type { ReadingCard, ReadingResolution, ReadingToken, StableReadingToken } from "./types.js";
 
 const MAX_TOKEN_LENGTH = 65_536;
 export const MAX_QUESTION_LENGTH = 4_000;
