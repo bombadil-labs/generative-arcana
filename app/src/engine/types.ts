@@ -73,4 +73,8 @@ export interface ImportDeckOptions {
   tagline?: string;
   spreads?: Spread[];
   replaceExisting?: boolean;
+  /** Host/resource identity; omitted for ordinary slug-keyed imports. */
+  runtimeId?: string;
+  /** Resolution-only compatibility identities for migrated/runtime-hosted decks. */
+  aliases?: readonly string[];
 }

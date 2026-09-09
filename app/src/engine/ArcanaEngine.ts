@@ -3,7 +3,7 @@ import { omega } from "../decks/cardMeta";
 import { DeckRegistry, deckRegistry } from "../decks/registry";
 import { immutableJsonSnapshot } from "../decks/jsonSnapshot";
 import { isValidSpread, resolveSpread, spreadsForDeck, type Spread } from "../decks/spreads";
-import type { DeckModule } from "../decks/types";
+import { deckHasIdentity, type DeckModule } from "../decks/types";
 import { deal } from "../reading/deal";
 import { decodeReading, encodeReading, resolveReading as resolveReadingTokenData } from "../reading/encode";
 import { buildPrompt } from "../reading/prompt";
@@ -38,7 +38,14 @@ export class ArcanaEngine {
 
   importDeck(data: unknown, options: ImportDeckOptions = {}): DeckModule {
     return this.decks.registerDeck(
-      { data, tagline: options.tagline, spreads: options.spreads, custom: true },
+      {
+        data,
+        tagline: options.tagline,
+        spreads: options.spreads,
+        custom: true,
+        runtimeId: options.runtimeId,
+        aliases: options.aliases,
+      },
       { replaceExisting: options.replaceExisting },
     );
   }
@@ -124,7 +131,7 @@ export class ArcanaEngine {
   ): Promise<ArcanaReading> {
     const deck = this.requireDeck(deckId);
     const resolved = resolveSpread(spreadIdOrInline, deck.spreads);
-    if (!isValidSpread(resolved) || (resolved.deckId && resolved.deckId !== deck.id)) {
+    if (!isValidSpread(resolved) || (resolved.deckId && !deckHasIdentity(deck, resolved.deckId))) {
       throw new Error("Unknown or invalid spread for this deck.");
     }
     const spread = immutableJsonSnapshot(resolved, "reading spread");
@@ -136,11 +143,11 @@ export class ArcanaEngine {
   async resolveReading(token: string, expectedDeckId?: string): Promise<ArcanaReading> {
     const decoded = decodeReading(token);
     if (!decoded) throw new Error("This reading token is malformed.");
-    if (expectedDeckId !== undefined && decoded.d !== expectedDeckId) {
-      throw new Error("This reading belongs to a different deck than the route.");
-    }
     const deck = this.decks.getDeck(decoded.d);
     if (!deck) throw new Error(`This reading references an unknown deck: ${decoded.d}.`);
+    if (expectedDeckId !== undefined && this.decks.getDeck(expectedDeckId) !== deck) {
+      throw new Error("This reading belongs to a different deck than the route.");
+    }
     const resolution = await resolveReadingTokenData(decoded, deck);
     if (!resolution.ok) throw new Error(resolution.error);
     return this.hydrateReading(token, deck, resolution.spread, decoded.q, resolution.dealt, resolution.legacy);
