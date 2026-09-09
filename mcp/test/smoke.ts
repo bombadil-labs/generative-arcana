@@ -44,7 +44,8 @@ async function main(): Promise<void> {
     const names = new Set(listed.tools.map((tool) => tool.name));
     for (const name of REQUIRED_TOOLS) assert.ok(names.has(name), `missing MCP tool: ${name}`);
     const renderTool = listed.tools.find((tool) => tool.name === "render_reading");
-    assert.equal(renderTool?._meta?.ui?.resourceUri, SPREAD_WIDGET_URI, "render_reading must advertise the spread UI resource");
+    const renderMeta = renderTool?._meta as { ui?: { resourceUri?: string } } | undefined;
+    assert.equal(renderMeta?.ui?.resourceUri, SPREAD_WIDGET_URI, "render_reading must advertise the spread UI resource");
 
     const resources = await withTimeout(client.listResources(), 5_000, "stdio resources/list");
     assert.ok(resources.resources.some((resource) => resource.uri === SPREAD_WIDGET_URI), "spread UI resource is not discoverable");
