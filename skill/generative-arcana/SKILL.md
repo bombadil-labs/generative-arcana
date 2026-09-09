@@ -1,6 +1,6 @@
 ---
 name: generative-arcana
-description: Design thematically coherent custom tarot decks woven from four symbolic axes — suit, rank, a required transversal substrate (the generalization of tarot's Chaldean/decan order), and the latent prime/composite character of each card's number. Use when the user asks to create, design, or generate a custom tarot deck for a theme (e.g. "design a cyberpunk tarot deck", "make a tarot deck about ocean mythology"). The skill is a router: it proposes a per-stage generation plan, loads the chosen strategy modules, and emits a single JSON deck.
+description: Design thematically coherent custom tarot decks woven from four symbolic axes — suit, rank, a required transversal substrate (the generalization of tarot's Chaldean/decan order), and the latent prime/composite character of each card's number. Use when the user asks to create, design, or generate a custom tarot deck for a theme (e.g. "design a cyberpunk tarot deck", "make a tarot deck about ocean mythology"). The skill is a router: it proposes a per-stage generation plan, loads the chosen strategy modules, and emits a single canonical `DeckManifest` JSON artifact.
 ---
 
 # Generative Arcana
@@ -39,7 +39,7 @@ Both walks traverse the same N stations in the same canonical order. See `refere
 
 Hold across every theme and strategy; never duplicate their contents into strategy files.
 
-- `references/schema.md` — the normalized four-axis JSON schema, the walk, and what each field is for.
+- `references/schema.md` — the canonical `DeckManifest` envelope, normalized four-axis deck payload, the walk, and what each field is for.
 - `references/integration.md` — declare/sublimate/latent directives, the meaning-integration procedure, chiral inversion.
 - `references/numeric_axis.md` — the prime/composite fourth quantum number and its resonance with the transversal.
 - `references/svg_symbols.md` — glyph constraints (suit glyphs; optional major glyph; optional station symbol).
@@ -96,17 +96,29 @@ Face ranks: four roles, distinct initials (for glyph abbreviation), an encoded p
 
 Generate the 56 minor cards. Each integrates its **suit** (style, declared) × **rank** (content, declared) × its **station** (motif, sublimated — from the minor walk) × its **numeric character** (latent — derived from its rank's number; not stored per-card). Follow `references/integration.md` exactly. Overrides only where a card genuinely refines a parent axis.
 
-### Stage 6 — Emit JSON
+### Stage 6 — Emit the canonical DeckManifest
 
-Assemble the full `Deck` per `references/schema.md` (theme, 4 ordered suits, 14 ranks, transversal, major_arcana, 78 cards) and save:
+Assemble the full `Deck` payload per `references/schema.md` (theme, 4 ordered suits, 14 ranks, transversal, major_arcana, 78 cards), write a concise explicit `tagline`, and wrap them in the canonical host-neutral artifact:
+
+```json
+{
+  "data": { "...": "the complete Deck payload" },
+  "tagline": "A concise human-facing summary of the deck.",
+  "spreads": []
+}
+```
+
+`spreads` is optional; omit it when the deck has no authored native spreads. Do **not** emit a catalog resource ID, owner/principal, visibility, revision/timestamps, OAuth/provider/session data, or renderer/MCP host metadata. `data.slug` remains authored metadata; the platform assigns stable resource identity when the manifest is imported.
+
+Save the artifact:
 
 ```bash
-cat > /mnt/user-data/outputs/[deck-slug].json << 'EOF'
-[the complete JSON]
+cat > /mnt/user-data/outputs/[deck-slug].manifest.json << 'EOF'
+[the complete DeckManifest JSON]
 EOF
 ```
 
-Confirm the save and report the path. (No renderer is part of this skill yet — the JSON is the deliverable.)
+Confirm the save and report the path. (No renderer is part of this skill yet — the canonical JSON manifest is the deliverable.)
 
 ## Working with feedback
 
@@ -116,6 +128,7 @@ Confirm the save and report the path. (No renderer is part of this skill yet —
 
 ## Quality checks
 
+- **Canonical envelope?** Is the final artifact exactly the authored `DeckManifest` concern — `data`, explicit non-empty `tagline`, and optional `spreads` — with no catalog/account/host identity metadata?
 - **Axes orthogonal?** Do suit, rank, and transversal each carve the space differently? (If the transversal aligns with the suits, N or the walk is wrong.)
 - **No denormalization?** Does any card restate an axis (a suit's style, a rank's content, a station's motif) instead of overriding it? It shouldn't. (The factorization *gloss* IS stored — intentionally; the factorization is not.)
 - **Transversal sublimated?** Read ten random pip descriptions — can you feel the station without it being named? (A station `symbol`, if any, stays weather on the card face — surfacing only as a deliberate, rare exception, never the default register.)
