@@ -23,6 +23,7 @@
     "src/engine/types.ts",
     "src/engine/ArcanaEngine.ts",
     "src/mcp/ArcanaToolAdapter.ts",
-    "src/runtime/defineCard.ts"
+    "src/runtime/defineCard.ts",
+    "src/catalog/api.ts"
   ]
 }

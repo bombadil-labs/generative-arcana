@@ -135,6 +135,10 @@ export function listDecks(): DeckModule[] {
   return deckRegistry.listDecks();
 }
 
+export function unregisterDeck(id: string): DeckModule | undefined {
+  return deckRegistry.unregisterDeck(id);
+}
+
 function runtimeId(value: string): string {
   if (typeof value !== "string" || !value.trim()) throw new Error("runtimeId: must be a non-empty string.");
   return value.trim();
