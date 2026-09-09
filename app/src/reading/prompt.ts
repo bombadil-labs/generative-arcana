@@ -1,9 +1,9 @@
 /** Build a self-contained, LLM-ready interpretation prompt from a resolved reading. Grounded
  *  entirely in the deck's authored data — no backend, no tokens, works pasted into any model. */
-import type { DeckModule, DeckDataFile } from "../decks/types";
-import type { Spread } from "../decks/spreads";
-import type { ReadingCard } from "./types";
-import { rankLabel, suitLabel } from "../decks/cardMeta";
+import type { DeckModule, DeckDataFile } from "../decks/types.js";
+import type { Spread } from "../decks/spreads.js";
+import type { ReadingCard } from "./types.js";
+import { rankLabel, suitLabel } from "../decks/cardMeta.js";
 
 type Station = { name: string; description?: string };
 
