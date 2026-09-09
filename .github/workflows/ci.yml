@@ -55,6 +55,8 @@ jobs:
             command: npm run test:deck-catalog --prefix mcp
           - check: catalog tools
             command: npm run test:catalog-tools --prefix mcp
+          - check: shared decks
+            command: npm run test:shared-decks --prefix mcp
           - check: principal resolver
             command: npm run test:principal --prefix mcp
           - check: alpha auth
