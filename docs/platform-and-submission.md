@@ -1,19 +1,43 @@
 # Generative Arcana as a platform
 
-The MCP integration has crossed the important boundary: it can render a real spread UI inside ChatGPT.
-The next phase is not merely "harden the MCP server". Generative Arcana needs one product/domain model
-that can be consumed by both a first-party web application and the ChatGPT plugin.
+The MCP integration has crossed the important boundary: it can carry a real reading into a host-native visual
+experience. The next phase is not merely "harden the ChatGPT integration". Generative Arcana needs one
+product/domain model and one host-neutral MCP contract that can be consumed by a first-party web application,
+ChatGPT, Claude, and other MCP-capable hosts.
 
 ## Product shape
 
-Generative Arcana has three layers:
+Generative Arcana has four layers:
 
 1. **Deck platform** — accounts, owned decks, revisions, visibility/publication, discovery, and later visual assets.
 2. **First-party web app** — create/import/edit decks, browse cards, publish/unpublish, share links, and perform readings.
-3. **ChatGPT plugin** — conversational client of the same deck platform, with in-chat spread rendering.
+3. **MCP service** — host-neutral conversational/API access to the same deck platform.
+4. **Host adapters** — thin presentation/capability layers for ChatGPT, Claude, and future MCP clients.
 
-The web app and plugin must not maintain separate notions of a deck or user. They share the same durable deck
-identity and authorization rules.
+The web app and MCP hosts must not maintain separate notions of a deck, reading, or user. They share the same
+durable identities and authorization rules. A host may render the same reading differently without changing what
+the reading is.
+
+## Host neutrality
+
+The MCP contract is a portability boundary, not a ChatGPT API. Core tools should return renderer-neutral semantic
+results first: deck ids, reading ids, spread positions, card identities, orientation, authored position prompts,
+layout hints, and visual asset references/content. Host-specific presentation metadata is additive.
+
+Rendering should follow a layered rule:
+
+1. **semantic result** — authoritative structured content that any MCP client can understand;
+2. **portable visual payload** — card images/assets and layout hints that are useful across hosts;
+3. **MCP Apps UI** — when a host supports interactive MCP app resources, render a richer spread component;
+4. **host compatibility adapter** — namespaced metadata/bridges for a specific client, isolated from domain and tool
+   semantics;
+5. **text/image fallback** — clients without the richer UI path still receive a complete usable reading.
+
+Do not detect or branch on model identity inside the domain layer. Prefer capability/protocol support, and keep
+client-specific extensions namespaced so an unfamiliar MCP host can safely ignore them. The current spread widget
+already follows this direction: the generic MCP Apps initialization/result protocol is primary, while ChatGPT's
+`window.openai` bridge and `openai/*` metadata are compatibility glue. Claude or another host may use a different
+rendering adapter while consuming the same `render_reading` semantics.
 
 ## User-owned decks
 
@@ -43,15 +67,17 @@ point onward it has exactly the same privacy, sharing, publication, revision, an
 
 LLM-assisted deck creation is a separate authoring path that converges on the same canonical manifest:
 
-1. the Generative Arcana skill teaches the host model the deck grammar and authoring process;
+1. host-appropriate instructions/skills teach the available model the deck grammar and authoring process;
 2. the model produces a candidate renderer-neutral manifest;
 3. the MCP validates the candidate and returns actionable validation errors when needed;
 4. once valid, the MCP persists it as an ordinary user-owned deck.
 
-For ChatGPT/plugin creation, the host model can do the synthesis work, so Generative Arcana does not need to pay for
-a second inference merely to create the deck. A future web-only "generate a deck for me" flow may call a hosted model
-and can be metered or premium because it incurs platform cost. Entitlements should live on the user/account and be
-client-agnostic; the deck format and upload/import path remain universal.
+When an MCP host already provides an LLM, that host model can do the synthesis work, so Generative Arcana does not
+need to pay for a second inference merely to create the deck. ChatGPT, Claude, and future hosts may package or expose
+the authoring guidance differently, but they must converge on the same manifest contract. A future web-only
+"generate a deck for me" flow may call a hosted model and can be metered or premium because it incurs platform cost.
+Entitlements should live on the user/account and be client-agnostic; the deck format and upload/import path remain
+universal.
 
 ## Bundled decks and launch content
 
@@ -92,7 +118,9 @@ The renderer remains client-side and renderer-agnostic. The API supplies validat
 
 ## Submission-hardening track
 
-The public ChatGPT plugin should be hardened against the same production service used by the web app. Before review:
+ChatGPT submission is one distribution target for the same production MCP service used by the web app and other
+MCP hosts. OpenAI-specific review requirements should remain at the adapter/deployment edge rather than changing the
+portable tool contract. Before ChatGPT review:
 
 1. replace static bearer auth with standards-compliant OAuth and stable principal resolution;
 2. expose only production-safe tools and annotate read/write/destructive behavior correctly;
@@ -125,6 +153,8 @@ internal user id.
 
 Add authenticated My Decks, publishing, public deck pages, and catalog discovery to the existing renderer application.
 
-### Phase 5 — plugin submission
+### Phase 5 — host adapters and submissions
 
-Point the production plugin at that same service, finish CSP/domain/legal/reviewer metadata, and submit.
+Keep the core MCP service host-neutral, exercise it against multiple MCP clients, and maintain thin host adapters. For
+ChatGPT, finish CSP/domain/legal/reviewer metadata and submit. For Claude and other hosts, implement/test their
+presentation adapter or fallback behavior without forking deck/reading semantics.
