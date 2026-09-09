@@ -1,4 +1,4 @@
-import { ARCANA_MCP_VERSION } from "../mcp/src/version";
+import { ARCANA_MCP_VERSION } from "../mcp/src/version.js";
 
 export default {
   async fetch(): Promise<Response> {

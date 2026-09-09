@@ -1,8 +1,8 @@
-import { DeckRegistry } from "../../app/src/decks/registry";
-import { registerBundledDecks } from "../../app/src/decks/bundled";
-import { ArcanaEngine } from "../../app/src/engine/ArcanaEngine";
-import { ArcanaToolAdapter } from "../../app/src/mcp/ArcanaToolAdapter";
-import { PersistingArcanaToolAdapter, restoreArcanaHostState, type ArcanaHostStateRepository } from "./hostState";
+import { DeckRegistry } from "../../app/src/decks/registry.js";
+import { registerBundledDecks } from "../../app/src/decks/bundled.js";
+import { ArcanaEngine } from "../../app/src/engine/ArcanaEngine.js";
+import { ArcanaToolAdapter } from "../../app/src/mcp/ArcanaToolAdapter.js";
+import { PersistingArcanaToolAdapter, restoreArcanaHostState, type ArcanaHostStateRepository } from "./hostState.js";
 
 export type ArcanaHostFactory = () => ArcanaToolAdapter;
 
