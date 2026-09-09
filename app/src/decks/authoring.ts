@@ -39,7 +39,7 @@ export const DECK_MANIFEST_SPEC = Object.freeze({
   },
   validation: {
     normalizesDeckData: true,
-    canonicalizesCardOrder: true,
+    derivesCanonicalRuntimeCardOrder: true,
     normalizesNativeSpreadOwnership: true,
     preservesUnknownDeckExtensions: true,
   },

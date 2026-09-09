@@ -98,6 +98,6 @@ Invalid authored content stays a normal validation result:
 
 ## Why there is no duplicate JSON Schema source of truth
 
-The machine-readable spec intentionally describes the artifact boundary rather than attempting to reimplement every deck rule as a second static schema. The shared deck-domain validator performs referential checks, canonical card ordering, native spread normalization, JSON snapshotting, and extension preservation that are not usefully captured by a shallow envelope schema alone.
+The machine-readable spec intentionally describes the artifact boundary rather than attempting to reimplement every deck rule as a second static schema. The shared deck-domain validator performs referential checks, canonical runtime card-order derivation, native spread normalization, JSON snapshotting, and extension preservation that are not usefully captured by a shallow envelope schema alone.
 
 If a future editor needs JSON Schema for completion/form generation, it should be generated or tested against this executable boundary rather than becoming a competing definition of what a valid deck is.
