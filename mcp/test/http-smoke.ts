@@ -44,7 +44,8 @@ async function main(): Promise<void> {
       for (const name of REQUIRED_HTTP_TOOLS) assert.ok(names.has(name), `missing HTTP MCP tool: ${name}`);
       assert.equal(names.has("import_deck"), false, "stateless HTTP must not expose persistent import_deck");
       const renderTool = listed.tools.find((tool) => tool.name === "render_reading");
-      assert.equal(renderTool?._meta?.ui?.resourceUri, SPREAD_WIDGET_URI, "HTTP render_reading must advertise the spread UI resource");
+      const renderMeta = renderTool?._meta as { ui?: { resourceUri?: string } } | undefined;
+      assert.equal(renderMeta?.ui?.resourceUri, SPREAD_WIDGET_URI, "HTTP render_reading must advertise the spread UI resource");
 
       const resources = await withTimeout(client.listResources(), 5_000, "HTTP resources/list");
       assert.ok(resources.resources.some((resource) => resource.uri === SPREAD_WIDGET_URI), "HTTP spread UI resource is not discoverable");
