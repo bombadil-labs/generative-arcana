@@ -51,6 +51,8 @@ jobs:
             command: npm run test:host-store --prefix mcp
           - check: durable state
             command: npm run test:durable-state --prefix mcp
+          - check: deck catalog
+            command: npm run test:deck-catalog --prefix mcp
           - check: principal resolver
             command: npm run test:principal --prefix mcp
           - check: alpha auth

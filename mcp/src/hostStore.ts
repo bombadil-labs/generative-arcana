@@ -3,6 +3,7 @@ import { registerBundledDecks } from "../../app/src/decks/bundled.js";
 import { ArcanaEngine } from "../../app/src/engine/ArcanaEngine.js";
 import { ArcanaToolAdapter } from "../../app/src/mcp/ArcanaToolAdapter.js";
 import { PersistingArcanaToolAdapter, restoreArcanaHostState, type ArcanaHostStateRepository } from "./hostState.js";
+import { CatalogPersistingArcanaToolAdapter, migrateLegacyCustomDecks, restoreUserDeckRecords, type UserDeckCatalogRepository } from "./userDeckCatalog.js";
 
 export type ArcanaHostFactory = () => ArcanaToolAdapter;
 
@@ -49,8 +50,8 @@ export class InMemoryArcanaHostStore implements ArcanaHostStore {
 /**
  * Durable principal-scoped host store.
  *
- * Hosts are cached in-process, but their custom deck manifests are restored from an external
- * repository when first accessed and persisted after successful `import_deck` calls.
+ * Hosts are cached in-process. Legacy callers restore/persist the old host-state snapshot; callers
+ * that provide a deck catalog migrate once and thereafter reconstruct custom decks from first-class rows.
  */
 export class PersistentArcanaHostStore implements ArcanaHostStore {
   private readonly hosts = new Map<string, Promise<ArcanaToolAdapter>>();
@@ -58,6 +59,7 @@ export class PersistentArcanaHostStore implements ArcanaHostStore {
   constructor(
     private readonly repository: ArcanaHostStateRepository,
     private readonly createHost: ArcanaHostFactory = createBundledArcanaAdapter,
+    private readonly deckCatalog?: UserDeckCatalogRepository,
   ) {}
 
   get(scopeId: string): Promise<ArcanaToolAdapter> {
@@ -77,7 +79,8 @@ export class PersistentArcanaHostStore implements ArcanaHostStore {
     const key = requireScopeId(scopeId);
     const hadCached = this.hosts.delete(key);
     const hadPersisted = await this.repository.delete(key);
-    return hadCached || hadPersisted;
+    const deletedCatalogDecks = this.deckCatalog ? await this.deckCatalog.deleteAllOwned(key) : 0;
+    return hadCached || hadPersisted || deletedCatalogDecks > 0;
   }
 
   clearCache(): void {
@@ -90,6 +93,13 @@ export class PersistentArcanaHostStore implements ArcanaHostStore {
 
   private async loadHost(scopeId: string): Promise<ArcanaToolAdapter> {
     const adapter = this.createHost();
+    if (this.deckCatalog) {
+      await migrateLegacyCustomDecks(scopeId, this.repository, this.deckCatalog);
+      const records = await this.deckCatalog.listOwned(scopeId);
+      restoreUserDeckRecords(adapter, scopeId, records);
+      return new CatalogPersistingArcanaToolAdapter(adapter, scopeId, this.deckCatalog);
+    }
+
     const persisted = await this.repository.load(scopeId);
     if (persisted !== null) restoreArcanaHostState(adapter, persisted);
     return new PersistingArcanaToolAdapter(adapter, scopeId, this.repository);
