@@ -10,6 +10,7 @@ async function main(): Promise<void> {
   await httpContract();
   await realHttpRoutingContract();
   await mcpContract();
+  await mcpManifestImportContract();
 }
 
 async function httpContract(): Promise<void> {
@@ -147,6 +148,37 @@ async function mcpContract(): Promise<void> {
     });
     assert.equal(invalid.isError, undefined, "invalid authored content remains structured repair data");
     assert.equal((invalid.structuredContent as { result?: { valid?: boolean } } | undefined)?.result?.valid, false);
+  } finally {
+    await client.close().catch(() => undefined);
+    await server.close().catch(() => undefined);
+  }
+}
+
+async function mcpManifestImportContract(): Promise<void> {
+  const server = createArcanaMcpServer({ includeStatefulTools: true });
+  const client = new Client({ name: "manifest-import-contract-test", version: "0.2.0" });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  try {
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+    const data = structuredClone(deepTime);
+    data.slug = "manifest-native-mcp";
+    data.name = "Manifest Native MCP";
+
+    const imported = await client.callTool({
+      name: "import_deck",
+      arguments: { manifest: { data, tagline: "Imported as one canonical artifact" } },
+    });
+    assert.equal(imported.isError, undefined);
+    const result = (imported.structuredContent as { result?: { id?: string } } | undefined)?.result;
+    assert.equal(result?.id, "manifest-native-mcp");
+
+    const resolved = await client.callTool({
+      name: "get_deck",
+      arguments: { deckId: "manifest-native-mcp" },
+    });
+    assert.equal(resolved.isError, undefined);
+    const deck = (resolved.structuredContent as { result?: { tagline?: string } } | undefined)?.result;
+    assert.equal(deck?.tagline, "Imported as one canonical artifact");
   } finally {
     await client.close().catch(() => undefined);
     await server.close().catch(() => undefined);

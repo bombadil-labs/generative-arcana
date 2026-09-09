@@ -2,6 +2,7 @@ import type { ArcanaEngine } from "../engine/ArcanaEngine";
 import type { ArcanaReading, CardQuery, ImportDeckOptions } from "../engine/types";
 import type { Spread } from "../decks/spreads";
 import { DECK_MANIFEST_SPEC, inspectDeckAuthoringArtifact, invalidDeckAuthoringArtifact } from "../decks/authoring";
+import { validateDeckManifest } from "../decks/manifest";
 
 export const ARCANA_TOOL_NAMES = [
   "list_decks",
@@ -38,7 +39,7 @@ export const ARCANA_TOOL_DEFINITIONS: readonly ArcanaToolDefinition[] = Object.f
   { name: "interpretation_context", description: "Project a resolved reading into authored LLM-ready interpretation context.", readOnly: true },
   { name: "get_deck_authoring_spec", description: "Get the machine-readable canonical DeckManifest authoring contract.", readOnly: true },
   { name: "validate_deck_manifest", description: "Validate a canonical DeckManifest without importing it; legacy raw deck JSON is identified as compatibility input.", readOnly: true },
-  { name: "import_deck", description: "Import validated custom deck JSON into this host's isolated deck registry.", readOnly: false },
+  { name: "import_deck", description: "Import a canonical DeckManifest into this host; legacy raw deck data/JSON remains supported for compatibility.", readOnly: false },
 ]);
 
 /** Transport-neutral tool contract. MCP/CLI/HTTP adapters should delegate here instead of rebuilding semantics. */
@@ -130,6 +131,25 @@ export interface ParsedImportDeckInput {
 /** Parse transport-neutral import input without mutating a runtime registry. */
 export function parseImportDeckInput(input: unknown): ParsedImportDeckInput {
   const args = record(input);
+  const payloadCount = [args.manifest, args.data, args.json].filter((value) => value !== undefined).length;
+  if (payloadCount !== 1) throw new Error("Provide exactly one of manifest, data, or json.");
+
+  if (args.manifest !== undefined) {
+    if (args.tagline !== undefined || args.spreads !== undefined) {
+      throw new Error("When manifest is provided, tagline and spreads must be authored inside the manifest.");
+    }
+    const validation = validateDeckManifest(args.manifest);
+    if (!validation.ok) throw new Error(validation.error);
+    return {
+      data: validation.manifest.data,
+      options: {
+        tagline: validation.manifest.tagline,
+        ...(validation.manifest.spreads === undefined ? {} : { spreads: validation.manifest.spreads }),
+        ...operationImportOptions(args),
+      },
+    };
+  }
+
   let data: unknown = args.data;
   if (typeof args.json === "string") {
     try {
@@ -197,9 +217,15 @@ function cardQuery(value: unknown): CardQuery {
 function importOptions(args: Record<string, unknown>) {
   return {
     ...(args.tagline === undefined ? {} : { tagline: optionalString(args.tagline) }),
-    ...(args.replaceExisting === undefined ? {} : { replaceExisting: booleanArg(args.replaceExisting, "replaceExisting") }),
     ...(args.spreads === undefined ? {} : { spreads: arrayArg(args.spreads, "spreads") as Spread[] }),
+    ...operationImportOptions(args),
   };
+}
+
+function operationImportOptions(args: Record<string, unknown>) {
+  return args.replaceExisting === undefined
+    ? {}
+    : { replaceExisting: booleanArg(args.replaceExisting, "replaceExisting") };
 }
 
 function booleanArg(value: unknown, key: string): boolean {

@@ -67,14 +67,19 @@ const schemas: Record<ArcanaToolName, z.ZodTypeAny> = {
     message: "Provide exactly one of manifest or json.",
   }),
   import_deck: z.object({
+    manifest: z.unknown().optional(),
     data: z.unknown().optional(),
     json: z.string().max(MAX_IMPORT_JSON_CHARS).optional(),
     tagline: z.string().min(1).optional(),
     spreads: z.array(spread).max(MAX_SPREADS).optional(),
     replaceExisting: z.boolean().optional(),
-  }).refine((value) => value.data !== undefined || value.json !== undefined, {
-    message: "Provide either data or json.",
-  }),
+  }).refine(
+    (value) => [value.manifest, value.data, value.json].filter((payload) => payload !== undefined).length === 1,
+    { message: "Provide exactly one of manifest, data, or json." },
+  ).refine(
+    (value) => value.manifest === undefined || (value.tagline === undefined && value.spreads === undefined),
+    { message: "When manifest is provided, tagline and spreads must be authored inside the manifest." },
+  ),
 };
 
 export interface ArcanaOAuthToolContext {

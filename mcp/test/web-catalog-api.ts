@@ -41,7 +41,7 @@ async function main(): Promise<void> {
     response = await fetch(`${base}/api/me/decks`, {
       method: "POST",
       headers: { authorization: "Bearer secret", "content-type": "application/json" },
-      body: JSON.stringify({ data, tagline: "Imported through the web API" }),
+      body: JSON.stringify({ manifest: { data, tagline: "Imported through the web API" } }),
     });
     assert.equal(response.status, 201);
     const created = await response.json() as { id: string; slug: string; visibility: string; ownerId?: string };

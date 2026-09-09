@@ -16,12 +16,9 @@ export interface SharedCatalogDeck extends CatalogDeckSummary {
   manifest: DeckManifest;
 }
 
-export interface ImportMyDeckRequest {
-  data: unknown;
-  tagline?: string;
-  spreads?: unknown[];
-  replaceExisting?: boolean;
-}
+export type ImportMyDeckRequest =
+  | { manifest: unknown; replaceExisting?: boolean }
+  | { data: unknown; tagline?: string; spreads?: unknown[]; replaceExisting?: boolean };
 
 export async function listPublicDecks(signal?: AbortSignal): Promise<CatalogDeckSummary[]> {
   return requestJson<CatalogDeckSummary[]>("/api/decks/public", { signal });
@@ -60,9 +57,7 @@ export function importRequestFromJson(value: unknown, replaceExisting = false): 
       throw new Error("Manifest spreads must be an array when provided.");
     }
     return {
-      data: value.data,
-      tagline: value.tagline,
-      ...(value.spreads === undefined ? {} : { spreads: value.spreads }),
+      manifest: value,
       ...(replaceExisting ? { replaceExisting: true } : {}),
     };
   }
