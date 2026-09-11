@@ -25,39 +25,51 @@ The gloss is stored **only where the number is originated** — not on every car
 - **Ranks may carry it, once** (`Rank.factorization`, optional). A minor's number is its rank's, so its gloss — if worth authoring — belongs on the rank, shared across the four suits. This is load-bearing under `ranks/prime_scaffold` and usually skipped otherwise (the suits do the minors' structural work; a per-rank number-gloss is rarely an interesting source).
 - **Minor cards carry nothing.** Their character is recovered by reference to their rank. Glossing all 56 would just denormalize 14 rank-level facts fourfold.
 
-Each `factorization` block has three semantic fields: **`character`** (`identity|prime|composite`, derived), **`factors`** (the prime factorization for composites — `[2,2]` for 4, `[2,7]` for 14 — derived, stored for legibility), and **`gloss`** (the authored semantic part). Schema v2 additionally permits **`visual_logic`**, the authored formal/compositional consequence of the same number.
+Each `factorization` block has three fields: **`character`** (`identity|prime|composite`, derived), **`factors`** (the prime factorization for composites — `[2,2]` for 4, `[2,7]` for 14 — derived, stored for legibility), and **`gloss`** (the authored part: one or two sentences on what the character means here). The factorization is arithmetic; the gloss is interpretation — and interpretation is the part worth storing. Schema v2 additionally permits **`visual_logic`**, the authored formal/compositional consequence of the same number.
 
 ## Writing the gloss
 
 - **Identity 0** — the additive identity, the void/precondition. Gloss: what "nothing yet, the ground before differentiation" *is* for this card.
 - **Identity 1** — the multiplicative identity, the transparent operator. Gloss: what "the pure unit of agency" is here.
-- **Prime** — irreducible. Gloss: *why this energy doesn't decompose* — name the atomic experience and then stop.
+- **Prime** — irreducible. Gloss: *why this energy doesn't decompose* — name the atomic experience and then stop. Resist over-glossing a prime; its whole point is that it simply *is*.
 - **Composite** — derived. The gloss leans on the factor-**cards**, not just the numbers:
-  - **x²** — the base card *stabilized / structured into a frame*.
-  - **x³** — the base *compounded into mastery or its shadow*.
+  - **x²** — the base card *stabilized / structured into a frame*: "Major 2 (The Two Moons) squared — the threshold made permanent."
+  - **x³** — the base *compounded into mastery or its shadow (excess, being consumed)*.
   - **x⁴** — the base *concentrated past containment* — collapse, breakthrough, shattering.
-  - **x × y** — *what happens when energy X meets energy Y*.
+  - **x × y** — *what happens when energy X meets energy Y*: name both factor-cards and the quality of their meeting. (`x²·y`: the first is structured, the second acts on it. `x·y²`: the second is fulfilled, the first witnesses it.)
 
-On a **major** the factors are the majors at those factors; on a **rank** (if you gloss it) they are the ranks.
+  On a **major** the factors are the majors at those factors (Major 6 = Major 2 × Major 3); on a **rank** (if you gloss it) they are the ranks (rank 6 = the 2-rank meeting the 3-rank).
 
 ## The gloss as signal — read this
 
-The gloss is not a field to fill mechanically. **If you cannot write a gloss that genuinely follows from the factors, that is information.** A composite whose meaning doesn't read as its factor-cards meeting — or a prime whose card decomposes too easily into parts — is telling you either the slot is wrong or a factor-card is mis-defined. Revise rather than write around it.
+The gloss is not a field to fill mechanically. **If you cannot write a gloss that genuinely follows from the factors, that is information.** A composite whose meaning doesn't read as its factor-cards meeting — or a prime whose card decomposes too easily into parts — is telling you one of two things:
+
+1. **The card chosen for this slot is wrong.** Under `strategies/majors/primes.md` especially, a composite slot's identity is *supposed* to derive from its factorization; if it won't, you have probably named the wrong archetype for that number.
+2. **A factor-card is mis-defined.** When the load-bearing 2 or 3 is off, everything built on it strains, and the strain shows up first as composites whose glosses won't close.
+
+Treat a forced gloss as a flag to **revise the slot or its factors** — not as something to write around. Most of the value of baking this axis in is this early-warning signal; a deck where every gloss closes cleanly is a deck whose numbers and meanings agree.
 
 ## Resonance with the transversal
 
-The numeric axis and transversal are siblings with different rhythms: station is periodic; prime/composite structure is arithmetic/aperiodic. Their interference creates reinforcement (a prime card on a structurally irreducible station) and crossing tension (derived number under irreducible environmental pressure, or vice versa). This is a soft tool; do not let arithmetic override coherent meaning.
+The numeric axis and the transversal are **siblings** — both cross-cut the suit×rank grid — but with different rhythms. The transversal is **periodic** (the station cycles with period N as you walk). The numeric axis is **arithmetic / aperiodic** (primes cluster early, thin late, recur by no fixed beat). Walk the cards and the two drift in and out of phase; their interference is the "oscillating resonance."
+
+Two phenomena worth noticing (and worth folding into the gloss when present):
+
+- **Reinforcement — "extra prime."** When a card is *numerically* prime **and** *transversally* prime (its station sits at a prime index in the canonical order), both cross-cutting structures say "irreducible" at once. The card is doubly-atomic — the deck's most elemental. Lean into irreducibility hard, and let the gloss note it.
+- **Tension — crossing.** When a composite number lands on a prime-position station (or a prime on a composite-position station), the two structures disagree about how reducible the card is. That productive dissonance is a reading: a derived thing wearing an atomic key signature, or vice versa.
+
+This resonance is a *soft* tool. The transversal's prime positions are just the prime indices of its order; you needn't compute them precisely to feel it, and you should not let arithmetic override a card's meaning.
 
 ## Generating *with* it vs. *noticing* it
 
-- **Generating with it** (`strategies/majors/primes.md`, `strategies/ranks/prime_scaffold.md`): the archetype is built from factorization; gloss/visual logic are load-bearing.
-- **Noticing it** (`journey.md`/`borrowed.md` majors, `questions.md`/`manual.md` ranks): the card was built another way, but the number remains an optional constraint. Every major still earns a gloss; ranks usually omit one unless it clarifies.
+- **Generating with it** (`strategies/majors/primes.md`, `strategies/ranks/prime_scaffold.md`): the archetype is *built from* the factorization, so the gloss almost writes itself and the signal is sharpest — a slot that resists a clean gloss is a slot to reconsider then and there.
+- **Noticing it** (`journey.md`/`borrowed.md` majors, `questions.md`/`manual.md` ranks): the card was built another way, but the number is still there. A **major** still earns its gloss — terse is fine ("prime — an irreducible beat in the journey") — and a number that flatly contradicts the trump is still worth a second look. A **rank** built this way will usually skip the optional gloss; author it only if it genuinely clarifies.
 
-So: **every major carries a `factorization.gloss`**; a **rank** carries one only when load-bearing; **minor cards carry none.**
+So: **every major carries a `factorization.gloss`**; a **rank** carries one only when it's load-bearing (chiefly `prime_scaffold`); **minor cards carry none.**
 
 ## Visual logic
 
-The authored semantic gloss and visual consequence of factorization are related but distinct. `factorization.visual_logic` states how the number constrains **formal organization** rather than what the number means.
+The authored semantic gloss and the visual consequence of factorization are related but distinct. Schema v2 permits `factorization.visual_logic` at the same number-owning layer as the gloss. It states how the number constrains **formal organization** rather than what the number means.
 
 For majors the default authoring profile normally writes this field. Primes/identity can favor an irreducible organizing proposition; composites should inherit formal ancestry from their factor-majors (axes, symmetry, rhythm, nesting, directional systems, scale relations) without literal pasted references or naive object counting. Under `ranks/prime_scaffold`, the same idea may be authored once on the rank and inherited by all minor cards of that rank.
 

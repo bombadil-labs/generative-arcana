@@ -2,7 +2,7 @@
 
 Define the 14 minor ranks (10 numbered + 4 face) as abstract frameworks that refract through every suit. Each numbered rank poses a **question** the suit answers, so all four cards of a rank share a question while differing by suit — deep structural parallax across the row. The default rank method.
 
-Each rank is a `Rank` per `references/schema.md`: `description` (the framework/abstraction), `question` (the question itself), `meaning` palette (3–6 upright + chiral inverted), `visual_content`, and structured `visual_form`.
+Each rank is a `Rank` per `references/schema.md`: `description` (the framework/abstraction), `question` (the question itself), `meaning` palette (3–6 upright + chiral inverted), `visual_content`.
 
 ## Numbered ranks (Ace–Ten)
 

@@ -22,7 +22,7 @@ For each suit, per `references/schema.md` → `Suit`:
 - **description** — what this quadrant is, in the theme.
 - **symbol** + **svg** — a glyph per `references/svg_symbols.md`; the four distinct at 16px.
 - **meaning** — 3–6 upright senses (a palette) and 3–6 chiral inverted (`references/integration.md`).
-- **visual_style** — a concise general summary; structured art direction belongs in `visual_grammar`.
+- **visual_style** — the declared aesthetic: colors, perspective, art movement, composition.
 
 ## 2b. Record the dialectic on the deck
 
@@ -34,7 +34,9 @@ and a **cells** map placing every suit (`{ [suit_slug]: [poleOfAxis0, poleOfAxis
 
 ## 3. Intra-suit coherence
 
-Decide how alike the four families are inside the shared deck material world. A deliberate choice, not a default.
+Decide how alike the four styles are — small controlled variations (a shared world) vs. wildly divergent visual languages. A deliberate choice, not a default.
+
+*Cyberpunk "Individual+Technology" → "Programs" (index 0):* glyph a radiating node; upright {individual agency, technical mastery, composable specialization, crafted solutions}; inverted {isolated expertise, over-optimization, tools become chains, solution seeking problems}; style "neon wireframes (pink/green/blue, red for errors) over dark grounds; close-up interfaces; angular precise compositions."
 
 Present the four ordered suits for feedback before Stage 2.
 
