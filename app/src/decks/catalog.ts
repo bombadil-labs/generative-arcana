@@ -1,4 +1,4 @@
-import type { DeckManifest } from "./manifest";
+import type { DeckManifest, DeckManifestInput } from "./manifest";
 
 /**
  * Visibility is intentionally orthogonal to ownership.
@@ -9,14 +9,14 @@ import type { DeckManifest } from "./manifest";
  */
 export type DeckVisibility = "private" | "unlisted" | "public";
 
-/** Compatibility name retained while older catalog/MCP code migrates to the canonical term. */
-export type UserDeckManifest = DeckManifest;
+/** Compatibility input name retained while older catalog/MCP code migrates to the canonical term. */
+export type UserDeckManifest = DeckManifestInput;
 
 /**
  * Durable identity for a user-authored deck.
  *
- * `id` is an opaque, globally stable resource identity and must not be derived from the mutable deck
- * name or slug. `slug` is presentation/routing metadata and may change independently.
+ * Persisted records always expose the current normalized `DeckManifest`, even when imported from a
+ * historical envelope. Storage format is a repository concern and need not mirror this public shape.
  */
 export interface UserDeckRecord {
   id: string;

@@ -3,6 +3,7 @@ import type { ArcanaReading, CardQuery, ImportDeckOptions } from "../engine/type
 import type { Spread } from "../decks/spreads";
 import { DECK_MANIFEST_SPEC, inspectDeckAuthoringArtifact, invalidDeckAuthoringArtifact } from "../decks/authoring";
 import { validateDeckManifest } from "../decks/manifest";
+import { renderableCard } from "../decks/renderSpec";
 
 export const ARCANA_TOOL_NAMES = [
   "list_decks",
@@ -30,16 +31,16 @@ export interface ArcanaToolDefinition {
 export const ARCANA_TOOL_DEFINITIONS: readonly ArcanaToolDefinition[] = Object.freeze([
   { name: "list_decks", description: "List decks available in this Arcana host.", readOnly: true },
   { name: "get_deck", description: "Get one validated deck and its authored symbolic structure.", readOnly: true },
-  { name: "get_card", description: "Get one authored card by stable slug.", readOnly: true },
+  { name: "get_card", description: "Get one authored card plus a fully resolved render specification derived from its deck/family/rank/station/number context.", readOnly: true },
   { name: "analyze_card", description: "Resolve a card as a point in the deck's factorized symbolic space.", readOnly: true },
   { name: "query_cards", description: "Query exact intersections of authored card axes and numeric structure.", readOnly: true },
   { name: "list_spreads", description: "List generic and deck-native spreads available to a deck.", readOnly: true },
   { name: "cast_reading", description: "Cast a new reading using stable card identities and return its reproducible token.", readOnly: false },
-  { name: "resolve_reading", description: "Resolve a reading token into its deck, spread, and placements.", readOnly: true },
+  { name: "resolve_reading", description: "Resolve a reading token into its deck, spread, and renderable card placements.", readOnly: true },
   { name: "interpretation_context", description: "Project a resolved reading into authored LLM-ready interpretation context.", readOnly: true },
   { name: "get_deck_authoring_spec", description: "Get the machine-readable canonical DeckManifest authoring contract.", readOnly: true },
-  { name: "validate_deck_manifest", description: "Validate a canonical DeckManifest without importing it; legacy raw deck JSON is identified as compatibility input.", readOnly: true },
-  { name: "import_deck", description: "Import a canonical DeckManifest into this host; legacy raw deck data/JSON remains supported for compatibility.", readOnly: false },
+  { name: "validate_deck_manifest", description: "Validate a canonical DeckManifest without importing it; supported legacy inputs are identified and normalized.", readOnly: true },
+  { name: "import_deck", description: "Import a canonical DeckManifest into this host; supported legacy raw deck data/JSON remains accepted for compatibility.", readOnly: false },
 ]);
 
 /** Transport-neutral tool contract. MCP/CLI/HTTP adapters should delegate here instead of rebuilding semantics. */
@@ -69,9 +70,10 @@ export class ArcanaToolAdapter {
       case "get_card": {
         const deckId = stringArg(args, "deckId");
         const slug = stringArg(args, "cardSlug");
+        const deck = requireDeck(this.engine, deckId);
         const card = this.engine.getCard(deckId, slug);
         if (!card) throw new Error(`Unknown card “${slug}” in deck “${deckId}”.`);
-        return card;
+        return renderableCard(deck, card);
       }
       case "analyze_card":
         return this.engine.analyzeCard(stringArg(args, "deckId"), stringArg(args, "cardSlug"));
@@ -173,7 +175,7 @@ function readingResult(reading: ArcanaReading) {
     legacy: reading.legacy,
     placements: reading.placements.map((placement) => ({
       position: placement.position,
-      card: placement.card,
+      card: renderableCard(reading.deck, placement.card),
       reversed: placement.reversed,
       meaning: placement.meaning,
     })),

@@ -1,21 +1,25 @@
 import type { DeckManifest } from "./manifest";
-import { createDeckManifest, validateDeckManifest } from "./manifest";
+import {
+  CURRENT_DECK_MANIFEST_SCHEMA_VERSION,
+  createDeckManifest,
+  validateDeckManifest,
+} from "./manifest";
 
-export const DECK_MANIFEST_SPEC_VERSION = "1";
+export const DECK_MANIFEST_SPEC_VERSION = "2";
 
-/**
- * Compact machine-readable description of the authored artifact boundary.
- *
- * This intentionally describes ownership of concerns rather than attempting to duplicate every
- * referential-integrity rule as JSON Schema. `validateDeckManifest` remains the executable source of
- * truth for the full contract.
- */
+/** Compact machine-readable description of the authored artifact boundary. */
 export const DECK_MANIFEST_SPEC = Object.freeze({
   kind: "generative-arcana/deck-manifest",
   version: DECK_MANIFEST_SPEC_VERSION,
+  schema: {
+    current: CURRENT_DECK_MANIFEST_SCHEMA_VERSION,
+    legacyManifestV1Accepted: true,
+    legacyRawDeckAccepted: true,
+  },
   envelope: {
-    required: ["data", "tagline"] as const,
+    required: ["schemaVersion", "data", "tagline"] as const,
     optional: ["spreads"] as const,
+    schemaVersion: `must be ${CURRENT_DECK_MANIFEST_SCHEMA_VERSION} for new authored manifests`,
     data: "validated renderer-independent DeckDataFile",
     tagline: "non-empty human-facing string",
     spreads: "optional deck-native Spread array",
@@ -23,6 +27,10 @@ export const DECK_MANIFEST_SPEC = Object.freeze({
   identity: {
     authoredSlug: "manifest.data.slug",
     stableResourceId: "assigned by a Generative Arcana catalog after import; never authored into the manifest",
+  },
+  projections: {
+    cardRenderSpec: "derived, denormalized read view embedding deck/family/rank/station/number/card visual context",
+    storageIndependence: "physical database normalization is a repository concern, not part of DeckManifest semantics",
   },
   excludedConcerns: [
     "catalog resource id",
@@ -36,12 +44,15 @@ export const DECK_MANIFEST_SPEC = Object.freeze({
   compatibility: {
     rawDeckDataImportAccepted: true,
     rawDeckDataIsCanonicalManifest: false,
+    v1ManifestAcceptedAndMigrated: true,
+    v1ManifestIsCanonical: false,
   },
   validation: {
     normalizesDeckData: true,
     derivesCanonicalRuntimeCardOrder: true,
     normalizesNativeSpreadOwnership: true,
     preservesUnknownDeckExtensions: true,
+    migratesSupportedLegacyManifestVersions: true,
   },
   authoringProfiles: {
     runtimeCardinalityFixed: false,
@@ -50,6 +61,7 @@ export const DECK_MANIFEST_SPEC = Object.freeze({
 } as const);
 
 export interface DeckManifestSummary {
+  schemaVersion: number;
   name: string;
   slug: string;
   version: string;
@@ -60,7 +72,7 @@ export interface DeckManifestSummary {
   spreadCount: number;
 }
 
-export type DeckAuthoringInputKind = "manifest" | "legacy-raw-deck" | "unknown";
+export type DeckAuthoringInputKind = "manifest-v2" | "legacy-manifest-v1" | "legacy-raw-deck" | "unknown";
 
 export type DeckAuthoringValidation =
   | {
@@ -68,6 +80,7 @@ export type DeckAuthoringValidation =
       specVersion: string;
       inputKind: Exclude<DeckAuthoringInputKind, "unknown">;
       canonical: boolean;
+      migrated: boolean;
       summary: DeckManifestSummary;
       warning?: string;
       normalizedManifest?: DeckManifest;
@@ -84,12 +97,7 @@ export interface InspectDeckAuthoringOptions {
   includeNormalizedManifest?: boolean;
 }
 
-/**
- * Validate an authored artifact without importing it or mutating a caller's deck registry.
- *
- * Canonical DeckManifest is the producer contract. Bare DeckDataFile remains accepted here only so
- * upload/import compatibility can be diagnosed with the same validation boundary used by persistence.
- */
+/** Validate authored input without importing it or mutating runtime/catalog state. */
 export function inspectDeckAuthoringArtifact(
   value: unknown,
   options: InspectDeckAuthoringOptions = {},
@@ -98,15 +106,25 @@ export function inspectDeckAuthoringArtifact(
   if (manifestCandidate) {
     const validation = validateDeckManifest(value);
     if (!validation.ok) {
-      return invalid("manifest", true, validation.error);
+      return invalid("manifest-v2", true, validation.error);
     }
-    return valid("manifest", true, validation.manifest, options);
+    const canonical = validation.sourceSchemaVersion === CURRENT_DECK_MANIFEST_SCHEMA_VERSION;
+    return valid(
+      canonical ? "manifest-v2" : "legacy-manifest-v1",
+      canonical,
+      validation.manifest,
+      validation.migrated,
+      options,
+      canonical
+        ? {}
+        : { warning: "DeckManifest v1 is accepted for compatibility and normalized to schemaVersion 2. New authoring should emit schemaVersion: 2." },
+    );
   }
 
   try {
     const manifest = createDeckManifest(value);
-    return valid("legacy-raw-deck", false, manifest, options, {
-      warning: "Bare DeckDataFile is accepted for compatibility, but new authoring workflows should emit canonical DeckManifest { data, tagline, spreads? }.",
+    return valid("legacy-raw-deck", false, manifest, true, options, {
+      warning: "Bare DeckDataFile is accepted for compatibility, but new authoring workflows should emit schemaVersion 2 DeckManifest.",
     });
   } catch (error) {
     return invalid(
@@ -117,25 +135,25 @@ export function inspectDeckAuthoringArtifact(
   }
 }
 
-/** Build a stable invalid result for transport adapters that fail before JSON reaches domain validation. */
 export function invalidDeckAuthoringArtifact(error: string): DeckAuthoringValidation {
   return invalid("unknown", false, error);
 }
 
 function valid(
-  inputKind: "manifest" | "legacy-raw-deck",
+  inputKind: Exclude<DeckAuthoringInputKind, "unknown">,
   canonical: boolean,
   manifest: DeckManifest,
+  migrated: boolean,
   options: InspectDeckAuthoringOptions,
   extra: { warning?: string } = {},
 ): DeckAuthoringValidation {
-  const summary = summarize(manifest);
   return {
     valid: true,
     specVersion: DECK_MANIFEST_SPEC_VERSION,
     inputKind,
     canonical,
-    summary,
+    migrated,
+    summary: summarize(manifest),
     ...extra,
     ...(options.includeNormalizedManifest ? { normalizedManifest: manifest } : {}),
   };
@@ -153,6 +171,7 @@ function invalid(inputKind: DeckAuthoringInputKind, canonical: boolean, error: s
 
 function summarize(manifest: DeckManifest): DeckManifestSummary {
   return {
+    schemaVersion: manifest.schemaVersion,
     name: manifest.data.name,
     slug: manifest.data.slug,
     version: manifest.data.version,
@@ -168,8 +187,7 @@ function looksLikeManifestEnvelope(value: unknown): boolean {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
   if (Object.prototype.hasOwnProperty.call(record, "data")) return true;
-  // A half-authored envelope should receive manifest-specific diagnostics rather than being mistaken
-  // for raw DeckDataFile. Real DeckDataFile always requires name/slug/version at the top level.
+  if (Object.prototype.hasOwnProperty.call(record, "schemaVersion")) return true;
   return !Object.prototype.hasOwnProperty.call(record, "name")
     && (Object.prototype.hasOwnProperty.call(record, "tagline") || Object.prototype.hasOwnProperty.call(record, "spreads"));
 }
