@@ -1,0 +1,150 @@
+{
+  "suits": {
+    "humility": {
+      "numeric_value": 0,
+      "factorization": {
+        "character": "identity",
+        "gloss": "Zero: the empty set of principles, the precondition that holds none yet enables all. Pride is the fall from it.",
+        "visual_logic": "Use absence as structure: an unlit cube-corner, hollow center, erased channel, or field organized by what is deliberately not claimed. Black is not a filled paint swatch but the ground before additive light."
+      },
+      "visual_grammar": {
+        "medium_handling": "Graphite, charcoal, and near-black wash dominate; colored pigment is absent or appears only as reflected traces from neighboring structures.",
+        "composition": "Sparse off-center or hollow-centered fields where negative space carries more weight than the emblem. Forms sit low, recede, bow, or leave the central cube-corner empty.",
+        "edge_language": "Soft erased graphite, lost-and-found contours, rubbed boundaries, and quiet dark silhouettes.",
+        "value_structure": "Low-key graphite blacks with a narrow silver-gray range; highlights are rare and never triumphant.",
+        "camera_and_scale": "Wide or modest human/object scale with generous unclaimed ground around the subject.",
+        "detail_distribution": "Detail diminishes toward the center of attention instead of accumulating there; construction traces and paper texture remain visible.",
+        "finish": "Unpossessive, grounded, quiet, and materially dark—the cube's zero-corner as ethical negative space.",
+        "avoid": ["dramatic spotlighting", "ornate central enthronement", "black treated as glossy luxury"]
+      }
+    },
+    "valor": {
+      "numeric_value": 1,
+      "factorization": {
+        "character": "identity",
+        "gloss": "One: the unit, the operator — Courage, the single act that must come first for any other virtue to be practised at all.",
+        "visual_logic": "One red Courage channel acts as a single initiating vector. Let one directional stroke, stance, path, or thrust organize the whole image without needing a second channel to justify it."
+      },
+      "visual_grammar": {
+        "medium_handling": "Saturated red transparent pigment over firm graphite, with hard pencil pressure and occasional scraped white/silver along the active edge.",
+        "composition": "One strong directional vector—advance, ascent, strike, crossing, or forward stance—carries the frame from potential into action.",
+        "edge_language": "Hard leading edge, decisive diagonal or vertical, crisp silhouette on the action side and looser graphite wake behind.",
+        "value_structure": "Red luminous mid/high value against charcoal ground with one forceful contrast boundary.",
+        "camera_and_scale": "Close-to-medium, frontal or three-quarter action scale; enough ground remains visible to show what is being faced.",
+        "detail_distribution": "Detail concentrates along the forward edge, hand/tool/foot, threshold, or point of committed contact.",
+        "finish": "Direct, initiating, courageous, and singular—the Courage bit made a deed.",
+        "avoid": ["symmetry that neutralizes direction", "many competing focal vectors", "soft sentimental red"]
+      }
+    },
+    "compassion": {
+      "numeric_value": 2,
+      "factorization": {
+        "character": "prime",
+        "gloss": "Two: the first prime — Love, irreducible, the first real reach of the self beyond itself.",
+        "visual_logic": "Treat relation itself as the irreducible proposition: one green bridge, enclosure, paired curve, or shared interval joins self and other. The two-term reach should not decompose into isolated portraits."
+      },
+      "visual_grammar": {
+        "medium_handling": "Transparent green pigment pools softly over graphite and silverpoint, with layered curved strokes and gentle overlap where forms meet.",
+        "composition": "Paired or enclosing forms create a protected shared interval: embrace, bridge, bowl, arc, listening space, or two bodies oriented toward one another.",
+        "edge_language": "Rounded, permeable, overlapping contours with softened contact zones rather than rigid borders.",
+        "value_structure": "Green middle values with luminous overlap and a calmer graphite surround; contrast gathers at points of relation rather than domination.",
+        "camera_and_scale": "Human/object relational scale, usually eye-level and close enough to read mutual orientation.",
+        "detail_distribution": "Hands, faces, connecting material, shared tools, and the between-space receive detail; isolated outer edges recede.",
+        "finish": "Relational, receptive, sheltering, and irreducibly two-sided—the Love bit made spatial.",
+        "avoid": ["solitary heroic centrality", "hard separation of paired forms", "green as generic nature scenery"]
+      }
+    },
+    "sacrifice": {
+      "numeric_value": 3,
+      "factorization": {
+        "character": "prime",
+        "gloss": "Three: prime — Love and Courage fused (yellow), an irreducible giving that no analysis divides.",
+        "visual_logic": "This is the first productive disagreement between structures: arithmetic 3 is prime, while lattice 011 contains Love+Courage. Fuse the green/red channels into one indivisible yellow outward transfer—two bit sources, one formally atomic act of giving."
+      },
+      "visual_grammar": {
+        "medium_handling": "Luminous yellow glaze is built from visibly converging warm/green channel traces over graphite, but the final field reads as one coherent light rather than striped components.",
+        "composition": "Energy, object, light, or bodily weight moves outward from one center toward another; the donor side opens as the receiving side gains.",
+        "edge_language": "Clear outward rays, open hand/arc shapes, directional transfer lines, and edges that thin as material leaves the source.",
+        "value_structure": "Bright yellow-gold against charcoal with visible depletion/opening at the source and increased luminosity at the gift's destination.",
+        "camera_and_scale": "Medium relational scale showing both what gives and what receives; the transfer itself remains the dominant geometry.",
+        "detail_distribution": "Detail migrates along the path of transfer; origin and destination are less important than the visible giving between them.",
+        "finish": "Generous, costly, outward, and paradoxically indivisible despite its two-bit origin.",
+        "avoid": ["symmetrical exchange that erases cost", "yellow as simple sunshine", "separate red and green panels with no fusion"]
+      }
+    },
+    "honesty": {
+      "numeric_value": 4,
+      "factorization": {
+        "character": "composite",
+        "factors": [2, 2],
+        "gloss": "Four = two squared: Truth as built structure (blue) — a single principle that nonetheless reads as an edifice, the framework reason stands inside.",
+        "visual_logic": "The second deliberate interference: bit-lattice 100 is a single Truth channel while arithmetic 4 is 2². Let one blue axis generate a four-square frame, grid, or repeated relational structure—the atomic bit becoming composite architecture."
+      },
+      "visual_grammar": {
+        "medium_handling": "Clear blue transparent pigment rides over ruler-straight graphite/silverpoint construction; corrections remain visible but do not muddy the final axis.",
+        "composition": "Frontal, axial, measured and legible: one truth-line establishes a square, grid, window, ledger, or fourfold frame that exposes what is where.",
+        "edge_language": "Crisp ruled edges, clean intersections, transparent layers, and visible construction geometry.",
+        "value_structure": "Cool blue against charcoal with clear separation of planes and minimal ambiguous midtone; illumination favors legibility.",
+        "camera_and_scale": "Frontal or orthographic views that minimize perspectival deceit; scale chosen so evidence can be inspected.",
+        "detail_distribution": "Detail gathers at labels, joins, measured intervals, inscriptions, and the exact facts the composition is asserting.",
+        "finish": "Lucid, accountable, structural, and cool—the Truth bit as a framework one can stand inside and audit.",
+        "avoid": ["mystifying fog", "dramatic oblique camera tricks", "blue as generic melancholy"]
+      }
+    },
+    "honor": {
+      "numeric_value": 5,
+      "factorization": {
+        "character": "prime",
+        "gloss": "Five: prime — Truth and Courage (magenta), the stand taken in the open and answered for.",
+        "visual_logic": "Arithmetic 5 is irreducible while lattice 101 contains Truth+Courage. Fuse blue axial declaration and red committed vector into one magenta public line: what is said and what is done must share one unbreakable direction."
+      },
+      "visual_grammar": {
+        "medium_handling": "Magenta transparent pigment is laid over a visible blue structural axis and red action trace, then unified by firm graphite outline rather than left as separate channels.",
+        "composition": "Public alignment: a figure/object/action stands on or crosses a declared axis where word and deed can be seen together—banner line, oath line, bridge, procession, or open square.",
+        "edge_language": "Crisp outer silhouette with one decisive diagonal intersecting a stable axial line; no hidden reverse side.",
+        "value_structure": "Magenta medium/high values against charcoal with bright exposed intersections and little concealed shadow at the focal act.",
+        "camera_and_scale": "Medium-to-wide public scale; the subject is visible in relation to witnesses, road, civic space, or consequence.",
+        "detail_distribution": "Detail concentrates on the declared sign and the action that fulfills or betrays it—hands, standard, face, path, oath-object.",
+        "finish": "Answerable, visible, committed, and formally unified despite dual Principle bits.",
+        "avoid": ["private melodrama with no public consequence", "split blue/red halves that never resolve", "ornamental magenta glamour"]
+      }
+    },
+    "justice": {
+      "numeric_value": 6,
+      "factorization": {
+        "character": "composite",
+        "factors": [2, 3],
+        "gloss": "Six = two times three: Truth+Love by the bits (cyan), yet Compassion x Sacrifice by the factors — the card whose binary and prime parents disagree.",
+        "visual_logic": "Let both decompositions remain legible without conflation: cyan's Truth+Love produces balanced mediation, while arithmetic 2×3 adds Compassion's relational enclosure acting through Sacrifice's outward transfer. The result is a two-sided structure that redistributes rather than merely splits."
+      },
+      "visual_grammar": {
+        "medium_handling": "Cyan transparent pigment combines blue structural ruling with green relational curves; selective yellow transfer-traces may appear only where arithmetic factor ancestry clarifies the act.",
+        "composition": "Balanced but active mediation: paired fields, scales, two supports, or two claimants joined by a central channel that visibly redistributes weight/value rather than freezing symmetry.",
+        "edge_language": "Clean bilateral edges softened at the mediating center; straight Truth axes and curved Love links meet without one erasing the other.",
+        "value_structure": "Cyan luminous mid-values with matched but not necessarily equal side masses; the center is brightest where adjustment occurs.",
+        "camera_and_scale": "Frontal or slightly elevated view showing both sides and the mediating mechanism in one accountable frame.",
+        "detail_distribution": "Detail is comparative: evidence on both sides plus high specificity at the point of balancing, binding, payment, or judgment.",
+        "finish": "Measured, merciful, distributive, and structurally composite—the lattice and arithmetic allowed to disagree productively.",
+        "avoid": ["perfect symmetry with no redistribution", "blindfolded-scales cliché as the only idea", "cyan as technological UI glow"]
+      }
+    },
+    "spirituality": {
+      "numeric_value": 7,
+      "factorization": {
+        "character": "prime",
+        "gloss": "Seven: prime — all three principles together (white), the irreducible union that cannot be assembled from fewer.",
+        "visual_logic": "The strongest interference: lattice 111 visibly contains all three Principle channels, yet arithmetic 7 is prime. Let red, green, and blue remain traceable at the edges while converging into one irreducible white center/cube/field whose wholeness is not a mere stack of parts."
+      },
+      "visual_grammar": {
+        "medium_handling": "Layer red, green, and blue transparent glazes until their overlap approaches luminous white, with silverpoint/graphite cube construction still faintly visible beneath the convergence.",
+        "composition": "Integrated volumetric whole: cube, mandala-like spatial field, converging axes, or full lattice in which every direction participates without one Principle becoming the master.",
+        "edge_language": "Multiple channel edges enter, overlap, and disappear into a bright unified center; outer contours may remain prismatic while the core is clean.",
+        "value_structure": "Highest-key virtue family: white/silver center against graphite, with red/green/blue separation visible mainly at peripheral or transitional edges.",
+        "camera_and_scale": "Wide enough to show the complete relational field, but with one coherent center that reads as integrated rather than crowded.",
+        "detail_distribution": "Detail is distributed across the whole lattice and culminates in a calm central convergence; no single component hoards complexity.",
+        "finish": "Integrated, luminous, spacious, and irreducible—the maximal bit-state experienced as one whole rather than a checklist of three Principles.",
+        "avoid": ["rainbow spectacle", "white as blank emptiness", "three isolated RGB stripes", "ornate mystical clutter that hides the lattice"]
+      }
+    }
+  }
+}

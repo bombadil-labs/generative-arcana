@@ -29,6 +29,11 @@ import evolutionRanks from "../../../decks/evolution/v2/ranks.json";
 import evolutionStations from "../../../decks/evolution/v2/stations.json";
 import evolutionMajorArcana from "../../../decks/evolution/v2/major-arcana.json";
 import ultimaOctaveJson from "../../../decks/ultima-octave/deck.json";
+import ultimaOctaveVisualLanguage from "../../../decks/ultima-octave/v2/visual-language.json";
+import ultimaOctaveSuits from "../../../decks/ultima-octave/v2/suits.json";
+import ultimaOctaveRanks from "../../../decks/ultima-octave/v2/ranks.json";
+import ultimaOctaveStations from "../../../decks/ultima-octave/v2/stations.json";
+import ultimaOctaveMajorArcana from "../../../decks/ultima-octave/v2/major-arcana.json";
 import deepTimeJson from "../../../decks/deep-time/deck.json";
 import deepTimeVisualLanguage from "../../../decks/deep-time/v2/visual-language.json";
 import deepTimeSuits from "../../../decks/deep-time/v2/suits.json";
@@ -92,6 +97,15 @@ const evolutionV2 = composeBundledDeckData(
   evolutionMajorArcana,
 );
 
+const ultimaOctaveV2 = composeBundledDeckData(
+  ultimaOctaveJson,
+  ultimaOctaveVisualLanguage,
+  ultimaOctaveSuits,
+  ultimaOctaveRanks,
+  ultimaOctaveStations,
+  ultimaOctaveMajorArcana,
+);
+
 export const BUNDLED_DECK_MANIFESTS = {
   ultima: {
     data: ultimaV2,
@@ -126,7 +140,7 @@ export const BUNDLED_DECK_MANIFESTS = {
     tagline: "How speech bootstraps consciousness — Dewart's involution as a deck.",
   },
   "ultima-octave": {
-    data: ultimaOctaveJson,
+    data: ultimaOctaveV2,
     tagline: "Eight virtues, eight octaves — Garriott's colour-cube of virtue as a lattice deck.",
   },
   "deep-time": {

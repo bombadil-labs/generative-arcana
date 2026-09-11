@@ -19,7 +19,7 @@ jobs:
         with:
           node-version: 22
       - run: node tools/check-authoring-hosts.mjs
-      - run: node tools/audit-deck-v2.mjs --check --require-enriched=finalfantasy,deep-time,evolution,ultima,byrne,ulysses
+      - run: node tools/audit-deck-v2.mjs --check --require-enriched=finalfantasy,deep-time,evolution,ultima,byrne,ulysses,ultima-octave
 
   app:
     name: App ${{ matrix.check }}
@@ -85,6 +85,8 @@ jobs:
             command: npm run test:byrne-v2 --prefix mcp
           - check: Ulysses v2 render projection
             command: npm run test:ulysses-v2 --prefix mcp
+          - check: Ultima Octave v2 render projection
+            command: npm run test:ultima-octave-v2 --prefix mcp
           - check: web app static serving
             command: npm run test:web-app-static --prefix mcp
           - check: shared decks

@@ -1,0 +1,19 @@
+{
+  "version": "2.1.0",
+  "minor_number_origin": "suit",
+  "visual_language": {
+    "medium": "Sacred technical plate: soft graphite and silverpoint drafting over charcoal-gray rag paper, with translucent mineral-pigment/glaze color behaving like emitted light through a hand-built geometric diagram.",
+    "surface": "Matte graphite tooth, rubbed construction lines, faint cube grids, compass marks, pressure-darkened pencil, translucent color overlap, and occasional silver lunar sheen remain materially visible.",
+    "mark_making": "Precise diagram line and heraldic silhouette are crossed with hand-drawn construction, stipple, measured hatching, geometric registration, and luminous color fields. Truth/Love/Courage may appear as blue/green/red channels or structural directions, never as decorative RGB UI chrome.",
+    "signature_accent": "The three Principle channels—Truth blue, Love green, Courage red—combine additively into the eight virtue colors. Small channel traces, cube-corner geometry, or registration marks may reveal the lattice beneath an image without turning every card into the same diagram.",
+    "finish": "A tactile occult instrument from Britannia: part heraldic atlas, part color-theory plate, part shrine diagram. Abstract enough to expose the 3-bit lattice, concrete enough that each octave still depicts its place/person/word/object/site.",
+    "avoid": [
+      "mere hue-swapped copies with identical composition",
+      "glossy RGB user-interface aesthetics",
+      "generic fantasy concept-art rendering",
+      "rainbow gradients unrelated to the three Principle channels",
+      "pixel-art nostalgia as the primary visual language",
+      "flattening arithmetic factorization and bit-lattice decomposition into the same structure"
+    ]
+  }
+}

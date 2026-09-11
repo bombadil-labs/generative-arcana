@@ -1,0 +1,84 @@
+{
+  "ranks": {
+    "virtue": {
+      "visual_content": "The virtue itself as an ethical abstraction: its emblem, bit-state, color, and defining act or absence presented without a secondary in-world carrier.",
+      "visual_form": {
+        "composition_law": "Canonical ethical emblem plate.",
+        "spatial_logic": "One distilled symbol or situation occupies a measured cube-corner field with minimal contextual scenery.",
+        "rhythm": "Name, state, contemplate.",
+        "density": "Sparse.",
+        "figure_ground": "The virtue proposition is figure; the graphite lattice is ground."
+      }
+    },
+    "place": {
+      "visual_content": "The Britannian city, dungeon, or geographic site aligned to the virtue, including the spatial/civic feature by which that place expresses or betrays it.",
+      "visual_form": {
+        "composition_law": "Map/architecture plate.",
+        "spatial_logic": "Plan, elevation, horizon, street/island boundary, or cutaway makes location primary and inhabitants secondary.",
+        "rhythm": "Approach, orient, enter.",
+        "density": "Moderate with legible geography.",
+        "figure_ground": "Built/land form defines the field; figures read as occupants or scale."
+      }
+    },
+    "role": {
+      "visual_content": "The profession/class that practises the virtue or its shadow—fighter, bard, tinker, mage, ranger, paladin, druid, shepherd—shown through its characteristic tool, posture, and action.",
+      "visual_form": {
+        "composition_law": "Full-body vocational figure study.",
+        "spatial_logic": "One human role occupies the field in an active stance with its defining tool/practice visibly engaged.",
+        "rhythm": "Stand, act, demonstrate.",
+        "density": "Moderate around body and tool.",
+        "figure_ground": "The practitioner is figure; contextual setting remains enough to show the work."
+      }
+    },
+    "companion": {
+      "visual_content": "The named companion associated with the virtue, rendered as a specific person within the social/biographical context that makes their virtue legible.",
+      "visual_form": {
+        "composition_law": "Relational character portrait.",
+        "spatial_logic": "A named figure is offset toward an implied or visible party-space, object, or place that shows how they stand with others rather than isolated as an icon.",
+        "rhythm": "Recognize, relate, accompany.",
+        "density": "Human-scale and moderately detailed.",
+        "figure_ground": "Portrait specificity is figure; relationship/context prevents pure celebrity-style isolation."
+      }
+    },
+    "word": {
+      "visual_content": "The virtue's mantra/word of power as an utterance: letters, rune-like phonemes, breath, resonance, and the act of speaking or inscribing it.",
+      "visual_form": {
+        "composition_law": "Typographic/calligraphic invocation.",
+        "spatial_logic": "The word or syllables organize the page spatially as sound becoming mark; surrounding imagery is secondary to the utterance.",
+        "rhythm": "Breath, syllable, resonance.",
+        "density": "Sparse-to-moderate depending word length.",
+        "figure_ground": "Letterform and voiced negative space become the main figure."
+      }
+    },
+    "stone": {
+      "visual_content": "The virtue-colored stone of the Stygian Abyss: mineral object, cut/faceted color, weight, translucency, and the barrier or ritual use it answers.",
+      "visual_form": {
+        "composition_law": "Mineral specimen/relic plate.",
+        "spatial_logic": "One stone occupies a measured pedestal, hand, aperture, or barrier relation with facet geometry clearly inspectable.",
+        "rhythm": "Hold, examine, raise.",
+        "density": "Sparse with high local detail.",
+        "figure_ground": "The colored mineral is sharply figured against graphite/silver construction."
+      }
+    },
+    "reagent": {
+      "visual_content": "The reagent aligned to the virtue as an alchemical/botanical/material specimen, with enough physical specificity to show how it behaves in spellcraft rather than as a generic icon.",
+      "visual_form": {
+        "composition_law": "Natural-history/alchemical specimen plate.",
+        "spatial_logic": "One material specimen is isolated, sectioned, pinned, suspended, or arrayed with small measured annotations and visible physical texture.",
+        "rhythm": "Collect, identify, combine.",
+        "density": "Moderate, detail-rich at the specimen.",
+        "figure_ground": "Specimen is figure; labels/construction lines explain without overwhelming."
+      }
+    },
+    "shrine": {
+      "visual_content": "The Shrine of the virtue as a sacred architectural destination: approach, stone platform/altar, wilderness placement, elevation, and the meditative relation between visitor and site.",
+      "visual_form": {
+        "composition_law": "Pilgrimage architecture plate.",
+        "spatial_logic": "A path/axis leads from a small approaching figure or foreground threshold toward a raised or centered shrine structure.",
+        "rhythm": "Approach, ascend, center.",
+        "density": "Open environment around a clear architectural destination.",
+        "figure_ground": "The shrine and its approach-axis are figure; surrounding wilderness creates contemplative ground."
+      }
+    }
+  }
+}

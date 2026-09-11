@@ -1,0 +1,86 @@
+{
+  "transversal": {
+    "stations": {
+      "new-moon": {
+        "visual_environment": {
+          "illumination": "No direct moonlight; forms are carried by charcoal/graphite value and only the faintest silver edge or reflected virtue-color.",
+          "palette": "Near-black graphite, paper gray, muted virtue color, almost no silver-white.",
+          "atmosphere": "Precondition, secrecy, stillness, unlit gate, and potential before the lunar cycle declares itself.",
+          "motion": "Nearly still; movement is inferred rather than illuminated.",
+          "density": "Low visible information in the outer field; local colored structure may remain legible.",
+          "material_effects": "Graphite tooth and erasure dominate; silverpoint appears as buried construction rather than shine."
+        }
+      },
+      "waxing-crescent": {
+        "visual_environment": {
+          "illumination": "A thin directional silver rim catches one side of forms while most of the field remains dark.",
+          "palette": "Graphite and virtue color with a narrow cool silver-white crescent accent.",
+          "atmosphere": "First opening, tentative visibility, beginning, and a gate just starting to answer.",
+          "motion": "Subtle emergence toward the lit edge.",
+          "density": "Low-to-moderate; detail concentrates where the rim light touches.",
+          "material_effects": "Silverpoint and rubbed white pigment skim raised edges without changing the underlying family medium."
+        }
+      },
+      "first-quarter": {
+        "visual_environment": {
+          "illumination": "Half the scene is clearly silver-lit and half held in graphite shadow, with a firm terminator line or split plane.",
+          "palette": "Equal charcoal and silver-white modulation over the virtue's authored color.",
+          "atmosphere": "Decision, tension, half-open gate, and two equally real conditions held at once.",
+          "motion": "Balanced directional pull across the light/shadow divide.",
+          "density": "Moderate and visibly partitioned.",
+          "material_effects": "One side reveals paper/color texture; the other compresses toward graphite mass."
+        }
+      },
+      "waxing-gibbous": {
+        "visual_environment": {
+          "illumination": "Broad cool silver illumination fills most forms, leaving a smaller but still meaningful dark remainder.",
+          "palette": "Virtue color lifted by abundant silver-white with charcoal retained at the retreating edge.",
+          "atmosphere": "Near-readiness, swelling visibility, anticipation, and an opening almost complete.",
+          "motion": "Light appears to advance or gather toward fullness.",
+          "density": "Moderate-to-high visible detail as more of the field becomes readable.",
+          "material_effects": "Translucent color glazes brighten; silver rubbing and graphite hatching coexist rather than flatten."
+        }
+      },
+      "full-moon": {
+        "visual_environment": {
+          "illumination": "Maximum cool silver-white lunar fill with soft reflected light and minimal hidden form.",
+          "palette": "Virtue color at its clearest under luminous silver-white; graphite remains structural rather than dominant.",
+          "atmosphere": "Disclosure, fullness, wide-open gate, clarity, and exposure without necessarily implying moral goodness.",
+          "motion": "Calm suspension at peak illumination.",
+          "density": "Highest legible detail across the whole field.",
+          "material_effects": "Silverpoint, pale pigment, reflective mineral fleck, and paper highlights become fully active."
+        }
+      },
+      "waning-gibbous": {
+        "visual_environment": {
+          "illumination": "Still-bright silver light comes from the receding side, with longer graphite shadows beginning to reclaim the frame.",
+          "palette": "Cool silver and virtue color remain rich but begin to deepen toward graphite at one edge.",
+          "atmosphere": "After-peak reflection, consequence, gratitude or fatigue, and light beginning to withdraw.",
+          "motion": "A slow ebb away from maximum disclosure.",
+          "density": "High but slightly less even; detail begins to fall off at the darkening edge.",
+          "material_effects": "Silver glaze thins visibly into graphite hatch, making recession part of the material surface."
+        }
+      },
+      "last-quarter": {
+        "visual_environment": {
+          "illumination": "Half-light returns in the opposite orientation from first quarter: one side relinquished to shadow, the other still clearly silver-lit.",
+          "palette": "Cool half-silver / half-graphite modulation over the virtue color, with the shadow side now dominant in emotional direction.",
+          "atmosphere": "Release, reckoning, half-closing gate, and the decision of what to carry into darkness.",
+          "motion": "Directional withdrawal toward the unlit half.",
+          "density": "Moderate and partitioned, with disappearing detail emphasized.",
+          "material_effects": "Erasure and dark graphite re-enter visibly; remaining silver edges feel like residue rather than emergence."
+        }
+      },
+      "waning-crescent": {
+        "visual_environment": {
+          "illumination": "Only a last thin silver sliver remains, grazing the edge of a field already mostly returned to graphite dark.",
+          "palette": "Near-black/gray with the virtue color subdued and one fading cool silver accent.",
+          "atmosphere": "Closure, last memory, relinquishment, final gate before dark, and quiet return to precondition.",
+          "motion": "Fading, settling, descending, or turning inward.",
+          "density": "Low; the scene sheds visible detail toward the next new moon.",
+          "material_effects": "Graphite and paper regain dominance while silverpoint survives as a hairline trace or rubbed ghost."
+        }
+      }
+    }
+  }
+}
