@@ -12,6 +12,8 @@ test("authoring spec names schema v2 DeckManifest as the canonical producer arti
   assert.equal(DECK_MANIFEST_SPEC.schema.current, 2);
   assert.equal(DECK_MANIFEST_SPEC.compatibility.rawDeckDataImportAccepted, true);
   assert.equal(DECK_MANIFEST_SPEC.compatibility.rawDeckDataIsCanonicalManifest, false);
+  assert.deepEqual(DECK_MANIFEST_SPEC.numericOwnership.allowed, ["rank", "suit", "card"]);
+  assert.equal(DECK_MANIFEST_SPEC.numericOwnership.minorOriginField, "manifest.data.minor_numeric_origin");
 });
 
 test("canonical schema v2 manifests validate with compact structural summary", () => {
