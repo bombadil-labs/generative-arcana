@@ -5,8 +5,8 @@
  * the fully merged object and every exported/runtime DeckManifest still contains one canonical data tree.
  * Arrays and scalar values replace; plain objects merge recursively.
  */
-export function composeBundledDeckData(base: unknown, ...fragments: unknown[]): unknown {
-  return fragments.reduce((current, fragment) => merge(current, fragment), clone(base));
+export function composeBundledDeckData<T>(base: T, ...fragments: unknown[]): T {
+  return fragments.reduce<unknown>((current, fragment) => merge(current, fragment), clone(base)) as T;
 }
 
 function merge(base: unknown, patch: unknown): unknown {
