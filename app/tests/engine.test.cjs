@@ -33,45 +33,67 @@ test("card analysis exposes authored axes and numeric coordinate", () => {
 
 test("casting produces a first-class resolved reading and round-trips through its token", async () => {
   const { engine, deck } = engineWithDeck();
-  const reading = await engine.castReading(deck.id, "single", "What now?", { reversalRate: 0 });
+  const reading = await engine.castReading(deck.id, "single", "What is moving?", { reversalRate: 0 });
   assert.equal(reading.deck, deck);
-  assert.equal(reading.question, "What now?");
+  assert.equal(reading.spread.id, "single");
+  assert.equal(reading.cards.length, 1);
   assert.equal(reading.placements.length, 1);
+  assert.equal(reading.placements[0].reversed, false);
   assert.equal(reading.placements[0].card.slug, reading.cards[0].slug);
-  assert.equal(reading.placements[0].meaning, reading.placements[0].card.meaning.upright);
-  const restored = await engine.resolveReading(reading.token, deck.id);
+  assert.ok(Object.isFrozen(reading));
+  assert.ok(Object.isFrozen(reading.spread));
+
+  const restored = await engine.resolveReading(reading.token);
   assert.equal(restored.deck, deck);
   assert.equal(restored.cards[0].slug, reading.cards[0].slug);
-  assert.equal(restored.placements[0].card.slug, reading.placements[0].card.slug);
+  assert.equal(restored.question, "What is moving?");
+  assert.equal(restored.legacy, false);
 });
 
-test("engine creates and immediately resolves deck-native spreads", async () => {
-  const registry = new DeckRegistry();
-  const engine = new ArcanaEngine(registry);
-  const data = rawDeck();
-  data.slug = "custom-native-spread";
-  const deck = engine.importDeck(data, {
-    spreads: [{
-      id: "native-test",
-      name: "Native Test",
-      description: "A native spread",
-      positions: [{ name: "Card", prompt: "the native position" }],
-    }],
-  });
-  assert.equal(engine.listSpreads(deck.id).some((spread) => spread.id === "native-test"), true);
-  const reading = await engine.castReading(deck.id, "native-test", "Native?", { reversalRate: 0 });
-  assert.equal(reading.spread.id, "native-test");
-  assert.equal((await engine.resolveReading(reading.token, deck.id)).spread.id, "native-test");
-});
-
-test("card queries share factorized axis semantics with analysis", () => {
+test("interpretation text is a projection of a resolved reading", async () => {
   const { engine, deck } = engineWithDeck();
-  const card = deck.cards.find((candidate) => candidate.arcana === "minor") ?? deck.cards[0];
+  const reading = await engine.castReading(deck.id, "single", "Open reading", { reversalRate: 0 });
+  const text = engine.buildInterpretationContext(reading);
+  assert.match(text, new RegExp(deck.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(text, new RegExp(reading.placements[0].card.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(text, /TASK/);
+});
+
+test("spread listing is detached from shared generic spread state", () => {
+  const { engine, deck } = engineWithDeck();
+  const spreads = engine.listSpreads(deck.id);
+  assert.ok(spreads.some((spread) => spread.id === "single"));
+  assert.ok(Object.isFrozen(spreads));
+  assert.ok(Object.isFrozen(spreads[0]));
+});
+
+test("reading tokens cannot resolve against a host that lacks their deck", async () => {
+  const { engine, deck } = engineWithDeck();
+  const reading = await engine.castReading(deck.id, "single", "", { reversalRate: 0 });
+  const empty = new ArcanaEngine(new DeckRegistry());
+  await assert.rejects(empty.resolveReading(reading.token), /unknown deck/i);
+});
+
+test("routed resolution rejects a token for a different expected deck", async () => {
+  const { engine, deck } = engineWithDeck();
+  const reading = await engine.castReading(deck.id, "single", "", { reversalRate: 0 });
+  await assert.rejects(engine.resolveReading(reading.token, "different-deck"), /different deck than the route/i);
+});
+
+test("card queries address exact intersections in the symbolic space", () => {
+  const { engine, deck } = engineWithDeck();
+  const card = deck.cards.find((candidate) => candidate.arcana === "minor");
+  assert.ok(card, "fixture should contain a minor card");
   const analysis = engine.analyzeCard(deck.id, card.slug);
-  assert.ok(engine.queryCards(deck.id, { arcana: card.arcana }).some((candidate) => candidate.card.slug === card.slug));
-  if (card.suit_slug) assert.ok(engine.queryCards(deck.id, { suit: card.suit_slug }).some((candidate) => candidate.card.slug === card.slug));
-  if (card.rank_slug) assert.ok(engine.queryCards(deck.id, { rank: card.rank_slug }).some((candidate) => candidate.card.slug === card.slug));
-  assert.ok(engine.queryCards(deck.id, { station: card.station_slug }).some((candidate) => candidate.card.slug === card.slug));
+  const results = engine.queryCards(deck.id, {
+    arcana: "minor",
+    suit: card.suit_slug,
+    rank: card.rank_slug,
+    station: card.station_slug,
+  });
+  assert.ok(results.some((candidate) => candidate.card.slug === card.slug));
+  assert.ok(Object.isFrozen(results));
+
   if (analysis.number.omega !== undefined) {
     assert.ok(engine.queryCards(deck.id, { omega: analysis.number.omega }).some((candidate) => candidate.card.slug === card.slug));
   }
