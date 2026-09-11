@@ -32,6 +32,14 @@ export const DECK_MANIFEST_SPEC = Object.freeze({
     cardRenderSpec: "derived, denormalized read view embedding deck/family/rank/station/number/card visual context",
     storageIndependence: "physical database normalization is a repository concern, not part of DeckManifest semantics",
   },
+  numericOwnership: {
+    minorOriginField: "manifest.data.minor_numeric_origin",
+    allowed: ["rank", "suit", "card"] as const,
+    ownerValueField: "numeric_value",
+    ownerFactorizationField: "factorization",
+    legacyInference: "when minor_numeric_origin is omitted, infer matching rank numeric_value, then suit numeric_value, then card-local numbering",
+    note: "Majors always originate their number on the card; alternate minor profiles may originate it on rank, suit, or card.",
+  },
   excludedConcerns: [
     "catalog resource id",
     "owner/principal id",
