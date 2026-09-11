@@ -6,6 +6,7 @@ export * from "./registry";
 export * from "./manifest";
 export * from "./authoring";
 export * from "./renderSpec";
+export * from "./numericContext";
 export type { DeckVisibility, UserDeckManifest, UserDeckRecord } from "./catalog";
 export type {
   DeckModule,
@@ -14,6 +15,8 @@ export type {
   VisualFamilyGrammar,
   RankVisualForm,
   StationVisualEnvironment,
+  FactorizationData,
+  MinorNumericOrigin,
 } from "./types";
 
 import "./ultima"; // registers the Ultima deck (+ its sketches)

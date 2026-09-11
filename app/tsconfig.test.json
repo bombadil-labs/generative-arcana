@@ -11,6 +11,7 @@
     "src/decks/card.ts",
     "src/decks/cardMeta.ts",
     "src/decks/jsonSnapshot.ts",
+    "src/decks/numericContext.ts",
     "src/decks/types.ts",
     "src/decks/catalog.ts",
     "src/decks/spreads.ts",
