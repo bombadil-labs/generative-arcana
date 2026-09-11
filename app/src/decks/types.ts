@@ -10,6 +10,49 @@ export interface FactorizationData {
   character: "identity" | "prime" | "composite";
   factors?: number[];
   gloss: string;
+  /** Optional formal/compositional consequence of the number's factor structure. */
+  visual_logic?: string;
+}
+
+/** Shared material vocabulary that makes the whole deck feel made in one visual world. */
+export interface DeckVisualLanguage {
+  medium?: string;
+  surface?: string;
+  mark_making?: string;
+  signature_accent?: string;
+  finish?: string;
+  avoid?: string[];
+}
+
+/** Family-level rendering grammar. Suits and the Major Arcana may each own one. */
+export interface VisualFamilyGrammar {
+  medium_handling?: string;
+  composition?: string;
+  edge_language?: string;
+  value_structure?: string;
+  camera_and_scale?: string;
+  detail_distribution?: string;
+  finish?: string;
+  avoid?: string[];
+}
+
+/** Rank-level formal law: how a rank organizes an image independently of subject matter. */
+export interface RankVisualForm {
+  composition_law?: string;
+  spatial_logic?: string;
+  rhythm?: string;
+  density?: string;
+  figure_ground?: string;
+}
+
+/** Station-level environmental modulation. It changes the weather, not the visual family. */
+export interface StationVisualEnvironment {
+  illumination?: string;
+  palette?: string;
+  atmosphere?: string;
+  motion?: string;
+  density?: string;
+  material_effects?: string;
 }
 
 export interface SymbolData {
@@ -34,16 +77,22 @@ export interface AxisEntry {
 
 export interface SuitEntry extends AxisEntry {
   symbol?: SymbolData;
+  /** Structured family grammar; `visual_style` remains accepted as a legacy/general prose field. */
+  visual_grammar?: VisualFamilyGrammar;
 }
 
 export interface RankEntry extends AxisEntry {
   symbol?: string;
   numeric_value?: number;
   arcana?: "minor";
+  /** Formal/compositional identity of the rank, orthogonal to `visual_content`. */
+  visual_form?: RankVisualForm;
 }
 
 export interface StationEntry extends AxisEntry {
   symbol?: SymbolData;
+  /** Environmental modulation only; should not redefine suit/Major medium or composition. */
+  visual_environment?: StationVisualEnvironment;
 }
 
 export interface TransversalData {
@@ -58,6 +107,8 @@ export interface TransversalData {
 export interface MajorArcanaData {
   story?: string;
   visual_style?: string;
+  /** Major-Arcana family grammar, parallel to a suit's visual grammar. */
+  visual_grammar?: VisualFamilyGrammar;
   symbol?: SymbolData;
   [key: string]: unknown;
 }
@@ -90,6 +141,8 @@ export interface DeckDataFile {
   slug: string;
   version: string;
   theme: DeckTheme;
+  /** Optional shared visual/material substrate; renderer-independent authored semantics. */
+  visual_language?: DeckVisualLanguage;
   suits: Record<string, SuitEntry>;
   ranks: Record<string, RankEntry>;
   transversal: TransversalData;
