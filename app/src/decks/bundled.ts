@@ -2,10 +2,25 @@ import ultimaJson from "../../../decks/ultima/deck.json";
 import byrneJson from "../../../decks/byrne/deck.json";
 import ulyssesJson from "../../../decks/ulysses/deck.json";
 import finalFantasyJson from "../../../decks/finalfantasy/deck.json";
+import finalFantasyVisualLanguage from "../../../decks/finalfantasy/v2/visual-language.json";
+import finalFantasySuits from "../../../decks/finalfantasy/v2/suits.json";
+import finalFantasyRanks from "../../../decks/finalfantasy/v2/ranks.json";
+import finalFantasyStations from "../../../decks/finalfantasy/v2/stations.json";
+import finalFantasyMajorArcana from "../../../decks/finalfantasy/v2/major-arcana.json";
 import evolutionJson from "../../../decks/evolution/deck.json";
 import ultimaOctaveJson from "../../../decks/ultima-octave/deck.json";
 import deepTimeJson from "../../../decks/deep-time/deck.json";
+import { composeBundledDeckData } from "./composeBundledDeckData";
 import { DeckRegistry, deckRegistry } from "./registry";
+
+const finalFantasyV2 = composeBundledDeckData(
+  finalFantasyJson,
+  finalFantasyVisualLanguage,
+  finalFantasySuits,
+  finalFantasyRanks,
+  finalFantasyStations,
+  finalFantasyMajorArcana,
+);
 
 export const BUNDLED_DECK_MANIFESTS = {
   ultima: {
@@ -33,7 +48,7 @@ export const BUNDLED_DECK_MANIFESTS = {
     tagline: "One Dublin day as odyssey — wisdom in one's relationship to the ordinary.",
   },
   finalfantasy: {
-    data: finalFantasyJson,
+    data: finalFantasyV2,
     tagline: "Crystals, creatures, and the cycle of light — the recurring myth as a deck.",
   },
   evolution: {
