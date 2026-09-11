@@ -8,7 +8,13 @@ export interface CardData {
   suit_slug?: string;
   rank_slug?: string;
   /** Optional numeric interpretation; construction profiles determine where it originates. */
-  factorization?: { character: "identity" | "prime" | "composite"; factors?: number[]; gloss: string };
+  factorization?: {
+    character: "identity" | "prime" | "composite";
+    factors?: number[];
+    gloss: string;
+    /** Optional formal/compositional consequence of the number's factor structure. */
+    visual_logic?: string;
+  };
   meaning: { upright: string; inverted: string };
   visuals: { detailed_description: string; style_override?: string; content_override?: string };
 }
