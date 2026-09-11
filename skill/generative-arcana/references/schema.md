@@ -107,26 +107,30 @@ enum Arcana { Major = "major", Minor = "minor" }
 // AXES — stored entities, referenced by slug.
 // ─────────────────────────────────────────────────────────────
 
+// SUIT — grid axis. DECLARE. ORDERED (index 0–3) so the transversal walk is deterministic.
 interface Suit {
-  index: number
+  index: number                                  // 0–3; fixed suit order
   name: string
-  slug: string
+  slug: string                                   // lowercase, hyphenated
   description: string
-  symbol: { name: string; description: string; svg: string }
-  meaning: { upright: string[]; inverted: string[] }
+  symbol: { name: string; description: string; svg: string }  // glyph, stamped on the card
+  meaning: { upright: string[]; inverted: string[] }          // 3–6 each; a generative palette
   visual_style: string                           // concise legacy/general summary
   visual_grammar?: VisualFamilyGrammar           // default authoring profile should populate this
 }
 
+// RANK — grid axis. DECLARE. 14 MINOR ranks (majors have no rank layer).
 interface Rank {
-  index: number
+  index: number                                  // 0-based: 0 = Ace … 13 = fourth face
   arcana: Arcana.Minor
-  numeric_value: number
-  name: string
-  symbol: string
-  description: string
-  question?: string
-  factorization?: {
+  numeric_value: number                          // 1–14  (this number carries the prime/composite axis)
+  name: string                                   // "Ace", "Two"…"Ten", or face-rank name
+  symbol: string                                 // glyph: "A","II"…"X", or face-rank initial
+  description: string                            // the rank's framework (the abstraction it poses)
+  question?: string                              // numbered ranks: the question, with a literal {suit}
+                                                 //   placeholder, e.g. "What stabilizes {suit}?" — consumers
+                                                 //   substitute the suit name. Omit for face ranks.
+  factorization?: {                              // OPTIONAL: number-owned interpretation, written once on rank
     character: "identity" | "prime" | "composite"
     factors?: number[]
     gloss: string
@@ -134,16 +138,17 @@ interface Rank {
   }
   visual_form?: RankVisualForm                   // formal identity across suits
   meaning: { upright: string[]; inverted: string[] }
-  visual_content: string                         // abstract imagery/event before suit styling
+  visual_content: string                         // abstract imagery this rank depicts, before styling
 }
 
+// TRANSVERSAL — substrate axis. SUBLIMATE. REQUIRED. Covers every card.
 interface Station {
   slug: string
-  index: number
+  index: number                                  // position in the canonical order (0-based)
   name: string
-  description: string
-  symbol?: { name: string; description: string; svg: string }
-  meaning: { upright: string[]; inverted: string[] }
+  description: string                            // concise meta-layer statement of the station
+  symbol?: { name: string; description: string; svg: string }  // optional transverse-axis glyph
+  meaning: { upright: string[]; inverted: string[] }           // semantic charge; carried as undertone
   visual_motif: string                           // concise legacy/general summary
   visual_environment?: StationVisualEnvironment // environmental modulation; must not replace family grammar
 }
@@ -151,11 +156,12 @@ interface Station {
 interface Transversal {
   name: string
   description: string
-  ordering_rationale: string
-  suit_stride?: number
-  stations: { [station_slug: string]: Station }
+  ordering_rationale: string                     // why THIS sequence in THIS order; what the order means
+  suit_stride?: number                           // the per-suit kick; coprime to N; default 1. See "The walk".
+  stations: { [station_slug: string]: Station }  // N stations, N ≥ 4
 }
 
+// MAJOR ARCANA — a visual family, no MajorRank type; 22 cards built directly.
 interface MajorArcana {
   story: string
   visual_style: string                           // concise legacy/general summary
@@ -163,17 +169,21 @@ interface MajorArcana {
   symbol?: { name: string; description: string; svg: string }
 }
 
+// ─────────────────────────────────────────────────────────────
+// CARDS — slugs + integrated outputs only.
+// ─────────────────────────────────────────────────────────────
+
 interface Card {
   name: string
-  number: string
+  number: string                                 // major: "0".."21"; minor: numeric_value "1".."14"
   slug: string
   arcana: Arcana
-  station_slug: string
-  meaning: { upright: string; inverted: string }
+  station_slug: string                           // → transversal station, from the walk
+  meaning: { upright: string; inverted: string } // INTEGRATED prose across the axes
   visuals: {
     detailed_description: string                 // concrete scene unique to this card
-    style_override?: string
-    content_override?: string
+    style_override?: string                      // genuine exception only
+    content_override?: string                    // genuine exception only
   }
 }
 
@@ -181,18 +191,21 @@ interface MinorArcanaCard extends Card {
   arcana: Arcana.Minor
   suit_slug: string
   rank_slug: string
+  // slug = `${suit_slug}-${rank_slug}`
 }
 
 interface MajorArcanaCard extends Card {
   arcana: Arcana.Major
   factorization: {
     character: "identity" | "prime" | "composite"
-    factors?: number[]
+    factors?: number[]                           // composite only; derived, stored for legibility
     gloss: string                                // AUTHORED semantic consequence
     visual_logic?: string                        // AUTHORED formal ancestry/consequence; default profile normally writes it
   }
+  // slug = `major-${number}`
 }
 
+// Optional, deck-level. Present only when suits are the cross-product of two dialectics.
 interface SuitDialectic {
   axes: [
     { name: string; poles: [string, string] },
@@ -202,14 +215,14 @@ interface SuitDialectic {
 }
 
 interface Deck {
-  name: string
+  name: string                                   // theme name + " Tarot"
   slug: string
-  version: string
+  version: string                                // authored content version
   theme: Theme
   visual_language?: DeckVisualLanguage           // default profile should populate shared material world
-  suits: { [suit_slug: string]: Suit }
-  ranks: { [rank_slug: string]: Rank }
-  transversal: Transversal
+  suits: { [suit_slug: string]: Suit }           // exactly 4 in default profile, ordered by index
+  ranks: { [rank_slug: string]: Rank }           // exactly 14 in default profile
+  transversal: Transversal                       // REQUIRED
   major_arcana: MajorArcana
   dialectic?: SuitDialectic
   cards: { [card_slug: string]: MinorArcanaCard | MajorArcanaCard }
@@ -222,27 +235,35 @@ The source model above stays normalized: a card does not repeat its deck, family
 
 ## The walk
 
-The transversal touches every card, so station assignment is **deterministic and structural** — no configured anchor. The suit order (`Suit.index`) and rank order (`Rank.index`) fix it. Let `N` = number of stations and `k` = transversal `suit_stride` (default 1).
+The transversal touches every card, so station assignment is **deterministic and structural** — no configured anchor. The suit order (`Suit.index`) and rank order (`Rank.index`) fix it. Let `N` = number of stations (indexed `0 … N-1` in canonical order) and `k = transversal.suit_stride` (default 1).
 
-- **Minor walk** — `station_index = (rank.index + k · suit.index) mod N`. Origin: first suit's Ace → station 0.
-- **Major walk** — `station_index = major_number mod N`. Origin: Major 0 → station 0.
+- **Minor walk** — `station_index = (rank.index + k · suit.index) mod N`. Origin: the first suit's Ace (suit 0, rank 0) → station 0.
+- **Major walk** — a *separate* walk. `station_index = major_number mod N`. Origin: Major 0 → station 0.
 
-Resolve each station index to `station_slug` via canonical station order.
+Resolve each `station_index` to a `station_slug` via the canonical order and write it to the card. (Materialized for self-description and querying, though recoverable from structure.)
 
-**Why the kick.** A plain continuous count over contiguous 14-rank suits collapses when N divides 14. The per-suit stride de-aligns suits. Choose a full-cycle `k` coprime to N when possible; more generally distinct suit offsets require `S ≤ N / gcd(N,k)` for S suits. `k=1` is the most legible close voicing; larger coprime values fold the suits more widely around the station ring.
+**Why `k`, and why not a plain continuous count.** Laying the 56 minors out as contiguous 14-rank suits and walking `station = (14·suit + rank) mod N` looks continuous and clean, but when `N` divides 14 — which the classic **7** does — it collapses: `14·suit ≡ 0 (mod 7)`, so `station = rank mod N`, identical in every suit, and the axis stops cross-cutting entirely. The escape is a per-suit kick `k` **coprime to N** (the suit stride): each suit's walk is shifted, so no two suits share a pattern. The major walk needs no kick: 22 ≡ 1 mod 7, so a plain count never realigns.
+
+**Choosing `k` — the fold.** `k` is the *chord* the suits strike through the qualitative cycle. At a fixed rank they occupy `{r, r+k, r+2k, r+3k} mod N`: `k = 1` packs them onto adjacent stations; larger `k` spreads them around the ring. The choice is N-relative.
+
+- **Full-cycle design rule:** choose `k` coprime to N. This is sufficient, not necessary, for distinct suit offsets. With S consecutive suit indices, the exact noncollision condition is `S ≤ N / gcd(N,k)`.
+- **Default `k = 1`** — cleanest, most legible diagonal.
+- **To unfold**, climb toward `floor(N/2)` through valid coprime strides for more fold.
 
 ## Field notes
 
-**Suits are ordered.** `Suit.index` is load-bearing for structural walks.
+**Suits are ordered.** `Suit.index` is load-bearing: the minor walk reads it. Keep `suits` keyed by slug but treat `index` as the source of truth for order.
 
-**Meaning palettes vs. integrated meaning.** Axes carry lists; a card carries synthesized prose. See `integration.md`.
+**Meaning palettes vs. integrated meaning.** Axes carry lists (an unreduced sense palette); a card carries prose (the synthesis). List = atom; prose = integration. See `integration.md`.
 
-**Overrides, not guidance.** A card writes only genuine `style_override` / `content_override` deltas; inherited visual grammar remains on its owning layers.
+**Overrides, not guidance.** No per-card copies of parent art direction. A card writes only genuine `style_override` / `content_override` deltas, or leaves them unset to inherit.
 
-**station_slug is the textual reference; environment resolves at read.** Do not copy station prose into each stored card merely to make reads convenient. `CardRenderSpec` performs that denormalization.
+**station_slug is the textual reference; station environment resolves at read.** No per-card station prose is needed merely for self-contained reads; `CardRenderSpec` supplies the inherited environment. A station may still surface its optional symbol deliberately and rarely per `references/svg_symbols.md`.
 
-**The prime/composite gloss and visual logic live at number origin.** Majors own theirs; ranks may own them once when load-bearing; minors inherit rank number context rather than duplicating it.
+**The prime/composite gloss and visual logic live at number origin.** Majors own them per card; ranks may own them once when load-bearing; minor cards inherit rank number context rather than duplicating it. See `references/numeric_axis.md`.
 
-**Canonical card order is derived, not key order.** Consumers sort majors by `number`; minors by `suit.index` then `rank.index`.
+**Canonical card order is derived, not key order.** Consumers that need order derive majors by `number`; minors by `suit.index` then `rank.index`. JSON property insertion order is not semantic card order.
 
-**Majors carry no rank.** Their semantic content comes from the majors strategy, family visual grammar from `major_arcana`, station environment from the major walk, and numeric formal ancestry from factorization.
+**Majors carry no rank.** A major's semantic content comes directly from its majors strategy, visual family from `major_arcana`, station environment from the major walk, and numeric formal ancestry from factorization.
+
+**Naming.** Numbered ranks: index 0 → "Ace", 1–9 → "Two"…"Ten". Face ranks (index 10–13): the rank's `name`, no "the". Majors: the card's own name.
