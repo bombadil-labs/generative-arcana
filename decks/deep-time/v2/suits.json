@@ -1,0 +1,52 @@
+{
+  "suits": {
+    "vents": {
+      "visual_grammar": {
+        "medium_handling": "Dense matte dark fields ruptured by incandescent transparent-to-opaque plumes, with glowing edges and particulate ejecta rising through the surface.",
+        "composition": "Strong upward thrust from a low source: cones, conduits, columns, fountains, or new ground pushing into open space.",
+        "edge_language": "Hard fresh-rock silhouettes near the source, soft turbulent plume edges above, and occasional glassy sharpness at newly cooled surfaces.",
+        "value_structure": "Abyssal dark ground against concentrated high-value heat; luminosity originates from below or within rather than from a neutral sky.",
+        "camera_and_scale": "Cross-section or low monumental view that makes emergence from depth visible; enough vertical room for the process to rise.",
+        "detail_distribution": "Maximum detail at vent, conduit, fresh crust, and ejecta; the surrounding field simplifies as heat and plume disperse.",
+        "finish": "Incandescent, glassy, and newly made, with the freshest surfaces still visually radiating.",
+        "avoid": ["top-lit pastoral volcano scenery", "evenly distributed warm color", "static horizontal calm"]
+      }
+    },
+    "strata": {
+      "visual_grammar": {
+        "medium_handling": "Flat mineral-color bands accumulated in distinct layers, with small variations in grain, thickness, and inclusion rather than blended painterly modeling.",
+        "composition": "Strictly horizontal cross-section or cut-face organization; the picture plane itself behaves like an exposed archive of successive beds.",
+        "edge_language": "Long continuous bedding contacts with subtle irregularity, fine lamination, and crisp readable boundaries between deposited intervals.",
+        "value_structure": "Even archival illumination and restrained contrast; differences between layers carry more information than dramatic highlights.",
+        "camera_and_scale": "Orthographic or near-orthographic cut-face view, often with little conventional horizon; time is read vertically through stacked depth.",
+        "detail_distribution": "Detail is distributed by layer—fossils, grains, ash, color shifts, and unconformities appear as evidence inside otherwise calm bands.",
+        "finish": "Banded, measured, patient, and legible like a core log without becoming sterile technical drafting.",
+        "avoid": ["single heroic focal object", "strong diagonal motion as the base composition", "dramatic spotlighting that obscures bedding"]
+      }
+    },
+    "grains": {
+      "visual_grammar": {
+        "medium_handling": "Granular dots, dry particulate fields, translucent dust, and eroded edges that visibly release material into motion.",
+        "composition": "Wind- or water-swept diagonals, dunes, currents, and drifting streams; mass yields into transport rather than holding a fixed center.",
+        "edge_language": "Downstream/downwind edges dissolve into particles while up-current forms remain more legible; contours abrade instead of snapping.",
+        "value_structure": "Pale mineral mid-values, dust, bone, and sediment against softened shadows; contrast diffuses with distance and motion.",
+        "camera_and_scale": "Medium-to-wide field view or process cross-section that leaves visible room for material to travel through the frame.",
+        "detail_distribution": "Fine grain clusters near source and settling zones, thinning into sparse moving particles across open ground.",
+        "finish": "Hazy, granular, mobile, and visibly worn, with forms surrendering their edges without losing process legibility.",
+        "avoid": ["sealed hard silhouettes", "immobile centered monuments", "perfectly clean vector contours"]
+      }
+    },
+    "faults": {
+      "visual_grammar": {
+        "medium_handling": "Matte slate and charcoal blocks interrupted by one vivid mineral seam or fracture, with sharply offset strata and occasional granular debris.",
+        "composition": "Continuity visibly displaced across a diagonal or oblique slip plane; the same body appears on both sides but no longer at the same position.",
+        "edge_language": "Hard breaks, sheared contacts, scarps, and crisp displacement lines, contrasted with intact banding that proves what used to align.",
+        "value_structure": "Low-to-mid dark mineral masses with raking highlights and one high-chroma fracture/seam accent.",
+        "camera_and_scale": "Cross-section, cut block, or raking landscape view chosen to make offset measurable at a glance.",
+        "detail_distribution": "Precision concentrates along the fault trace, displaced markers, scarps, and fresh fracture surfaces; intact blocks remain simpler.",
+        "finish": "Stillness immediately after violence: dry, displaced, exact, with strain legible in geometry rather than spectacle.",
+        "avoid": ["random cracked texture with no displacement logic", "soft symmetrical compositions", "fracture used only as decoration"]
+      }
+    }
+  }
+}
