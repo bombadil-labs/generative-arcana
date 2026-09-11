@@ -1,4 +1,5 @@
 export * from "./types";
+export * from "./spreadScene";
 export * from "./tokens";
 export * from "./color";
 export { buildStationLight, buildStationLightBySlug } from "./lighting";
@@ -13,9 +14,12 @@ export {
   registerKitPack,
   registerRawPack,
   registerImagePack,
+  registerSpreadKitPack,
   isIllustrated,
+  hasSpreadVisual,
   registerPack,
   listPacks,
   resolveVisual,
+  resolveSpreadVisual,
 } from "./defineCard";
-export type { VisualPack, ResolvedVisual } from "./defineCard";
+export type { VisualPack, ResolvedVisual, ResolvedSpreadVisual } from "./defineCard";
