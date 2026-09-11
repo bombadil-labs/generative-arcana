@@ -19,6 +19,7 @@ jobs:
         with:
           node-version: 22
       - run: node tools/check-authoring-hosts.mjs
+      - run: node tools/audit-deck-v2.mjs --check
 
   app:
     name: App ${{ matrix.check }}
