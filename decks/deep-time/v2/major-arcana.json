@@ -1,0 +1,38 @@
+{
+  "major_arcana": {
+    "visual_grammar": {
+      "medium_handling": "Monumental geological cross-sections built from banded mineral fields, translucent depth washes, fracture seams, and internally luminous events.",
+      "composition": "The picture plane is cut through the planet: deep vertical or sectional scale, with one major geological event organized at its numbered depth and no human figure competing with the process.",
+      "edge_language": "Stratigraphic contacts, crystal boundaries, thermal gradients, faults, veins, and erosion surfaces shift between exact scientific legibility and atmospheric depth.",
+      "value_structure": "Basalt-dark mass anchors the frame while magma, crystal, ice, water, or mineral seams supply concentrated internal light.",
+      "camera_and_scale": "Impossible geological overview: core sample, crust-to-depth section, planetary slice, or monumental cut face in which kilometers can coexist in one readable frame.",
+      "detail_distribution": "Highest information density gathers at the card's defining horizon/event; surrounding layers simplify into context and deep-time scale.",
+      "finish": "A sublime scientific section: materially legible, process-driven, and internally luminous without becoming photorealistic terrain.",
+      "avoid": ["human figures in Major Arcana", "generic scenic mountain painting", "decorative geological texture with no sectional logic"]
+    }
+  },
+  "cards": {
+    "major-0": {"factorization": {"visual_logic": "Hold the section in pre-record near-formlessness: continuous molten depth with no stable horizon, grain, or layer capable of preserving distinction."}},
+    "major-1": {"factorization": {"visual_logic": "One tiny but exact zircon grain becomes the single persistent reference point inside otherwise unstable material—the unit by which all later depth/time can be measured."}},
+    "major-2": {"factorization": {"visual_logic": "Use one irreducible compressive axis through the section. Every deformation acknowledges the same load; remove that vector and the whole composition loses its cause."}},
+    "major-3": {"factorization": {"visual_logic": "Organize the card as one continuous thermal gradient from hot to cool rather than a collection of heat objects; the gradient itself is the indivisible form."}},
+    "major-4": {"factorization": {"visual_logic": "Square Pressure into a load-bearing mountain frame: two orthogonal/paired compressive relations stabilize uplift into a standing four-sided mass."}},
+    "major-5": {"factorization": {"visual_logic": "Give Water one continuous irreducible path through the section—solvent, carrier, and connector are different expressions of the same unbroken flow system."}},
+    "major-6": {"factorization": {"visual_logic": "Intersect Pressure's load axis with Heat's gradient inside one sealed depth chamber; transformation occurs where the two independent systems overlap."}},
+    "major-7": {"factorization": {"visual_logic": "Let Life appear as one irreducible living interface rewriting an otherwise abiotic record—a singular biospheric front whose presence changes every adjacent layer."}},
+    "major-8": {"factorization": {"visual_logic": "Repeat Pressure recursively downward: nested compressive stages carry one slab deeper until structure becomes consumption and the section folds into the melt zone."}},
+    "major-9": {"factorization": {"visual_logic": "Square Heat into a nested plutonic chamber: thermal organization becomes self-containing crystalline structure, with one heat system echoed inside another boundary."}},
+    "major-10": {"factorization": {"visual_logic": "Bind Pressure's reservoir to Water's continuous path, then release that relation vertically: contained load below, periodic conduit above, one recurring fountain."}},
+    "major-11": {"factorization": {"visual_logic": "Make temporal depth itself the single irreducible axis: one uninterrupted scale spans many layers/events without being reducible to any particular layer."}},
+    "major-12": {"factorization": {"visual_logic": "Carry the Mountain's pressure-built structure across a fixed Heat source: repeated volcanoes form a directional chain while the underlying plume remains stationary."}},
+    "major-13": {"factorization": {"visual_logic": "One extinction horizon cuts the entire archive as an indivisible boundary; every layer above and below is dated in relation to that single line."}},
+    "major-14": {"factorization": {"visual_logic": "Compress Life through Pressure into a preserved imprint: living form and enclosing sediment meet in one sealed contact where body becomes legible record."}},
+    "major-15": {"factorization": {"visual_logic": "Interpenetrate Heat's gradient with Water's flow inside solid rock; veins and altered bands show two irreducible systems combining without either simply containing the other."}},
+    "major-16": {"factorization": {"visual_logic": "Recursively overbuild Pressure's mountain frame until the nested load can no longer contain itself; the stabilizing geometry becomes the geometry of rupture."}},
+    "major-17": {"factorization": {"visual_logic": "Use one invisible but coherent orientation field through many crystallizing grains; each grain points differently only insofar as one planet-wide field permits."}},
+    "major-18": {"factorization": {"visual_logic": "Raise the Heat-squared Pluton with Pressure: a nested crystalline interior is domed upward until only its upper half becomes exposed, implying a much larger hidden body."}},
+    "major-19": {"factorization": {"visual_logic": "One external radiant field enters from above and organizes every exposed surface; the Sun remains formally outside the geological section even while driving its weathered face."}},
+    "major-20": {"factorization": {"visual_logic": "Let the pressure-built Mountain meet Water as a long cutting path: stable relief and continuous flow remain simultaneously legible, with the river deriving its geometry from both."}},
+    "major-21": {"factorization": {"visual_logic": "Combine Heat's planetary gradient with Life's thin living interface into one whole-Earth section: interior engine and biosphere read as coupled systems completing a still-active archive."}}
+  }
+}

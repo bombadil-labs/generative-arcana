@@ -1,0 +1,17 @@
+{
+  "version": "1.1.0",
+  "visual_language": {
+    "medium": "Diagrammatic geological cross-section illustration: matte mineral-color fields, granular particulate marks, translucent atmospheric washes, and sparse luminous event accents.",
+    "surface": "The image behaves like a freshly cut rock face or core sample on a deep matte ground: bands, grains, veins, fractures, and inclusions remain materially legible rather than smoothed into generic scenery.",
+    "mark_making": "Layering, bedding, particulate drift, offset blocks, plume-like fields, contour seams, and mineral veins; repeated geological process marks carry more meaning than decorative brush flourish.",
+    "signature_accent": "One concentrated seam, horizon, crystal, thermal glow, or mineral event may carry vivid luminous color against otherwise earthbound massing.",
+    "finish": "Scientific plate meets geological sublime: process-first, tactile and diagrammatically legible at card scale, with enough atmosphere to feel planetary without becoming photorealistic landscape art.",
+    "avoid": [
+      "generic fantasy landscape painting",
+      "glossy 3D rock rendering",
+      "decorative crystals unrelated to the depicted process",
+      "smooth gradients that erase bedding, grain, fracture, or contact geometry",
+      "uniform texture that makes the four geological process families indistinguishable"
+    ]
+  }
+}
