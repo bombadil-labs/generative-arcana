@@ -19,7 +19,7 @@ jobs:
         with:
           node-version: 22
       - run: node tools/check-authoring-hosts.mjs
-      - run: node tools/audit-deck-v2.mjs --check
+      - run: node tools/audit-deck-v2.mjs --check --require-enriched=finalfantasy
 
   app:
     name: App ${{ matrix.check }}

@@ -1,0 +1,19 @@
+{
+  "version": "2.1.0",
+  "visual_language": {
+    "medium": "Hand-painted gouache and transparent ink on cold-press cotton paper, with opaque and translucent passages sharing one tactile image surface.",
+    "surface": "Visible cold-press paper tooth, matte pigment, occasional dry-brush grain, and translucent staining remain legible rather than digitally smoothed away.",
+    "mark_making": "Visible brushwork and wash behavior: dragged dry brush, translucent ink blooms, family-specific pencil/pastel/stipple accents, and crisp opaque touches used selectively.",
+    "signature_accent": "Selective crystal-white highlights and restrained luminous bloom, with occasional prismatic or metallic accents reserved for magic, crystals, and moments of revelation.",
+    "finish": "Tactile, handmade stylized illustrative realism: recognizable creatures and expressive silhouettes, neither photorealistic nor chibi, with material texture retained through the final image.",
+    "avoid": [
+      "photorealism",
+      "chibi proportions",
+      "glossy 3D rendering",
+      "smooth vector art",
+      "generic anime cel shading",
+      "airbrushed digital polish",
+      "uniform digital surfaces that erase paper tooth"
+    ]
+  }
+}

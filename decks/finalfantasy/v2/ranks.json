@@ -1,0 +1,144 @@
+{
+  "ranks": {
+    "ace": {
+      "visual_content": "A single undivided instance of the suit's energy, isolated before history, relation, or specialization.",
+      "visual_form": {
+        "composition_law": "One undivided form.",
+        "spatial_logic": "A single focal form isolated in an open field or simple enclosure, with no competing center.",
+        "rhythm": "One sustained beat.",
+        "density": "Sparse.",
+        "figure_ground": "A clear singular figure against generous ground."
+      }
+    },
+    "two": {
+      "visual_content": "Two suit-bearing forms held in a live relation of balance, tension, partnership, or choice, with the charged interval between them central.",
+      "visual_form": {
+        "composition_law": "Bilateral tension.",
+        "spatial_logic": "Two poles face, mirror, oppose, or balance across an active gap, hinge, or bridge.",
+        "rhythm": "Reciprocal pair: call and response.",
+        "density": "Open enough that the interval between the two remains visible.",
+        "figure_ground": "Both poles and the relation between them must read."
+      }
+    },
+    "three": {
+      "visual_content": "A third form, event, or possibility visibly emerging from the interaction of two prior forces.",
+      "visual_form": {
+        "composition_law": "Triangular emergence.",
+        "spatial_logic": "Three-point organization in which a third form or direction visibly emerges from the relation of the first two.",
+        "rhythm": "Two establish; the third releases or transforms.",
+        "density": "Moderate, with space for the emergent third.",
+        "figure_ground": "The third may crystallize in negative space rather than simply add another object."
+      }
+    },
+    "four": {
+      "visual_content": "The suit consolidated into a stable enclosure, platform, or four-corner frame that can visibly hold weight.",
+      "visual_form": {
+        "composition_law": "Enclosed square structure.",
+        "spatial_logic": "A four-corner frame, enclosure, platform, or orthogonal field that visibly stabilizes the image.",
+        "rhythm": "Measured and repeating.",
+        "density": "Stable and evenly held.",
+        "figure_ground": "Interior and boundary are both legible; the frame itself carries meaning."
+      }
+    },
+    "five": {
+      "visual_content": "A previously stable suit-structure visibly broken, displaced, contested, or opened under pressure.",
+      "visual_form": {
+        "composition_law": "Visibly broken order.",
+        "spatial_logic": "A previously stable pattern is offset, breached, missing a piece, or interrupted by an incompatible force.",
+        "rhythm": "Expected order, then a break.",
+        "density": "Uneven and pressurized around the disruption.",
+        "figure_ground": "Fracture, gap, or intrusion becomes active negative space."
+      }
+    },
+    "six": {
+      "visual_content": "Two sides of the suit exchanging aid, force, value, information, or relief across a shared channel.",
+      "visual_form": {
+        "composition_law": "Reciprocal symmetry and exchange.",
+        "spatial_logic": "Two balanced fields are linked by a visible path of transfer, return, circulation, or mutual support.",
+        "rhythm": "Call-and-response flow.",
+        "density": "Balanced on both sides of a shared channel.",
+        "figure_ground": "The connection between fields is as important as either field."
+      }
+    },
+    "seven": {
+      "visual_content": "A solitary bearer of suit-energy facing a test, boundary, doubt, or opposing field that must be met without guarantees.",
+      "visual_form": {
+        "composition_law": "Isolated subject under trial.",
+        "spatial_logic": "One bearer or proposition is held apart against a threshold, surrounding field, or resistant environment.",
+        "rhythm": "A suspended beat under pressure.",
+        "density": "Sparse overall, with tension concentrated around the isolated subject.",
+        "figure_ground": "Solitary figure and opposing field remain sharply distinct."
+      }
+    },
+    "eight": {
+      "visual_content": "Repeated suit-action performed with skill and momentum, the rhythm of practice becoming visible as motion.",
+      "visual_form": {
+        "composition_law": "Rhythmic repetition in motion.",
+        "spatial_logic": "Repeated directional units, gestures, marks, or steps create momentum across the frame.",
+        "rhythm": "Accelerating pulse.",
+        "density": "Moderate to high but strongly organized.",
+        "figure_ground": "The repeated pattern itself becomes the vehicle of action."
+      }
+    },
+    "nine": {
+      "visual_content": "The suit nearly fulfilled but carried as weight, duty, accumulation, or the last hard stretch before completion.",
+      "visual_form": {
+        "composition_law": "Compressed, burdened frame.",
+        "spatial_logic": "The frame crowds inward, stacks weight, or accumulates obligations around a subject nearing the edge of endurance.",
+        "rhythm": "Slow accumulation with little release.",
+        "density": "High and compressed.",
+        "figure_ground": "Breathing room is scarce; the burden shapes the remaining negative space."
+      }
+    },
+    "ten": {
+      "visual_content": "The suit at full expression, abundant enough to exceed its original frame and tip from completion into transition.",
+      "visual_form": {
+        "composition_law": "Imagery overflowing the composition.",
+        "spatial_logic": "The established structure reaches saturation and spills beyond borders, cycles outward, or becomes too abundant for its original frame.",
+        "rhythm": "Culminating saturation followed by release or transition.",
+        "density": "Very high or abundant.",
+        "figure_ground": "The frame can no longer fully contain what has completed."
+      }
+    },
+    "freelancer": {
+      "visual_content": "A novice or unspecialized bearer of the suit with several possible directions still open and no single mastered form yet fixed.",
+      "visual_form": {
+        "composition_law": "Open, provisional possibility.",
+        "spatial_logic": "Several paths or tools remain available without one dominating; the composition leaves deliberate unfinished/open regions.",
+        "rhythm": "Exploratory starts and pauses.",
+        "density": "Light to moderate.",
+        "figure_ground": "The figure is legible but not yet sovereign over the frame."
+      }
+    },
+    "knight": {
+      "visual_content": "An active practitioner of the suit committed to one path and carrying it into decisive field action.",
+      "visual_form": {
+        "composition_law": "Committed directional action.",
+        "spatial_logic": "A strong diagonal, charge, pursuit, defense, or traversal carries the suit decisively across the frame.",
+        "rhythm": "One committed movement with follow-through.",
+        "density": "Moderate, concentrated along the action path.",
+        "figure_ground": "The practitioner cuts a clear route through the surrounding field."
+      }
+    },
+    "sage": {
+      "visual_content": "A master who holds the suit's complexity inward as controlled knowledge, integrating multiple layers without losing clarity.",
+      "visual_form": {
+        "composition_law": "Layered, nested synthesis.",
+        "spatial_logic": "Multiple signs, planes, or systems converge around a calm controlling center without collapsing into clutter.",
+        "rhythm": "Measured recurrence with nested echoes.",
+        "density": "Rich but ordered.",
+        "figure_ground": "Fine detail surrounds a still center of comprehension."
+      }
+    },
+    "warrior-of-light": {
+      "visual_content": "The suit fully realized and turned outward as exemplary heroic action, commanding the whole field while guiding others through it.",
+      "visual_form": {
+        "composition_law": "Integrated command of the whole field.",
+        "spatial_logic": "The central heroic action coordinates foreground, middle ground, and horizon into one complete composition rather than merely occupying the center.",
+        "rhythm": "Resolved, expansive, and authoritative.",
+        "density": "Full but breathable; nothing feels accidental.",
+        "figure_ground": "The hero and world read as one resolved system, with the figure commanding rather than erasing the environment."
+      }
+    }
+  }
+}

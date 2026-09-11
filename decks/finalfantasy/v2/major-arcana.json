@@ -1,0 +1,43 @@
+{
+  "major_arcana": {
+    "visual_grammar": {
+      "medium_handling": "Gouache-tempera with translucent oil-like glazing, restrained metallic-gold accents, and crystal-white highlights laid over a matte painted base.",
+      "composition": "Expansive poster or box-art staging: sweeping skies, monumental ruins, crystals, summons, and machines, with human figures arranged against worlds much larger than themselves.",
+      "edge_language": "Atmospheric edges and selective crispness rather than heavy outlining; distant forms dissolve into glaze while focal silhouettes remain readable.",
+      "value_structure": "Broad cinematic massing from abyssal dark through crystal-white focal light, with a strong hierarchy of luminous accents.",
+      "camera_and_scale": "Extreme wide, heroic low-angle, or vertiginous scale relationships; the party often appears small against colossal worlds, gods, towers, or celestial events.",
+      "detail_distribution": "Hierarchical detail: highest precision at the focal character, crystal, or decisive object; increasingly atmospheric simplification with depth and scale.",
+      "finish": "Painterly matte body with translucent depth, restrained metallic-gold or crystal-white emphasis, and no uniform digital sheen.",
+      "avoid": [
+        "heavy black outlining",
+        "uniform detail across the entire frame",
+        "posterized cel shading",
+        "chibi or super-deformed staging"
+      ]
+    }
+  },
+  "cards": {
+    "major-0": {"factorization": {"visual_logic": "Suspend the frame in near-emptiness: one latent focal possibility held inside generous untouched ground, with no secondary system yet claiming the composition."}},
+    "major-1": {"factorization": {"visual_logic": "Introduce one decisive vector or beacon that starts the image moving; a singular initiating axis should organize everything that follows."}},
+    "major-2": {"factorization": {"visual_logic": "Build the image as an irreducible dyad: two presences or poles bound by one relation that cannot be removed without destroying the composition."}},
+    "major-3": {"factorization": {"visual_logic": "Use a triadic generative structure with a clear apex/source relation; the Mentor should feel like a third term that makes transmission possible."}},
+    "major-4": {"factorization": {"visual_logic": "Square the Companion's dyad into a stable fellowship: two paired relations cross-braced into a durable quadrilateral or four-part frame."}},
+    "major-5": {"factorization": {"visual_logic": "Give the Empire one monolithic organizing mass or axis. Its authority should feel formally indivisible rather than assembled from smaller visual modules."}},
+    "major-6": {"factorization": {"visual_logic": "Combine the Companion's dyadic relation with the Mentor's triadic depth: a paired human relation carried through three directional or spatial layers into range and travel."}},
+    "major-7": {"factorization": {"visual_logic": "Reduce the image to one uncompromising passage, axis, or threshold. The Trial's organization should feel indivisible: there is no alternate route hidden inside it."}},
+    "major-8": {"factorization": {"visual_logic": "Cube the Companion formally through nested dyadic relations at multiple scales: mortal bond, summoned ally, and world-scale response should echo without becoming a literal count."}},
+    "major-9": {"factorization": {"visual_logic": "Square the Mentor's triadic logic: one three-part organization nested inside or reflected by another, so knowledge appears to examine and deepen its own source."}},
+    "major-10": {"factorization": {"visual_logic": "Make living dyad and imperial monolith visibly interlock: the Companion's paired/relational logic is captured inside the Empire's singular mechanical order."}},
+    "major-11": {"factorization": {"visual_logic": "Organize the card around one clean, irreducible rupture—an uncompromising break line or severance that does not fragment into smaller incidents."}},
+    "major-12": {"factorization": {"visual_logic": "Pass the Fellowship's stable paired structure through the Mentor's triadic hierarchy: a fourfold company converges through layers of teaching, cost, or inheritance toward one sacrificial decision."}},
+    "major-13": {"factorization": {"visual_logic": "Use one catastrophic pivot or falling axis that reorganizes the entire field at once. The Fall should not read as a sequence of smaller failures."}},
+    "major-14": {"factorization": {"visual_logic": "Combine the Companion's before/after dyad with the Trial's singular threshold: one being crosses one irreversible axis and returns formally transformed."}},
+    "major-15": {"factorization": {"visual_logic": "Let the Mentor's triadic knowledge system feed the Empire's monolithic center: multiple layers of lore converge into one institutional throne or dominant focal authority."}},
+    "major-16": {"factorization": {"visual_logic": "Recursively nest the Companion's dyadic structure until it overbuilds itself: repeated paired order becomes too dense to hold and the frame visibly fails under its own recursion."}},
+    "major-17": {"factorization": {"visual_logic": "Preserve a single small luminous focal proposition against overwhelming ground. Hope should be formally irreducible even when physically tiny."}},
+    "major-18": {"factorization": {"visual_logic": "Embed the Companion's paired relation inside the Deep Lore's nested triadic structure: traveler and remembered world persist through layered ruin, echo, and aftermath."}},
+    "major-19": {"factorization": {"visual_logic": "Use one continuous convergent arc or circulation that gathers separated elements into a single unbroken reunion without subdividing the return into stages."}},
+    "major-20": {"factorization": {"visual_logic": "Set the Fellowship's stable four-part structure against the Empire's monolithic axis: a coordinated company climbs or presses toward one singular apex of power."}},
+    "major-21": {"factorization": {"visual_logic": "Carry the Mentor's triadic generative logic through the Trial's indivisible threshold: a three-part cycle of inheritance, ordeal, and renewal resolves in one sweeping world-scale reorganization."}}
+  }
+}
