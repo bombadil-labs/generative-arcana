@@ -1,0 +1,76 @@
+{
+  "transversal": {
+    "stations": {
+      "headphones": {
+        "visual_environment": {
+          "illumination": "Low private screen/electronic glow close to the face, with the surrounding world dropping quickly into dark.",
+          "palette": "Black, cool gray, muted blue-green, cathode or screen blue, and tiny warm skin accents.",
+          "atmosphere": "Interior, close-miked, insulated, hyper-attentive, and nearly silent outside the immediate listening space.",
+          "motion": "Minimal external motion; tiny repetitive or nervous movement can become large through attention.",
+          "density": "Sparse and intimate, with sensory information compressed close to the subject.",
+          "material_effects": "Film grain and paper texture become more apparent in the dark; small light leaks, contact-sheet edges, or headphone-cable lines may act as private annotations."
+        }
+      },
+      "club": {
+        "visual_environment": {
+          "illumination": "Hard small-room red/white stage light with deep black falloff and practical lamps close to bodies.",
+          "palette": "Red-black, nicotine amber, dirty white, dark denim/gray, and occasional electric accent.",
+          "atmosphere": "Sweat-close, nervy, immediate, crowded, and slightly abrasive.",
+          "motion": "Jitter, twitch, short explosive gesture, shoulder-to-shoulder movement.",
+          "density": "High near bodies/stage, quickly collapsing into dark at the room edges.",
+          "material_effects": "Fast grain, imperfect flash, blurred limbs, clipped highlights, scratched print or Xerox-like contrast can surface without erasing family grammar."
+        }
+      },
+      "hall": {
+        "visual_environment": {
+          "illumination": "Warm low gold from a formal proscenium or concert-hall lighting rig, even enough to compose bodies rather than explode them.",
+          "palette": "Honey gold, dark wood, cream, muted black, burgundy, and restrained stage white.",
+          "atmosphere": "Composed, dignified, framed, seated, and given deliberate distance.",
+          "motion": "Measured, rehearsed, formal, or held between phrases.",
+          "density": "Balanced and orderly across stage/audience architecture.",
+          "material_effects": "Print edges and grain calm down; symmetry, proscenium borders, programs, curtains, or formal crop geometry become more legible."
+        }
+      },
+      "stadium": {
+        "visual_environment": {
+          "illumination": "Vast darkness punctured by banks of hard floodlight and one tiny brilliant performance zone.",
+          "palette": "Near-black, cold white, saturated stage color, steel gray, and distant crowd glints.",
+          "atmosphere": "Massive, amplified, anthemic, distant, and almost abstract in scale.",
+          "motion": "Wave-like crowd motion, large gesture, or a small performer magnified by distance.",
+          "density": "Extreme contrast between dense mass/crowd and enormous dark volume.",
+          "material_effects": "Grain, halftone, and repeated points of light emphasize scale; the stage may bloom while people remain documentary rather than heroic."
+        }
+      },
+      "open_air": {
+        "visual_environment": {
+          "illumination": "Natural daylight under a wide sky, responsive to wind and changing weather rather than theatrical sources.",
+          "palette": "Sky blue, natural green, sun-warm skin, earth, cloud white, and saturated ordinary color.",
+          "atmosphere": "Breathable, polyrhythmic, communal, unroofed, and physically exposed to weather.",
+          "motion": "Wind, walking, bicycles, loose clothing, grass, bodies moving without proscenium.",
+          "density": "Low-to-moderate with generous horizon/sky or environmental room.",
+          "material_effects": "Available-light film grain, slightly faded print color, sun flare, airborne dust/pollen, and hand marks that feel made outdoors or on the move."
+        }
+      },
+      "civic_square": {
+        "visual_environment": {
+          "illumination": "Clear public daylight with ordinary street shadows and no privileged theatrical spotlight.",
+          "palette": "Concrete gray, sky blue, optimistic yellow, poster red, bicycle metal, clothing colors, and public greenery.",
+          "atmosphere": "Openly social, civic, practical, hopeful, and accountable to many ordinary people.",
+          "motion": "Walking, talking, gathering, demonstrating, building, cycling, and small coordinated public acts.",
+          "density": "Moderate distributed human activity; no single celebrity center should swallow the commons.",
+          "material_effects": "Poster fragments, public signage, notebook marks, map traces, newspaper texture, and spot-color overprint can enter as evidence of collective participation."
+        }
+      },
+      "body": {
+        "visual_environment": {
+          "illumination": "Warm close light on skin and fabric, often soft gold or simple stage white with the external room falling away.",
+          "palette": "Skin, gray suit cloth, warm gold, sweat-dark fabric, bare wood/floor, and small personal color.",
+          "atmosphere": "Proprioceptive, barefoot, intimate, direct, and located inside movement rather than around it.",
+          "motion": "Weight shift, breath, footfall, hand gesture, balance, awkwardness becoming groove.",
+          "density": "Concentrated on one or several bodies and the small space they actively inhabit.",
+          "material_effects": "Film grain, motion smear, fabric texture, sweat, pencil/grease marks following joints or trajectories; the body is the diagram and the room."
+        }
+      }
+    }
+  }
+}

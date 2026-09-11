@@ -1,0 +1,130 @@
+{
+  "ranks": {
+    "0": {
+      "visual_form": {
+        "composition_law": "One concentrated ignition.",
+        "spatial_logic": "A single focal mark, body, light, or proposition isolated before relation or system forms.",
+        "rhythm": "One beat.",
+        "density": "Very sparse.",
+        "figure_ground": "One clear figure against generous ground."
+      }
+    },
+    "1": {
+      "visual_form": {
+        "composition_law": "Bilateral split or relation.",
+        "spatial_logic": "Two poles mirror, oppose, choose, or answer across one charged interval.",
+        "rhythm": "Pair and counter-pair.",
+        "density": "Low.",
+        "figure_ground": "Both poles and the space between them must remain legible."
+      }
+    },
+    "2": {
+      "visual_form": {
+        "composition_law": "Triangular emergence.",
+        "spatial_logic": "Two established terms produce a visible third term, direction, or shared space.",
+        "rhythm": "Two establish; a third appears.",
+        "density": "Moderate.",
+        "figure_ground": "The emergent third may appear in negative space rather than as another object."
+      }
+    },
+    "3": {
+      "visual_form": {
+        "composition_law": "Four-square structure.",
+        "spatial_logic": "A stable frame, grid, room, platform, or four-corner system visibly holds the image together.",
+        "rhythm": "Measured enclosure.",
+        "density": "Even and stable.",
+        "figure_ground": "Boundary and interior are equally meaningful."
+      }
+    },
+    "4": {
+      "visual_form": {
+        "composition_law": "Established order visibly disrupted.",
+        "spatial_logic": "A stable pattern is cracked, displaced, interrupted, misregistered, or invaded by an incompatible force.",
+        "rhythm": "Pattern, break, consequence.",
+        "density": "Uneven around the rupture.",
+        "figure_ground": "The anomaly or fracture becomes active negative space."
+      }
+    },
+    "5": {
+      "visual_form": {
+        "composition_law": "Asymmetry rebalanced through adjustment.",
+        "spatial_logic": "A disrupted field is rerouted, counterweighted, negotiated, or reconfigured into a workable new relation without returning to its old symmetry.",
+        "rhythm": "Displacement, response, new flow.",
+        "density": "Moderate and redistributed.",
+        "figure_ground": "The repaired relation is visible as a changed path, not an erased wound."
+      }
+    },
+    "6": {
+      "visual_form": {
+        "composition_law": "A system or figure turns back upon its own representation.",
+        "spatial_logic": "Mirror, map, monitor, diagram, shadow, or recursive frame makes the subject inspect itself from within the scene.",
+        "rhythm": "Look, compare, reconsider.",
+        "density": "Moderate with an intentional pause.",
+        "figure_ground": "Figure and representation/reflection both read; neither fully replaces the other."
+      }
+    },
+    "7": {
+      "visual_form": {
+        "composition_law": "Purposeful process in action.",
+        "spatial_logic": "A sequence of hands, tools, steps, repeated marks, or moving bodies shows energy being applied toward a concrete transformation.",
+        "rhythm": "Directed repeated work.",
+        "density": "Moderate-to-high but organized.",
+        "figure_ground": "Process marks remain visible enough to show how the result is being made."
+      }
+    },
+    "8": {
+      "visual_form": {
+        "composition_law": "Near-complete fullness.",
+        "spatial_logic": "Many elements accumulate into a mature abundant field while preserving one coherent center, interval, or breath.",
+        "rhythm": "Accumulation toward ripeness.",
+        "density": "High but breathable.",
+        "figure_ground": "Abundance surrounds rather than obliterates the focal relation."
+      }
+    },
+    "9": {
+      "visual_form": {
+        "composition_law": "Completion exceeds its original frame.",
+        "spatial_logic": "The full system spills, hands off, loops, multiplies, or crosses the boundary that once contained it.",
+        "rhythm": "Saturation, overflow, transition.",
+        "density": "Very high or visibly spilling.",
+        "figure_ground": "The frame itself becomes insufficient and the excess points toward the next cycle."
+      }
+    },
+    "10": {
+      "visual_form": {
+        "composition_law": "Observer outside the action.",
+        "spatial_logic": "A watcher, notebook, camera, window, or frame-within-frame is offset from the event and makes the act of looking visible.",
+        "rhythm": "Attend, record, hold back.",
+        "density": "Sparse-to-moderate.",
+        "figure_ground": "Observed scene and observing position remain distinctly separated."
+      }
+    },
+    "11": {
+      "visual_form": {
+        "composition_law": "Performed size.",
+        "spatial_logic": "A central figure uses costume, pose, prop, or proscenium to project confidence larger than the private self behind it.",
+        "rhythm": "Entrance, flourish, hold.",
+        "density": "Moderate around the performer.",
+        "figure_ground": "The gap between performed scale and actual human scale should remain subtly visible."
+      }
+    },
+    "12": {
+      "visual_form": {
+        "composition_law": "Exile in a large field.",
+        "spatial_logic": "A solitary figure is small against horizon, wilderness, empty room, or social distance; baggage or a long shadow may carry what cannot be left behind.",
+        "rhythm": "Long pause, single crossing.",
+        "density": "Low.",
+        "figure_ground": "Negative space is the principal pressure on the figure."
+      }
+    },
+    "13": {
+      "visual_form": {
+        "composition_law": "Authentic presence coordinates the whole field.",
+        "spatial_logic": "A full-height embodied figure stands among others and helps organize shared movement without becoming separate from the group.",
+        "rhythm": "Ground, conduct, release.",
+        "density": "Full but breathable.",
+        "figure_ground": "The figure belongs to the collective composition even while carrying clear presence."
+      }
+    }
+  }
+}

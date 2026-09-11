@@ -1,0 +1,68 @@
+{
+  "suits": {
+    "structures": {
+      "visual_grammar": {
+        "medium_handling": "Cool documentary stills and architectural/contact-sheet fragments overlaid with crisp graphite, blueprint-blue rule lines, plan notation, and measured crop marks.",
+        "composition": "Orthographic, gridded, framed, or windowed compositions: floor plans, elevations, organizational charts, façades, and observed behavior held at analytical distance.",
+        "edge_language": "Precise ruled edges, hard crop boundaries, architectural line, right angles, and clean figure/ground separation with only small evidence of human hand.",
+        "value_structure": "High-key whites and cool grays with disciplined dark linework and sparse accent color; value hierarchy should feel measured and inspectable.",
+        "camera_and_scale": "Detached eye-level, elevated, or plan-like views; medium-to-wide framing that places the subject inside a system rather than merging viewer and subject.",
+        "detail_distribution": "High detail at diagrams, labels, windows, plans, observed gestures, and system boundaries; surrounding fields remain sparse and controlled.",
+        "finish": "Taxonomic, architectural, documentary, and cool—the image has been studied before it has been lived.",
+        "avoid": [
+          "warm immersive stage light",
+          "expressive motion blur",
+          "crowded unstructured collage"
+        ]
+      }
+    },
+    "rivers": {
+      "visual_grammar": {
+        "medium_handling": "Documentary photography broken into repeated frames, flowing contact strips, translucent warm overprints, sound-wave traces, hand-drawn loops, and soft graphite/ink currents.",
+        "composition": "Overhead or oblique systems-in-motion: loops, spirals, traffic, crowds, rivers, bicycles, rhythmic repetition, and patterns that can be watched without yet entering them.",
+        "edge_language": "Curved traces, repeated contours, soft registration echoes, wave-like boundaries, and partial overlaps rather than hard boxes.",
+        "value_structure": "Warm earth and muted documentary mid-values articulated by rhythmic light/dark recurrence rather than a single dominant focal contrast.",
+        "camera_and_scale": "Elevated, overhead, or medium-wide observer views that reveal pattern across many moving units; the body is visible as system before it becomes first-person experience.",
+        "detail_distribution": "Detail repeats in motifs and intervals across the frame—wheels, bodies, waves, marks—rather than clustering entirely around one hero.",
+        "finish": "Polyrhythmic, observational, organic, and slightly analytical: flow seen clearly enough to map but not yet surrendered to.",
+        "avoid": [
+          "rigid orthographic grids",
+          "isolated heroic portraiture",
+          "single frozen central gesture"
+        ]
+      }
+    },
+    "curiosity": {
+      "visual_grammar": {
+        "medium_handling": "Bright civic documentary photography mixed with notebooks, interview transcripts, question marks, whiteboard diagrams, poster fragments, colored pencil, and inviting spot-color annotations.",
+        "composition": "Open relational fields: two or more people facing, listening, questioning, demonstrating, building, or thinking together across tables, streets, workshops, and public forums.",
+        "edge_language": "Open frames, conversational overlaps, hand-marked arrows and circles, porous collage boundaries, and approachable rather than authoritative diagramming.",
+        "value_structure": "Clear daylight or bright interiors with optimistic yellows and sky blues balanced by readable documentary neutrals; contrast supports legibility and welcome.",
+        "camera_and_scale": "Eye-level human-scale medium views that place the viewer among participants, close enough to read attention and gesture without collapsing into performance close-up.",
+        "detail_distribution": "Detail gathers at faces, hands, notes, shared tools, public signage, questions, and the actual object of inquiry; background context stays socially legible.",
+        "finish": "Civic, dialogic, provisional, and generous—the image feels like an invitation to ask another question and join the work.",
+        "avoid": [
+          "didactic corporate infographic polish",
+          "detached surveillance viewpoints",
+          "grand solitary hero framing"
+        ]
+      }
+    },
+    "dance": {
+      "visual_grammar": {
+        "medium_handling": "Live-performance and street-documentary frames printed warm and grainy, with motion smear, layered exposures, rhythmic crop sequences, grease-pencil beats, and saturated stage or daylight accents.",
+        "composition": "Bodies share the whole field through choreography, bicycle-like circular motion, crossing paths, repeated limbs, and collective groove; the viewer is inside the event, not looking down on it.",
+        "edge_language": "Motion-blurred limbs, repeated exposure ghosts, energetic crop edges, sweat-softened light, and gestures that cross or break the frame.",
+        "value_structure": "Warm reds, oranges, golds, and electric accents against deep performance dark or bright open daylight; contrast pulses rhythmically across moving bodies.",
+        "camera_and_scale": "Close-to-medium body scale, often among the dancers or performers; low/eye-level angles emphasize proprioception, weight shift, feet, hands, and shared space.",
+        "detail_distribution": "Detail concentrates on bodies in motion, shoes, hands, faces, instruments, sweat, fabric, and the local cues of collective timing; distant context may blur into rhythm.",
+        "finish": "Embodied, kinetic, communal, awkward-joyful, and materially live—the frame feels caught from inside a groove rather than composed after the fact.",
+        "avoid": [
+          "detached overhead pattern-only views",
+          "static posed portraiture",
+          "slick music-video glamour"
+        ]
+      }
+    }
+  }
+}
