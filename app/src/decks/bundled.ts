@@ -8,6 +8,11 @@ import finalFantasyRanks from "../../../decks/finalfantasy/v2/ranks.json";
 import finalFantasyStations from "../../../decks/finalfantasy/v2/stations.json";
 import finalFantasyMajorArcana from "../../../decks/finalfantasy/v2/major-arcana.json";
 import evolutionJson from "../../../decks/evolution/deck.json";
+import evolutionVisualLanguage from "../../../decks/evolution/v2/visual-language.json";
+import evolutionSuits from "../../../decks/evolution/v2/suits.json";
+import evolutionRanks from "../../../decks/evolution/v2/ranks.json";
+import evolutionStations from "../../../decks/evolution/v2/stations.json";
+import evolutionMajorArcana from "../../../decks/evolution/v2/major-arcana.json";
 import ultimaOctaveJson from "../../../decks/ultima-octave/deck.json";
 import deepTimeJson from "../../../decks/deep-time/deck.json";
 import deepTimeVisualLanguage from "../../../decks/deep-time/v2/visual-language.json";
@@ -34,6 +39,15 @@ const deepTimeV2 = composeBundledDeckData(
   deepTimeRanks,
   deepTimeStations,
   deepTimeMajorArcana,
+);
+
+const evolutionV2 = composeBundledDeckData(
+  evolutionJson,
+  evolutionVisualLanguage,
+  evolutionSuits,
+  evolutionRanks,
+  evolutionStations,
+  evolutionMajorArcana,
 );
 
 export const BUNDLED_DECK_MANIFESTS = {
@@ -66,7 +80,7 @@ export const BUNDLED_DECK_MANIFESTS = {
     tagline: "Crystals, creatures, and the cycle of light — the recurring myth as a deck.",
   },
   evolution: {
-    data: evolutionJson,
+    data: evolutionV2,
     tagline: "How speech bootstraps consciousness — Dewart's involution as a deck.",
   },
   "ultima-octave": {

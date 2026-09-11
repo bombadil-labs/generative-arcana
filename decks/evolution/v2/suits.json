@@ -1,0 +1,52 @@
+{
+  "suits": {
+    "names": {
+      "visual_grammar": {
+        "medium_handling": "Precise ink-line specimen drawing and lexical/diagram marks on pale matte grounds, with sparse cool color and crisp ruled structure.",
+        "composition": "Catalogued, gridded, or plate-like arrangements hold the world at arm's length; objects float in measured negative space as things available to be distinguished and named.",
+        "edge_language": "Clean contours, ruled seams, fine pointers, labels-as-marks, and exact separations with little atmospheric blur.",
+        "value_structure": "High-key pale fields with cool mid-tone objects and restrained dark ink; contrast clarifies category rather than dramatizing action.",
+        "camera_and_scale": "Orthographic or specimen-table viewpoint; medium distance and analytical remove, as though looking through a lexicon, naturalist plate, or classification tray.",
+        "detail_distribution": "Fine detail clusters on distinguishing features, boundaries, and relational marks while surrounding ground remains quiet.",
+        "finish": "Cool, clear, taxonomic, and receptive; precision without sterility.",
+        "avoid": ["dramatic action diagonals", "intimate soft-focus portrait framing", "self-originating halo light"]
+      }
+    },
+    "claims": {
+      "visual_grammar": {
+        "medium_handling": "High-contrast matte fields cut by decisive coral/red strokes, wedges, baselines, impacts, and sharp directional marks.",
+        "composition": "One asserted vector drives into a world-object, boundary, or field; diagonals and impact points organize the frame around the act of saying 'it is so.'",
+        "edge_language": "Hard edges, abrupt contacts, strike marks, and decisive silhouettes with minimal ambiguity at the point of assertion.",
+        "value_structure": "Dark or stark neutral fields punctured by hot high-value/high-chroma impact accents and one dominant directional contrast.",
+        "camera_and_scale": "Immediate medium view or graphic close-up at the instant an outward act meets its object.",
+        "detail_distribution": "Precision concentrates at the target, contact point, and asserting gesture; secondary context stays stark.",
+        "finish": "Urgent, directional, and declarative—the visual equivalent of a thesis brought down on reality.",
+        "avoid": ["passive catalog symmetry", "diffuse sentimental atmosphere", "multiple competing focal gestures"]
+      }
+    },
+    "tells": {
+      "visual_grammar": {
+        "medium_handling": "Soft atmospheric glaze over subdued line and form, with amber-brown shadow, partial silhouettes, and details emerging indirectly from dim interior light.",
+        "composition": "Oblique, partial, and intimate: a figure half-turned, a gesture caught at the edge, or a relation revealed indirectly rather than presented head-on.",
+        "edge_language": "Soft focus, lost-and-found contours, reflected edges, and small involuntary sharp details that betray what the rest of the image withholds.",
+        "value_structure": "Warm low-to-mid values with localized amber light and broad soft shadow; important information often lives near the edge of visibility.",
+        "camera_and_scale": "Close or medium human scale, slightly off-axis, as if observing mood, tone, or leakage without being formally addressed.",
+        "detail_distribution": "One or two involuntary tells—hand, mouth, posture, ripple, reflected glance—carry high specificity inside otherwise soft context.",
+        "finish": "Intimate, atmospheric, and indirectly revealing; the self is sensed before it is claimed.",
+        "avoid": ["frontal declarative posing", "clinical grid organization", "uniform sharpness"]
+      }
+    },
+    "avowals": {
+      "visual_grammar": {
+        "medium_handling": "Clean centered forms over darker matte fields, with contained gold-white light originating inside figures, rings, mirrors, or vertical strokes rather than falling onto them.",
+        "composition": "Centered, upright, reflexive, and self-enclosing; figure, ring, mirror, or vertical axis turns the image back upon its own source.",
+        "edge_language": "Clear enclosing contours and verticals softened only where interior radiance exceeds them; reflection and enclosure remain precise.",
+        "value_structure": "Dark-to-mid surroundings around a luminous internal center; value organization makes self-originating light visibly different from external illumination.",
+        "camera_and_scale": "Frontal medium view or iconic close composition in which the subject can meet its own gaze or occupy its own field deliberately.",
+        "detail_distribution": "Maximum detail at eyes, ring, mirror, hands, or the locus of self-assertion; the surrounding world subordinates itself to reflexive presence.",
+        "finish": "Luminous, contained, vertically self-possessed, and explicit without becoming grandiose.",
+        "avoid": ["external spotlight as the source of illumination", "offhand candid framing", "busy environmental detail that overwhelms self-presence"]
+      }
+    }
+  }
+}

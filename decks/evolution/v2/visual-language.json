@@ -1,0 +1,18 @@
+{
+  "version": "1.1.0",
+  "visual_language": {
+    "medium": "Luminous editorial-diagram illustration: matte fields, precise ink-like lines and geometric marks, soft atmospheric glazing, and isolated forms that can shift between specimen, figure, sign, and abstract relation.",
+    "surface": "A clean matte picture plane with deliberate negative space; paper-like quiet grounds and deep fields both preserve the legibility of lines, seams, rings, labels, gestures, and emitted light.",
+    "mark_making": "Ruled seams, grids, tags, arrows, ripples, wedges, rings, sightlines, and softly glazed human silhouettes; marks behave semantically rather than decoratively.",
+    "signature_accent": "Contained luminescence marks the moment a relation becomes conscious: a warm internal gold, charged coral strike, cool lexical clarity, or amber disclosure is used as a precise semantic accent rather than general glow.",
+    "finish": "Spare philosophical illustration in which a diagram becomes inhabited without losing its conceptual clarity; stylized, tactile, and emotionally legible rather than photorealistic or UI-like.",
+    "avoid": [
+      "generic sci-fi interface graphics",
+      "neon cyberpunk HUD styling",
+      "photorealistic portraiture",
+      "busy infographic layouts that require reading labels to understand the image",
+      "decorative geometry with no semantic relation",
+      "uniform glow that erases the difference between received light and self-originating light"
+    ]
+  }
+}
