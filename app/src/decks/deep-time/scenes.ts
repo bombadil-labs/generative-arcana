@@ -301,11 +301,11 @@ function drawColumnLabels(
     const active = hover === placement.index;
     p.noStroke();
     p.fill(255, 246, 222, active ? 245 : 190);
-    p.textAlign(p.LEFT, p.TOP);
+    p.textAlign("left", "top");
     p.text(placement.position.name.toUpperCase(), pad, y + pad);
 
     p.fill(255, 246, 222, active ? 230 : 155);
-    p.textAlign(p.RIGHT, p.BOTTOM);
+    p.textAlign("right", "bottom");
     const suffix = placement.reversed ? " · REVERSED" : "";
     p.text(`${placement.card.name}${suffix}`, w - pad, y + bandH - pad);
   }
