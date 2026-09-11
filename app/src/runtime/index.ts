@@ -1,5 +1,6 @@
 export * from "./types";
 export * from "./spreadScene";
+export * from "./spreadSceneData";
 export * from "./tokens";
 export * from "./color";
 export { buildStationLight, buildStationLightBySlug } from "./lighting";
