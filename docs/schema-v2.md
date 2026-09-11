@@ -10,7 +10,7 @@ Schema v2 separates three concerns that the original all-in-one JSON era natural
 - suit / Major family: family-level handling and composition;
 - rank: semantic progression and formal grammar;
 - station: transversal meaning and environmental modulation;
-- number origin: factorization gloss / visual logic;
+- number origin: factorization gloss / visual logic; new profiles may explicitly declare whether minor numbers originate at rank, suit, or card;
 - card: concrete integrated meaning, scene, and genuine overrides;
 - spreads: deck-native reading geometry/position semantics.
 
@@ -28,7 +28,7 @@ This means we can optimize storage and editing without forcing another deck-form
 
 Normalized writes are not normalized reads. A single card returned by MCP should be renderable in isolation.
 
-The `CardRenderSpec` projection therefore denormalizes the full inherited visual stack:
+The `CardRenderSpec` projection therefore denormalizes the full inherited visual stack. Numeric interpretation is resolved from the declared number-owning layer rather than assuming every minor is rank-numbered:
 
 ```text
 deck visual language
@@ -39,7 +39,7 @@ rank formal grammar (minor only)
   ↓
 station environment
   ↓
-number/factorization visual logic
+number/factorization visual logic (card/rank/suit owner)
   ↓
 card concrete scene + overrides
 ```

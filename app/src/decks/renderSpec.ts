@@ -1,5 +1,6 @@
 import type { CardData } from "./card";
 import { immutableJsonSnapshot } from "./jsonSnapshot";
+import { resolveCardFactorization } from "./numeric";
 import type {
   DeckModule,
   DeckVisualLanguage,
@@ -48,6 +49,7 @@ export interface CardRenderSpec {
     number: {
       label: string;
       factorization?: NonNullable<CardData["factorization"]>;
+      factorizationOwner?: "card" | "rank" | "suit";
     };
   };
   render: {
@@ -99,7 +101,8 @@ export function resolveCardRenderSpec(deck: DeckModule, card: CardData): CardRen
   const major = card.arcana === "major" ? deck.data.major_arcana : undefined;
   const familyGrammar = suit?.visual_grammar ?? major?.visual_grammar;
   const familyStyle = suit?.visual_style ?? major?.visual_style;
-  const factorization = card.factorization ?? rank?.factorization;
+  const resolvedFactorization = resolveCardFactorization(deck.data, card);
+  const factorization = resolvedFactorization?.factorization;
 
   let dialectic: Array<{ axis: string; pole: string }> | undefined;
   if (card.suit_slug && deck.data.dialectic) {
@@ -162,6 +165,7 @@ export function resolveCardRenderSpec(deck: DeckModule, card: CardData): CardRen
       number: {
         label: card.number,
         ...(factorization ? { factorization } : {}),
+        ...(resolvedFactorization ? { factorizationOwner: resolvedFactorization.owner } : {}),
       },
     },
     render: {

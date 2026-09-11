@@ -78,3 +78,32 @@ test("legacy visual prose is carried into the render projection as fallback cont
   assert.equal(spec.render.legacy.rankContent, rank.visual_content);
   assert.equal(spec.render.legacy.stationMotif, station.visual_motif);
 });
+
+test("explicit suit-owned minor numbers resolve factorization from the suit instead of legacy card duplication", () => {
+  const data = rawDeck();
+  data.minor_number_origin = "suit";
+  const suits = Object.values(data.suits);
+  for (const suit of suits) {
+    suit.numeric_value = [4, 2, 3, 5][suit.index];
+    suit.factorization = {
+      character: suit.numeric_value === 4 ? "composite" : "prime",
+      ...(suit.numeric_value === 4 ? { factors: [2, 2] } : {}),
+      gloss: `suit-owned ${suit.name}`,
+      visual_logic: `formal logic for ${suit.name}`,
+    };
+  }
+  for (const card of Object.values(data.cards)) {
+    if (card.arcana !== "minor") continue;
+    card.number = String(data.suits[card.suit_slug].numeric_value);
+    card.factorization = { character: "prime", gloss: "legacy card duplicate that must not win" };
+  }
+
+  const registry = new DeckRegistry();
+  const deck = registry.registerDeck({ data, tagline: "Suit-owned numeric fixture" });
+  const card = deck.cards.find((candidate) => candidate.arcana === "minor" && candidate.suit_slug === Object.keys(data.suits)[2]);
+  const spec = resolveCardRenderSpec(deck, card);
+
+  assert.equal(spec.context.number.factorizationOwner, "suit");
+  assert.equal(spec.context.number.factorization.gloss, `suit-owned ${data.suits[card.suit_slug].name}`);
+  assert.equal(spec.render.form.numericLogic, `formal logic for ${data.suits[card.suit_slug].name}`);
+});

@@ -138,3 +138,34 @@ test("catalog-backed decks cast with resource ids while legacy slug routes remai
   assert.equal((await engine.resolveReading(reading.token, data.slug)).deck, deck);
   assert.equal((await engine.resolveReading(reading.token, deck.id)).deck, deck);
 });
+
+test("analysis and factorization queries honor explicit suit-owned minor numbers", () => {
+  const data = rawDeck();
+  data.minor_number_origin = "suit";
+  for (const suit of Object.values(data.suits)) {
+    suit.numeric_value = [4, 2, 3, 5][suit.index];
+    suit.factorization = {
+      character: suit.numeric_value === 4 ? "composite" : "prime",
+      ...(suit.numeric_value === 4 ? { factors: [2, 2] } : {}),
+      gloss: `suit-owned ${suit.name}`,
+    };
+  }
+  for (const card of Object.values(data.cards)) {
+    if (card.arcana !== "minor") continue;
+    card.number = String(data.suits[card.suit_slug].numeric_value);
+    card.factorization = { character: "prime", gloss: "legacy duplicate" };
+  }
+
+  const registry = new DeckRegistry();
+  const deck = registry.registerDeck({ data, tagline: "Suit-owned numeric fixture" });
+  const engine = new ArcanaEngine(registry);
+  const suit = Object.values(data.suits).find((entry) => entry.numeric_value === 4);
+  const card = deck.cards.find((candidate) => candidate.arcana === "minor" && candidate.suit_slug === suit.slug);
+  const analysis = engine.analyzeCard(deck.id, card.slug);
+  assert.equal(analysis.number.factorizationOwner, "suit");
+  assert.equal(analysis.number.factorization.character, "composite");
+  assert.equal(analysis.number.factorization.gloss, `suit-owned ${suit.name}`);
+  const matches = engine.queryCards(deck.id, { factorizationCharacter: "composite", suit: suit.slug });
+  assert.ok(matches.length > 0);
+  assert.ok(matches.every((entry) => entry.number.factorizationOwner === "suit"));
+});

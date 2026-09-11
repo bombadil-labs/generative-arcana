@@ -110,10 +110,10 @@ function axis(value: unknown, path: string, kind: "suit" | "rank" | "station"): 
       if (kind === "rank") text(a.symbol, `${p}.symbol`);
       else symbol(a.symbol, `${p}.symbol`);
     }
-    if (kind === "rank") {
-      if (own(a, "numeric_value")) integer(a.numeric_value, `${p}.numeric_value`);
-      if (own(a, "arcana") && a.arcana !== "minor") fail(`${p}.arcana`, "must be minor");
+    if ((kind === "rank" || kind === "suit") && own(a, "numeric_value")) {
+      integer(a.numeric_value, `${p}.numeric_value`);
     }
+    if (kind === "rank" && own(a, "arcana") && a.arcana !== "minor") fail(`${p}.arcana`, "must be minor");
   }
   if ([...indices].some((i) => i >= indices.size)) fail(path, "indices must be contiguous from zero");
   return entries;
@@ -131,6 +131,9 @@ export function validateDeck(value: unknown): DeckValidation {
     text(theme.description, "theme.description");
     text(theme.creator, "theme.creator");
     if (own(d, "visual_language")) deckVisualLanguage(d.visual_language, "visual_language");
+    if (own(d, "minor_number_origin") && !["rank", "suit", "card"].includes(d.minor_number_origin as string)) {
+      fail("minor_number_origin", "must be rank, suit, or card");
+    }
     const suits = axis(d.suits, "suits", "suit");
     const ranks = axis(d.ranks, "ranks", "rank");
     const tx = object(d.transversal, "transversal");
@@ -188,6 +191,12 @@ export function validateDeck(value: unknown): DeckValidation {
         slug(c.rank_slug, `${p}.rank_slug`);
         if (!own(suits, c.suit_slug)) fail(`${p}.suit_slug`, "references an unknown suit");
         if (!own(ranks, c.rank_slug)) fail(`${p}.rank_slug`, "references an unknown rank");
+        const origin = d.minor_number_origin;
+        if (origin === "rank" || origin === "suit") {
+          const owner = origin === "rank" ? object(ranks[c.rank_slug], `${p}.rank`) : object(suits[c.suit_slug], `${p}.suit`);
+          if (!own(owner, "numeric_value")) fail(`${p}.number`, `requires ${origin}.numeric_value when minor_number_origin is ${origin}`);
+          if (owner.numeric_value !== Number(c.number)) fail(`${p}.number`, `must match ${origin}.numeric_value`);
+        }
       } else if (own(c, "suit_slug") || own(c, "rank_slug")) fail(p, "major cards must not reference a suit or rank");
       meaning(c.meaning, `${p}.meaning`, false);
       const visuals = object(c.visuals, `${p}.visuals`);
