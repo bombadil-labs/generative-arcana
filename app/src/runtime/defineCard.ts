@@ -8,6 +8,7 @@
  * function facade; other hosts can own isolated registries without sharing process-global state.
  */
 import type { CardSketch } from "./types";
+import type { SpreadSketch } from "./spreadScene";
 
 /** Identity helper that pins the type so card modules get full inference. */
 export function defineCard(sketch: CardSketch): CardSketch {
@@ -43,6 +44,9 @@ export type ResolvedVisual =
   | { packId: string; kind: "p5"; code: string }
   | { packId: string; kind: "image"; url: string };
 
+/** Spread-level visuals currently use the typed shared-scene runtime. Additional renderers can be added without changing spread identity. */
+export type ResolvedSpreadVisual = { packId: string; kind: "kit"; scene: SpreadSketch };
+
 /**
  * Stateful visual-pack index for one host/runtime.
  *
@@ -52,6 +56,7 @@ export type ResolvedVisual =
  */
 export class VisualRegistry {
   private readonly content = new Map<string, Map<string, Map<string, StoredVisual>>>();
+  private readonly spreadScenes = new Map<string, Map<string, Map<string, SpreadSketch>>>();
   private readonly packs = new Map<string, VisualPack[]>();
 
   private assertScope(deckId: string, packId: string): void {
@@ -60,6 +65,26 @@ export class VisualRegistry {
 
   private packContent(deckId: string, packId: string): Map<string, StoredVisual> | undefined {
     return this.content.get(deckId)?.get(packId);
+  }
+
+  private spreadPackContent(deckId: string, packId: string): Map<string, SpreadSketch> | undefined {
+    return this.spreadScenes.get(deckId)?.get(packId);
+  }
+
+  private setSpreadPackContent(deckId: string, packId: string, entries: Map<string, SpreadSketch>): void {
+    if (!entries.size) {
+      const byPack = this.spreadScenes.get(deckId);
+      if (!byPack) return;
+      byPack.delete(packId);
+      if (!byPack.size) this.spreadScenes.delete(deckId);
+      return;
+    }
+    let byPack = this.spreadScenes.get(deckId);
+    if (!byPack) {
+      byPack = new Map();
+      this.spreadScenes.set(deckId, byPack);
+    }
+    byPack.set(packId, entries);
   }
 
   private setPackContent(deckId: string, packId: string, entries: Map<string, StoredVisual>): void {
@@ -121,6 +146,21 @@ export class VisualRegistry {
     this.replaceKind(deckId, packId, "p5", entries);
   }
 
+  // ── shared spread scenes (one canvas receives the resolved reading) ────────
+
+  registerSpreadKitPack(deckId: string, packId: string, scenes: readonly SpreadSketch[]): void {
+    this.assertScope(deckId, packId);
+    const next = new Map<string, SpreadSketch>();
+    for (const scene of scenes) {
+      if (!scene || typeof scene.spreadId !== "string" || !scene.spreadId.trim() || typeof scene.draw !== "function") {
+        throw new Error("Spread scene packs may contain only valid SpreadSketch definitions.");
+      }
+      if (next.has(scene.spreadId)) throw new Error(`Duplicate spread scene for spread: ${scene.spreadId}.`);
+      next.set(scene.spreadId, scene);
+    }
+    this.setSpreadPackContent(deckId, packId, next);
+  }
+
   // ── image packs (one URL per slug, rendered as <img>) ───────────────────────
 
   registerImagePack(deckId: string, packId: string, urls: Record<string, string>): void {
@@ -153,6 +193,7 @@ export class VisualRegistry {
   clearDeck(deckId: string): void {
     this.packs.delete(deckId);
     this.content.delete(deckId);
+    this.spreadScenes.delete(deckId);
   }
 
   // ── resolution ──────────────────────────────────────────────────────────────
@@ -185,6 +226,23 @@ export class VisualRegistry {
     }
     return null;
   }
+
+  /** Resolve a shared spread scene using the same skin preference/fallback ordering as card visuals. */
+  resolveSpreadVisual(deckId: string, spreadId: string, preferPackId?: string): ResolvedSpreadVisual | null {
+    const packs = this.listPacks(deckId);
+    const ordered = preferPackId
+      ? [...packs.filter((p) => p.id === preferPackId), ...packs.filter((p) => p.id !== preferPackId)]
+      : packs;
+    for (const pack of ordered) {
+      const scene = this.spreadPackContent(deckId, pack.id)?.get(spreadId);
+      if (scene) return { packId: pack.id, kind: "kit", scene };
+    }
+    return null;
+  }
+
+  hasSpreadVisual(deckId: string, spreadId: string): boolean {
+    return this.resolveSpreadVisual(deckId, spreadId) !== null;
+  }
 }
 
 /** Default registry used by the browser app and existing pack side-effect modules. */
@@ -203,6 +261,10 @@ export function registerImagePack(deckId: string, packId: string, urls: Record<s
   visualRegistry.registerImagePack(deckId, packId, urls);
 }
 
+export function registerSpreadKitPack(deckId: string, packId: string, scenes: readonly SpreadSketch[]): void {
+  visualRegistry.registerSpreadKitPack(deckId, packId, scenes);
+}
+
 export function registerPack(deckId: string, pack: VisualPack): void {
   visualRegistry.registerPack(deckId, pack);
 }
@@ -217,4 +279,12 @@ export function isIllustrated(deckId: string, slug: string): boolean {
 
 export function resolveVisual(deckId: string, slug: string, preferPackId?: string): ResolvedVisual | null {
   return visualRegistry.resolveVisual(deckId, slug, preferPackId);
+}
+
+export function resolveSpreadVisual(deckId: string, spreadId: string, preferPackId?: string): ResolvedSpreadVisual | null {
+  return visualRegistry.resolveSpreadVisual(deckId, spreadId, preferPackId);
+}
+
+export function hasSpreadVisual(deckId: string, spreadId: string): boolean {
+  return visualRegistry.hasSpreadVisual(deckId, spreadId);
 }
