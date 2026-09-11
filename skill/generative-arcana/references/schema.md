@@ -53,7 +53,7 @@ A card is an integration over four axes. Three are stored entities the card refe
 
 - **Suit, rank, and station live once.** A card points at them by slug and never copies their visual grammar. Those facts are reachable by reference at the point of use and embedded in resolved card views.
 - **A card stores `meaning` (integrated) and `visuals.detailed_description` (integrated);** a major also stores `factorization.gloss`. Plus optional `style`/`content` overrides, present only on deviation.
-- **The prime/composite gloss is stored only where the number is originated.** The factorization is always derived from the number. The *gloss* (what the factorization means) is authored — but a **minor's** number is its **rank's** value (1–14), shared by all four suits at that rank, so the gloss, if authored, lives on the `Rank` (once) and minor cards derive their character by reference. A **major's** number (0–21) is unique to the card with no rank to hold it, so its gloss lives on `MajorArcanaCard.factorization.gloss` and is **required**. Glossing every minor card would be denormalization. See `references/numeric_axis.md`.
+- **The prime/composite gloss is stored only where the number is originated.** The factorization is always derived from the number. In the default 78-card profile, a **minor's** number is its **rank's** value (1–14), so rank-owned gloss/visual logic is written once and inherited across suits. Alternate profiles may explicitly set `minor_number_origin: "suit"` (Ultima Octave) or `"card"`; the same atomic-write rule applies at that owner. A **major's** number (0–21) remains card-owned, so its gloss lives on `MajorArcanaCard.factorization.gloss` and is **required**. See `references/numeric_axis.md`.
 
 ## Interfaces
 
@@ -109,7 +109,14 @@ enum Arcana { Major = "major", Minor = "minor" }
 
 // SUIT — grid axis. DECLARE. ORDERED (index 0–3) so the transversal walk is deterministic.
 interface Suit {
-  index: number                                  // 0–3; fixed suit order
+  index: number                                  // 0–3 in the default profile; alternate profiles may differ
+  numeric_value?: number                         // only when this profile originates minor numbers at suit
+  factorization?: {                              // likewise: owned once here, not copied onto each card
+    character: "identity" | "prime" | "composite"
+    factors?: number[]
+    gloss: string
+    visual_logic?: string
+  }
   name: string
   slug: string                                   // lowercase, hyphenated
   description: string
@@ -175,7 +182,7 @@ interface MajorArcana {
 
 interface Card {
   name: string
-  number: string                                 // major: "0".."21"; minor: numeric_value "1".."14"
+  number: string                                 // major: "0".."21"; minor: authored profile's numeric value
   slug: string
   arcana: Arcana
   station_slug: string                           // → transversal station, from the walk
@@ -220,6 +227,7 @@ interface Deck {
   version: string                                // authored content version
   theme: Theme
   visual_language?: DeckVisualLanguage           // default profile should populate shared material world
+  minor_number_origin?: "rank" | "suit" | "card" // default profile emits "rank"; alternate profiles may differ
   suits: { [suit_slug: string]: Suit }           // exactly 4 in default profile, ordered by index
   ranks: { [rank_slug: string]: Rank }           // exactly 14 in default profile
   transversal: Transversal                       // REQUIRED
@@ -260,7 +268,7 @@ Resolve each `station_index` to a `station_slug` via the canonical order and wri
 
 **station_slug is the textual reference; station environment resolves at read.** No per-card station prose is needed merely for self-contained reads; `CardRenderSpec` supplies the inherited environment. A station may still surface its optional symbol deliberately and rarely per `references/svg_symbols.md`.
 
-**The prime/composite gloss and visual logic live at number origin.** Majors own them per card; ranks may own them once when load-bearing; minor cards inherit rank number context rather than duplicating it. See `references/numeric_axis.md`.
+**The prime/composite gloss and visual logic live at number origin.** Majors own them per card. Default-profile minors declare `minor_number_origin: "rank"` and inherit rank context; alternate profiles may originate the number at suit or card instead. Do not duplicate an axis-owned interpretation across every card. See `references/numeric_axis.md`.
 
 **Canonical card order is derived, not key order.** Consumers that need order derive majors by `number`; minors by `suit.index` then `rank.index`. JSON property insertion order is not semantic card order.
 
