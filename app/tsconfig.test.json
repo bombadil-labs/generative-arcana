@@ -30,6 +30,7 @@
     "src/runtime/defineCard.ts",
     "src/runtime/spreadScene.ts",
     "src/runtime/spreadSceneData.ts",
+    "src/visuals/manifest.ts",
     "src/catalog/api.ts",
     "src/authoring/api.ts"
   ]
