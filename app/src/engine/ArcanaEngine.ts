@@ -2,6 +2,7 @@ import type { CardData } from "../decks/card";
 import { omega } from "../decks/cardMeta";
 import { DeckRegistry, deckRegistry } from "../decks/registry";
 import { immutableJsonSnapshot } from "../decks/jsonSnapshot";
+import { resolveCardNumberContext } from "../decks/numericContext";
 import { isValidSpread, resolveSpread, spreadsForDeck, type Spread } from "../decks/spreads";
 import { deckHasIdentity, type DeckModule } from "../decks/types";
 import { deal } from "../reading/deal";
@@ -116,15 +117,17 @@ export class ArcanaEngine {
       }
     }
 
-    const value = parseCardNumber(card.number);
+    const number = resolveCardNumberContext(deck, card);
     const analysis: CardAnalysis = {
       deckId,
       card,
       axes: { ...(suit ? { suit } : {}), ...(rank ? { rank } : {}), station, ...(dialectic ? { dialectic } : {}) },
       number: {
-        label: card.number,
-        ...(value !== undefined ? { value, omega: omega(value) } : {}),
-        ...(card.factorization ? { factorization: card.factorization } : {}),
+        label: number.label,
+        origin: number.origin,
+        ...(number.value !== undefined ? { value: number.value, omega: omega(number.value) } : {}),
+        ...(number.factorization ? { factorization: number.factorization } : {}),
+        ...(number.factorizationSource ? { factorizationSource: number.factorizationSource } : {}),
       },
       authoredMeaning: card.meaning,
     };
@@ -201,9 +204,3 @@ export class ArcanaEngine {
 
 /** Default browser/application service over the default validated deck registry. */
 export const arcanaEngine = new ArcanaEngine();
-
-function parseCardNumber(label: string): number | undefined {
-  if (!/^(?:0|[1-9]\d*)$/.test(label)) return undefined;
-  const value = Number(label);
-  return Number.isSafeInteger(value) ? value : undefined;
-}
