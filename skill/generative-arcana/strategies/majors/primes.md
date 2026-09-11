@@ -26,3 +26,9 @@ Each major's station is fixed (`major_number mod N`) before you write the archet
 - Watch the resonance (`references/numeric_axis.md`): a **numerically-prime** slot that also sits on a **prime-position** station is doubly-atomic — these are the deck's most elemental trumps; lean hard into irreducibility. A composite trump on a prime-position station (or vice versa) carries a productive tension between "derived" and "irreducible."
 
 This interplay — the periodic station cycle beating against the arithmetic prime pattern — is where the majors get their density. The prime scaffold structures *what the slot is*; the transversal sets *its key signature*; together they over-determine the slot in a good way.
+
+## Formal visual ancestry
+
+Under this strategy, every major should normally author `factorization.visual_logic` as a load-bearing companion to the semantic gloss. Prime cards should possess an irreducible organizing proposition. Composite cards should inherit formal ancestry from their factor-majors—symmetry, axes, nesting, rhythm, directional layers, scale relations—without simply drawing factor cards inside the frame or counting objects. If the composite visual logic will not close from its factors, treat that as the same recasting signal as a failed semantic gloss.
+
+Also author `major_arcana.visual_grammar` as a coherent visual family inside the deck's shared `visual_language`; number affects each card's formal organization inside that family rather than inventing twenty-two unrelated styles.

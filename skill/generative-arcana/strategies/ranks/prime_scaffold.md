@@ -20,3 +20,7 @@ For each rank produce the `Rank` fields (`description` = the framework, `questio
 ## Don't force it
 
 Optional scaffolding. If the arithmetic strains a rank, drop it for `questions.md` or `manual.md` — coherence by any means beats forced factorization. And remember the axis is *always* present regardless (you can pick `questions` and still have the integrator notice primality); this strategy just promotes it from latent to structural.
+
+## Visual arithmetic
+
+Because this strategy promotes number from undertone to structure, author `Rank.factorization.visual_logic` along with the gloss. Primes/identity should have an irreducible formal idea; composites should visibly inherit organizational logic from their factor-ranks without literal object counting or pasted miniatures. The rule is authored once on the rank and resolved into all four minor-card render specs.

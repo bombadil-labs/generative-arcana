@@ -25,7 +25,7 @@ The gloss is stored **only where the number is originated** — not on every car
 - **Ranks may carry it, once** (`Rank.factorization`, optional). A minor's number is its rank's, so its gloss — if worth authoring — belongs on the rank, shared across the four suits. This is load-bearing under `ranks/prime_scaffold` and usually skipped otherwise (the suits do the minors' structural work; a per-rank number-gloss is rarely an interesting source).
 - **Minor cards carry nothing.** Their character is recovered by reference to their rank. Glossing all 56 would just denormalize 14 rank-level facts fourfold.
 
-Each `factorization` block has three fields: **`character`** (`identity|prime|composite`, derived), **`factors`** (the prime factorization for composites — `[2,2]` for 4, `[2,7]` for 14 — derived, stored for legibility), and **`gloss`** (the authored part: one or two sentences on what the character means here). The factorization is arithmetic; the gloss is interpretation — and interpretation is the part worth storing.
+Each `factorization` block has three fields: **`character`** (`identity|prime|composite`, derived), **`factors`** (the prime factorization for composites — `[2,2]` for 4, `[2,7]` for 14 — derived, stored for legibility), and **`gloss`** (the authored part: one or two sentences on what the character means here). The factorization is arithmetic; the gloss is interpretation — and interpretation is the part worth storing. Schema v2 additionally permits **`visual_logic`**, the authored formal/compositional consequence of the same number.
 
 ## Writing the gloss
 
@@ -66,3 +66,11 @@ This resonance is a *soft* tool. The transversal's prime positions are just the 
 - **Noticing it** (`journey.md`/`borrowed.md` majors, `questions.md`/`manual.md` ranks): the card was built another way, but the number is still there. A **major** still earns its gloss — terse is fine ("prime — an irreducible beat in the journey") — and a number that flatly contradicts the trump is still worth a second look. A **rank** built this way will usually skip the optional gloss; author it only if it genuinely clarifies.
 
 So: **every major carries a `factorization.gloss`**; a **rank** carries one only when it's load-bearing (chiefly `prime_scaffold`); **minor cards carry none.**
+
+## Visual logic
+
+The authored semantic gloss and the visual consequence of factorization are related but distinct. Schema v2 permits `factorization.visual_logic` at the same number-owning layer as the gloss. It states how the number constrains **formal organization** rather than what the number means.
+
+For majors the default authoring profile normally writes this field. Primes/identity can favor an irreducible organizing proposition; composites should inherit formal ancestry from their factor-majors (axes, symmetry, rhythm, nesting, directional systems, scale relations) without literal pasted references or naive object counting. Under `ranks/prime_scaffold`, the same idea may be authored once on the rank and inherited by all minor cards of that rank.
+
+A visual logic that cannot be made to follow from the factor structure is the same kind of signal as a semantic gloss that will not close: revisit the slot or its factor definitions instead of decorating around the mismatch. See `references/visual_language.md`.

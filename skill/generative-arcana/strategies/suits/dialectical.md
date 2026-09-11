@@ -39,3 +39,7 @@ Decide how alike the four styles are — small controlled variations (a shared w
 *Cyberpunk "Individual+Technology" → "Programs" (index 0):* glyph a radiating node; upright {individual agency, technical mastery, composable specialization, crafted solutions}; inverted {isolated expertise, over-optimization, tools become chains, solution seeking problems}; style "neon wireframes (pink/green/blue, red for errors) over dark grounds; close-up interfaces; angular precise compositions."
 
 Present the four ordered suits for feedback before Stage 2.
+
+## Visual family obligation
+
+After the four semantic quadrants are stable, derive four `visual_grammar` families per `references/visual_language.md`. The visual distinctions should express the dialectic structurally rather than merely assigning one color/mascot to each cell. Ask what each pole does to composition, space, edge, value, scale, detail, and material handling. Opposite cells should be good candidates for the opposition/diptych stress test: preserve enough invariant structure to reveal the relation while selected visual dimensions reverse or transform. Keep all four inside the deck-level `visual_language`; a dialectic does not license four unrelated production media unless that fracture is itself an explicit deck concept.

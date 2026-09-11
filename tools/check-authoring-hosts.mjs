@@ -23,6 +23,11 @@ for (const [label, meta] of [["portable", portableMeta], ["Claude", claudeMeta]]
 assert(portable.includes("get_deck_authoring_spec"), "portable workflow must consult the platform authoring spec when available");
 assert(portable.includes("validate_deck_manifest"), "portable workflow must validate canonical manifests when the platform tool is available");
 assert(portable.includes("valid: true, canonical: true"), "portable workflow must require canonical validation success before connected delivery/import");
+assert(portable.includes("references/visual_language.md"), "portable workflow must reference the structured visual-language contract");
+const visualLanguage = readFileSync(resolve(portableDir, "references/visual_language.md"), "utf8");
+for (const phrase of ["Rank recognizability", "Factorization composition", "Style inversion", "Subject-removal", "Station leakage", "Cross-deck distinctiveness"]) {
+  assert(visualLanguage.includes(phrase), `visual-language quality contract must retain stress test: ${phrase}`);
+}
 
 const canonicalRelative = "../../../skill/generative-arcana/SKILL.md";
 assert(claude.includes(canonicalRelative), "Claude wrapper must delegate to the portable authoring bundle");

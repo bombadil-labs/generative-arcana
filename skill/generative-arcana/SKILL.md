@@ -9,7 +9,7 @@ This is the **portable, host-neutral authoring workflow** for Generative Arcana.
 
 A custom tarot designer built on one idea: **a tarot deck is a small semantic space woven from a few axes, and every card is an integration over those axes.** Traditional tarot wove two (suit, rank), laid a third across them (the planets, in Chaldean order, as decan rulers), and carried a fourth silently in its numbering (the prime/composite structure of the trumps). Generative Arcana makes all four explicit, lets you re-instantiate each for any theme, and stores only what each card genuinely adds.
 
-v2.0. Changes from v1: the fourth (prime/composite) axis is now **baked in where the number is originated** — each **major** stores an authored `factorization.gloss`, and a gloss that won't cohere is treated as *signal* that the slot is miscast (was: derived-only, stored nothing). Minors derive their character from their **rank**, which may carry an optional gloss; minor cards store no factorization (glossing all 56 would denormalize). Stations gain an optional concise `description` and an optional `symbol` (meta-layer by default; may surface tastefully). Numbered ranks gain a `question` with a literal `{suit}` placeholder. Per-card `description` is dropped (it was redundant with `meaning`). See `references/schema.md`.
+v2.0. Changes from v1: the fourth (prime/composite) axis is now **baked in where the number is originated** — each **major** stores an authored `factorization.gloss`, and a gloss that won't cohere is treated as *signal* the slot is miscast (was: derived-only, stored nothing). Minors derive their character from their **rank**, which may carry an optional gloss; minor cards store no factorization (glossing all 56 would denormalize). Stations gain an optional concise `description` and an optional `symbol` (meta-layer by default; may surface tastefully). Numbered ranks gain a `question` with a literal `{suit}` placeholder. Per-card `description` is dropped (it was redundant with `meaning`). See `references/schema.md`.
 
 ## The formalism (read this first)
 
@@ -24,7 +24,7 @@ Four axes, two kinds, one storage rule. Internalize this before generating anyth
 
 The first three are **woven** — they are positions in the deck's space. The fourth is **intrinsic** — a property of the number, like spin: not a coordinate, just *there* — but on the majors its reading is written down, because a major's number-meaning can be done well or badly.
 
-**Atomic at write, derived at read.** An axis's contribution lives on the axis, once. A card stores only what it originates and cannot recover by reference: its **integrated meaning** and **integrated visual description** — and, for a **major**, its **factorization gloss** (plus optional `style`/`content` overrides, present only on deviation). It never restates a suit's style, a rank's content, or a station's motif. The numeric axis is the cleanest case of the rule: the factorization is always derived; the gloss is stored only at the number's origin (the major, or the rank), so a minor — whose number *is* its rank's — stores no factorization at all.
+**Atomic at write, derived at read.** An axis's contribution lives on the axis, once. A card stores only what it originates and cannot recover by reference: its **integrated meaning** and **integrated visual description** — and, for a **major**, its **factorization gloss** (plus optional `style`/`content` overrides, present only on deviation). It never restates a suit's style, a rank's content, or a station's motif. At read time the platform may deliberately denormalize those inherited facts into a self-contained `CardRenderSpec`; that is a view, not authored duplication.
 
 **Declare vs. sublimate vs. latent.** Suit and rank are foregrounded; the station is dissolved (handed to the integrator in full precisely so it can be sublimated well — it is an ordinary axis with an extraordinary instruction, not something hidden from the structure); the prime character stays an undertone in the meaning and visual, **but on the majors its gloss is written down** — leaned on where it clarifies, authored on every trump, and read as a quality signal when it resists. See `references/integration.md`.
 
@@ -47,6 +47,7 @@ Hold across every theme and strategy; never duplicate their contents into strate
 - `references/svg_symbols.md` — glyph constraints (suit glyphs; optional major glyph; optional station symbol).
 - `references/tarot_structure.md` — traditional tarot as a reference point, including the Chaldean decan order the transversal generalizes and the prime/composite structure the fourth axis generalizes.
 - `references/validation.md` — how a connected host uses Generative Arcana's executable spec/validator without making authoring depend on MCP availability.
+- `references/visual_language.md` — structured deck/family/rank/station/number visual grammar, resolved-card renderability, and visual stress tests.
 
 ## Platform contract when available
 
@@ -58,12 +59,13 @@ The platform validator owns runtime correctness. This skill owns generative qual
 
 Don't prompt stage-by-stage — plan once, adjust once, build.
 
-### Stage 0 — Theme, dialectics, and the plan
+### Stage 0 — Theme, visual language, dialectics, and the plan
 
 1. Articulate the **theme** (canonical name + evocative description). See `references/schema.md` → Theme.
-2. Read `references/tarot_structure.md` if you need the traditional baseline.
-3. Propose a **generation plan** — one strategy per stage — consulting `strategies/index.md` (the registry). Give each a one-line rationale. The transversal is always on; the choice there is *which* transversal.
-4. Present the plan; let the user adjust in one pass (strategies can be chosen aware of each other). Lock it, then execute in order.
+2. Establish the deck's **shared visual/material language** per `references/visual_language.md`: medium, surface, mark-making, signature accent, finish, and meaningful avoid-list. Make it specific enough to distinguish this deck even with theme nouns removed. This becomes `Deck.visual_language`.
+3. Read `references/tarot_structure.md` if you need the traditional baseline.
+4. Propose a **generation plan** — one strategy per stage — consulting `strategies/index.md` (the registry). Give each a one-line rationale. The transversal is always on; the choice there is *which* transversal.
+5. Present the plan; let the user adjust in one pass (strategies can be chosen aware of each other). Lock it, then execute in order.
 
 Every strategy emits values conforming to `references/schema.md` and defers to `references/integration.md` for the card pass — strategies decide *how to generate an axis's inputs*, never the card's output shape.
 
@@ -73,7 +75,7 @@ Establish four ordered suits (`index` 0–3). Strategies in `strategies/suits/`:
 - `dialectical.md` — cross-product of two theme-derived dialectics. The default.
 - `manual.md` — a four-fold structure the theme already supplies (elements, houses, seasons, nations).
 
-Output: four `Suit` entities (index, name, slug, glyph SVG per `references/svg_symbols.md`, meaning palette, `visual_style`).
+Output: four `Suit` entities (index, name, slug, glyph SVG per `references/svg_symbols.md`, meaning palette, concise `visual_style`, and structured `visual_grammar`). The four family grammars should diverge structurally—composition, edge/value, camera/scale, detail distribution, material handling—not merely by palette or mascot. See `references/visual_language.md`.
 
 ### Stage 2 — Transversal (substrate axis) — *before the majors*
 
@@ -81,16 +83,16 @@ Lay down the required transversal now: it is the deck's most global layer, the o
 - `chaldean.md` — the seven classical planets in Chaldean order. Best for esoteric/classical themes.
 - `themed_cycle.md` — a theme-native canonically-ordered cycle (alchemical operations, OSI layers, lunar phases, modes). The general case.
 
-Output: one `Transversal` entity — N **stations** in canonical order (N ≥ 4 so each rank's four suits land on distinct stations), an optional `suit_stride` (default 1; any value coprime to N works, so N = 7 is fine), each station carrying a semantic charge, a concise `description`, an optional `symbol`, and a `visual_motif`. The walk is structural (above); nothing to anchor. Once N, the order, and `suit_stride` are fixed, **every card's station is determined** — including each major's, which seeds Stage 3.
+Output: one `Transversal` entity — N **stations** in canonical order (N ≥ 4 so each rank's four suits land on distinct stations), an optional `suit_stride` (default 1; any value coprime to N works, so N = 7 is fine), each station carrying a semantic charge, a concise `description`, an optional `symbol`, a legacy/general `visual_motif`, and a structured `visual_environment`. **Station changes the weather, not the family**: illumination/palette/atmosphere/motion/material effects may modulate a card, but must not replace suit/Major medium, composition, or mark-making. See `references/visual_language.md`. The walk is structural (above); nothing to anchor. Once N, the order, and `suit_stride` are fixed, **every card's station is determined** — including each major's, which seeds Stage 3.
 
 ### Stage 3 — Major Arcana (style-suit + 22 cards)
 
-The Major Arcana is a suit contributing only `visual_style`; the 22 cards are generated **directly** (no major-rank layer — that would be 1:1 duplication). Each major already has a station (major walk) and a prime/composite character (its number). Strategies in `strategies/majors/`:
+The Major Arcana is a visual family contributing `visual_style` plus structured `visual_grammar`; the 22 cards are generated **directly** (no major-rank layer — that would be 1:1 duplication). Each major already has a station (major walk) and a prime/composite character (its number). Strategies in `strategies/majors/`:
 - `primes.md` — lean into the fourth axis: build 22 archetypes from irreducible primes + identities, deriving composites by factorization. Resonates with the transversal (a slot that is numerically prime *and* sits on an early/irreducible station is doubly-atomic).
 - `journey.md` — narrative-first: 22 beats from a story the theme tells. (The prime character stays latent and derivable; the integrator may still notice it.)
 - `borrowed.md` — map 1:1 onto an existing 22-element structure.
 
-Each slot's station (sublimated) and numeric character (gloss authored) inform what it becomes — and for `primes.md`, a composite whose gloss won't follow from its factor-cards is a flag to recast the slot. Output: `MajorArcana` + 22 `MajorArcanaCard`s per `references/integration.md`.
+Each slot's station (sublimated) and numeric character (gloss authored) inform what it becomes — and for `primes.md`, a composite whose gloss won't follow from its factor-cards is a flag to recast the slot. Author `major_arcana.visual_grammar` as its family-level visual system and normally give every major a `factorization.visual_logic` describing the formal consequence of its number. Composite visual logic should show ancestry from factor-majors without literal collage. Output: `MajorArcana` + 22 `MajorArcanaCard`s per `references/integration.md`.
 
 ### Stage 4 — Minor ranks (grid axis)
 
@@ -99,11 +101,11 @@ Define 14 ranks (10 numbered + 4 face) as abstract frameworks refracting through
 - `prime_scaffold.md` — lean into the fourth axis for ranks 1–14.
 - `manual.md` — a theme-native rank progression.
 
-Face ranks: four roles, distinct initials (for glyph abbreviation), an encoded progression. Output: 14 `Rank` entities (numbered ranks carry a `question` with a literal `{suit}` placeholder; a rank may optionally carry a `factorization` gloss — load-bearing under `prime_scaffold`, usually skipped otherwise).
+Face ranks: four roles, distinct initials (for glyph abbreviation), an encoded progression. Output: 14 `Rank` entities. In the default authoring profile, each rank also gets a `visual_form`—at least a `composition_law`, with spatial/rhythm/density/figure-ground fields where useful—so the rank is formally recognizable across suits before subject labels are read. Court/face ranks should express their progression visually rather than as four arbitrary portraits. A rank may optionally carry a `factorization` gloss/visual logic, load-bearing under `prime_scaffold`.
 
 ### Stage 5 — Minor projection
 
-Generate the 56 minor cards. Each integrates its **suit** (style, declared) × **rank** (content, declared) × its **station** (motif, sublimated — from the minor walk) × its **numeric character** (latent — derived from its rank's number; not stored per-card). Follow `references/integration.md` exactly. Overrides only where a card genuinely refines a parent axis.
+Generate the 56 minor cards. Each integrates its **suit family grammar** (declared) × **rank content + formal grammar** (declared) × its **station environment** (sublimated — from the minor walk) × its **numeric character/formal ancestry** (latent — derived from its rank's number; not stored per-card). Follow `references/integration.md` and `references/visual_language.md` exactly. `detailed_description` stores the one concrete scene, not a copy of the inherited prompt stack; Generative Arcana resolves that stack into `get_card(...).render` at read time. Overrides only where a card genuinely refines a parent axis.
 
 ### Stage 6 — Emit and validate the canonical DeckManifest
 
@@ -150,3 +152,5 @@ Confirm the save and report the path. If the user also asked to import it into a
 - **Stations legible in the meta-layer?** Each station has a concise `description` that says what it represents at a glance.
 - **Integration real?** Are card meanings syntheses, not concatenations? Are inversions chiral?
 - **Cross-cutting families legible?** Could a reader pull "all the [station] cards" across suits?
+- **Artist/generator handoff works?** A resolved `get_card(...).render` should contain enough deck/family/rank/station/number context plus the concrete scene to render the card without auxiliary lookups.
+- **Visual grammar stress-tested?** Run the applicable diagnostics in `references/visual_language.md`: rank recognizability, factorization composition, opposition/diptych where authored, style inversion, subject removal, station leakage, progression, and cross-deck distinctiveness.
