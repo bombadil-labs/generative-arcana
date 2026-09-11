@@ -1,5 +1,5 @@
 import { registerSpreadKitPack } from "@/runtime/defineCard";
-import { defineSpreadScene, type SpreadScenePlacement } from "@/runtime/spreadScene";
+import { defineSpreadScene, type SpreadSceneKit, type SpreadScenePlacement } from "@/runtime/spreadScene";
 
 type RGB = readonly [number, number, number];
 
@@ -24,66 +24,7 @@ const STATION: Record<string, RGB> = {
 
 const coreSample = defineSpreadScene({
   spreadId: "core-sample",
-
-  draw(kit) {
-    const { p, scene, w, h, t, pointer, reducedMotion } = kit;
-    const n = scene.placements.length;
-    if (!n) return;
-    const bandH = h / n;
-    const hover = pointer.inside ? placementAtY(pointer.y, n) : -1;
-
-    p.background(13, 12, 11);
-    p.noStroke();
-
-    // The spread's five positions are literally one shared stratigraphic column.
-    // Position 0 (Basement) belongs at the bottom; Weather belongs at the top.
-    for (const placement of scene.placements) {
-      const y = bandY(placement.index, n, h);
-      const family = familyOf(placement);
-      const base = FAMILY[family] ?? FAMILY.major;
-      const station: RGB = STATION[placement.render.context.station.slug] ?? [128, 128, 128];
-      const mixed = mix(base, station, 0.24);
-      const hoverLift = hover === placement.index ? 24 : 0;
-
-      p.fill(
-        Math.min(255, mixed[0] + hoverLift),
-        Math.min(255, mixed[1] + hoverLift),
-        Math.min(255, mixed[2] + hoverLift),
-      );
-      p.rect(0, y, w, bandH + 1);
-
-      drawBandTexture(p, placement, y, bandH, w, t, reducedMotion);
-
-      if (placement.reversed) {
-        p.noFill();
-        p.stroke(20, 18, 17, 88);
-        p.strokeWeight(1);
-        const spacing = Math.max(9, Math.min(w, h) * 0.02);
-        for (let x = -bandH; x < w + bandH; x += spacing) {
-          p.line(x, y + bandH, x + bandH, y);
-        }
-      }
-
-      if (hover === placement.index) {
-        p.noFill();
-        p.stroke(248, 238, 209, 210);
-        p.strokeWeight(Math.max(1, Math.min(w, h) * 0.003));
-        p.rect(2, y + 2, w - 4, bandH - 4);
-      }
-    }
-
-    // Cross-card phenomena are drawn AFTER the layers, on one canvas, so they can
-    // physically traverse placement boundaries. This is the point of a Living Spread.
-    for (const placement of scene.placements) {
-      const family = familyOf(placement);
-      if (family === "faults") drawFault(p, placement, n, w, h, t, reducedMotion);
-      if (family === "vents") drawPlume(p, placement, n, w, h, t, reducedMotion);
-      if (family === "grains") drawGrains(p, placement, n, w, h, t, reducedMotion);
-      if (placement.card.arcana === "major") drawMajorEvent(p, placement, n, w, h, t, reducedMotion);
-    }
-
-    drawColumnLabels(p, scene.placements, n, w, h, hover);
-  },
+  draw: drawCoreSample,
 
   onPointer(kit) {
     if (!kit.pointer.pressed) return;
@@ -94,11 +35,71 @@ const coreSample = defineSpreadScene({
 
   poster(kit) {
     // draw() is already deterministic at t=0 and remains legible without motion.
-    coreSample.draw({ ...kit, t: 0, reducedMotion: true });
+    drawCoreSample({ ...kit, t: 0, reducedMotion: true });
   },
 });
 
 registerSpreadKitPack("deep-time", "core-sample", [coreSample]);
+
+function drawCoreSample(kit: SpreadSceneKit) {
+  const { p, scene, w, h, t, pointer, reducedMotion } = kit;
+  const n = scene.placements.length;
+  if (!n) return;
+  const bandH = h / n;
+  const hover = pointer.inside ? placementAtY(pointer.y, n) : -1;
+
+  p.background(13, 12, 11);
+  p.noStroke();
+
+  // The spread's five positions are literally one shared stratigraphic column.
+  // Position 0 (Basement) belongs at the bottom; Weather belongs at the top.
+  for (const placement of scene.placements) {
+    const y = bandY(placement.index, n, h);
+    const family = familyOf(placement);
+    const base = FAMILY[family] ?? FAMILY.major;
+    const station: RGB = STATION[placement.render.context.station.slug] ?? [128, 128, 128];
+    const mixed = mix(base, station, 0.24);
+    const hoverLift = hover === placement.index ? 24 : 0;
+
+    p.fill(
+      Math.min(255, mixed[0] + hoverLift),
+      Math.min(255, mixed[1] + hoverLift),
+      Math.min(255, mixed[2] + hoverLift),
+    );
+    p.rect(0, y, w, bandH + 1);
+
+    drawBandTexture(p, placement, y, bandH, w, t, reducedMotion);
+
+    if (placement.reversed) {
+      p.noFill();
+      p.stroke(20, 18, 17, 88);
+      p.strokeWeight(1);
+      const spacing = Math.max(9, Math.min(w, h) * 0.02);
+      for (let x = -bandH; x < w + bandH; x += spacing) {
+        p.line(x, y + bandH, x + bandH, y);
+      }
+    }
+
+    if (hover === placement.index) {
+      p.noFill();
+      p.stroke(248, 238, 209, 210);
+      p.strokeWeight(Math.max(1, Math.min(w, h) * 0.003));
+      p.rect(2, y + 2, w - 4, bandH - 4);
+    }
+  }
+
+  // Cross-card phenomena are drawn AFTER the layers, on one canvas, so they can
+  // physically traverse placement boundaries. This is the point of a Living Spread.
+  for (const placement of scene.placements) {
+    const family = familyOf(placement);
+    if (family === "faults") drawFault(p, placement, n, w, h, t, reducedMotion);
+    if (family === "vents") drawPlume(p, placement, n, w, h, t, reducedMotion);
+    if (family === "grains") drawGrains(p, placement, n, w, h, t, reducedMotion);
+    if (placement.card.arcana === "major") drawMajorEvent(p, placement, n, w, h, t, reducedMotion);
+  }
+
+  drawColumnLabels(p, scene.placements, n, w, h, hover);
+}
 
 function familyOf(placement: SpreadScenePlacement): string {
   return placement.render.context.family.kind === "major"
