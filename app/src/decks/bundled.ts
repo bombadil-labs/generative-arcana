@@ -5,6 +5,11 @@ import ultimaRanks from "../../../decks/ultima/v2/ranks.json";
 import ultimaStations from "../../../decks/ultima/v2/stations.json";
 import ultimaMajorArcana from "../../../decks/ultima/v2/major-arcana.json";
 import byrneJson from "../../../decks/byrne/deck.json";
+import byrneVisualLanguage from "../../../decks/byrne/v2/visual-language.json";
+import byrneSuits from "../../../decks/byrne/v2/suits.json";
+import byrneRanks from "../../../decks/byrne/v2/ranks.json";
+import byrneStations from "../../../decks/byrne/v2/stations.json";
+import byrneMajorArcana from "../../../decks/byrne/v2/major-arcana.json";
 import ulyssesJson from "../../../decks/ulysses/deck.json";
 import finalFantasyJson from "../../../decks/finalfantasy/deck.json";
 import finalFantasyVisualLanguage from "../../../decks/finalfantasy/v2/visual-language.json";
@@ -35,6 +40,15 @@ const ultimaV2 = composeBundledDeckData(
   ultimaRanks,
   ultimaStations,
   ultimaMajorArcana,
+);
+
+const byrneV2 = composeBundledDeckData(
+  byrneJson,
+  byrneVisualLanguage,
+  byrneSuits,
+  byrneRanks,
+  byrneStations,
+  byrneMajorArcana,
 );
 
 const finalFantasyV2 = composeBundledDeckData(
@@ -82,7 +96,7 @@ export const BUNDLED_DECK_MANIFESTS = {
     ],
   },
   byrne: {
-    data: byrneJson,
+    data: byrneV2,
     tagline: "David Byrne's journey, from nervous art to embodied communion.",
   },
   ulysses: {
