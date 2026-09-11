@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { CardFrame } from "@/components/CardFrame";
 import { CardModal } from "@/components/CardModal";
+import { SpreadSceneCanvas } from "@/components/SpreadSceneCanvas";
 import { MAX_QUESTION_LENGTH } from "@/reading/encode";
 import { arcanaEngine } from "@/engine";
 import type { ArcanaReading } from "@/engine";
 import type { DeckModule } from "@/decks/types";
 import { navigate } from "./router";
 import { getPackId } from "./packPref";
-import { listPacks } from "@/runtime/defineCard";
+import { listPacks, resolveSpreadVisual } from "@/runtime/defineCard";
+import { buildSpreadSceneData } from "@/runtime/spreadSceneData";
 
 export function Reading({ deckId, token }: { deckId: string; token?: string }) {
   const deck = arcanaEngine.getDeck(deckId);
@@ -112,6 +114,7 @@ function ReadingComposer({ deck }: { deck: DeckModule }) {
 function ReadingResult({ deck, token }: { deck: DeckModule; token: string }) {
   const [copied, setCopied] = useState<string | null>(null);
   const [resolution, setResolution] = useState<{ token: string; deck: DeckModule; reading?: ArcanaReading; error?: string } | null>(null);
+  const [visualMode, setVisualMode] = useState<"scene" | "cards">("scene");
 
   useEffect(() => {
     let cancelled = false;
@@ -129,7 +132,11 @@ function ReadingResult({ deck, token }: { deck: DeckModule; token: string }) {
   // modal walks the dealt order, so prev/next moves through the spread itself.
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
-  useEffect(() => { setCopied(null); setOpenIndex(null); }, [token]);
+  useEffect(() => {
+    setCopied(null);
+    setOpenIndex(null);
+    setVisualMode("scene");
+  }, [token]);
 
   if (!resolution || resolution.token !== token || resolution.deck !== deck) return <p role="status" style={lede}>Verifying reading…</p>;
   if (resolution.error) return <p role="alert" style={errorText}>{resolution.error}</p>;
@@ -140,6 +147,9 @@ function ReadingResult({ deck, token }: { deck: DeckModule; token: string }) {
   const prompt = arcanaEngine.buildInterpretationContext(reading);
   const packs = listPacks(deck.id);
   const prefer = (packs.find((p) => p.id === getPackId(deck.id, packs[0]?.id ?? "")) ?? packs[0])?.id;
+  const spreadVisual = resolveSpreadVisual(deck.id, spread.id, prefer);
+  const sceneData = spreadVisual ? buildSpreadSceneData(reading) : null;
+  const showingScene = visualMode === "scene" && !!spreadVisual && !!sceneData;
 
   function copy(text: string, which: string) {
     navigator.clipboard?.writeText(text).then(() => { setCopied(which); setTimeout(() => setCopied(null), 1600); });
@@ -158,26 +168,71 @@ function ReadingResult({ deck, token }: { deck: DeckModule; token: string }) {
       {legacy && <p role="status" style={lede}>Legacy reading: this link uses card positions and has no deck fingerprint. The original deck revision cannot be verified.</p>}
       {deck.custom && <p style={lede}>To open this reading elsewhere, import the same deck JSON first. The link identifies the deck but does not contain its contents.</p>}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: "var(--s-4)", marginTop: "var(--s-4)" }}>
-        {placements.map((placement, i) => {
-          const { card, position: pos, reversed, meaning } = placement;
-          return (
-            <div key={i}>
-              <div style={positionLabel}>{i + 1}. {pos.name}</div>
-              <div style={{ color: "var(--ink-2)", font: "italic 400 11.5px/1.35 var(--font-body)", margin: "var(--s-1) 0 var(--s-2)" }}>{pos.prompt}</div>
-              <div style={{ transform: reversed ? "rotate(180deg)" : "none" }}>
-                <CardFrame card={card} deckId={deck.id} prefer={prefer} deck={deck.data} showBanner={false} mode="poster" onOpen={() => setOpenIndex(i)} />
-              </div>
-              <div style={{ marginTop: "var(--s-2)", font: "400 16px/1.25 var(--font-display)", color: "var(--ink)" }}>
-                {card.name}{" "}
-                {reversed && <span style={reversedTag}>· Reversed</span>}
-              </div>
-              {card.factorization?.gloss && <div style={{ marginTop: "var(--s-1)", color: "var(--ink-3)", font: "400 11px/1.4 var(--font-mono)" }}>Number — {card.factorization.gloss}</div>}
-              <p style={{ margin: "var(--s-1) 0 0", color: "var(--ink)", font: "400 12.5px/1.45 var(--font-body)" }}>{meaning}</p>
+      {spreadVisual && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--s-3)", flexWrap: "wrap", marginTop: "var(--s-4)" }}>
+          <div>
+            <div style={positionLabel}>Living Spread</div>
+            <div style={{ marginTop: "var(--s-1)", color: "var(--ink-2)", font: "400 12.5px/1.4 var(--font-body)" }}>
+              This deck can render the dealt cards as one shared visual scene. Click a region of the scene to inspect its card.
             </div>
-          );
-        })}
-      </div>
+          </div>
+          <div role="group" aria-label="Reading visual mode" style={{ display: "inline-flex", padding: 3, border: "1px solid var(--line)", borderRadius: "var(--r-2)", background: "var(--paper-2)" }}>
+            <button
+              type="button"
+              aria-pressed={visualMode === "scene"}
+              onClick={() => setVisualMode("scene")}
+              style={viewModeButton(visualMode === "scene")}
+            >
+              Living Spread
+            </button>
+            <button
+              type="button"
+              aria-pressed={visualMode === "cards"}
+              onClick={() => setVisualMode("cards")}
+              style={viewModeButton(visualMode === "cards")}
+            >
+              Cards
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showingScene ? (
+        <div style={sceneFrame}>
+          <SpreadSceneCanvas
+            data={sceneData!}
+            scene={spreadVisual!.scene}
+            onSignal={(name, detail) => {
+              if (name !== "inspect-placement" || !detail || typeof detail !== "object") return;
+              const index = (detail as { index?: unknown }).index;
+              if (typeof index === "number" && Number.isInteger(index) && index >= 0 && index < placements.length) {
+                setOpenIndex(index);
+              }
+            }}
+          />
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: "var(--s-4)", marginTop: "var(--s-4)" }}>
+          {placements.map((placement, i) => {
+            const { card, position: pos, reversed, meaning } = placement;
+            return (
+              <div key={i}>
+                <div style={positionLabel}>{i + 1}. {pos.name}</div>
+                <div style={{ color: "var(--ink-2)", font: "italic 400 11.5px/1.35 var(--font-body)", margin: "var(--s-1) 0 var(--s-2)" }}>{pos.prompt}</div>
+                <div style={{ transform: reversed ? "rotate(180deg)" : "none" }}>
+                  <CardFrame card={card} deckId={deck.id} prefer={prefer} deck={deck.data} showBanner={false} mode="poster" onOpen={() => setOpenIndex(i)} />
+                </div>
+                <div style={{ marginTop: "var(--s-2)", font: "400 16px/1.25 var(--font-display)", color: "var(--ink)" }}>
+                  {card.name}{" "}
+                  {reversed && <span style={reversedTag}>· Reversed</span>}
+                </div>
+                {card.factorization?.gloss && <div style={{ marginTop: "var(--s-1)", color: "var(--ink-3)", font: "400 11px/1.4 var(--font-mono)" }}>Number — {card.factorization.gloss}</div>}
+                <p style={{ margin: "var(--s-1) 0 0", color: "var(--ink)", font: "400 12.5px/1.45 var(--font-body)" }}>{meaning}</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <section style={{ marginTop: "var(--s-5)", paddingTop: "var(--s-4)", borderTop: "1px solid var(--line)" }}>
         <h3 style={sectionKicker}>Take it to an LLM</h3>
@@ -234,4 +289,24 @@ const errorText: React.CSSProperties = { color: "var(--error)", font: "400 15px/
 const spreadCard: React.CSSProperties = { all: "unset", cursor: "pointer", display: "block", padding: "var(--s-3)", borderRadius: "var(--r-2)", border: "1px solid", boxSizing: "border-box", transition: "border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease)" };
 const dealBtn: React.CSSProperties = { all: "unset", cursor: "pointer", padding: "11px 20px", borderRadius: "var(--r-2)", background: "var(--accent)", color: "var(--accent-ink)", font: "600 14px/1 var(--font-body)" };
 const secondaryBtn: React.CSSProperties = { all: "unset", cursor: "pointer", padding: "10px 16px", borderRadius: "var(--r-2)", background: "transparent", color: "var(--ink)", border: "1px solid var(--line-2)", font: "600 14px/1 var(--font-body)" };
+const sceneFrame: React.CSSProperties = {
+  width: "100%",
+  height: "clamp(380px, 64vh, 640px)",
+  marginTop: "var(--s-3)",
+  border: "1px solid var(--line)",
+  borderRadius: "var(--r-2)",
+  overflow: "hidden",
+  background: "var(--paper-2)",
+};
+function viewModeButton(active: boolean): React.CSSProperties {
+  return {
+    all: "unset",
+    cursor: "pointer",
+    padding: "8px 11px",
+    borderRadius: "var(--r-1)",
+    background: active ? "var(--accent)" : "transparent",
+    color: active ? "var(--accent-ink)" : "var(--ink-2)",
+    font: "600 12px/1 var(--font-body)",
+  };
+}
 const link: React.CSSProperties = { all: "unset", cursor: "pointer", color: "var(--ink-2)", font: "400 13px/1 var(--font-body)" };
