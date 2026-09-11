@@ -61,11 +61,15 @@ export interface SymbolData {
   svg?: string;
 }
 
+export type MinorNumericOrigin = "rank" | "suit" | "card";
+
 export interface AxisEntry {
   name: string;
   index: number;
   slug?: string;
   description?: string;
+  /** Optional authored number when this axis owns minor numbering in a deck profile. */
+  numeric_value?: number;
   visual_style?: string;
   visual_content?: string;
   visual_motif?: string;
@@ -83,7 +87,6 @@ export interface SuitEntry extends AxisEntry {
 
 export interface RankEntry extends AxisEntry {
   symbol?: string;
-  numeric_value?: number;
   arcana?: "minor";
   /** Formal/compositional identity of the rank, orthogonal to `visual_content`. */
   visual_form?: RankVisualForm;
@@ -143,6 +146,11 @@ export interface DeckDataFile {
   theme: DeckTheme;
   /** Optional shared visual/material substrate; renderer-independent authored semantics. */
   visual_language?: DeckVisualLanguage;
+  /**
+   * Which authored layer owns a minor card's number. Omit on legacy decks to infer from matching
+   * rank/suit numeric_value, then fall back to card-local numbering for compatibility.
+   */
+  minor_numeric_origin?: MinorNumericOrigin;
   suits: Record<string, SuitEntry>;
   ranks: Record<string, RankEntry>;
   transversal: TransversalData;
