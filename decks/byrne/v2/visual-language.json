@@ -1,0 +1,18 @@
+{
+  "version": "2.1.0",
+  "visual_language": {
+    "medium": "Documentary/editorial mixed media: 16mm/35mm-film and contact-sheet photography translated through matte print, graphite/grease-pencil annotation, collage, and restrained spot-color overprint on uncoated stock.",
+    "surface": "Visible film grain, paper fiber, halftone or contact-print texture, registration drift, tape/annotation traces, and matte ink remain legible; the deck should feel printed, handled, archived, and re-sequenced rather than digitally perfected.",
+    "mark_making": "Documentary photographic evidence is interrupted and connected by hand-drawn diagrams, arrows, grease-pencil circles, notebook marks, crop marks, repeated frames, and occasional rhythmic overprint; marks should feel investigatory or participatory rather than decorative.",
+    "signature_accent": "A restrained Byrne-like graphic accent vocabulary—signal red, optimistic yellow, sky blue, and occasional fluorescent stage color—appears as annotation, light, clothing, signage, or overprint against documentary neutrals.",
+    "finish": "Human-scale documentary modernism: intelligent, awkward, warm, materially analog, visually curious, and increasingly embodied across the deck; never a glossy celebrity portrait series or a generic music-poster house style.",
+    "avoid": [
+      "glossy celebrity portrait retouching",
+      "superheroic cinematic polish",
+      "generic vector infographic aesthetics",
+      "uniform digital surfaces with no film or paper texture",
+      "nostalgia filters applied identically to every era",
+      "turning every card into a literal concert photograph"
+    ]
+  }
+}

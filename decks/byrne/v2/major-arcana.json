@@ -1,0 +1,196 @@
+{
+  "major_arcana": {
+    "visual_grammar": {
+      "medium_handling": "Documentary still / archival-performance image translated into the deck's matte editorial print language: film grain, contact-sheet texture, restrained spot color, crop marks, and occasional hand annotation. The subject is David Byrne at the age/stage appropriate to the named song or era rather than a generic symbolic stand-in.",
+      "composition": "A chronological documentary arc. Early trumps favor cool, static, framed, observed compositions; middle trumps destabilize the frame through system, travel, rupture, and collaboration; late trumps grow warmer, closer, more fluid, civic, and bodily. Symbolic imagery may enter, but it should feel discovered within documentary footage rather than replacing the human subject.",
+      "edge_language": "Photographic/film edges, archival crop or frame boundaries, grain, modest motion blur, double exposure, projection, reflection, and hand-marked editorial traces; avoid fantasy illustration outlines.",
+      "value_structure": "Era-responsive documentary contrast: early cool neutrals and hard black/white separation gradually admit warmer skin, richer stage color, daylight, and collective luminous fields without flattening every decade into one filter.",
+      "camera_and_scale": "Age- and era-appropriate documentary camera language: early wary close/medium observation, increasingly mobile performance/street/civic framing, ending among bodies rather than outside them. Byrne remains human-scale even when the venue becomes enormous.",
+      "detail_distribution": "Specificity belongs in recognizable age, hair, wardrobe, suit silhouette, instrument/performance context, room/venue, gesture, and archival texture. Symbolic overlays stay secondary to the credible documentary subject.",
+      "finish": "A coherent documentary made across five decades: historically shifting footage held together by one tactile editorial/archival treatment and a visible progression from nervous self-observation toward embodied communion.",
+      "avoid": [
+        "generic anonymous protagonist standing in for Byrne",
+        "one identical age or wardrobe across all majors",
+        "slick biopic glamour",
+        "literal music-video recreation as the only idea",
+        "symbolic surrealism that erases documentary specificity"
+      ]
+    }
+  },
+  "cards": {
+    "major-0": {
+      "factorization": {
+        "character": "identity",
+        "gloss": "Zero — before the performance has acquired a stable persona or system: arrival with no fixed role yet, the open condition from which the Byrnian journey can begin.",
+        "visual_logic": "Leave generous documentary ground around an awkward arriving figure. No mature system or performative identity should yet organize the frame; the image is possibility before self-design."
+      }
+    },
+    "major-1": {
+      "factorization": {
+        "character": "identity",
+        "gloss": "One — the isolated operator turned inward: the self observing itself and discovering the unnerving fact of its own voice. The journey's first unit is the watcher switching on.",
+        "visual_logic": "Use one figure and one recursive/reflected source of attention. A single gaze, mirror, or monitoring loop should activate the whole frame without multiplying into a social system."
+      }
+    },
+    "major-2": {
+      "factorization": {
+        "character": "prime",
+        "gloss": "Two — an irreducible relation between person and system: self and government, citizen and structure. Neither term explains the other away; the card begins the deck's lifelong argument with frameworks.",
+        "visual_logic": "Build one clear dyad—person/system, house/city, private/public—across an active interval. The relation must be indispensable: remove either pole and the composition collapses.",
+        "factors": [2]
+      }
+    },
+    "major-3": {
+      "factorization": {
+        "character": "prime",
+        "gloss": "Three — an irreducible vantage: observer, observed world, and the distance between them. The Big Country's detachment is not assembled from smaller lessons; it is a new three-term way of seeing.",
+        "visual_logic": "Use a triadic geometry of observer, landscape/system, and separating frame or distance—window, airplane, map, horizon—so detachment itself becomes the third formal term.",
+        "factors": [3]
+      }
+    },
+    "major-4": {
+      "factorization": {
+        "character": "composite",
+        "gloss": "Two squared — the person/system relation of Government hardened into a total four-corner emergency frame. Life During Wartime is structure doubled until every route, object, and habit is organized by survival.",
+        "visual_logic": "Square the dyad into repeated checkpoints, routes, rooms, or urgent grid cells. The system should feel doubled and totalized: fourfold order under pressure rather than one simple opposition.",
+        "factors": [2, 2]
+      }
+    },
+    "major-5": {
+      "factorization": {
+        "character": "prime",
+        "gloss": "Five — an irreducible perfect stasis: Heaven simply is, beautiful and complete and therefore terrifying. Its stillness cannot be explained as a compromise among earlier structures.",
+        "visual_logic": "Give the image one fixed, immaculate center or loop with almost no formal escape. Perfection should feel singular, self-sufficient, and visually resistant to further decomposition.",
+        "factors": [5]
+      }
+    },
+    "major-6": {
+      "factorization": {
+        "character": "composite",
+        "gloss": "Two times three — system relation meets detached pattern-recognition: the house (2) is seen through the observer's triadic distance (3) and begins to breathe. Architecture acquires rhythm; structure discovers the body.",
+        "visual_logic": "Interlock an orthogonal dyadic/grid structure with a three-direction or three-phase motion pattern. The same architecture must read simultaneously as measured system and animated rhythm.",
+        "factors": [2, 3]
+      }
+    },
+    "major-7": {
+      "factorization": {
+        "character": "prime",
+        "gloss": "Seven — irreducible recognition: the instant 'How did I get here?' cannot be assembled gradually. It arrives whole, splitting ordinary life with one undivided fact of self-awareness.",
+        "visual_logic": "Organize around one uncompromising recognition axis—mirror, waterline, gaze, or doubled pose. Everything else should support the single shock of seeing oneself.",
+        "factors": [7]
+      }
+    },
+    "major-8": {
+      "factorization": {
+        "character": "composite",
+        "gloss": "Two cubed — the system/relation recursively repeated until road, routine, and collective movement become a world in themselves. Road to Nowhere turns repetition from trap into shared motion.",
+        "visual_logic": "Use nested or repeated paired route rhythms at several scales—people/road, step/step, here/there—so recursive structure becomes joyful procession rather than static grid.",
+        "factors": [2, 2, 2]
+      }
+    },
+    "major-9": {
+      "factorization": {
+        "character": "composite",
+        "gloss": "Three squared — the detached pattern-maker turns back on its own pattern until the frame becomes the event. Burning Down the House is observation doubled into transformation: perspective catches fire and remakes what contained it.",
+        "visual_logic": "Nest or echo a triadic arrangement inside another triad, then visibly destabilize the enclosing frame. Repetition should cause the structure to ignite, rupture, or become performance.",
+        "factors": [3, 3]
+      }
+    },
+    "major-10": {
+      "factorization": {
+        "character": "composite",
+        "gloss": "Two times five — the person/system relation meets Heaven's indivisible perfection and becomes something livable: home is a chosen structure whose still center is another person, not an abstract ideal.",
+        "visual_logic": "Place a calm singular domestic center inside a clear relational enclosure: two people or self/place held around one unforced focal stillness. Structure serves intimacy rather than containing it.",
+        "factors": [2, 5]
+      }
+    },
+    "major-11": {
+      "factorization": {
+        "character": "prime",
+        "gloss": "Eleven — an irreducible ecological inversion: the shopping mall is flowers now, and the whole value system flips in one clean imaginative act. It is a new proposition, not the sum of earlier comforts.",
+        "visual_logic": "Use one decisive before/after or civilization/nature inversion that reads instantly across the whole frame. Avoid many incremental transitions; the formal idea should arrive whole.",
+        "factors": [11]
+      }
+    },
+    "major-12": {
+      "factorization": {
+        "character": "composite",
+        "gloss": "Four times three — the totalized structure of Wartime (4) is seen through the Big Country's detached triadic vantage (3), and the familiar system reveals a misalignment. Something ain't right because the map and the lived frame no longer close.",
+        "visual_logic": "Build a familiar four-part/grid world and introduce a three-part observational offset that cannot align with it. Small registration drift, wrong shadow, or mismatched perspective should make systemic wrongness formally legible.",
+        "factors": [2, 2, 3]
+      }
+    },
+    "major-13": {
+      "factorization": {
+        "character": "prime",
+        "gloss": "Thirteen — irreducible inner conflict: the Civil Wars name a split that cannot be reduced to external factions because the battlefield is the self. The contradiction stands whole.",
+        "visual_logic": "Use one figure divided by a single strong seam, shadow, double exposure, or opposed bodily vector. Keep the conflict formally singular rather than multiplying it into many enemies.",
+        "factors": [13]
+      }
+    },
+    "major-14": {
+      "factorization": {
+        "character": "composite",
+        "gloss": "Two times seven — the constructed self/system relation (2) passes through Once in a Lifetime's recognition (7): the self-made man sees the blueprint as his own doing and can no longer pretend the design came from elsewhere.",
+        "visual_logic": "Intersect a designed grid/blueprint with one recognition axis such as mirror, gaze, or tracing hand. The figure should occupy both sides of creator/created relation at once.",
+        "factors": [2, 7]
+      }
+    },
+    "major-15": {
+      "factorization": {
+        "character": "composite",
+        "gloss": "Three times five — detached perspective (3) meets Heaven's indivisible ideal (5) and yields tenderness toward what does not fit perfection. Broken Things becomes a way of seeing damage without demanding its erasure.",
+        "visual_logic": "Arrange several broken or incomplete parts through a calm triadic relation around one still interval of value. The image should find compositional wholeness without pretending the fragments are unbroken.",
+        "factors": [3, 5]
+      }
+    },
+    "major-16": {
+      "factorization": {
+        "character": "composite",
+        "gloss": "Two to the fourth — the system relation recursively squared until the domestic frame cannot contain itself. Tiny Apocalypse is structure repeated inward at personal scale until the room becomes its own catastrophe.",
+        "visual_logic": "Nest four-square/domestic frames recursively—room within frame within routine—then let the repeated enclosure fail from inside. Collapse should arise from too much internalized structure, not an external meteor.",
+        "factors": [2, 2, 2, 2]
+      }
+    },
+    "major-17": {
+      "factorization": {
+        "character": "prime",
+        "gloss": "Seventeen — irreducible hope: One Fine Day is a future-facing yes that appears after collapse without needing proof from the broken systems behind it.",
+        "visual_logic": "Hold one clear horizon, opening, or small future-oriented light against damaged ground. The hopeful proposition should remain formally singular and impossible to subdivide.",
+        "factors": [17]
+      }
+    },
+    "major-18": {
+      "factorization": {
+        "character": "composite",
+        "gloss": "Two times nine — relationship/system (2) passes through Burning Down the House's transformed perspective (9): Lazarus returns because collaboration and re-seeing rebuild what destruction opened.",
+        "visual_logic": "Stage a clear before/after dyad inside a recursively transformed field: doubled body or prone/upright relation surrounded by echoes of the prior broken frame now reorganizing into return.",
+        "factors": [2, 3, 3]
+      }
+    },
+    "major-19": {
+      "factorization": {
+        "character": "prime",
+        "gloss": "Nineteen — irreducible embodied declaration: 'I dance like this' does not require a system, explanation, or correct form. The body itself becomes the atomic statement.",
+        "visual_logic": "Let one unmistakable body-in-motion proposition organize the frame without explanatory diagram or detached observer. The gesture should feel complete because it is inhabited, not because it is analyzed.",
+        "factors": [19]
+      }
+    },
+    "major-20": {
+      "factorization": {
+        "character": "composite",
+        "gloss": "Four times five — the survival structure of Wartime (4) meets Heaven's singular ideal (5), but at human scale: ordinary life itself becomes miraculous when the frame is stable enough to notice its impossible center.",
+        "visual_logic": "Use an ordinary four-square domestic/civic field organized around one small luminous or astonishing everyday center. Wonder should arise inside structure, not escape into spectacle.",
+        "factors": [2, 2, 5]
+      }
+    },
+    "major-21": {
+      "factorization": {
+        "character": "composite",
+        "gloss": "Three times seven — the detached three-term gaze of The Big Country passes through Once in a Lifetime's recognition: observer, world, and distance resolve when the watcher finally enters the crowd. Everybody Laughs completes the journey by making perception participatory.",
+        "visual_logic": "Layer foreground/middle/background or observer/world/frame as a triad, then drive one recognition/participation vector through all three so the former observer becomes visibly continuous with collective joy.",
+        "factors": [3, 7]
+      }
+    }
+  }
+}

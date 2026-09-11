@@ -19,7 +19,7 @@ jobs:
         with:
           node-version: 22
       - run: node tools/check-authoring-hosts.mjs
-      - run: node tools/audit-deck-v2.mjs --check --require-enriched=finalfantasy,deep-time,evolution,ultima
+      - run: node tools/audit-deck-v2.mjs --check --require-enriched=finalfantasy,deep-time,evolution,ultima,byrne
 
   app:
     name: App ${{ matrix.check }}
@@ -81,6 +81,8 @@ jobs:
             command: npm run test:evolution-v2 --prefix mcp
           - check: Ultima v2 render projection
             command: npm run test:ultima-v2 --prefix mcp
+          - check: Byrne v2 render projection
+            command: npm run test:byrne-v2 --prefix mcp
           - check: web app static serving
             command: npm run test:web-app-static --prefix mcp
           - check: shared decks
