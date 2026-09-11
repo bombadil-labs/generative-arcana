@@ -1,0 +1,18 @@
+{
+  "version": "2.1.0",
+  "visual_language": {
+    "medium": "Modernist illustrated-book print: letterpress typography, lithographic and etched line, photogravure/newsprint textures, ink wash, graphite, colored pencil, map fragments, and hand marginalia on warm rag paper.",
+    "surface": "Cream-to-grey paper fiber, deckled or trimmed book edges, letterpress bite, newsprint tooth, ink spread, plate tone, erased graphite, and palimpsest traces remain visible; the deck should feel printed, annotated, reread, and carried through Dublin.",
+    "mark_making": "Crosshatch, drypoint scratch, lithographic crayon, flowing pen line, ruled map/grid marks, type fragments, correction marks, handwritten glosses, and episode-specific textual devices coexist without becoming a scrapbook.",
+    "signature_accent": "Wine-dark blue, Guinness gold, Irish green, brick/rust, and occasional violet or ecclesiastical gold act as recurring print accents against Dublin greys, parchment, brown ink, and black type.",
+    "finish": "A tactile modernist edition of one day: literary, urban, embodied, intellectually restless, funny, dirty, tender, and formally experimental while remaining legible as a coherent printed deck.",
+    "avoid": [
+      "generic fantasy tarot ornament",
+      "uniform photographic documentary treatment",
+      "glossy digital concept art",
+      "one decorative Art Nouveau filter across every episode",
+      "clean vector typography with no print materiality",
+      "making every card solemn or monumental"
+    ]
+  }
+}

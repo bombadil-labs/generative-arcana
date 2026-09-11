@@ -1,0 +1,52 @@
+{
+  "suits": {
+    "towers": {
+      "visual_grammar": {
+        "medium_handling": "Drypoint/etching and hard black lithographic line with cold blue-grey washes, architectural graphite, and sparse sharp white paper left exposed.",
+        "composition": "Vertical, angular, aspirational structures—towers, stairs, cliffs, spires, profiles, and narrow shafts—organized through upward thrust and opposition.",
+        "edge_language": "Hard etched contours, acute angles, brittle crosshatch, dark architectural silhouettes, and abrupt white cuts.",
+        "value_structure": "Stark black/white and cold blue-grey contrast with few warm notes; bright values feel won against resistance.",
+        "camera_and_scale": "Low or eye-level views that exaggerate height and distance, or severe profile compositions that isolate the aspiring figure from the horizontal city.",
+        "detail_distribution": "Precision gathers on masonry, books, faces in profile, stairs, battlements, and intellectual objects; surrounding space stays severe.",
+        "finish": "Austere, heroic, overdetermined, slightly hostile—the print language of aspiration becoming fortification.",
+        "avoid": ["soft domestic warmth", "easy circular flow", "crowded comic bustle"]
+      }
+    },
+    "keys": {
+      "visual_grammar": {
+        "medium_handling": "Flowing lithographic crayon and warm ink wash with circular pen tracery, gold/indigo spot color, map-lines, labyrinth curves, and gently rubbed plate tone.",
+        "composition": "Circles, loops, routes, keys, knots, recurring paths, and warm city wandering; the eye travels around and through rather than colliding with a wall.",
+        "edge_language": "Curved continuous line, repeated arcs, soft intersections, rounded enclosures, and paths that rejoin themselves.",
+        "value_structure": "Warm mid-values, earth and gold against deep blue, with luminous small openings rather than stark heroic contrast.",
+        "camera_and_scale": "Human-scale street, room, or route views, often oblique or map-like enough to reveal recurrence while keeping embodied presence.",
+        "detail_distribution": "Detail follows routes, hands, ordinary objects, keys, food, shops, signs, and repeated civic motifs; no single emblem monopolizes the field.",
+        "finish": "Patient, cyclical, humane, and archetypal without leaving ordinary Dublin—the mythic discovered by flowing with the day.",
+        "avoid": ["severe vertical domination", "claustrophobic knotting with no exit", "grand heroic isolation"]
+      }
+    },
+    "nets": {
+      "visual_grammar": {
+        "medium_handling": "Dirty newsprint, charcoal, rough pen, overprinted type, smeared ink, tangled crosshatch, and muddy green-brown wash with visible corrections and abrasion.",
+        "composition": "Compressed rooms, crowded streets, overlapping obligations, tangled arguments, nets, bedding, wires, and diagonals that trap rather than release the eye.",
+        "edge_language": "Irregular scratch, snagged line, knotting, overprint, crushed margins, and forms partially occluded by other forms or text.",
+        "value_structure": "Muddy low-to-mid values with dingy greys, green-browns, tobacco tones, and hard local black; highlights are scarce and uncomfortable.",
+        "camera_and_scale": "Close, cramped, off-axis human views or street-level congestion; very little clean distance is granted.",
+        "detail_distribution": "Detail accumulates in debris, clothing, ashplants, type, faces, bedding, theological/social clutter, and petty material frictions.",
+        "finish": "Hung-over, entangled, comic-grotesque, and materially uncomfortable—the mundane felt as something that catches on you.",
+        "avoid": ["clean open sky", "ornamental symmetry", "romantic heroic chiaroscuro"]
+      }
+    },
+    "kidneys": {
+      "visual_grammar": {
+        "medium_handling": "Soft colored lithography and ink wash warmed by crayon/pencil rubbing, flesh and food tones, domestic paper textures, and rounded hand-drawn contour.",
+        "composition": "Organic close interiors and inhabited ordinary spaces—kitchens, baths, beds, tables, cats, bodies, meals—organized around comfort, appetite, care, and practical gesture.",
+        "edge_language": "Rounded soft contours, gently broken domestic line, fabric/flesh/steam edges, and warm overlapping forms rather than rigid boundaries.",
+        "value_structure": "Warm browns, pinks, cream, buttery yellow, soft black, and domestic shadow; mid-values dominate with localized tactile highlights.",
+        "camera_and_scale": "Close-to-medium human/body scale, usually eye-level within the room or at the table; the viewer inhabits rather than surveys the ordinary.",
+        "detail_distribution": "High tactile detail in hands, skin, food, utensils, fabric, cats, beds, steam, and small acts of practical kindness; background architecture remains secondary.",
+        "finish": "Embodied, tender, comic, sensual, and unheroic—the warm material intelligence of living well enough in the day.",
+        "avoid": ["cold abstract geometry", "monumental distance", "precious decorative prettiness that sanitizes bodily life"]
+      }
+    }
+  }
+}
