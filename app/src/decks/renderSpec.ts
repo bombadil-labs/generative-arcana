@@ -1,8 +1,10 @@
 import type { CardData } from "./card";
 import { immutableJsonSnapshot } from "./jsonSnapshot";
+import { resolveCardNumberContext, type NumericFactorizationSource } from "./numericContext";
 import type {
   DeckModule,
   DeckVisualLanguage,
+  FactorizationData,
   RankVisualForm,
   StationVisualEnvironment,
   VisualFamilyGrammar,
@@ -47,7 +49,9 @@ export interface CardRenderSpec {
     dialectic?: Array<{ axis: string; pole: string }>;
     number: {
       label: string;
-      factorization?: NonNullable<CardData["factorization"]>;
+      origin: NumericFactorizationSource;
+      factorization?: FactorizationData;
+      factorizationSource?: NumericFactorizationSource;
     };
   };
   render: {
@@ -99,7 +103,8 @@ export function resolveCardRenderSpec(deck: DeckModule, card: CardData): CardRen
   const major = card.arcana === "major" ? deck.data.major_arcana : undefined;
   const familyGrammar = suit?.visual_grammar ?? major?.visual_grammar;
   const familyStyle = suit?.visual_style ?? major?.visual_style;
-  const factorization = card.factorization ?? rank?.factorization;
+  const numberContext = resolveCardNumberContext(deck, card);
+  const factorization = numberContext.factorization;
 
   let dialectic: Array<{ axis: string; pole: string }> | undefined;
   if (card.suit_slug && deck.data.dialectic) {
@@ -161,7 +166,9 @@ export function resolveCardRenderSpec(deck: DeckModule, card: CardData): CardRen
       ...(dialectic ? { dialectic } : {}),
       number: {
         label: card.number,
+        origin: numberContext.origin,
         ...(factorization ? { factorization } : {}),
+        ...(numberContext.factorizationSource ? { factorizationSource: numberContext.factorizationSource } : {}),
       },
     },
     render: {

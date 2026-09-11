@@ -1,5 +1,6 @@
 import type { CardData } from "../decks/card";
-import type { RankEntry, StationEntry, SuitEntry, DeckModule } from "../decks/types";
+import type { FactorizationData, RankEntry, StationEntry, SuitEntry, DeckModule } from "../decks/types";
+import type { NumericFactorizationSource } from "../decks/numericContext";
 import type { Spread, SpreadPosition } from "../decks/spreads";
 import type { ReadingCard } from "../reading/types";
 
@@ -40,8 +41,11 @@ export interface CardAnalysis {
     value?: number;
     /** Ω(n), prime factors with multiplicity, when the card number is a safe non-negative integer. */
     omega?: number;
-    /** Authored numeric interpretation from the card, when present. */
-    factorization?: CardData["factorization"];
+    /** Authored layer that owns this number in the deck's minor profile; majors originate on-card. */
+    origin: NumericFactorizationSource;
+    /** Resolved authored numeric interpretation from its owning axis or legacy card fallback. */
+    factorization?: FactorizationData;
+    factorizationSource?: NumericFactorizationSource;
   };
   authoredMeaning: CardData["meaning"];
 }
