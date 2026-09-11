@@ -41,7 +41,7 @@ const coreSample = defineSpreadScene({
       const y = bandY(placement.index, n, h);
       const family = familyOf(placement);
       const base = FAMILY[family] ?? FAMILY.major;
-      const station = STATION[placement.render.context.station.slug] ?? [128, 128, 128];
+      const station: RGB = STATION[placement.render.context.station.slug] ?? [128, 128, 128];
       const mixed = mix(base, station, 0.24);
       const hoverLift = hover === placement.index ? 24 : 0;
 

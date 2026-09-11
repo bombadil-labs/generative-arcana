@@ -200,8 +200,8 @@ function ReadingResult({ deck, token }: { deck: DeckModule; token: string }) {
       {showingScene ? (
         <div style={sceneFrame}>
           <SpreadSceneCanvas
-            data={sceneData}
-            scene={spreadVisual.scene}
+            data={sceneData!}
+            scene={spreadVisual!.scene}
             onSignal={(name, detail) => {
               if (name !== "inspect-placement" || !detail || typeof detail !== "object") return;
               const index = (detail as { index?: unknown }).index;
