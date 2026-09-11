@@ -1,5 +1,6 @@
 import type { CardData } from "../decks/card";
 import { omega } from "../decks/cardMeta";
+import { resolveCardFactorization } from "../decks/numeric";
 import { DeckRegistry, deckRegistry } from "../decks/registry";
 import { immutableJsonSnapshot } from "../decks/jsonSnapshot";
 import { isValidSpread, resolveSpread, spreadsForDeck, type Spread } from "../decks/spreads";
@@ -117,6 +118,7 @@ export class ArcanaEngine {
     }
 
     const value = parseCardNumber(card.number);
+    const resolvedFactorization = resolveCardFactorization(deck.data, card);
     const analysis: CardAnalysis = {
       deckId,
       card,
@@ -124,7 +126,10 @@ export class ArcanaEngine {
       number: {
         label: card.number,
         ...(value !== undefined ? { value, omega: omega(value) } : {}),
-        ...(card.factorization ? { factorization: card.factorization } : {}),
+        ...(resolvedFactorization ? {
+          factorization: resolvedFactorization.factorization,
+          factorizationOwner: resolvedFactorization.owner,
+        } : {}),
       },
       authoredMeaning: card.meaning,
     };

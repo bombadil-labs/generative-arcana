@@ -40,8 +40,9 @@ export interface CardAnalysis {
     value?: number;
     /** Ω(n), prime factors with multiplicity, when the card number is a safe non-negative integer. */
     omega?: number;
-    /** Authored numeric interpretation from the card, when present. */
+    /** Authored numeric interpretation resolved from its declared card/rank/suit owner. */
     factorization?: CardData["factorization"];
+    factorizationOwner?: "card" | "rank" | "suit";
   };
   authoredMeaning: CardData["meaning"];
 }

@@ -75,8 +75,12 @@ export interface AxisEntry {
   [key: string]: unknown;
 }
 
+export type MinorNumberOrigin = "rank" | "suit" | "card";
+
 export interface SuitEntry extends AxisEntry {
   symbol?: SymbolData;
+  /** Optional authored number when this profile originates minor numbers at suit. */
+  numeric_value?: number;
   /** Structured family grammar; `visual_style` remains accepted as a legacy/general prose field. */
   visual_grammar?: VisualFamilyGrammar;
 }
@@ -143,6 +147,8 @@ export interface DeckDataFile {
   theme: DeckTheme;
   /** Optional shared visual/material substrate; renderer-independent authored semantics. */
   visual_language?: DeckVisualLanguage;
+  /** Explicit minor-number ownership for non-default profiles. Omit for legacy inference. */
+  minor_number_origin?: MinorNumberOrigin;
   suits: Record<string, SuitEntry>;
   ranks: Record<string, RankEntry>;
   transversal: TransversalData;
