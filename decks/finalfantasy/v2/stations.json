@@ -1,0 +1,86 @@
+{
+  "transversal": {
+    "stations": {
+      "fire": {
+        "visual_environment": {
+          "illumination": "Warm off-frame firelight with strong rim-light and localized flicker.",
+          "palette": "Charcoal, ember red, orange, and gold.",
+          "atmosphere": "Heat shimmer, ash, scorched air, and the sense of a forge just beyond the frame.",
+          "motion": "Rising, flickering, and turbulent.",
+          "density": "Moderate airborne particulate against dark pockets.",
+          "material_effects": "Dry brush breaks like char at hot edges; transparent ink blooms like smoke; crystal-white highlights flare only at the hottest points."
+        }
+      },
+      "thunder": {
+        "visual_environment": {
+          "illumination": "Hard instantaneous white-violet flash with stark cast shadows.",
+          "palette": "Electric blue, hard white, storm-violet, and bruised purple.",
+          "atmosphere": "Storm pressure and static charge in the air before or after a strike.",
+          "motion": "Abrupt, branching, and arrested at the decisive instant.",
+          "density": "Sparse but highly charged, with large dark-to-light jumps.",
+          "material_effects": "Ink edges sharpen or branch; opaque white cuts through matte pigment like a flash rather than a glow."
+        }
+      },
+      "earth": {
+        "visual_environment": {
+          "illumination": "Steady, even light that emphasizes weight and surface rather than spectacle.",
+          "palette": "Ochre, umber, stone gray, dust, and mineral green.",
+          "atmosphere": "Dry, grounded, massive, and patient.",
+          "motion": "Settling, compressing, rooting, or barely moving.",
+          "density": "Heavy forms and granular particulate; visual weight sits low in the frame.",
+          "material_effects": "Pigment granulates into stone and dust; stipple and paper tooth remain visible, with little luminous bloom."
+        }
+      },
+      "holy": {
+        "visual_environment": {
+          "illumination": "Soft volumetric gold-white light from above or within, clean enough to clarify rather than bleach the scene.",
+          "palette": "Ivory, pale gold, crystal-white, and restrained warm spectral color.",
+          "atmosphere": "Clear, restorative, reverent, and gently judging.",
+          "motion": "Upward, opening, or radiating.",
+          "density": "Airy with controlled halos and clean negative space.",
+          "material_effects": "Transparent washes lift into luminous glazes; crystal-white bloom and restrained metallic-gold accents may surface."
+        }
+      },
+      "ice": {
+        "visual_environment": {
+          "illumination": "Cold high-key light with crisp reflections and little warmth.",
+          "palette": "Frost blue, pale cyan, white, and silver-gray.",
+          "atmosphere": "Hushed, glassy, preserved, and slowed.",
+          "motion": "Arrested or reduced to tiny brittle movement.",
+          "density": "Sparse crystalline detail against clear quiet fields.",
+          "material_effects": "Ink and gouache edges harden into crystalline breaks; paper tooth can read like frost; white highlights stay sharp rather than blooming."
+        }
+      },
+      "water": {
+        "visual_environment": {
+          "illumination": "Refracted, reflected, or caustic light with soft moving highlights.",
+          "palette": "Teal, deep blue, blue-green, and reflected silver.",
+          "atmosphere": "Humid, fluid, remembered, and layered between surface and depth.",
+          "motion": "Flowing, circling, yielding, or drifting around obstacles.",
+          "density": "Layered depth with translucent overlap rather than opaque crowding.",
+          "material_effects": "Transparent ink feathers and pools; gouache edges soften as though wet; highlights repeat as reflection rather than a single hard source."
+        }
+      },
+      "wind": {
+        "visual_environment": {
+          "illumination": "High, airy, diffuse daylight with few hard shadows.",
+          "palette": "Pale sky blue, soft green, cream, and bright exposed paper.",
+          "atmosphere": "Open, dry, breathable, and full of drifting particulate.",
+          "motion": "Strong directional sweep, scattering, flutter, and soft motion blur.",
+          "density": "Low overall density with marks stretched along the direction of travel.",
+          "material_effects": "Dry-brush trails, lifted pigment, ink spatter, and exposed paper create a sense that the surface itself is being blown onward."
+        }
+      },
+      "dark": {
+        "visual_environment": {
+          "illumination": "One weak or distant source against deep shadow, often partly occluded.",
+          "palette": "Near-black, indigo, void-violet, and rare cold highlights.",
+          "atmosphere": "Umbral, hushed, devouring, and fertile with the sense of an ending that may also be a beginning.",
+          "motion": "Slow inward draw, eddy, or absorption rather than outward action.",
+          "density": "Negative space dominates; forms emerge only partially from darkness.",
+          "material_effects": "Layered dark washes absorb edges and color; opaque crystal-white is reduced to tiny surviving points."
+        }
+      }
+    }
+  }
+}
