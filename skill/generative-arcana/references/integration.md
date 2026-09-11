@@ -33,16 +33,28 @@ Inversion is **chiral**, never negation — the same energy turned shadow, exces
 
 ## Producing the integrated visual
 
-Write one `detailed_description`: a single, concrete, unique scene specific enough that an illustrator implementing it would produce an image sharing a recognizable **style** with the suit, recognizable **content** with the rank, and a felt **key signature** from the station, while depicting something true only of *this* card.
+The authored card stores one `detailed_description`: the **concrete scene unique to this card**. The integrator writes that scene while holding the complete visual stack in mind, but does **not** copy all inherited grammar into the card record. Generative Arcana resolves the inherited stack into `CardRenderSpec` at read time, so `get_card(...).render` is the fully specified human/AI rendering handoff. See `references/visual_language.md`.
 
-Compose by directive:
+Resolve the stack in this order:
 
-- **Style — DECLARE (suit).** `suit.visual_style` as the rendering register (major cards: `major_arcana.visual_style`). Bend via `style_override` only if needed; else inherit.
-- **Content — DECLARE (rank).** `rank.visual_content` as the thing depicted, specialized concretely for this suit (major cards: content from the chosen majors strategy). Bend via `content_override` only if needed; else inherit.
-- **Key signature — SUBLIMATE (station).** `station.visual_motif` sets the *conditions* the scene obtains under — light, color temperature, spatial constraint, atmosphere — not an object in the frame. By default, never "a small [station symbol] in the corner": write the scene as though the station were the time of day it happens at. (Lone exception: a card deliberately *surfacing* its station may let the station's `symbol` appear — rare and chosen, per `references/svg_symbols.md`.)
-- **Numeric undertone — LATENT (optional).** A prime card's image may feel more singular and unfactorable; a composite's may visibly carry the trace of its factors. Use only if it sharpens the image.
+1. **Material world — DECK.** `deck.visual_language` supplies shared medium, surface, mark-making, signature accent, finish, and exclusions. It answers what kind of artifact this deck is.
+2. **Visual family — DECLARE (suit / Major Arcana).** `suit.visual_grammar` or `major_arcana.visual_grammar` supplies medium handling, composition family, edge/value behavior, camera/scale, detail distribution, finish, and exclusions. Legacy `visual_style` remains useful prose/fallback, but new authoring should not rely on it alone.
+3. **Formal rank — DECLARE (minors).** `rank.visual_content` says *what kind of event/content* the rank contributes; `rank.visual_form` says *how the image is formally organized*. The latter should make rank kinship visible across suits.
+4. **Key signature — SUBLIMATE (station).** `station.visual_environment` may modulate illumination, palette, atmosphere, motion, density, and material effects. Legacy `visual_motif` is fallback prose. **The station changes the weather, not the family**: it must not silently swap medium, family composition, edge system, or mark-making.
+5. **Numeric formal ancestry — LATENT / GLOSSED.** Use `factorization.visual_logic` when the number materially sharpens organization. Prime/identity forms can be irreducible; composites can inherit formal relations from their factors without literal object-counting or collage. Minor cards inherit this from the rank when present; majors own it directly.
+6. **Concrete scene — CARD.** Write the particular subjects, actions, symbols, and spatial event into `visuals.detailed_description`. Use `style_override` / `content_override` only for a real exception after the inherited stack has been considered.
 
-The test: a reader names the suit and rank from the picture and cannot name the station — yet remove the station and the picture loses its weather.
+The source-storage test: if removing the card would make a reusable visual rule disappear from the deck, that rule probably belongs on deck/family/rank/station/number instead.
+
+The read-model test: when Generative Arcana resolves the card, a human artist or generative renderer should not need to fetch those parent records separately.
+
+### Visual precedence
+
+Later layers specialize earlier ones but do not casually erase them:
+
+`deck material → family handling/form → rank form → station environment → numeric logic → card scene/overrides`
+
+A station may make charcoal appear rain-slick; it does not convert charcoal into glossy vector art. A card override may break a family law, but the exception should be visible as an intentional choice rather than accidental prompt drift.
 
 ### Worked sketch
 
@@ -55,10 +67,10 @@ The test: a reader names the suit and rank from the picture and cannot name the 
 
 This step runs **only for major cards** — a minor's number is its rank's, so minors produce no `factorization` here (a rank's optional gloss is authored back in Stage 4, chiefly under `strategies/ranks/prime_scaffold.md`).
 
-For each **major**, write `factorization.character` (derived: identity/prime/composite), `factorization.factors` (derived; composites only), and `factorization.gloss` (authored — one or two sentences on what the number's character means *for this major*):
+For each **major**, write `factorization.character` (derived: identity/prime/composite), `factorization.factors` (derived; composites only), `factorization.gloss` (authored — one or two sentences on what the number's character means *for this major*), and normally `factorization.visual_logic` (authored — how that arithmetic constrains the card's formal organization):
 
 - **Identity / prime** — name the precondition (0), the transparent operator (1), or the irreducible energy (prime), in this trump's own terms. Don't over-explain a prime; its point is that it simply *is*.
-- **Composite** — make the factor-**majors** meet: an x² as the base major stabilized into structure, an x³ as mastery or excess, an x⁴ as collapse/breakthrough, an x·y as "what happens when [Major x] meets [Major y]."
+- **Composite** — make the factor-**majors** meet: an x² as the base major stabilized into structure, an x³ as mastery or excess, an x⁴ as collapse/breakthrough, an x·y as "what happens when [Major x] meets [Major y]." In `visual_logic`, inherit formal ancestry—axes, symmetry, rhythm, nesting, directional systems—not literal pasted imagery or simple object counts.
 
 **The gloss is a signal, not a checkbox.** If it won't follow from the factor-majors, the slot is probably miscast or a factor-major mis-defined — revise rather than write around it (`references/numeric_axis.md` → "The gloss as signal"). When the majors were *generated* from their primes (`majors/primes.md`) the gloss should be load-bearing and tight; when built another way (journey/borrowed), a brief honest note suffices — but still write one.
 
@@ -66,6 +78,8 @@ For each **major**, write `factorization.character` (derived: identity/prime/com
 
 - Meanings synthesized, not concatenated; station as valence, named only when surfacing; numeric tint optional.
 - Inversions chiral.
-- One concrete, unique `detailed_description`; style/content declared, station sublimated into conditions.
+- One concrete, unique `detailed_description`; inherited visual grammar remains normalized on its owning layers and resolves later into `CardRenderSpec`.
+- Visual precedence respected: station changes weather rather than replacing family medium/form; card overrides are real exceptions.
+- Applicable visual stress tests from `references/visual_language.md` pass, especially rank recognizability, subject removal, station leakage, and factorization composition.
 - Each **major's** `factorization.gloss` authored and coherent — follows from its factor-majors (composite), names the irreducible energy (prime), or the precondition/operator (identity). A forced gloss is signal to recast the slot, not a box to tick. (Minor cards carry no gloss.)
 - Overrides written only where a card actually deviates; otherwise inherit.
