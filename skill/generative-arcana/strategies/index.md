@@ -39,3 +39,7 @@ The **transversal is always on** (the choice is which one). The **prime/composit
 - **manual suits often want manual or themed ranks** for tonal consistency; a dialectical grid pairs naturally with `questions`.
 - **`majors/primes` pairs with `ranks/prime_scaffold`** if you want the fourth axis visible at both scales.
 - **The transversal composes with any of the above** — it is a substrate the others express, not a sibling that competes with them. So is the numeric axis: present regardless, glossed on every major (and optionally each rank) — leaned on hard under the prime strategies, noted briefly or skipped otherwise.
+
+## Visual grammar is always on
+
+Visual grammar is not a fifth strategy choice. Every generation plan also authors the shared stack in `references/visual_language.md`: deck material language, suit/Major family grammar, rank formal grammar, station environment, numeric visual logic where useful, and concrete card scene. Strategies may shape those outputs, but none may omit the visual layer and leave `detailed_description` to carry the entire art direction by itself.

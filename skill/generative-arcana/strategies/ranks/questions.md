@@ -2,7 +2,7 @@
 
 Define the 14 minor ranks (10 numbered + 4 face) as abstract frameworks that refract through every suit. Each numbered rank poses a **question** the suit answers, so all four cards of a rank share a question while differing by suit — deep structural parallax across the row. The default rank method.
 
-Each rank is a `Rank` per `references/schema.md`: `description` (the framework/abstraction), `question` (the question itself), `meaning` palette (3–6 upright + chiral inverted), `visual_content`.
+Each rank is a `Rank` per `references/schema.md`: `description` (the framework/abstraction), `question` (the question itself), `meaning` palette (3–6 upright + chiral inverted), `visual_content`, and structured `visual_form`.
 
 ## Numbered ranks (Ace–Ten)
 
@@ -33,3 +33,9 @@ Four roles — archetypes from the major arcana projected through suit space. Re
 - **Encoded progression** 11→14: hierarchy (Student→Warrior→Nurturing Ruler→Commanding Ruler), cycle (Spring→Summer→Autumn→Winter), composition (Element→Compound→Mixture→Synthesis), development (Observation→Experimentation→Integration→Mastery). Hierarchical, cyclic, rhizomatic, or distributed — between them they should capture some aspect of the major arcana and show how it applies suit by suit.
 
 Propose a progression fitting the deck's concepts; present for feedback.
+
+## Formal visual grammar
+
+Each rank also authors `visual_form` per `references/visual_language.md`. The question says what the rank asks; `visual_content` says what kind of event can answer it; `visual_form` says how an image at this rank organizes itself before suit-specific subject matter enters. Do not hardcode a universal Ace→Ten geometry: derive a coherent formal progression for this deck, then run the rank-recognizability test across suits.
+
+For the face ranks, make the chosen 11→14 progression formal as well as semantic. Increasing authority might change command of frame, viewpoint, multiplicity, finish, scale, or figure/ground relation. Four differently costumed portraits are not sufficient.

@@ -22,7 +22,7 @@ For each suit, per `references/schema.md` → `Suit`:
 - **description** — what this quadrant is, in the theme.
 - **symbol** + **svg** — a glyph per `references/svg_symbols.md`; the four distinct at 16px.
 - **meaning** — 3–6 upright senses (a palette) and 3–6 chiral inverted (`references/integration.md`).
-- **visual_style** — the declared aesthetic: colors, perspective, art movement, composition.
+- **visual_style** — a concise general summary; structured art direction belongs in `visual_grammar`.
 
 ## 2b. Record the dialectic on the deck
 
@@ -34,8 +34,10 @@ and a **cells** map placing every suit (`{ [suit_slug]: [poleOfAxis0, poleOfAxis
 
 ## 3. Intra-suit coherence
 
-Decide how alike the four styles are — small controlled variations (a shared world) vs. wildly divergent visual languages. A deliberate choice, not a default.
-
-*Cyberpunk "Individual+Technology" → "Programs" (index 0):* glyph a radiating node; upright {individual agency, technical mastery, composable specialization, crafted solutions}; inverted {isolated expertise, over-optimization, tools become chains, solution seeking problems}; style "neon wireframes (pink/green/blue, red for errors) over dark grounds; close-up interfaces; angular precise compositions."
+Decide how alike the four families are inside the shared deck material world. A deliberate choice, not a default.
 
 Present the four ordered suits for feedback before Stage 2.
+
+## Visual family obligation
+
+After the four semantic quadrants are stable, derive four `visual_grammar` families per `references/visual_language.md`. The visual distinctions should express the dialectic structurally rather than merely assigning one color/mascot to each cell. Ask what each pole does to composition, space, edge, value, scale, detail, and material handling. Opposite cells should be good candidates for the opposition/diptych stress test: preserve enough invariant structure to reveal the relation while selected visual dimensions reverse or transform. Keep all four inside the deck-level `visual_language`; a dialectic does not license four unrelated production media unless that fracture is itself an explicit deck concept.
