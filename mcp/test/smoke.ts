@@ -69,6 +69,32 @@ async function main(): Promise<void> {
     assert.equal(decks.length, BUNDLED_DECK_IDS.length);
     assert.deepEqual(new Set(decks.map((deck) => deck.id)), new Set(BUNDLED_DECK_IDS));
 
+    const minorCard = await withTimeout(client.callTool({
+      name: "get_card",
+      arguments: { deckId: "final-fantasy-tarot", cardSlug: "chocobo-4" },
+    }), 5_000, "stdio get_card Final Fantasy minor render spec");
+    assert.equal(minorCard.isError, undefined);
+    const minor = (minorCard.structuredContent as { result?: any } | undefined)?.result;
+    assert.equal(minor?.render?.deck?.version, "2.1.0");
+    assert.match(minor?.render?.render?.material?.medium ?? "", /gouache/i);
+    assert.match(minor?.render?.render?.material?.surface ?? "", /paper tooth/i);
+    assert.match(minor?.render?.render?.form?.familyComposition ?? "", /horizon|field|road/i);
+    assert.equal(minor?.render?.render?.form?.rank?.composition_law, "Visibly broken order.");
+    assert.match(minor?.render?.render?.legacy?.rankContent ?? "", /stable suit-structure/i);
+    assert.match(minor?.render?.render?.environment?.palette ?? "", /Frost blue/i);
+    assert.match(minor?.render?.render?.scene?.description ?? "", /chocobo/i);
+    assert.ok(minor?.render?.render?.avoid?.includes("chibi proportions"));
+
+    const majorCard = await withTimeout(client.callTool({
+      name: "get_card",
+      arguments: { deckId: "final-fantasy-tarot", cardSlug: "major-6" },
+    }), 5_000, "stdio get_card Final Fantasy major render spec");
+    assert.equal(majorCard.isError, undefined);
+    const major = (majorCard.structuredContent as { result?: any } | undefined)?.result;
+    assert.match(major?.render?.render?.form?.familyComposition ?? "", /box-art|poster/i);
+    assert.match(major?.render?.render?.form?.numericLogic ?? "", /dyadic|triadic/i);
+    assert.match(major?.render?.context?.number?.factorization?.gloss ?? "", /Two times three/i);
+
     const packs = await withTimeout(client.callTool({
       name: "list_visual_packs",
       arguments: { deckId: "final-fantasy-tarot" },
