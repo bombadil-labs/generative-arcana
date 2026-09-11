@@ -1,0 +1,68 @@
+{
+  "suits": {
+    "chocobo": {
+      "visual_grammar": {
+        "medium_handling": "Opaque gouache laid broadly, with wind-dragged dry brush exposing paper tooth and directional strokes that feel carried by travel.",
+        "composition": "Low horizons, wide fields, diagonal movement, and open space ahead; compositions pull outward toward a road, trail, or receding horizon.",
+        "edge_language": "Broken contours and directional feather-like strokes; moving edges can open into dust, grass, or wind rather than close as hard outlines.",
+        "value_structure": "Sunlit mid-to-high values with a few clear dark anchors; broad readable masses rather than dense tonal modeling.",
+        "camera_and_scale": "Eye-level to slightly low travel views in medium or wide shot, with enough landscape around the subject to make the next horizon palpable.",
+        "detail_distribution": "Detail clusters around face, tack, feet, road markers, and immediate companions; fields and skies stay broad and breathable.",
+        "finish": "Dry-brush grain, dust, and grass dragged across the surface; lively incomplete edges keep the image in motion.",
+        "avoid": [
+          "static centered portraiture",
+          "sealed interior compositions",
+          "heavy smooth outlining"
+        ]
+      }
+    },
+    "moogle": {
+      "visual_grammar": {
+        "medium_handling": "Gouache softened with colored pencil and waxy pastel rubbed into the paper tooth, allowing fur, fabric, paper, and lamplight to feel handled rather than rendered.",
+        "composition": "Nested interiors, eye-level intimacy, and rounded inward groupings around hearths, counters, save points, letters, beds, or shared tables.",
+        "edge_language": "Soft edges, textile grain, fuzzy crosshatching, and rounded contours that dissolve gently into fabric, fur, and lamplight.",
+        "value_structure": "Warm clustered mid-values held by gentle dark enclosure, with small bright pools of local light and comfort.",
+        "camera_and_scale": "Eye-level close or medium interior views at domestic scale; the viewer should feel inside the shelter rather than observing it from afar.",
+        "detail_distribution": "Warm pools of detail around hands, letters, shelves, food, fabric, and small communal objects; peripheral surfaces soften.",
+        "finish": "Layered rubbing, colored-pencil texture, and plush matte highlights without glossy smoothness.",
+        "avoid": [
+          "vast empty horizons",
+          "knife-sharp high-contrast silhouettes",
+          "sterile geometric grids"
+        ]
+      }
+    },
+    "cactuar": {
+      "visual_grammar": {
+        "medium_handling": "Flat gouache combined with linocut-like ink shapes and mineral stippling, keeping color bands simple and surfaces dry.",
+        "composition": "Centered, frontal, planted, often near-symmetrical; the image reads as a held territory, guarded center, or explicit boundary.",
+        "edge_language": "Hard silhouettes, clipped graphic shapes, and granular stippling at sand, stone, cactus, and boundary surfaces.",
+        "value_structure": "Limited value bands with hard graphic shadows and sparse highlights; contrast should read immediately at card scale.",
+        "camera_and_scale": "Frontal medium or wide views with a low horizon and anchored subject; icon-like territorial presence rather than deep recession.",
+        "detail_distribution": "Sparse detail concentrated on the subject and boundary markers, with broad flat planes of desert or stone around them.",
+        "finish": "Graphic matte blocks, stippled mineral texture, and dry granular edges that preserve the feel of cut ink and pigment.",
+        "avoid": [
+          "soft fuzzy edges",
+          "deep one-point perspective",
+          "romantic atmospheric haze"
+        ]
+      }
+    },
+    "tonberry": {
+      "visual_grammar": {
+        "medium_handling": "Transparent ink washes layered over dark gouache, with opaque lantern and crystal-white highlights emerging from the gloom.",
+        "composition": "Deep one-point or strongly recessive corridors, thresholds, stairs, and distant doors, with a small advancing figure aligned to the depth axis.",
+        "edge_language": "Swallowed edges, layered glazes, dense dark greens and blacks, and tiny islands of razor-sharp detail.",
+        "value_structure": "Predominantly low-key with one contained light source and broad negative shadow; most forms remain partially absorbed by darkness.",
+        "camera_and_scale": "Eye-level corridor perspective or slightly high dungeon view, emphasizing long depth and the inevitability of a small figure approaching.",
+        "detail_distribution": "Precision concentrates around lantern, knife, eyes, threshold, and near surfaces; distant and peripheral detail collapses into glaze.",
+        "finish": "Layered transparent staining over matte dark underpainting, punctured by tiny opaque highlights rather than overall polish.",
+        "avoid": [
+          "high-key cheerful openness",
+          "flat centered iconography",
+          "even illumination"
+        ]
+      }
+    }
+  }
+}
