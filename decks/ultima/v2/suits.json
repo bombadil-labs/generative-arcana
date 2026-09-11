@@ -1,0 +1,52 @@
+{
+  "suits": {
+    "crowns": {
+      "visual_grammar": {
+        "medium_handling": "Opaque heraldic pigment, burnished gold-leaf accents, manuscript border geometry, and fine civic ink detail over parchment.",
+        "composition": "Frontal, symmetrical, emblematic civic staging: thrones, ledgers, gates, halls, markets, seals, and governed spaces arranged like coins, charters, or illuminated legal pages.",
+        "edge_language": "Clean heraldic silhouettes, ruled architectural boundaries, repeated border motifs, and precise ink contours softened only by parchment texture.",
+        "value_structure": "Warm parchment and ordered mid-values anchored by royal blue/dark ink, with gold used as hierarchy rather than ambient glow.",
+        "camera_and_scale": "Frontal medium-to-wide civic view with little perspectival distortion; institutions and spaces feel stable, inspectable, and publicly accountable.",
+        "detail_distribution": "Fine detail gathers on seals, ledgers, regalia, façades, thresholds, and evidence of stewardship; large governed masses stay calm and legible.",
+        "finish": "Formal, burnished, civic, and manuscript-like—the visual grammar of something recorded under seal.",
+        "avoid": ["wild diagonal action", "dreamlike spatial ambiguity", "dark dungeon recession"]
+      }
+    },
+    "blades": {
+      "visual_grammar": {
+        "medium_handling": "Dark carved/woodcut-like ink over matte iron-gray and blood-red pigment, with dry hatching, scraped highlights, and forceful diagonal strokes.",
+        "composition": "Kinetic diagonals, pursuits, clashes, dungeon passages, and exposed roads; figures are caught mid-strike, mid-flight, or at the instant courage becomes action.",
+        "edge_language": "Hard cut silhouettes, aggressive hatch direction, broken carved contours, and sharp weapon/terrain intersections.",
+        "value_structure": "High contrast from cave/storm dark to pale blade/impact highlights, with restrained red used as heat, wound, or urgency.",
+        "camera_and_scale": "Low or eye-level action view, medium-to-wide enough to show path, foe, and consequence; space is something crossed or fought through.",
+        "detail_distribution": "Precision concentrates at weapon, foe, wound, path, and immediate terrain; surrounding darkness is cut in broad graphic masses.",
+        "finish": "Biting, kinetic, manual-illustration woodcut energy rather than polished combat concept art.",
+        "avoid": ["static frontal seals", "soft decorative glow", "ornament that slows the action"]
+      }
+    },
+    "runes": {
+      "visual_grammar": {
+        "medium_handling": "Deep indigo and matte pigment on vellum with luminous gold-ink/runic penwork, candle-warm glazing, and flattened iconographic fields.",
+        "composition": "Page-like, centered or vertically ordered sacred space: books, runes, shrines, diagrams, spells, and contemplative figures arranged as if knowledge itself were illuminated.",
+        "edge_language": "Angular glyph lines, precise marginal marks, flat icon contours, and small gold-lit details against saturated manuscript fields.",
+        "value_structure": "Deep indigo/dark vellum fields support concentrated gold and candle-white marks; the brightest values belong to legible knowledge.",
+        "camera_and_scale": "Flattened iconographic or near-orthographic interior view; depth is subordinate to textual/symbolic hierarchy.",
+        "detail_distribution": "High detail in runes, diagrams, written margins, books, and ritual objects; surrounding planes remain controlled and sacred.",
+        "finish": "Illuminated, learned, devotional, and slightly severe—the page as a vessel of fixed wisdom.",
+        "avoid": ["naturalistic deep landscape perspective", "loose painterly blur", "generic magical particle effects"]
+      }
+    },
+    "moongates": {
+      "visual_grammar": {
+        "medium_handling": "Translucent indigo, moon-silver, and phosphor-red glazing over matte night pigment, with soft halo edges and reflected-water washes.",
+        "composition": "Rounded passages, arches, circles, crossings, companionship, reflective water, and open nocturnal roads; forms curve around portals and transitions rather than locking into rigid frames.",
+        "edge_language": "Soft haloed contours, reflected/doubled edges, rounded arches, water-softened boundaries, and occasional crisp threshold silhouettes.",
+        "value_structure": "Deep nocturnal ground with small luminous gates/moons/reflections; light pools rather than spreads evenly.",
+        "camera_and_scale": "Medium or wide dream-road view with enough depth for passage from here to there; often low horizon or reflected plane.",
+        "detail_distribution": "Detail gathers at gate edges, companions, moons, reflections, and objects crossing thresholds; darkness and water simplify the rest.",
+        "finish": "Luminous nocturne—tender, liminal, reflective, and mobile without becoming soft-focus fantasy wallpaper.",
+        "avoid": ["hard civic symmetry", "woodcut violence", "flat manuscript page geometry as the dominant structure"]
+      }
+    }
+  }
+}
