@@ -9,10 +9,10 @@ async function main(): Promise<void> {
   assert.equal(Object.keys(manifest.data.suits).length, 8, "Octave must remain an eight-suit virtue lattice");
   assert.equal(Object.keys(manifest.data.ranks).length, 8, "Octave must remain eight representational rank-octaves");
   assert.equal(Object.keys(manifest.data.cards).length, 86, "Octave must preserve its 8×8 + 22 corpus");
-  assert.equal(manifest.data.minor_number_origin, "suit");
 
   const registry = new DeckRegistry();
-  registry.registerDeck(manifest);
+  const deck = registry.registerDeck(manifest);
+  assert.equal(deck.data.minor_number_origin, "suit");
   const tools = new ArcanaToolAdapter(new ArcanaEngine(registry));
 
   const sacrifice = await tools.call("get_card", {
