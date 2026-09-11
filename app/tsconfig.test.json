@@ -28,6 +28,7 @@
     "src/engine/ArcanaEngine.ts",
     "src/mcp/ArcanaToolAdapter.ts",
     "src/runtime/defineCard.ts",
+    "src/runtime/spreadScene.ts",
     "src/catalog/api.ts",
     "src/authoring/api.ts"
   ]
