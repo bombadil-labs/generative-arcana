@@ -33,6 +33,7 @@ Additional legacy differences matter during migration:
 ## Migration progress
 
 - **Final Fantasy** — first v2 visual migration. The historical `deck.json` keeps stable symbolic/card content while `decks/finalfantasy/v2/*.json` holds normalized enrichment fragments for deck material language, suit families, rank narrative/form, station environments, and Major formal ancestry. The bundled loader deep-composes those fragments before validation, so the runtime/exported deck is one canonical v2 data tree.
+- **Deep Time** — second migration and deliberate anti-overfitting case. Its v2 fragments recover the visual stack from the locked `DESIGN.md` plus the existing Core Sample generative renderer: geological cross-section material language; plume/bedding/particle/fault family grammars; geology-native rank form; rock-cycle environments; and Major formal ancestry. The renderer remains an implementation of those semantics, not part of the manifest.
 
 ## Definition of enriched
 

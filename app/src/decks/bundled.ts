@@ -10,6 +10,11 @@ import finalFantasyMajorArcana from "../../../decks/finalfantasy/v2/major-arcana
 import evolutionJson from "../../../decks/evolution/deck.json";
 import ultimaOctaveJson from "../../../decks/ultima-octave/deck.json";
 import deepTimeJson from "../../../decks/deep-time/deck.json";
+import deepTimeVisualLanguage from "../../../decks/deep-time/v2/visual-language.json";
+import deepTimeSuits from "../../../decks/deep-time/v2/suits.json";
+import deepTimeRanks from "../../../decks/deep-time/v2/ranks.json";
+import deepTimeStations from "../../../decks/deep-time/v2/stations.json";
+import deepTimeMajorArcana from "../../../decks/deep-time/v2/major-arcana.json";
 import { composeBundledDeckData } from "./composeBundledDeckData";
 import { DeckRegistry, deckRegistry } from "./registry";
 
@@ -20,6 +25,15 @@ const finalFantasyV2 = composeBundledDeckData(
   finalFantasyRanks,
   finalFantasyStations,
   finalFantasyMajorArcana,
+);
+
+const deepTimeV2 = composeBundledDeckData(
+  deepTimeJson,
+  deepTimeVisualLanguage,
+  deepTimeSuits,
+  deepTimeRanks,
+  deepTimeStations,
+  deepTimeMajorArcana,
 );
 
 export const BUNDLED_DECK_MANIFESTS = {
@@ -60,7 +74,7 @@ export const BUNDLED_DECK_MANIFESTS = {
     tagline: "Eight virtues, eight octaves — Garriott's colour-cube of virtue as a lattice deck.",
   },
   "deep-time": {
-    data: deepTimeJson,
+    data: deepTimeV2,
     tagline: "The Earth as an archive that writes itself — a reading is a core sample of the present.",
     spreads: [
       {
