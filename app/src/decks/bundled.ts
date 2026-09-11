@@ -1,4 +1,9 @@
 import ultimaJson from "../../../decks/ultima/deck.json";
+import ultimaVisualLanguage from "../../../decks/ultima/v2/visual-language.json";
+import ultimaSuits from "../../../decks/ultima/v2/suits.json";
+import ultimaRanks from "../../../decks/ultima/v2/ranks.json";
+import ultimaStations from "../../../decks/ultima/v2/stations.json";
+import ultimaMajorArcana from "../../../decks/ultima/v2/major-arcana.json";
 import byrneJson from "../../../decks/byrne/deck.json";
 import ulyssesJson from "../../../decks/ulysses/deck.json";
 import finalFantasyJson from "../../../decks/finalfantasy/deck.json";
@@ -22,6 +27,15 @@ import deepTimeStations from "../../../decks/deep-time/v2/stations.json";
 import deepTimeMajorArcana from "../../../decks/deep-time/v2/major-arcana.json";
 import { composeBundledDeckData } from "./composeBundledDeckData";
 import { DeckRegistry, deckRegistry } from "./registry";
+
+const ultimaV2 = composeBundledDeckData(
+  ultimaJson,
+  ultimaVisualLanguage,
+  ultimaSuits,
+  ultimaRanks,
+  ultimaStations,
+  ultimaMajorArcana,
+);
 
 const finalFantasyV2 = composeBundledDeckData(
   finalFantasyJson,
@@ -52,7 +66,7 @@ const evolutionV2 = composeBundledDeckData(
 
 export const BUNDLED_DECK_MANIFESTS = {
   ultima: {
-    data: ultimaJson,
+    data: ultimaV2,
     tagline: "The Avatar's quest, from Stranger to Codex.",
     spreads: [
       {

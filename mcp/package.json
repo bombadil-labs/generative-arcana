@@ -31,7 +31,8 @@
     "test:cross-host-account": "tsx test/cross-host-account-flow.ts",
     "test:authoring-api": "tsx test/authoring-api.ts",
     "test:deep-time-v2": "tsx test/deep-time-v2.ts",
-    "test:evolution-v2": "tsx test/evolution-v2.ts"
+    "test:evolution-v2": "tsx test/evolution-v2.ts",
+    "test:ultima-v2": "tsx test/ultima-v2.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",

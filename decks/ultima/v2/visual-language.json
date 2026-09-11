@@ -1,0 +1,17 @@
+{
+  "version": "2.1.0",
+  "visual_language": {
+    "medium": "Hand-illuminated fantasy codex art: opaque mineral and gouache-like pigment, iron-gall/woodcut ink line, translucent colored glazing, and selective gold-leaf or phosphor-like accents on parchment and vellum.",
+    "surface": "Warm parchment/vellum tooth remains visible through flat pigment, ink hatching, rubbed color, gilded borders, and translucent night washes; the image should feel authored onto a page rather than rendered into a seamless digital surface.",
+    "mark_making": "Heraldic blocks, carved/hatched ink, runic penwork, manuscript ornament, haloed washes, and small luminous glyphs; each family handles the common codex material differently while remaining visibly from one Britannian book.",
+    "signature_accent": "Selective gold leaf, ankh/rune illumination, moon-silver, and moongate phosphor provide sacred or magical highlights without turning the whole deck glossy.",
+    "finish": "Mythic early-RPG manual meets medieval illuminated manuscript: tactile, hieratic, slightly flattened, materially handmade, and readable at card scale while retaining atmosphere.",
+    "avoid": [
+      "photorealistic medieval reenactment",
+      "glossy 3D fantasy rendering",
+      "generic anime or modern game-concept-art polish",
+      "uniform digital gradients that erase parchment and ink texture",
+      "one identical composition language across all four suits"
+    ]
+  }
+}

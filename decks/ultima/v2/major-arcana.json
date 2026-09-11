@@ -1,0 +1,38 @@
+{
+  "major_arcana": {
+    "visual_grammar": {
+      "medium_handling": "Full-page codex frontispiece: layered opaque pigment, gold leaf, carved ink bite, indigo vellum depth, lunar glazing, and recurring ankh illumination combined more richly than any minor suit.",
+      "composition": "Mythic hieratic plates with strong central/axial structure, architectural or landscape depth where needed, and enough surrounding symbolic world to make each trump feel like a chapter-frontispiece of the Avatar's journey.",
+      "edge_language": "Heraldic crispness at sacred/sovereign forms, carved ink at conflict, manuscript precision at wisdom, and soft lunar/glazed edges at passage—combined selectively, never all at equal intensity.",
+      "value_structure": "Deep manuscript darks and parchment mids support concentrated gold, moon-silver, phosphor, or clarion highlights according to the trump's governing event.",
+      "camera_and_scale": "Iconic to epic: frontal throne/shrine plates, deep quest roads, monumental gates, celestial/cataclysmic vistas, and intimate sacrificial interiors all remain clearly composed as illuminated pages.",
+      "detail_distribution": "Highest ornament and specificity cluster around the trump's central relation, ankh/rune/gate/throne motif, and one or two narrative witnesses; peripheries simplify into page-like atmosphere.",
+      "finish": "Ornate full-bleed illumination—mythic, materially codex-like, and more integrated than any single suit while preserving each trump's readability.",
+      "avoid": ["generic high-fantasy concept art", "uniform gold ornament regardless of meaning", "busy collage of Ultima references", "modern glossy RPG UI aesthetics"]
+    }
+  },
+  "cards": {
+    "major-0": {"factorization": {"visual_logic": "Leave the Stranger small inside an overwhelmingly open page/land: no suit, virtue, road, or sovereign order has yet organized the field, so potential is visible as unclaimed space."}},
+    "major-1": {"factorization": {"visual_logic": "One initiating figure/gesture becomes the transparent unit of action: a single vertical or forward axis should start the whole page moving without yet multiplying into companions or institutions."}},
+    "major-2": {"factorization": {"visual_logic": "Build the card as one irreducible lunar dyad/threshold: two moons or two sides of passage define a relation that cannot be simplified without losing the crossing itself."}},
+    "major-3": {"factorization": {"visual_logic": "Use a threefold generative root—Truth, Love, Courage—as an irreducible triangle or triadic field from which later virtue-structures visibly descend."}},
+    "major-4": {"factorization": {"visual_logic": "Square the Two Moons into durable architecture: paired thresholds become four-corner enclosure, gate frozen into wall/castle/throne geometry."}},
+    "major-5": {"factorization": {"visual_logic": "Give sovereignty one irreducible axial center: throne, ruler, and realm orient around a single stabilizing line rather than a coalition of equal focal points."}},
+    "major-6": {"factorization": {"visual_logic": "Combine the Moons' dyadic relation with the Principles' triad: companions form a circle/network whose pairwise bonds participate in a larger threefold generative field."}},
+    "major-7": {"factorization": {"visual_logic": "Reduce the Quest to one uncompromising road/vector crossing the page. The act of setting out should be formally indivisible even if companions travel it."}},
+    "major-8": {"factorization": {"visual_logic": "Cube passage through nested thresholds at multiple depths/scales: mastery of the between becomes repeated gate-within-gate organization that risks becoming imprisonment."}},
+    "major-9": {"factorization": {"visual_logic": "Square the Principles inward: one triadic outer order is echoed by a second, smaller inner triad around the Lantern/wise center, turning public virtue into internal illumination."}},
+    "major-10": {"factorization": {"visual_logic": "Let threshold/moon duality rotate around sovereignty's fixed axis: the Wheel should make passage and realm visibly co-dependent as ages turn around a stable center."}},
+    "major-11": {"factorization": {"visual_logic": "One irreducible line of self-governance holds person and wyrm in relation. Strength appears as a singular governing bond rather than accumulated techniques or restraints."}},
+    "major-12": {"factorization": {"visual_logic": "Suspend the Castle's fourfold frame inside the Principles' triadic field and invert its orientation: stable passage is voluntarily relinquished so another order can be perceived through sacrifice."}},
+    "major-13": {"factorization": {"visual_logic": "Make the Black Gate one absolute threshold across the whole page. Everything before/after relates to this indivisible boundary; no sequence of smaller exits should dilute it."}},
+    "major-14": {"factorization": {"visual_logic": "Bring the Moons' two-sided passage into the Quest's singular road: opposing currents/temperatures converge around one measured central path rather than cancelling one another."}},
+    "major-15": {"factorization": {"visual_logic": "Lock the Principles' triadic generation into sovereignty's monolithic axis: many virtuous strands are visibly owned/routed through one false center, making bondage look formally orderly."}},
+    "major-16": {"factorization": {"visual_logic": "Recursively square the threshold/castle frame until repeated enclosure exceeds containment and shatters along its own nested boundaries."}},
+    "major-17": {"factorization": {"visual_logic": "Hold one irreducible shrine/light/opening against damaged ground. Renewal should read as a singular mercy that the ruined structures around it cannot generate by themselves."}},
+    "major-18": {"factorization": {"visual_logic": "Let lunar duality witness the Principles squared through layered reflections, false doubles, or repeated triads; fecundity becomes visually abundant but epistemically unreliable."}},
+    "major-19": {"factorization": {"visual_logic": "Use one indivisible radiant source/field whose clarity organizes the entire page without secondary explanation: justice becomes visible as daylight itself."}},
+    "major-20": {"factorization": {"visual_logic": "Sound sovereignty through the Castle's stable fourfold threshold: a fixed gate/frame becomes a transmitting call across worlds, with concentric or echoed structure extending outward."}},
+    "major-21": {"factorization": {"visual_logic": "Combine the Principles' generative triad with the Quest's irreducible road into a complete moving pattern: many virtues remain distinct yet participate in one integrated circulation around the Codex."}}
+  }
+}
