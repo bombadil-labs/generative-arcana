@@ -101,6 +101,10 @@ function axis(value: unknown, path: string, kind: "suit" | "rank" | "station"): 
     indices.add(a.index);
     if (own(a, "slug") && a.slug !== key) fail(`${p}.slug`, "must match its object key");
     optionalText(a, ["description", "visual_style", "visual_content", "visual_motif", "question"], p);
+    if (own(a, "numeric_value")) {
+      if (kind === "station") fail(`${p}.numeric_value`, "is not supported on station axes");
+      integer(a.numeric_value, `${p}.numeric_value`);
+    }
     if (own(a, "meaning")) meaning(a.meaning, `${p}.meaning`, true);
     if (own(a, "factorization")) factorization(a.factorization, `${p}.factorization`);
     if (kind === "suit" && own(a, "visual_grammar")) visualFamilyGrammar(a.visual_grammar, `${p}.visual_grammar`);
@@ -110,10 +114,7 @@ function axis(value: unknown, path: string, kind: "suit" | "rank" | "station"): 
       if (kind === "rank") text(a.symbol, `${p}.symbol`);
       else symbol(a.symbol, `${p}.symbol`);
     }
-    if (kind === "rank") {
-      if (own(a, "numeric_value")) integer(a.numeric_value, `${p}.numeric_value`);
-      if (own(a, "arcana") && a.arcana !== "minor") fail(`${p}.arcana`, "must be minor");
-    }
+    if (kind === "rank" && own(a, "arcana") && a.arcana !== "minor") fail(`${p}.arcana`, "must be minor");
   }
   if ([...indices].some((i) => i >= indices.size)) fail(path, "indices must be contiguous from zero");
   return entries;
@@ -131,6 +132,12 @@ export function validateDeck(value: unknown): DeckValidation {
     text(theme.description, "theme.description");
     text(theme.creator, "theme.creator");
     if (own(d, "visual_language")) deckVisualLanguage(d.visual_language, "visual_language");
+    if (own(d, "minor_numeric_origin")
+      && d.minor_numeric_origin !== "rank"
+      && d.minor_numeric_origin !== "suit"
+      && d.minor_numeric_origin !== "card") {
+      fail("minor_numeric_origin", "must be rank, suit, or card");
+    }
     const suits = axis(d.suits, "suits", "suit");
     const ranks = axis(d.ranks, "ranks", "rank");
     const tx = object(d.transversal, "transversal");
@@ -188,6 +195,15 @@ export function validateDeck(value: unknown): DeckValidation {
         slug(c.rank_slug, `${p}.rank_slug`);
         if (!own(suits, c.suit_slug)) fail(`${p}.suit_slug`, "references an unknown suit");
         if (!own(ranks, c.rank_slug)) fail(`${p}.rank_slug`, "references an unknown rank");
+        if (d.minor_numeric_origin === "rank") {
+          const owner = ranks[c.rank_slug] as RecordValue;
+          if (!own(owner, "numeric_value")) fail(`${p}.number`, "deck declares rank-owned numbering but the referenced rank has no numeric_value");
+          if (owner.numeric_value !== Number(c.number)) fail(`${p}.number`, "must match the referenced rank numeric_value");
+        } else if (d.minor_numeric_origin === "suit") {
+          const owner = suits[c.suit_slug] as RecordValue;
+          if (!own(owner, "numeric_value")) fail(`${p}.number`, "deck declares suit-owned numbering but the referenced suit has no numeric_value");
+          if (owner.numeric_value !== Number(c.number)) fail(`${p}.number`, "must match the referenced suit numeric_value");
+        }
       } else if (own(c, "suit_slug") || own(c, "rank_slug")) fail(p, "major cards must not reference a suit or rank");
       meaning(c.meaning, `${p}.meaning`, false);
       const visuals = object(c.visuals, `${p}.visuals`);
