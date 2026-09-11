@@ -2,10 +2,11 @@
 
 Generative Arcana owns the executable validation boundary for authored decks. Hosts may supply inference and UX, but they should not reproduce deck validation rules themselves.
 
-The canonical producer artifact is `DeckManifest`:
+The canonical producer artifact is schema-v2 `DeckManifest`:
 
 ```ts
 interface DeckManifest {
+  schemaVersion: 2;
   data: DeckDataFile;
   tagline: string;
   spreads?: Spread[];
@@ -18,63 +19,32 @@ See `docs/deck-manifest.md` for the ownership and identity contract.
 
 A portable authoring workflow is:
 
-1. produce a `DeckManifest`;
+1. produce a schema-v2 `DeckManifest`;
 2. validate it through Generative Arcana;
 3. use `{ valid: false, error }` as repair feedback and repeat;
 4. continue only when the result is `valid: true` and `canonical: true`;
 5. persist/import the same authored content; the catalog then assigns stable resource identity, ownership, visibility, and revision.
 
-Validation is stateless and account-independent. It never imports a deck or mutates a caller's runtime/catalog.
+Validation is stateless and account-independent.
 
 ## MCP
 
 Two read-only tools are available in every MCP host:
 
-- `get_deck_authoring_spec` — compact machine-readable description of the canonical envelope, identity boundary, compatibility policy, and validation behavior.
-- `validate_deck_manifest` — validates either `manifest` (an object) or `json` (a string). Set `includeNormalizedManifest: true` only when the normalized artifact is needed; large decks make that response correspondingly large.
+- `get_deck_authoring_spec`
+- `validate_deck_manifest`
 
-Invalid authored content is returned as structured repair data rather than as a failed MCP tool call. Malformed tool input (for example supplying both `manifest` and `json`) is still a tool error.
-
-### Importing the validated artifact
-
-When a connected host should persist the deck, the preferred stateful call accepts the canonical artifact directly:
-
-```text
-import_deck({ manifest })
-```
-
-`replaceExisting` is operation metadata and may accompany the manifest explicitly:
-
-```text
-import_deck({ manifest, replaceExisting: true })
-```
-
-A manifest import rejects top-level `tagline` or `spreads` overrides; those authored fields must come from the manifest itself. Legacy `{ data, tagline, spreads }` and raw `json` import forms remain available for compatibility.
-
-## HTTP
-
-The same account-independent surface is available beside the web app and MCP endpoint:
-
-```text
-GET  /api/authoring/spec
-POST /api/authoring/validate
-```
-
-`POST /api/authoring/validate` accepts the authored JSON document directly. Add `?includeNormalizedManifest=true` to receive the validated/normalized manifest in the result.
-
-These routes do not require `DATABASE_URL`, browser authentication, or MCP OAuth. The production HTTP server still applies its existing Host/Origin validation, request-size limits, and rate limiting.
-
-## Result shape
-
-Successful canonical validation returns a compact result like:
+A successful canonical validation returns:
 
 ```json
 {
   "valid": true,
-  "specVersion": "1",
-  "inputKind": "manifest",
+  "specVersion": "2",
+  "inputKind": "manifest-v2",
   "canonical": true,
+  "migrated": false,
   "summary": {
+    "schemaVersion": 2,
     "name": "Example Tarot",
     "slug": "example",
     "version": "1.0.0",
@@ -87,33 +57,25 @@ Successful canonical validation returns a compact result like:
 }
 ```
 
-A bare legacy `DeckDataFile` may also validate because uploads/imports still support that historical input shape. Such a result is explicitly marked:
+A historical v1 manifest without `schemaVersion` remains readable but returns `inputKind: "legacy-manifest-v1"`, `canonical: false`, `migrated: true`, and may return its normalized v2 manifest. Bare `DeckDataFile` is a second compatibility path (`legacy-raw-deck`). New producers should never standardize on either legacy form.
 
-```json
-{
-  "valid": true,
-  "inputKind": "legacy-raw-deck",
-  "canonical": false,
-  "warning": "Bare DeckDataFile is accepted for compatibility ..."
-}
+Invalid authored content remains structured repair data rather than a failed tool call.
+
+### Importing the validated artifact
+
+```text
+import_deck({ manifest })
 ```
 
-New authoring producers should never standardize on that compatibility path.
+`replaceExisting` is operation metadata and may accompany the manifest explicitly. Top-level `tagline`/`spreads` overrides are rejected when `manifest` is supplied.
 
-Invalid authored content stays a normal validation result:
+## HTTP
 
-```json
-{
-  "valid": false,
-  "specVersion": "1",
-  "inputKind": "manifest",
-  "canonical": true,
-  "error": "manifest.tagline: must be a non-empty string."
-}
+The same account-independent surface is available beside the web app and MCP endpoint:
+
+```text
+GET  /api/authoring/spec
+POST /api/authoring/validate
 ```
 
-## Why there is no duplicate JSON Schema source of truth
-
-The machine-readable spec intentionally describes the artifact boundary rather than attempting to reimplement every deck rule as a second static schema. The shared deck-domain validator performs referential checks, canonical runtime card-order derivation, native spread normalization, JSON snapshotting, and extension preservation that are not usefully captured by a shallow envelope schema alone.
-
-If a future editor needs JSON Schema for completion/form generation, it should be generated or tested against this executable boundary rather than becoming a competing definition of what a valid deck is.
+These routes do not require browser auth or MCP OAuth; ordinary Host/Origin, size, and rate guardrails still apply.

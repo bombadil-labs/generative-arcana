@@ -111,13 +111,14 @@ Assemble the full `Deck` payload per `references/schema.md` (theme, 4 ordered su
 
 ```json
 {
+  "schemaVersion": 2,
   "data": { "...": "the complete Deck payload" },
   "tagline": "A concise human-facing summary of the deck.",
   "spreads": []
 }
 ```
 
-`spreads` is optional; omit it when the deck has no authored native spreads. Do **not** emit a catalog resource ID, owner/principal, visibility, revision/timestamps, OAuth/provider/session data, or renderer/MCP host metadata. `data.slug` remains authored metadata; the platform assigns stable resource identity when the manifest is imported.
+`schemaVersion: 2` is required for newly authored manifests. `spreads` is optional; omit it when the deck has no authored native spreads. Do **not** emit a catalog resource ID, owner/principal, visibility, revision/timestamps, OAuth/provider/session data, or renderer/MCP host metadata. `data.slug` remains authored metadata; the platform assigns stable resource identity when the manifest is imported.
 
 When `validate_deck_manifest` is available, validate this exact envelope before delivery. Repair any `valid: false` result and re-run; if the result says `canonical: false`, convert the artifact to the canonical manifest envelope and re-run. Finish only on `valid: true, canonical: true`. Validation does not itself import or publish anything.
 
@@ -140,7 +141,7 @@ Confirm the save and report the path. If the user also asked to import it into a
 ## Quality checks
 
 - **Platform-valid when available?** If the executable validator is connected, did the final artifact reach `valid: true, canonical: true` before delivery/import?
-- **Canonical envelope?** Is the final artifact exactly the authored `DeckManifest` concern — `data`, explicit non-empty `tagline`, and optional `spreads` — with no catalog/account/host identity metadata?
+- **Canonical envelope?** Is the final artifact schema v2 — `schemaVersion: 2`, `data`, explicit non-empty `tagline`, and optional `spreads` — with no catalog/account/host identity metadata?
 - **Axes orthogonal?** Do suit, rank, and transversal each carve the space differently? (If the transversal aligns with the suits, N or the walk is wrong.)
 - **No denormalization?** Does any card restate an axis (a suit's style, a rank's content, a station's motif) instead of overriding it? It shouldn't. (The factorization *gloss* IS stored — intentionally; the factorization is not.)
 - **Transversal sublimated?** Read ten random pip descriptions — can you feel the station without it being named? (A station `symbol`, if any, stays weather on the card face — surfacing only as a deliberate, rare exception, never the default register.)

@@ -24,37 +24,51 @@ async function httpContract(): Promise<void> {
   try {
     let response = await fetch(`${base}/api/authoring/spec`);
     assert.equal(response.status, 200);
-    const spec = await response.json() as { spec: { kind: string }; validation: { mcpTool: string } };
+    const spec = await response.json() as { spec: { kind: string; schema: { current: number } }; validation: { mcpTool: string } };
     assert.equal(spec.spec.kind, "generative-arcana/deck-manifest");
+    assert.equal(spec.spec.schema.current, 2);
     assert.equal(spec.validation.mcpTool, "validate_deck_manifest");
 
     response = await fetch(`${base}/api/authoring/validate`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ data: deepTime, tagline: "HTTP canonical" }),
+      body: JSON.stringify({ schemaVersion: 2, data: deepTime, tagline: "HTTP canonical" }),
     });
     assert.equal(response.status, 200);
-    const canonical = await response.json() as { valid: boolean; canonical: boolean; summary: { slug: string }; normalizedManifest?: unknown };
+    const canonical = await response.json() as { valid: boolean; canonical: boolean; summary: { schemaVersion: number; slug: string }; normalizedManifest?: unknown };
     assert.equal(canonical.valid, true);
     assert.equal(canonical.canonical, true);
+    assert.equal(canonical.summary.schemaVersion, 2);
     assert.equal(canonical.summary.slug, deepTime.slug);
     assert.equal(canonical.normalizedManifest, undefined);
 
     response = await fetch(`${base}/api/authoring/validate?includeNormalizedManifest=true`, {
       method: "POST",
       headers: { "content-type": "application/json" },
+      body: JSON.stringify({ data: deepTime, tagline: "Legacy v1" }),
+    });
+    const legacyManifest = await response.json() as { valid: boolean; canonical: boolean; inputKind: string; normalizedManifest?: { schemaVersion: number } };
+    assert.equal(legacyManifest.valid, true);
+    assert.equal(legacyManifest.canonical, false);
+    assert.equal(legacyManifest.inputKind, "legacy-manifest-v1");
+    assert.equal(legacyManifest.normalizedManifest?.schemaVersion, 2);
+
+    response = await fetch(`${base}/api/authoring/validate?includeNormalizedManifest=true`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
       body: JSON.stringify(deepTime),
     });
-    const legacy = await response.json() as { valid: boolean; canonical: boolean; inputKind: string; normalizedManifest?: { data: { slug: string } } };
+    const legacy = await response.json() as { valid: boolean; canonical: boolean; inputKind: string; normalizedManifest?: { schemaVersion: number; data: { slug: string } } };
     assert.equal(legacy.valid, true);
     assert.equal(legacy.canonical, false);
     assert.equal(legacy.inputKind, "legacy-raw-deck");
+    assert.equal(legacy.normalizedManifest?.schemaVersion, 2);
     assert.equal(legacy.normalizedManifest?.data.slug, deepTime.slug);
 
     response = await fetch(`${base}/api/authoring/validate`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ data: deepTime, tagline: "" }),
+      body: JSON.stringify({ schemaVersion: 2, data: deepTime, tagline: "" }),
     });
     const invalid = await response.json() as { valid: boolean; error?: string };
     assert.equal(response.status, 200, "domain-invalid authored content is a repair result, not a transport error");
@@ -87,7 +101,7 @@ async function realHttpRoutingContract(): Promise<void> {
     response = await fetch(`${base}/api/authoring/validate`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ data: deepTime, tagline: "Real HTTP route" }),
+      body: JSON.stringify({ schemaVersion: 2, data: deepTime, tagline: "Real HTTP route" }),
     });
     assert.equal(response.status, 200);
     assert.equal((await response.json() as { valid?: boolean }).valid, true);
@@ -130,12 +144,13 @@ async function mcpContract(): Promise<void> {
 
     const spec = await client.callTool({ name: "get_deck_authoring_spec", arguments: {} });
     assert.equal(spec.isError, undefined);
-    const specResult = (spec.structuredContent as { result?: { kind?: string } } | undefined)?.result;
+    const specResult = (spec.structuredContent as { result?: { kind?: string; schema?: { current?: number } } } | undefined)?.result;
     assert.equal(specResult?.kind, "generative-arcana/deck-manifest");
+    assert.equal(specResult?.schema?.current, 2);
 
     const validated = await client.callTool({
       name: "validate_deck_manifest",
-      arguments: { manifest: { data: deepTime, tagline: "MCP canonical" } },
+      arguments: { manifest: { schemaVersion: 2, data: deepTime, tagline: "MCP canonical" } },
     });
     assert.equal(validated.isError, undefined);
     const result = (validated.structuredContent as { result?: { valid?: boolean; canonical?: boolean } } | undefined)?.result;
@@ -144,7 +159,7 @@ async function mcpContract(): Promise<void> {
 
     const invalid = await client.callTool({
       name: "validate_deck_manifest",
-      arguments: { manifest: { data: deepTime, tagline: "" } },
+      arguments: { manifest: { schemaVersion: 2, data: deepTime, tagline: "" } },
     });
     assert.equal(invalid.isError, undefined, "invalid authored content remains structured repair data");
     assert.equal((invalid.structuredContent as { result?: { valid?: boolean } } | undefined)?.result?.valid, false);
@@ -166,7 +181,7 @@ async function mcpManifestImportContract(): Promise<void> {
 
     const imported = await client.callTool({
       name: "import_deck",
-      arguments: { manifest: { data, tagline: "Imported as one canonical artifact" } },
+      arguments: { manifest: { schemaVersion: 2, data, tagline: "Imported as one canonical artifact" } },
     });
     assert.equal(imported.isError, undefined);
     const result = (imported.structuredContent as { result?: { id?: string } } | undefined)?.result;

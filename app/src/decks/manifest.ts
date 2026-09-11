@@ -3,21 +3,26 @@ import { DeckRegistry } from "./registry";
 import type { Spread } from "./spreads";
 import type { DeckDataFile, DeckModule } from "./types";
 
-/**
- * Canonical renderer-, host-, auth-, and catalog-independent authored artifact.
- *
- * Every authoring route (manual upload, LLM-assisted creation, future editors/importers) should
- * terminate in this shape before persistence. Resource identity, owner, revision, visibility, and
- * provider/session metadata are catalog concerns and never belong inside the manifest.
- *
- * `data.slug` is authored metadata. It is not the globally stable resource identity assigned when
- * a manifest enters a Generative Arcana catalog.
- */
+export const CURRENT_DECK_MANIFEST_SCHEMA_VERSION = 2 as const;
+export type DeckManifestSchemaVersion = 1 | typeof CURRENT_DECK_MANIFEST_SCHEMA_VERSION;
+
+/** Canonical v2 authored artifact. */
 export interface DeckManifest {
+  schemaVersion: typeof CURRENT_DECK_MANIFEST_SCHEMA_VERSION;
   data: DeckDataFile;
   tagline: string;
   spreads?: Spread[];
 }
+
+/** Historical v1 envelope. Absence of `schemaVersion` is treated as v1 for compatibility. */
+export interface LegacyDeckManifestV1 {
+  schemaVersion?: 1;
+  data: DeckDataFile;
+  tagline: string;
+  spreads?: Spread[];
+}
+
+export type DeckManifestInput = DeckManifest | LegacyDeckManifestV1;
 
 export interface DeckManifestOptions {
   tagline?: string;
@@ -25,25 +30,25 @@ export interface DeckManifestOptions {
 }
 
 export type DeckManifestValidation =
-  | { ok: true; manifest: DeckManifest }
+  | {
+      ok: true;
+      manifest: DeckManifest;
+      sourceSchemaVersion: DeckManifestSchemaVersion;
+      migrated: boolean;
+    }
   | { ok: false; error: string };
 
-/** Snapshot one validated runtime deck into the canonical renderer-independent authored artifact. */
+/** Snapshot one validated runtime deck into the current canonical authored artifact. */
 export function snapshotDeckManifest(deck: DeckModule): DeckManifest {
   return immutableJsonSnapshot({
+    schemaVersion: CURRENT_DECK_MANIFEST_SCHEMA_VERSION,
     data: deck.data,
     tagline: deck.tagline,
     ...(deck.spreads ? { spreads: deck.spreads } : {}),
   }, "Deck manifest");
 }
 
-/**
- * Normalize raw deck data plus optional authored envelope fields into a canonical manifest.
- *
- * This is the compatibility/construction path used by older raw-deck imports. The scratch registry
- * owns the same validation, canonical card ordering, spread normalization, and immutable snapshotting
- * used by ordinary runtime registration, without mutating a caller's registry.
- */
+/** Normalize raw deck data plus optional authored envelope fields into the current manifest schema. */
 export function createDeckManifest(data: unknown, options: DeckManifestOptions = {}): DeckManifest {
   const scratch = new DeckRegistry();
   const deck = scratch.registerDeck({
@@ -56,10 +61,10 @@ export function createDeckManifest(data: unknown, options: DeckManifestOptions =
 }
 
 /**
- * Validate the canonical authored envelope itself.
+ * Validate any supported manifest envelope and normalize it to the current canonical schema.
  *
- * Canonical authoring producers must provide an explicit non-empty tagline. Consumers may continue
- * to accept legacy raw DeckDataFile input by routing it through `createDeckManifest` first.
+ * v1 manifests omitted `schemaVersion`; v2 requires `schemaVersion: 2`. Future unsupported versions
+ * fail closed rather than being silently interpreted as the current contract.
  */
 export function validateDeckManifest(value: unknown): DeckManifestValidation {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -74,6 +79,9 @@ export function validateDeckManifest(value: unknown): DeckManifestValidation {
     return { ok: false, error: "manifest.spreads: must be an array when provided." };
   }
 
+  const version = manifestSchemaVersion(record.schemaVersion);
+  if (!version.ok) return version;
+
   try {
     return {
       ok: true,
@@ -81,6 +89,8 @@ export function validateDeckManifest(value: unknown): DeckManifestValidation {
         tagline: record.tagline,
         ...(record.spreads === undefined ? {} : { spreads: record.spreads as Spread[] }),
       }),
+      sourceSchemaVersion: version.version,
+      migrated: version.version !== CURRENT_DECK_MANIFEST_SCHEMA_VERSION,
     };
   } catch (error) {
     return {
@@ -88,4 +98,14 @@ export function validateDeckManifest(value: unknown): DeckManifestValidation {
       error: error instanceof Error ? error.message : "Invalid deck manifest.",
     };
   }
+}
+
+function manifestSchemaVersion(value: unknown):
+  | { ok: true; version: DeckManifestSchemaVersion }
+  | { ok: false; error: string } {
+  if (value === undefined || value === 1) return { ok: true, version: 1 };
+  if (value === CURRENT_DECK_MANIFEST_SCHEMA_VERSION) {
+    return { ok: true, version: CURRENT_DECK_MANIFEST_SCHEMA_VERSION };
+  }
+  return { ok: false, error: `manifest.schemaVersion: unsupported schema version ${String(value)}.` };
 }

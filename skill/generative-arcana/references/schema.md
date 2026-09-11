@@ -21,6 +21,7 @@ New authoring workflows emit a **`DeckManifest`**, not a bare deck payload and n
 
 ```typescript
 interface DeckManifest {
+  schemaVersion: 2 // canonical schema version; older envelopes are compatibility input only
   data: Deck       // the symbolic payload defined below
   tagline: string  // required, concise human-facing summary
   spreads?: Spread[]
@@ -40,7 +41,7 @@ interface Spread {
 }
 ```
 
-The `Deck` interface below is therefore `manifest.data`. Existing import surfaces may still accept a bare `Deck` as compatibility input and normalize it into a manifest, but new producers should write the canonical envelope directly.
+The `Deck` interface below is therefore `manifest.data`. `schemaVersion` versions the authored envelope independently of the deck's own content `version`. Existing v1 manifests (which omitted `schemaVersion`) and bare `Deck` payloads remain compatibility inputs and are normalized to v2; new producers must emit `schemaVersion: 2`.
 
 `manifest.data.slug` is authored metadata. It is **not** Generative Arcana's durable resource identity; the catalog assigns an opaque stable ID after import. Likewise, do not put owner IDs, visibility, revisions/timestamps, OAuth/provider/session data, MCP metadata, or renderer implementation objects into the manifest. Those are host/catalog concerns layered around the authored artifact.
 

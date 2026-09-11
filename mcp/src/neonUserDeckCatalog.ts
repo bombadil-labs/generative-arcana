@@ -212,7 +212,7 @@ function parseRow(row: Record<string, unknown>): UserDeckRecord {
   return immutableJsonSnapshot(record, "User deck catalog row");
 }
 
-function snapshotManifest(manifest: UserDeckManifest): UserDeckManifest {
+function snapshotManifest(manifest: UserDeckManifest) {
   const validation = validateDeckManifest(manifest);
   if (!validation.ok) throw new Error(validation.error);
   return validation.manifest;

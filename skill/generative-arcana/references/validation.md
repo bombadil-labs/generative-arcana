@@ -10,7 +10,7 @@ If the tool is unavailable, continue normally from `references/schema.md`. The a
 
 ## Before final delivery
 
-After assembling the complete canonical `DeckManifest`, call:
+After assembling the complete canonical schema-v2 `DeckManifest` (`schemaVersion: 2`), call:
 
 ```text
 validate_deck_manifest({ manifest: <the complete manifest> })
@@ -21,7 +21,7 @@ Do not request `includeNormalizedManifest` unless you actually need the normaliz
 Treat results this way:
 
 - `valid: true, canonical: true` — the authored artifact may be delivered or imported.
-- `valid: true, canonical: false` — the input is legacy raw deck compatibility input. Wrap it in the canonical `{ data, tagline, spreads? }` envelope and validate again. New authoring must not finish on this path.
+- `valid: true, canonical: false` — the input is supported legacy content (a v1 manifest without `schemaVersion`, or bare raw deck data). Use the normalized v2 shape or explicitly add `schemaVersion: 2`, then validate again. New authoring must not finish on this path.
 - `valid: false` — use `error` as repair feedback, edit the artifact, and validate again. Do not paper over the failure or merely warn the user.
 - tool/transport failure — do not reinterpret that as a validation failure. If the platform validator is unavailable, perform the local quality checks in this bundle and clearly deliver the manifest without claiming server validation.
 
