@@ -13,31 +13,28 @@ interface DeckManifest {
 }
 ```
 
+See `docs/deck-manifest.md` for the ownership and identity contract.
+
 ## Validation loop
 
-1. produce schema-v2 `DeckManifest`;
+A portable authoring workflow is:
+
+1. produce a schema-v2 `DeckManifest`;
 2. validate it through Generative Arcana;
-3. repair from `{ valid: false, error }`;
-4. continue only on `valid: true, canonical: true`;
-5. persist/import the same normalized authored content.
+3. use `{ valid: false, error }` as repair feedback and repeat;
+4. continue only when the result is `valid: true` and `canonical: true`;
+5. persist/import the same authored content; the catalog then assigns stable resource identity, ownership, visibility, and revision.
 
 Validation is stateless and account-independent.
 
-## MCP and HTTP
+## MCP
 
-Read-only MCP tools:
+Two read-only tools are available in every MCP host:
 
 - `get_deck_authoring_spec`
 - `validate_deck_manifest`
 
-HTTP equivalents:
-
-```text
-GET  /api/authoring/spec
-POST /api/authoring/validate
-```
-
-A successful canonical result is shaped like:
+A successful canonical validation returns:
 
 ```json
 {
@@ -60,14 +57,25 @@ A successful canonical result is shaped like:
 }
 ```
 
-A historical v1 manifest (`{ data, tagline, spreads? }`) returns `inputKind: "legacy-manifest-v1"`, `canonical: false`, `migrated: true`, and can optionally return its normalized schema-v2 manifest. Bare `DeckDataFile` remains a second compatibility input (`legacy-raw-deck`). New producers must not standardize on either path.
+A historical v1 manifest without `schemaVersion` remains readable but returns `inputKind: "legacy-manifest-v1"`, `canonical: false`, `migrated: true`, and may return its normalized v2 manifest. Bare `DeckDataFile` is a second compatibility path (`legacy-raw-deck`). New producers should never standardize on either legacy form.
 
-## Import
+Invalid authored content remains structured repair data rather than a failed tool call.
 
-The preferred stateful call accepts the validated artifact directly:
+### Importing the validated artifact
 
 ```text
 import_deck({ manifest })
 ```
 
-`replaceExisting` is operation metadata and may accompany the manifest. Authored `tagline`/`spreads` cannot be overridden outside the manifest.
+`replaceExisting` is operation metadata and may accompany the manifest explicitly. Top-level `tagline`/`spreads` overrides are rejected when `manifest` is supplied.
+
+## HTTP
+
+The same account-independent surface is available beside the web app and MCP endpoint:
+
+```text
+GET  /api/authoring/spec
+POST /api/authoring/validate
+```
+
+These routes do not require browser auth or MCP OAuth; ordinary Host/Origin, size, and rate guardrails still apply.
