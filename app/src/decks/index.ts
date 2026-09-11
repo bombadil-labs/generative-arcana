@@ -6,7 +6,14 @@ export * from "./registry";
 export * from "./manifest";
 export * from "./authoring";
 export type { DeckVisibility, UserDeckManifest, UserDeckRecord } from "./catalog";
-export type { DeckModule, DeckDataFile } from "./types";
+export type {
+  DeckModule,
+  DeckDataFile,
+  DeckVisualLanguage,
+  VisualFamilyGrammar,
+  RankVisualForm,
+  StationVisualEnvironment,
+} from "./types";
 
 import "./ultima"; // registers the Ultima deck (+ its sketches)
 import "./byrne"; // registers the Byrne Journey Tarot (placeholder visuals)

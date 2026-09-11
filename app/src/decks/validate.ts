@@ -29,6 +29,39 @@ function integer(value: unknown, path: string, min = 0): asserts value is number
 function optionalText(o: RecordValue, fields: string[], path: string) {
   for (const k of fields) if (own(o, k)) text(o[k], `${path}.${k}`);
 }
+function optionalContent(o: RecordValue, fields: string[], path: string) {
+  for (const k of fields) if (own(o, k)) text(o[k], `${path}.${k}`, true);
+}
+function stringList(value: unknown, path: string) {
+  if (!Array.isArray(value)) fail(path, "must be an array of strings");
+  value.forEach((entry, index) => text(entry, `${path}[${index}]`, true));
+}
+function proseObject(value: unknown, path: string, fields: string[], withAvoid = false): RecordValue {
+  const result = object(value, path);
+  optionalContent(result, fields, path);
+  if (withAvoid && own(result, "avoid")) stringList(result.avoid, `${path}.avoid`);
+  return result;
+}
+function deckVisualLanguage(value: unknown, path: string) {
+  proseObject(value, path, ["medium", "surface", "mark_making", "signature_accent", "finish"], true);
+}
+function visualFamilyGrammar(value: unknown, path: string) {
+  proseObject(value, path, [
+    "medium_handling",
+    "composition",
+    "edge_language",
+    "value_structure",
+    "camera_and_scale",
+    "detail_distribution",
+    "finish",
+  ], true);
+}
+function rankVisualForm(value: unknown, path: string) {
+  proseObject(value, path, ["composition_law", "spatial_logic", "rhythm", "density", "figure_ground"]);
+}
+function stationVisualEnvironment(value: unknown, path: string) {
+  proseObject(value, path, ["illumination", "palette", "atmosphere", "motion", "density", "material_effects"]);
+}
 function meaning(value: unknown, path: string, palette: boolean) {
   const m = object(value, path);
   for (const k of ["upright", "inverted"]) {
@@ -42,6 +75,7 @@ function factorization(value: unknown, path: string) {
   const f = object(value, path);
   if (!["identity", "prime", "composite"].includes(f.character as string)) fail(`${path}.character`, "must be identity, prime, or composite");
   text(f.gloss, `${path}.gloss`);
+  if (own(f, "visual_logic")) text(f.visual_logic, `${path}.visual_logic`, true);
   if (own(f, "factors")) {
     if (!Array.isArray(f.factors)) fail(`${path}.factors`, "must be an array");
     f.factors.forEach((v, i) => integer(v, `${path}.factors[${i}]`, 2));
@@ -69,6 +103,9 @@ function axis(value: unknown, path: string, kind: "suit" | "rank" | "station"): 
     optionalText(a, ["description", "visual_style", "visual_content", "visual_motif", "question"], p);
     if (own(a, "meaning")) meaning(a.meaning, `${p}.meaning`, true);
     if (own(a, "factorization")) factorization(a.factorization, `${p}.factorization`);
+    if (kind === "suit" && own(a, "visual_grammar")) visualFamilyGrammar(a.visual_grammar, `${p}.visual_grammar`);
+    if (kind === "rank" && own(a, "visual_form")) rankVisualForm(a.visual_form, `${p}.visual_form`);
+    if (kind === "station" && own(a, "visual_environment")) stationVisualEnvironment(a.visual_environment, `${p}.visual_environment`);
     if (own(a, "symbol")) {
       if (kind === "rank") text(a.symbol, `${p}.symbol`);
       else symbol(a.symbol, `${p}.symbol`);
@@ -93,6 +130,7 @@ export function validateDeck(value: unknown): DeckValidation {
     text(theme.name, "theme.name", true);
     text(theme.description, "theme.description");
     text(theme.creator, "theme.creator");
+    if (own(d, "visual_language")) deckVisualLanguage(d.visual_language, "visual_language");
     const suits = axis(d.suits, "suits", "suit");
     const ranks = axis(d.ranks, "ranks", "rank");
     const tx = object(d.transversal, "transversal");
@@ -103,6 +141,7 @@ export function validateDeck(value: unknown): DeckValidation {
     const stations = axis(tx.stations, "transversal.stations", "station");
     const major = object(d.major_arcana, "major_arcana");
     optionalText(major, ["story", "visual_style"], "major_arcana");
+    if (own(major, "visual_grammar")) visualFamilyGrammar(major.visual_grammar, "major_arcana.visual_grammar");
     if (own(major, "symbol")) symbol(major.symbol, "major_arcana.symbol");
 
     if (own(d, "dialectic")) {

@@ -26,7 +26,7 @@ Those routes may differ radically in how they help a user create the content. Th
 
 ### `data`
 
-The renderer-independent symbolic deck model (`DeckDataFile`). It owns authored deck structure and content: theme, suits, ranks, transversal, majors, cards, and optional extension fields accepted by the runtime deck validator.
+The renderer-independent symbolic deck model (`DeckDataFile`). It owns authored deck structure and content: theme, suits, ranks, transversal, majors, cards, and optional extension fields accepted by the runtime deck validator. Renderer-independent **visual semantics** (shared material language, family composition grammar, rank form, station environment, numeric visual logic) also belong here; executable renderer objects do not. See `docs/visual-grammar.md`.
 
 `data.slug` is authored metadata. It is useful for presentation and backwards-compatible lookup, but it is **not** the durable Generative Arcana resource identity.
 
