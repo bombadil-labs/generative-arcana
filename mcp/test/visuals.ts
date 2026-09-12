@@ -65,6 +65,7 @@ async function main(): Promise<void> {
   assert.deepEqual([...art.data.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
 
   assert.equal(await visuals.loadCardArt("final-fantasy-tarot", "not-a-real-card"), null);
+  assert.equal(await visuals.loadCardArt("deep-time", "major-0", "core-sample"), null);
   await assert.rejects(
     () => visuals.loadCardArt("final-fantasy-tarot", "../major-0"),
     /not safe for static asset lookup/,
@@ -72,10 +73,6 @@ async function main(): Promise<void> {
   await assert.rejects(
     () => visuals.loadCardArt("final-fantasy-tarot", "major-0", "missing-pack"),
     /Unknown server-renderable visual pack/,
-  );
-  await assert.rejects(
-    () => visuals.loadCardArt("deep-time", "major-0", "core-sample"),
-    /provides Living Spreads but no server card art/,
   );
 }
 
