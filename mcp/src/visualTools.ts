@@ -1,10 +1,11 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import type { CardData } from "../../app/src/decks/card";
-import type { Spread } from "../../app/src/decks/spreads";
+import type { CardRenderSpec } from "../../app/src/decks/renderSpec";
 import type { ArcanaToolAdapter } from "../../app/src/mcp/ArcanaToolAdapter";
 import type { ArcanaToolCallObserver } from "./observability";
 import type { ToolSecurityScheme } from "./oauthResource";
+import { buildLivingSpreadResult, type ResolvedReadingForLivingSpread } from "./livingSpreadPayload";
 import { ARCANA_SPREAD_WIDGET_URI, registerArcanaSpreadWidget } from "./spreadWidget";
 import type { ServerVisualStore } from "./staticVisuals";
 
@@ -23,16 +24,12 @@ export interface RegisterArcanaVisualToolsOptions {
   securitySchemes?: readonly ToolSecurityScheme[];
 }
 
-interface ResolvedReadingView {
-  token: string;
-  deckId: string;
-  deckName: string;
-  spread: Spread;
-  question: string;
+interface ResolvedReadingView extends ResolvedReadingForLivingSpread {
   placements: Array<{
     position: { name: string; prompt: string };
-    card: CardData;
+    card: CardData & { render: CardRenderSpec };
     reversed: boolean;
+    meaning: string;
   }>;
 }
 
@@ -52,7 +49,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
   server.registerTool(
     "list_visual_packs",
     {
-      description: "List server-renderable visual packs available for one deck.",
+      description: "List server-renderable card-art and Living Spread visual packs available for one deck.",
       inputSchema: z.object({ deckId: z.string().min(1) }),
       annotations: readOnlyAnnotations,
       ...(authMeta ? { _meta: authMeta } : {}),
@@ -71,7 +68,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
   server.registerTool(
     "get_card_art",
     {
-      description: "Return actual card artwork as MCP image content when this host can render the deck.",
+      description: "Return actual card artwork as MCP image content when this host has server-renderable card art for the deck.",
       inputSchema: z.object({
         deckId: z.string().min(1),
         cardSlug: z.string().min(1),
@@ -109,7 +106,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
     "render_reading",
     {
       title: "Render Arcana spread",
-      description: "Render an existing Arcana reading token as one responsive visual spread. Positions are labeled, their prompts are available on hover/focus, and reversed cards are shown inverted. This never recasts the reading.",
+      description: "Render an existing Arcana reading token. A matching Living Spread is preferred when available; otherwise server card art is laid out responsively. This never recasts the reading.",
       inputSchema: z.object({
         token: z.string().min(1),
         deckId: z.string().min(1).optional(),
@@ -130,7 +127,21 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
         token,
         ...(deckId ? { deckId } : {}),
       }) as ResolvedReadingView;
-      if (!visuals.listPacks(reading.deckId).length) throw noVisualError(reading.deckId);
+
+      const spreadScene = visuals.resolveSpreadScene(reading.deckId, reading.spread.id, packId);
+      if (spreadScene) {
+        const result = buildLivingSpreadResult(reading, spreadScene);
+        return {
+          content: [{
+            type: "text" as const,
+            text: `${reading.deckName} · ${reading.spread.name}${reading.question ? `\n${reading.question}` : ""}\nLiving Spread · ${spreadScene.packLabel}`,
+          }],
+          structuredContent: { result },
+        };
+      }
+
+      const staticPacks = visuals.listPacks(reading.deckId).filter((pack) => pack.renderer === "static-image");
+      if (!staticPacks.length) throw noVisualError(reading.deckId, reading.spread.id);
 
       const content: Array<
         | { type: "text"; text: string }
@@ -208,11 +219,12 @@ async function observed<T>(
   }
 }
 
-function noVisualError(deckId: string): Error {
-  return new Error(`Deck “${deckId}” has no server-renderable visual pack yet. Its symbolic reading tools remain available.`);
+function noVisualError(deckId: string, spreadId: string): Error {
+  return new Error(`Deck “${deckId}” has no server-renderable visual for spread “${spreadId}” yet. Its symbolic reading tools remain available.`);
 }
 
 function visualLookupError(deckId: string, visuals: ServerVisualStore): Error {
-  if (!visuals.listPacks(deckId).length) return noVisualError(deckId);
+  const cardPacks = visuals.listPacks(deckId).filter((pack) => pack.renderer === "static-image");
+  if (!cardPacks.length) return new Error(`Deck “${deckId}” has no server-renderable card-art pack yet.`);
   return new Error(`No card art was found in the server-renderable visual packs for deck “${deckId}”.`);
 }
