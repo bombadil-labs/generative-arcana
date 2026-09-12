@@ -223,11 +223,11 @@ function relativeAssetPath(value: unknown, path: string): string {
   if (result.startsWith("/") || result.includes("\\") || result.includes("?") || result.includes("#")) {
     fail(path, "must be a relative POSIX bundle path without query or fragment");
   }
+  if (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(result)) fail(path, "must not be a URL or URI");
   const segments = result.split("/");
   if (segments.some((segment) => !segment || segment === "." || segment === "..")) {
     fail(path, "must not contain empty, dot, or parent-directory segments");
   }
-  if (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(result)) fail(path, "must not be a URL or URI");
   return result;
 }
 
