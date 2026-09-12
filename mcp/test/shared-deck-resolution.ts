@@ -89,8 +89,8 @@ async function main(): Promise<void> {
       arguments: { token: reading.token },
     });
     assert.equal(rendered.isError, true);
-    assert.match(textContent(rendered), /no server-renderable visual pack yet/i,
-      "visual rendering recognizes the shared deck before reporting missing art");
+    assert.match(textContent(rendered), /no server-renderable visual.*spread/i,
+      "visual rendering recognizes the shared deck before reporting the spread has no renderable visual");
 
     // Readings minted before catalog runtime identity used the authored slug in token.d. A stable
     // resource route can safely disambiguate that legacy token; the slug alone cannot be treated as
