@@ -148,10 +148,9 @@ export class StaticVisualStore implements ServerVisualStore {
       ? [...packs.filter((pack) => pack.id === preferPackId), ...packs.filter((pack) => pack.id !== preferPackId)]
       : packs;
 
-    if (preferPackId && !packs.some((pack) => pack.id === preferPackId)) {
-      if (spreadPacks.some((pack) => pack.id === preferPackId)) {
-        throw new Error(`Visual pack “${preferPackId}” for deck “${deckId}” provides Living Spreads but no server card art.`);
-      }
+    if (preferPackId
+      && !packs.some((pack) => pack.id === preferPackId)
+      && !spreadPacks.some((pack) => pack.id === preferPackId)) {
       throw new Error(`Unknown server-renderable visual pack “${preferPackId}” for deck “${deckId}”.`);
     }
 
@@ -181,9 +180,9 @@ export class StaticVisualStore implements ServerVisualStore {
       ? [...packs.filter((pack) => pack.id === preferPackId), ...packs.filter((pack) => pack.id !== preferPackId)]
       : packs;
 
-    if (preferPackId && !packs.some((pack) => pack.id === preferPackId)) {
-      // A card-only pack is a valid preference; the caller may fall back to its card renderer.
-      if ((this.byDeck.get(deckId) ?? []).some((pack) => pack.id === preferPackId)) return null;
+    if (preferPackId
+      && !packs.some((pack) => pack.id === preferPackId)
+      && !(this.byDeck.get(deckId) ?? []).some((pack) => pack.id === preferPackId)) {
       throw new Error(`Unknown server-renderable visual pack “${preferPackId}” for deck “${deckId}”.`);
     }
 
