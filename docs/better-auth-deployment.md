@@ -95,6 +95,34 @@ commands. For auth plan/apply, supply the DDL-capable connection in `BETTER_AUTH
 migration role as the production runtime role. Do not set migration credentials in frontend/Vite
 variables, browser code, build output, or client-visible configuration.
 
+## Isolated staging and Neon-managed auth
+
+Neon's console **Managed Better Auth** service is separate from this self-hosted runtime. Its
+managed tables live in `neon_auth`; enabling it does not configure Arcana's `/api/auth` server.
+Arcana uses 13 `arcana_auth_*` tables plus its `arcana_*` domain tables in an approved application
+schema, normally `public`. Do not target `neon_auth`, reuse managed-service credentials/endpoints
+as Arcana configuration, or infer identity ownership from matching email addresses.
+[Neon managed-auth architecture](https://neon.com/docs/auth/overview)
+
+- Use an isolated, empty/schema-only staging database or a deliberately sanitized snapshot.
+  A branch copied from production also copies its data and managed-auth state; a different branch
+  name alone is not data sanitization. Check branch capacity before provisioning; a branch limit
+  is not permission to delete another branch, upgrade a plan, or change billing.
+- Scope staging Vercel variables to **Preview and the intended Git branch**. Both `DATABASE_URL`
+  and any `BETTER_AUTH_DATABASE_URL` override must select the isolated staging target. Do not let
+  an inherited auth connection silently point at production. Use one stable staging origin for
+  `BETTER_AUTH_URL`, its `/api/auth` issuer and its `/mcp` resource, plus staging-only auth secrets
+  and controlled email recipients. Environment edits require a new preview deployment.
+- Before planning or applying, verify `current_database()`, `current_schema()` and `session_user`
+  against the approved target. Set a consistent, explicit application `search_path` for the
+  migrator and runtime roles, normally `public`; the SQL uses unqualified table names. Inspect
+  the plan's recorded schema and every SQL statement. Table-name prefixes alone do not enforce
+  schema isolation.
+- Keep both roles without ownership, DDL or DML privileges over `neon_auth` or other provider-managed
+  schemas. Give the migrator only the required application-schema privileges and the runtime only
+  application-table DML. Do not grant broad cross-schema privileges or run migrations against
+  the managed-auth schema. Never disable or remove the managed service as a setup shortcut.
+
 ## Schema review and application
 
 Run with the committed lockfile and installed package scripts. The commands below are procedures;

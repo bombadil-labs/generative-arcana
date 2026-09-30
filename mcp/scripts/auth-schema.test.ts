@@ -65,10 +65,14 @@ const authOptions = createArcanaBetterAuthOptions({ baseURL: 'https://schema-tes
   database: { dialect, type: 'postgres' }, sendEmail: async () => { throw new Error('Schema test must not send email'); },
 });
 try {
+  // A provider-managed auth schema may coexist in the database. Arcana must leave it alone.
+  await db.exec('CREATE SCHEMA neon_auth; CREATE TABLE neon_auth."user" (id text primary key, marker text not null); INSERT INTO neon_auth."user" VALUES (\'managed-sentinel\', \'untouched\');');
   const initial = await getMigrations(authOptions, { throwOnUnsafe: false });
   const sql = await initial.compileMigrations();
   assert.ok(initial.toBeCreated.length >= Object.keys(AUTH_TABLE_NAMES).length);
   for (const table of Object.values(AUTH_TABLE_NAMES)) assert.ok(sql.includes(`"${table}"`), `Missing ${table}`);
+  assert.ok(Object.values(AUTH_TABLE_NAMES).every((table) => table.startsWith('arcana_auth_')));
+  assert.ok(!sql.includes('neon_auth'), 'generated Arcana schema must not target managed auth');
   const live = buildAuthSchemaPlan({ ...input, sql, unsafeChanges: initial.unsafeChanges, schemaProblems: initial.schemaProblems });
   assertReviewedAuthSchemaPlan(live, live);
   const before = await db.query<{ count: number }>("SELECT count(*)::integer AS count FROM information_schema.tables WHERE table_schema='public'");
@@ -89,9 +93,11 @@ try {
   assert.equal(authSchemaHasChanges(stable), false, 'freshly applied generated SQL should be idempotent');
   assert.throws(() => assertReviewedAuthSchemaPlan(live, stable), /changed/, 'previous plan cannot reapply against changed schema');
   assert.equal((await db.query<{ count: number }>('SELECT count(*)::integer AS count FROM arcana_auth_jwks')).rows[0].count, 0, 'schema operations must not create private keys');
+  assert.deepEqual((await db.query('SELECT id, marker FROM neon_auth."user"')).rows, [{ id: 'managed-sentinel', marker: 'untouched' }], 'planning and applying Arcana auth SQL must preserve managed auth data');
+  assert.deepEqual((await db.query<{ table_name: string }>("SELECT table_name FROM information_schema.tables WHERE table_schema='neon_auth' ORDER BY table_name")).rows, [{ table_name: 'user' }], 'Arcana must not add tables to the managed schema');
   await db.exec(`INSERT INTO arcana_auth_user (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('existing','Existing user','schema@example.invalid',false,now(),now()); ALTER TABLE arcana_auth_user DROP COLUMN email;`);
   const unsafe = await getMigrations(authOptions, { throwOnUnsafe: false });
   assert.ok(unsafe.unsafeChanges.length, 'required-column backfill must not silently apply to populated table');
   assert.throws(() => assertSafeAuthSchemaPlan(buildAuthSchemaPlan({ ...input, sql: ';', unsafeChanges: unsafe.unsafeChanges, schemaProblems: unsafe.schemaProblems })), /manual review/);
-  console.log('Real PostgreSQL/PGlite schema generation passed: 13 namespaced tables, no introspection DDL/keys/resource seeds, read-only transaction, transactional SQL, idempotency and unsafe-backfill refusal');
+  console.log('Real PostgreSQL/PGlite schema generation passed: 13 namespaced tables, managed-auth schema preserved, no introspection DDL/keys/resource seeds, read-only transaction, transactional SQL, idempotency and unsafe-backfill refusal');
 } finally { await db.close(); }

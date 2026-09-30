@@ -66,6 +66,10 @@ time. These numbers are a budget exercise, not a promise of cost or availability
 Neither server startup nor an ordinary auth/catalog request should create or alter tables. Apply
 [deployment migrations](better-auth-deployment.md#schema-review-and-application) as a separate,
 authorized operator action. The runtime role should not have schema-owner or DDL rights after setup.
+When Neon-managed auth is also enabled, preserve its `neon_auth` schema and keep Arcana's roles
+and `arcana_auth_*` tables in the approved application schema. Verify connection targets,
+`search_path`, and schema-level privilege isolation using the
+[staging and managed-auth requirements](better-auth-deployment.md#isolated-staging-and-neon-managed-auth).
 
 The auth planner uses the installed Better Auth schema rather than hand-maintaining a copy. Its
 plan includes generated SQL, unsafe-change/schema diagnostics, exact target host/database/schema/
