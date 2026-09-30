@@ -197,9 +197,7 @@ function AuthenticatedLibrary({ user }: { user: { displayName?: string; email?: 
             <div style={{ font: "600 13px/1.35 var(--font-body)", color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis" }}>{accountLabel}</div>
             {user.displayName && user.email && <div style={{ font: "400 11px/1.4 var(--font-mono)", color: "var(--ink-3)", overflow: "hidden", textOverflow: "ellipsis" }}>{user.email}</div>}
           </div>
-          <form method="POST" action="/auth/logout" style={{ marginLeft: "auto" }}>
-            <button type="submit" style={quietButton}>Sign out</button>
-          </form>
+          <div style={{ marginLeft: "auto", fontSize: 12 }}><a href="#/account/connections">Manage account</a></div>
         </div>
       </header>
 

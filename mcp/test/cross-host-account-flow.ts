@@ -12,12 +12,6 @@ import {
 } from "../src/oauthIdentity";
 import { InMemoryUserDeckCatalogRepository } from "../src/userDeckCatalog";
 import { createArcanaWebCatalogRequestHandler, isArcanaWebCatalogPath } from "../src/webCatalogApi";
-import {
-  createWorkOSBrowserAuthRequestHandler,
-  isArcanaBrowserAuthPath,
-  WorkOSBrowserAuthAdapter,
-  type WorkOSBrowserClient,
-} from "../src/workosBrowserAuth";
 
 const ISSUER = "https://identity.example.test/";
 const MCP_TOKEN = "host-token";
@@ -30,40 +24,14 @@ async function main(): Promise<void> {
     lastName: "Host",
     profilePictureUrl: null,
   };
-  const workosClient: WorkOSBrowserClient = {
-    getAuthorizationUrl({ state }) {
-      const url = new URL("https://login.example.test/authorize");
-      url.searchParams.set("state", state);
-      return url.href;
-    },
-    async authenticateWithCode({ code }) {
-      assert.equal(code, "browser-code");
-      return { user, sealedSession: "browser-session" };
-    },
-    async loadSealedSession({ sessionData }) {
-      return {
-        async authenticate() {
-          return sessionData === "browser-session"
-            ? { authenticated: true, user }
-            : { authenticated: false, reason: "invalid_jwt" };
-        },
-        async refresh() {
-          return { authenticated: false, reason: "invalid_grant", retryable: false };
-        },
-        async getLogoutUrl() {
-          return "https://login.example.test/logout";
-        },
-      };
+  // Provider-neutral bridge test only. Real Better Auth/OAuth flows have their own integration suite.
+  const browserAuth = {
+    async authenticate(req: import("node:http").IncomingMessage) {
+      return req.headers.cookie === "test-browser-session=owner"
+        ? { identity: { issuer: ISSUER, subject: user.id }, email: user.email, displayName: "Cross Host" }
+        : null;
     },
   };
-  const browserAuth = new WorkOSBrowserAuthAdapter({
-    apiKey: "sk_test_cross_host",
-    clientId: "client_cross_host",
-    cookiePassword: "0123456789abcdef0123456789abcdef",
-    redirectUri: "http://127.0.0.1/auth/callback",
-    issuer: ISSUER,
-    secureCookies: false,
-  }, workosClient);
 
   const identities = new InMemoryExternalIdentityRepository();
   const browserPrincipalResolver = new ExternalIdentityBrowserPrincipalResolver(browserAuth, identities);
@@ -81,7 +49,6 @@ async function main(): Promise<void> {
 
   const catalog = new InMemoryUserDeckCatalogRepository();
   const hosts = new PersistentArcanaHostStore(new MemoryHostStateRepository(), undefined, catalog);
-  const authHandler = createWorkOSBrowserAuthRequestHandler(browserAuth);
   const catalogHandler = createArcanaWebCatalogRequestHandler({
     catalog,
     hosts,
@@ -96,10 +63,6 @@ async function main(): Promise<void> {
 
   const server = createServer((req, res) => {
     const pathname = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`).pathname;
-    if (isArcanaBrowserAuthPath(pathname)) {
-      void authHandler(req, res);
-      return;
-    }
     if (isArcanaWebCatalogPath(pathname)) {
       void catalogHandler(req, res);
       return;
@@ -112,7 +75,7 @@ async function main(): Promise<void> {
   const base = `http://127.0.0.1:${address.port}`;
 
   try {
-    const browserCookie = await signInBrowser(base);
+    const browserCookie = "test-browser-session=owner";
 
     let response = await fetch(`${base}/api/me/decks`, { headers: { cookie: browserCookie } });
     assert.equal(response.status, 200);
@@ -208,29 +171,6 @@ async function main(): Promise<void> {
   }
 }
 
-async function signInBrowser(base: string): Promise<string> {
-  let response = await fetch(`${base}/auth/login?returnTo=${encodeURIComponent("/#/my-decks")}`, { redirect: "manual" });
-  assert.equal(response.status, 302);
-  const authorization = new URL(response.headers.get("location")!);
-  const state = authorization.searchParams.get("state");
-  const authStateCookie = cookiePair(response.headers.get("set-cookie") ?? "", "arcana-session-auth-state");
-  assert.ok(state && authStateCookie);
-
-  response = await fetch(`${base}/auth/callback?code=browser-code&state=${encodeURIComponent(state!)}`, {
-    headers: { cookie: authStateCookie! },
-    redirect: "manual",
-  });
-  assert.equal(response.status, 303);
-  assert.equal(response.headers.get("location"), "/#/my-decks");
-  const sessionCookie = cookiePair(response.headers.get("set-cookie") ?? "", "arcana-session");
-  assert.ok(sessionCookie);
-
-  response = await fetch(`${base}/auth/session`, { headers: { cookie: sessionCookie! } });
-  assert.equal(response.status, 200);
-  assert.equal((await response.json() as { authenticated?: boolean }).authenticated, true);
-  return sessionCookie!;
-}
-
 function bearerHeaders(): Record<string, string> {
   return { authorization: `Bearer ${MCP_TOKEN}` };
 }
@@ -246,11 +186,6 @@ function patchVisibility(
     headers: { ...headers, "content-type": "application/json" },
     body: JSON.stringify({ visibility }),
   });
-}
-
-function cookiePair(setCookie: string, name: string): string | null {
-  const match = new RegExp(`(?:^|,\\s*)${name}=([^;]*)`).exec(setCookie);
-  return match ? `${name}=${match[1]}` : null;
 }
 
 interface DeckSummary {

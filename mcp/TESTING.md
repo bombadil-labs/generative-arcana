@@ -1,14 +1,35 @@
-# Generative Arcana private-alpha testing
+# Generative Arcana account and private-alpha testing
 
-The private alpha is ready for testing when all CI gates are green and a deployed `/healthz` reports the expected MCP version. The goal of the first dogfood round is not to prove divination value; it is to discover whether an LLM equipped with Generative Arcana behaves differently and more coherently than one merely prompted to imitate a tarot reader.
+The default account path is self-hosted Better Auth with PostgreSQL. Green CI and liveness do
+not establish production account readiness. Use the [deployment guide](../docs/better-auth-deployment.md)
+and complete the [real browser/Claude/ChatGPT launch checklist](../docs/production-launch-checklist.md)
+before inviting friends. Private-alpha bearer tests remain useful regression/dogfooding coverage,
+but they do not test user signup, consent, account isolation or hosted-client compatibility.
 
-## Preflight
+## Account preflight
 
-1. `GET /healthz` returns `ok: true`, the expected `version`, and the configured limits.
-2. Anonymous MCP connection lists twelve tools and does **not** list `import_deck`.
-3. Authenticated private-alpha connection lists all thirteen tools.
-4. Bad bearer credentials receive HTTP 401.
-5. CI is green for app tests/typecheck/build, MCP typecheck, persistence/auth, both protocol transports, golden eval, guardrails, visual assets, and container builds.
+1. Run app tests/typecheck/build, MCP typecheck, protocol/auth/ownership tests, migration guards,
+   identity migration/shared limiter tests, catalog freshness, semantics, visuals and container gates.
+2. Apply explicit reviewed domain/auth migrations in an authorized disposable database first.
+   Confirm the server cannot create tables on startup and a missing schema fails readiness.
+3. On staging, prove actual SMTP signup verification/reset, browser session flow, consent, resource
+   token/scopes, refresh/disconnect, two users/two clients, restart and separate-instance persistence.
+4. Identify the exact production commit and inspect JSON `/healthz`, `/readyz` and metadata. The
+   accepted account deployment has Better Auth enabled, OAuth configured, alpha disabled and healthy
+   bounded dependency checks; this is still a prerequisite, not full end-to-end proof.
+5. Run every real product and operations acceptance row. A synthetic OAuth client, in-memory auth
+   adapter, embedded PostgreSQL engine or hand-supplied bearer cannot substitute for the real
+   browser, Claude, ChatGPT, SMTP provider, and deployed Neon tests.
+
+## Private-alpha transport preflight
+
+1. `/healthz` identifies the expected artifact/version and alpha auth mode.
+2. Anonymous MCP advertises the public tool set and intentionally omits protected account tools in
+   non-OAuth mode. Do not assert an obsolete fixed tool count.
+3. The configured alpha bearer permits imports scoped to its one opaque principal; a bad bearer
+   fails with 401 rather than anonymous fallback.
+4. Durable alpha storage has a persistent volume or explicitly migrated database and passes restart
+   testing. It is not multi-user signup. Do not distribute the alpha secret as a friend-account fix.
 
 ## Core dogfood journeys
 
@@ -87,6 +108,26 @@ npm --prefix mcp run eval:golden
 npm --prefix mcp run smoke
 npm --prefix mcp run smoke:http-guardrails
 npm --prefix mcp run test:visuals
+npm --prefix mcp run test:auth-email
+npm --prefix mcp run test:better-auth
+npm --prefix mcp run test:better-auth-ownership
+npm --prefix mcp run test:auth-schema
+npm --prefix mcp run test:domain-migrations
 ```
 
 The golden suite is deterministic infrastructure/semantic coverage. As real dogfood sessions reveal model-behavior failures, promote minimal reproducible conversations into a separate agent-eval corpus rather than making the deterministic suite fuzzy.
+
+## What local auth evidence establishes
+
+The Better Auth protocol tests use the actual installed library and a disposable PostgreSQL/PGlite
+engine. The ownership suite uses real signup/verification/login and two OAuth clients to exercise
+one `usr_*` identity, a separate user, scoped client disconnect, and old-token rejection after
+reconsent. Migration tests use generated auth SQL and legacy domain schema upgrades. The email
+transport is a capture sink; host clients are synthetic. These boundaries must remain explicit in
+reports. A blocked local browser visual check is a not-run case, not a pass; server-render/API tests
+do not establish visual or interactive correctness. Live-host and operations gates remain required.
+
+`test:auth-email` uses synthetic environment fixtures and a stubbed Nodemailer transport. It covers
+the Resend Marketplace variables, explicit SMTP precedence, missing/malformed configuration,
+domain/header injection rejection, TLS settings and delivery rejection. It does not read real mail
+credentials, contact Resend or send mail, and does not prove sender verification or inbox delivery.

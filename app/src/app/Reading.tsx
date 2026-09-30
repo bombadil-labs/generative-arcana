@@ -10,13 +10,14 @@ import { navigate } from "./router";
 import { getPackId } from "./packPref";
 import { listPacks, resolveSpreadVisual } from "@/runtime/defineCard";
 import { buildSpreadSceneData } from "@/runtime/spreadSceneData";
+import { catalogDeckRuntime } from "@/catalog/runtime";
 
 export function Reading({ deckId, token }: { deckId: string; token?: string }) {
   const deck = arcanaEngine.getDeck(deckId);
   if (!deck) {
     return (
       <div style={{ padding: "var(--s-5)" }}>
-        <p style={{ color: "var(--ink)", font: "400 16px/1.5 var(--font-body)" }}>Unknown deck “{deckId}”. Custom decks are session-local: import the original deck JSON, then reopen this link.</p>
+        <p style={{ color: "var(--ink)", font: "400 16px/1.5 var(--font-body)" }}>Unknown deck “{deckId}”. For an account deck, sign in or check that its owner still shares it. For a browser-local deck, import the original deck JSON, then reopen this link.</p>
         <button onClick={() => navigate("/")} style={link}>← all decks</button>
       </div>
     );
@@ -141,6 +142,7 @@ function ReadingResult({ deck, token }: { deck: DeckModule; token: string }) {
   if (!resolution || resolution.token !== token || resolution.deck !== deck) return <p role="status" style={lede}>Verifying reading…</p>;
   if (resolution.error) return <p role="alert" style={errorText}>{resolution.error}</p>;
   if (!resolution.reading) return <p role="alert" style={errorText}>Unable to resolve this reading.</p>;
+  const catalogSource = catalogDeckRuntime.source(deck);
   const reading = resolution.reading;
   const { spread, placements, legacy, question } = reading;
   const seqCards = placements.map((placement) => placement.card);
@@ -166,7 +168,15 @@ function ReadingResult({ deck, token }: { deck: DeckModule; token: string }) {
       </div>
 
       {legacy && <p role="status" style={lede}>Legacy reading: this link uses card positions and has no deck fingerprint. The original deck revision cannot be verified.</p>}
-      {deck.custom && <p style={lede}>To open this reading elsewhere, import the same deck JSON first. The link identifies the deck but does not contain its contents.</p>}
+      {catalogSource ? (
+        <p style={lede}>
+          {catalogSource.visibility === "private"
+            ? "This account deck is private. Only its signed-in owner can open this reading link. Change it to unlisted or public in My Decks to share it."
+            : "This account deck is available to anyone with this link while it remains unlisted or public. The link opens the current catalog revision; a changed or deleted deck may make the original reading unavailable."}
+        </p>
+      ) : deck.custom ? (
+        <p style={lede}>This deck is browser-local. To open this reading elsewhere or after reloading, import the same deck JSON first. The link identifies the deck but does not contain its contents.</p>
+      ) : null}
 
       {spreadVisual && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--s-3)", flexWrap: "wrap", marginTop: "var(--s-4)" }}>
@@ -237,7 +247,7 @@ function ReadingResult({ deck, token }: { deck: DeckModule; token: string }) {
       <section style={{ marginTop: "var(--s-5)", paddingTop: "var(--s-4)", borderTop: "1px solid var(--line)" }}>
         <h3 style={sectionKicker}>Take it to an LLM</h3>
         <p style={{ color: "var(--ink-2)", font: "400 13.5px/1.5 var(--font-body)", marginTop: 0 }}>
-          Share the link (a browsing model can open it), or copy the self-contained prompt into any model. Nothing is sent to a server — the whole reading lives in the URL fragment.
+          Share the link with someone who can access the deck, or copy the self-contained prompt into a model. The question and dealt cards stay in the URL fragment and are not sent to the catalog. Account deck contents are fetched from the server. Anyone you share the link or prompt with can read the question and cards.
         </p>
         <div style={{ display: "flex", gap: "var(--s-2)", flexWrap: "wrap" }}>
           <button onClick={() => copy(window.location.href, "link")} style={secondaryBtn}>{copied === "link" ? "Copied ✓" : "Copy share link"}</button>

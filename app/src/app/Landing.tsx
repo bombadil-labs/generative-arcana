@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { listDecks } from "@/decks";
 import { loadCustomDeck } from "@/decks/custom";
+import { catalogDeckRuntime } from "@/catalog/runtime";
 import { isIllustrated } from "@/runtime/defineCard";
 import { Svg } from "@/components/cardMeta";
 import { navigate } from "./router";
 
 export function Landing() {
-  const decks = listDecks();
+  // Catalog snapshots belong to their revalidated routes/library, not this local collection.
+  const decks = listDecks().filter((deck) => !catalogDeckRuntime.source(deck));
   const [pasting, setPasting] = useState(false);
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -25,13 +27,19 @@ export function Landing() {
         <p style={lede}>
           A home for <em>custom tarot decks</em> — symbolic systems you can inspect, browse, read with,
           author, and share across hosts. Explore the reference decks below, open a deck published by
-          the community, or load your own manifest locally.
+          the community, save a deck to your account in My Decks, or load deck JSON just for this browser session.
         </p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--s-3)", marginTop: "var(--s-4)" }}>
           <button onClick={() => navigate("/community")} style={primaryAction}>Browse community decks →</button>
-          <button onClick={() => setPasting((p) => !p)} style={secondaryAction}>Load a deck manifest</button>
+          <button onClick={() => navigate("/my-decks")} style={secondaryAction}>My account decks</button>
+          <button onClick={() => setPasting((p) => !p)} style={secondaryAction}>Load browser-local JSON</button>
         </div>
       </header>
+
+      <p style={{ ...pasteCopy, marginBottom: "var(--s-4)" }}>
+        Account decks start private. Unlisted decks open for anyone with their link; public decks also
+        appear in Community. Browser-local imports below are not uploaded and must be imported again after a reload.
+      </p>
 
       <div style={grid}>
         {decks.map((d) => {
@@ -44,7 +52,7 @@ export function Landing() {
                 <div style={tileBody}>
                   <div style={deckName}>{d.name}</div>
                   <div style={tagline}>{d.tagline}</div>
-                  <div style={metaLine}>{(d.custom ? "local deck" : d.data.theme.creator)} · {d.cards.length} cards · {illustrated === 0 ? "generative" : `${illustrated} illustrated`}</div>
+                  <div style={metaLine}>{(d.custom ? "browser-local deck" : d.data.theme.creator)} · {d.cards.length} cards · {illustrated === 0 ? "generative" : `${illustrated} illustrated`}</div>
                 </div>
               </div>
             </button>
@@ -52,7 +60,7 @@ export function Landing() {
         })}
 
         <button onClick={() => { setPasting((p) => !p); setError(null); }} style={pasteTile} onMouseEnter={lift} onMouseLeave={drop}>
-          <div style={pasteInner}><div style={pasteTitle}>+ Load your own</div><div style={pasteCopy}>Paste any valid Generative Arcana deck manifest and use it immediately in this browser.</div></div>
+          <div style={pasteInner}><div style={pasteTitle}>+ Load your own</div><div style={pasteCopy}>Paste valid deck JSON to use it in this browser session. Save it in My Decks for account access and unlisted or public sharing.</div></div>
         </button>
       </div>
 

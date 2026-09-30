@@ -1,9 +1,11 @@
 # Generative Arcana as a platform
 
 The MCP integration has crossed the important boundary: it can carry a real reading into a host-native visual
-experience. The next phase is not merely "harden the ChatGPT integration". Generative Arcana needs one
-product/domain model and one host-neutral MCP contract that can be consumed by a first-party web application,
-ChatGPT, Claude, and other MCP-capable hosts.
+experience. The account/catalog/import and first-party web foundations described here are implemented.
+The launch task is activating their production configuration and proving the real two-host/two-account
+journey, not rebuilding those foundations. See the [deployment guide](better-auth-deployment.md) and
+[dated launch evidence checklist](production-launch-checklist.md). This design document is not proof
+that accounts are enabled or that either host's production OAuth flow has passed.
 
 ## Product shape
 
@@ -81,11 +83,10 @@ universal.
 
 ## Bundled decks and launch content
 
-The historical decks in this repository are development/reference fixtures, not implicitly launch catalog content.
-The production catalog should start empty or with a deliberately curated set of decks authored through the same
-user-facing workflow that everyone else uses. Bundled fixtures may remain available in local/dev/test contexts.
-
-That keeps the launch ontology clean: public decks are published resources, not source-code accidents.
+The seven bundled decks currently ship in the production app and service as reference content.
+They are distinct from user-published catalog records: appearing in the bundled picker does not create
+an owner or imply a Community publication. The public catalog should contain only deliberately
+published resources. Retiring or curating the bundled picker is a separate product decision.
 
 ## Account/auth boundary
 
@@ -102,17 +103,17 @@ Production authorization rules live at the resource boundary:
 
 ## Web application direction
 
-The current Vite renderer is already most of a first-party client: it browses decks, renders cards, and composes
-readings. It should evolve from a static GitHub Pages application into the product UI rather than being replaced.
-A server/API layer can add:
+The Vite client browses decks, renders cards, and composes readings. The existing Node service now
+provides server-side browser sessions and catalog APIs for the implemented product UI:
 
-- sign in / account settings;
-- My Decks;
-- import/create/edit flows;
-- publish/unpublish controls;
-- public deck profile/share pages;
-- catalog/discovery;
-- stable server-backed reading links where appropriate.
+- sign up, verify email, sign in, reset passwords, and sign out through self-hosted Better Auth sessions;
+- My Decks and validated manifest import with explicit replacement;
+- private/unlisted/public visibility controls;
+- stable deck-resource routes and catalog/discovery.
+
+An account-settings/deletion UX, hosted generation/editor, and archival reading storage remain
+separate work. Current reading links are fingerprint-checked URL-fragment tokens, not stored
+historical revision snapshots.
 
 The renderer remains client-side and renderer-agnostic. The API supplies validated manifests and asset references.
 
@@ -122,7 +123,7 @@ ChatGPT submission is one distribution target for the same production MCP servic
 MCP hosts. OpenAI-specific review requirements should remain at the adapter/deployment edge rather than changing the
 portable tool contract. Before ChatGPT review:
 
-1. replace static bearer auth with standards-compliant OAuth and stable principal resolution;
+1. activate the implemented standards-compliant OAuth and stable principal resolution in production, retiring alpha credentials deliberately;
 2. expose only production-safe tools and annotate read/write/destructive behavior correctly;
 3. pin the widget CSP and production widget domain;
 4. publish website, support, privacy, and terms pages;
@@ -131,27 +132,32 @@ portable tool contract. Before ChatGPT review:
 7. provide reviewer credentials/instructions for authenticated paths;
 8. run protocol, auth, UI, mobile, accessibility, and destructive-action regression checks against the production URL.
 
-## Migration strategy
+## Implementation phases and remaining verification
 
-Do this incrementally:
+These phases describe the architecture's progression. Phases 1–4 have implementations in the
+repository; mocked/local tests do not establish live provider/client compatibility or durable
+production operation. Use the launch checklist to record activation and acceptance evidence.
 
 ### Phase 1 — domain foundation
 
-Introduce `UserDeckRecord` and visibility semantics without changing existing bundled-deck behavior.
+Implemented: `UserDeckRecord` and visibility semantics without changing existing bundled-deck behavior.
 
 ### Phase 2 — persistent catalog
 
-Add a relational deck repository keyed by opaque user/deck ids. Import existing principal-scoped custom decks into the
-new repository on first authenticated access or through an explicit migration.
+Implemented: a Neon catalog keyed by opaque user/deck ids, plus legacy principal-scoped state
+migration. Before retiring the alpha principal, inventory its decks and plan any ownership transfer.
+A legacy state import is not evidence that alpha-owned decks become a newly signed-up user's property.
 
 ### Phase 3 — real accounts
 
-Add OAuth/account resolution and preserve the `PrincipalResolver` seam. The MCP and web API both consume the resulting
+Implemented: OAuth/account resolution through the `PrincipalResolver` seam. The MCP and web API both consume the resulting
 internal user id.
 
 ### Phase 4 — first-party web product
 
-Add authenticated My Decks, publishing, public deck pages, and catalog discovery to the existing renderer application.
+Implemented: authenticated My Decks, visibility management, stable deck routes, and Community
+catalog discovery in the existing renderer. Production browser-auth configuration and real-user
+acceptance still need evidence.
 
 ### Phase 5 — host adapters and submissions
 

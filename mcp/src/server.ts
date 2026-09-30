@@ -107,10 +107,13 @@ export interface ArcanaMcpServerOptions {
 }
 
 export function createArcanaMcpServer(options: ArcanaMcpServerOptions = {}): McpServer {
-  const localAdapter = options.adapter ?? createBundledArcanaAdapter();
   const principal = options.principal ?? options.oauth?.principal ?? null;
+  const canReadPrivate = !options.oauth || principalHasScopes(principal, options.oauth.readScopes);
+  // Authentication alone must not expose the principal's already-hydrated private deck adapter.
+  // A client without decks:read still receives the anonymous bundled/public experience.
+  const localAdapter = canReadPrivate && options.adapter ? options.adapter : createBundledArcanaAdapter();
   const adapter = options.catalog
-    ? new CatalogResolvingArcanaToolAdapter(localAdapter, options.catalog, principal?.id ?? null)
+    ? new CatalogResolvingArcanaToolAdapter(localAdapter, options.catalog, canReadPrivate ? principal?.id ?? null : null)
     : localAdapter;
   const includeStatefulTools = options.includeStatefulTools ?? true;
   const visuals = options.visuals ?? createBundledStaticVisualStore();

@@ -11,11 +11,12 @@ export function serveArcanaWebApp(
   if (req.method !== "GET" && req.method !== "HEAD") return false;
 
   const root = resolve(distDir);
-  const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+  // Origin-form paths beginning with // must not be reinterpreted as URL authorities.
+  const url = new URL(req.url?.replace(/^\/+/, "/") ?? "/", `http://${req.headers.host ?? "localhost"}`);
   let pathname: string;
   try { pathname = decodeURIComponent(url.pathname); }
   catch { return false; }
-  if (pathname.includes("\0")) return false;
+  if (pathname.includes("\0") || isArcanaMachinePath(pathname)) return false;
 
   const relative = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
   const requested = resolve(root, relative);
@@ -41,6 +42,13 @@ export function serveArcanaWebApp(
   }
   createReadStream(file).pipe(res);
   return true;
+}
+
+/** Missing/disabled machine endpoints must never become successful HTML application routes. */
+export function isArcanaMachinePath(pathname: string): boolean {
+  const normalized = pathname.replace(/\\/g, "/").replace(/\/+/g, "/");
+  return ["/api", "/auth", "/mcp", "/.well-known", "/healthz", "/readyz"]
+    .some((prefix) => normalized === prefix || normalized.startsWith(`${prefix}/`));
 }
 
 function regularFile(path: string): boolean {

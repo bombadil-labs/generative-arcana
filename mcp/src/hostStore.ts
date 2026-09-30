@@ -51,7 +51,8 @@ export class InMemoryArcanaHostStore implements ArcanaHostStore {
  * Durable principal-scoped host store.
  *
  * Hosts are cached in-process. Legacy callers restore/persist the old host-state snapshot; callers
- * that provide a deck catalog migrate once and thereafter reconstruct custom decks from first-class rows.
+ * that provide a deck catalog migrate once and reconcile owned rows before every adapter call.
+ * The cache retains execution contexts, not authority over catalog contents or deleted resources.
  */
 export class PersistentArcanaHostStore implements ArcanaHostStore {
   private readonly hosts = new Map<string, Promise<ArcanaToolAdapter>>();

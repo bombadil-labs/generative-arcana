@@ -77,11 +77,28 @@ warns that these index-based links do not establish the original deck revision. 
 are refused: the old importer relied on JSON property order, which cannot be safely reconstructed
 from a newly imported file. Cast a new reading to obtain a v2 link.
 
-Custom decks are still session-local and are not embedded in a link. A recipient must import the
-same original deck JSON and reopen the link. A fingerprint detects missing/different revisions; it
-does not provide archival storage or retrieve an old bundled deck automatically. Anyone possessing
-a link can read its question and card selections; URL-fragment storage is not encryption. Copying
-the self-contained prompt remains an alternative for sharing a reading without installing its deck.
+Custom deck contents are not embedded in a reading link. Availability depends on the import path:
+
+- **Browser-local paste:** the deck exists only in the current page runtime. After a full reload or
+  in another browser, import the same original JSON before reopening its reading link.
+- **Private account import:** the catalog stores the deck under a stable resource ID. Its owner
+  must sign into the same account to resolve it; possession of a reading link grants no deck access.
+- **Unlisted/public account import:** the app and MCP can resolve the visible deck by stable resource
+  ID without a local re-import. Unlisted decks stay out of public discovery; public decks appear in
+  Community. Re-privatizing or deleting prevents future unauthorized catalog resolution, but cannot
+  erase copies or prompts someone already received.
+
+Account storage requires a configured server deployment; a static Pages build or browser paste is
+not an account save. See [host onboarding](authoring-hosts.md) and the
+[production verification status](production-launch-checklist.md).
+
+A fingerprint detects missing/different revisions; it does not provide archival storage, fetch an
+old account revision, or retrieve an old bundled deck automatically. Explicit replacement preserves
+the resource ID and publication state, but an old reading whose fingerprint differs from the new
+manifest will fail rather than silently change meaning. Keep the original manifest if you need to
+archive that revision. Anyone possessing a link can read its question and card selections;
+URL-fragment storage is not encryption. Copying the self-contained prompt remains an alternative
+for sharing a reading without installing its deck; review it for private content before sharing.
 
 ## Checks
 

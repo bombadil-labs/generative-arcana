@@ -9,7 +9,6 @@ type NeonSql = (strings: TemplateStringsArray, ...params: unknown[]) => Promise<
 
 export class NeonUserDeckCatalogRepository implements UserDeckCatalogRepository {
   private readonly sql: NeonSql;
-  private ready?: Promise<void>;
 
   constructor(connectionString: string, sql?: NeonSql) {
     if (!connectionString.trim()) throw new Error("DATABASE_URL must be non-empty.");
@@ -17,7 +16,6 @@ export class NeonUserDeckCatalogRepository implements UserDeckCatalogRepository 
   }
 
   async listOwned(ownerId: string): Promise<UserDeckRecord[]> {
-    await this.ensureSchema();
     const owner = requireText(ownerId, "ownerId");
     const rows = await this.sql`
       SELECT id, owner_id, slug, manifest, visibility, revision, created_at, updated_at, published_at
@@ -29,7 +27,6 @@ export class NeonUserDeckCatalogRepository implements UserDeckCatalogRepository 
   }
 
   async get(deckId: string): Promise<UserDeckRecord | null> {
-    await this.ensureSchema();
     const id = requireText(deckId, "deckId");
     const rows = await this.sql`
       SELECT id, owner_id, slug, manifest, visibility, revision, created_at, updated_at, published_at
@@ -41,7 +38,6 @@ export class NeonUserDeckCatalogRepository implements UserDeckCatalogRepository 
   }
 
   async listPublic(limit = 50): Promise<UserDeckRecord[]> {
-    await this.ensureSchema();
     const max = requireLimit(limit);
     const rows = await this.sql`
       SELECT id, owner_id, slug, manifest, visibility, revision, created_at, updated_at, published_at
@@ -54,7 +50,6 @@ export class NeonUserDeckCatalogRepository implements UserDeckCatalogRepository 
   }
 
   async ensureImported(ownerId: string, manifest: UserDeckManifest): Promise<UserDeckRecord> {
-    await this.ensureSchema();
     const owner = requireText(ownerId, "ownerId");
     const clean = snapshotManifest(manifest);
     const id = randomUUID();
@@ -77,7 +72,6 @@ export class NeonUserDeckCatalogRepository implements UserDeckCatalogRepository 
   }
 
   async createImported(ownerId: string, manifest: UserDeckManifest): Promise<UserDeckRecord> {
-    await this.ensureSchema();
     const owner = requireText(ownerId, "ownerId");
     const clean = snapshotManifest(manifest);
     const id = randomUUID();
@@ -95,7 +89,6 @@ export class NeonUserDeckCatalogRepository implements UserDeckCatalogRepository 
   }
 
   async upsertImported(ownerId: string, manifest: UserDeckManifest): Promise<UserDeckRecord> {
-    await this.ensureSchema();
     const owner = requireText(ownerId, "ownerId");
     const clean = snapshotManifest(manifest);
     const id = randomUUID();
@@ -115,7 +108,6 @@ export class NeonUserDeckCatalogRepository implements UserDeckCatalogRepository 
   }
 
   async setVisibility(ownerId: string, deckId: string, visibility: DeckVisibility): Promise<UserDeckRecord> {
-    await this.ensureSchema();
     const owner = requireText(ownerId, "ownerId");
     const id = requireText(deckId, "deckId");
     const next = requireVisibility(visibility);
@@ -141,7 +133,6 @@ export class NeonUserDeckCatalogRepository implements UserDeckCatalogRepository 
   }
 
   async deleteOwned(ownerId: string, deckId: string): Promise<boolean> {
-    await this.ensureSchema();
     const owner = requireText(ownerId, "ownerId");
     const id = requireText(deckId, "deckId");
     const rows = await this.sql`
@@ -153,7 +144,6 @@ export class NeonUserDeckCatalogRepository implements UserDeckCatalogRepository 
   }
 
   async deleteAllOwned(ownerId: string): Promise<number> {
-    await this.ensureSchema();
     const owner = requireText(ownerId, "ownerId");
     const rows = await this.sql`
       DELETE FROM arcana_user_decks
@@ -163,34 +153,7 @@ export class NeonUserDeckCatalogRepository implements UserDeckCatalogRepository 
     return rows.length;
   }
 
-  private ensureSchema(): Promise<void> {
-    this.ready ??= (async () => {
-      await this.sql`
-        CREATE TABLE IF NOT EXISTS arcana_user_decks (
-          id text PRIMARY KEY,
-          owner_id text NOT NULL,
-          slug text NOT NULL,
-          manifest jsonb NOT NULL,
-          visibility text NOT NULL DEFAULT 'private' CHECK (visibility IN ('private', 'unlisted', 'public')),
-          revision integer NOT NULL DEFAULT 1 CHECK (revision > 0),
-          created_at timestamptz NOT NULL DEFAULT now(),
-          updated_at timestamptz NOT NULL DEFAULT now(),
-          published_at timestamptz,
-          UNIQUE (owner_id, slug)
-        )
-      `;
-      await this.sql`
-        CREATE INDEX IF NOT EXISTS arcana_user_decks_owner_updated_idx
-        ON arcana_user_decks (owner_id, updated_at DESC)
-      `;
-      await this.sql`
-        CREATE INDEX IF NOT EXISTS arcana_user_decks_public_published_idx
-        ON arcana_user_decks (published_at DESC, updated_at DESC)
-        WHERE visibility = 'public'
-      `;
-    })();
-    return this.ready;
-  }
+
 }
 
 function parseRow(row: Record<string, unknown>): UserDeckRecord {

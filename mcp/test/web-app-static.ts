@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { serveArcanaWebApp } from "../src/webAppStatic";
+import { isArcanaMachinePath, serveArcanaWebApp } from "../src/webAppStatic";
 
 async function main(): Promise<void> {
   const dir = await mkdtemp(join(tmpdir(), "arcana-web-static-"));
@@ -35,6 +35,14 @@ async function main(): Promise<void> {
     response = await fetch(`${base}/some/future/route`);
     assert.equal(response.status, 200, "unknown application routes should fall back to index.html");
     assert.match(await response.text(), /Arcana/);
+
+    for (const path of ["//api/missing", "///.well-known/missing", "/api", "/api/unknown", "/auth/missing", "/mcp/unknown", "/.well-known/oauth-protected-resource/mcp", "/.well-known/oauth-authorization-server", "/readyz/extra", "/%61pi/unknown", "/%2ewell-known/unknown"]) {
+      response = await fetch(`${base}${path}`);
+      assert.equal(response.status, 404, `${path} must not fall back to HTML`);
+    }
+    assert.equal(isArcanaMachinePath("//api//unknown"), true);
+    assert.equal(isArcanaMachinePath("/apiary"), false, "namespace boundaries should preserve ordinary app routes");
+    assert.equal(isArcanaMachinePath("/author"), false);
 
     response = await fetch(`${base}/`, { method: "HEAD" });
     assert.equal(response.status, 200);

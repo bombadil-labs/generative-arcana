@@ -1,9 +1,9 @@
-FROM node:22-alpine
+FROM node:24-alpine
 
 WORKDIR /srv
 
-COPY mcp/package.json ./mcp/package.json
-RUN cd mcp && npm install --omit=dev
+COPY mcp/package.json mcp/package-lock.json ./mcp/
+RUN cd mcp && npm ci --omit=dev
 
 COPY app/src ./app/src
 COPY decks ./decks

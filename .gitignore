@@ -26,3 +26,10 @@ __pycache__/
 
 # art-tooling review artifacts (montage contact sheets; the real art lives in app/src/decks/*/<skin>/)
 tools/*/*montage*.png
+
+# Auth/database credentials and operator migration plans
+.env
+.env.*
+!.env.example
+!*.env.example
+*identity-link-plan*.json

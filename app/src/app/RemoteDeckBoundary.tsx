@@ -1,44 +1,45 @@
 import { useEffect, useState } from "react";
-import { getDeck, registerDeck } from "@/decks";
-import { getSharedDeck } from "@/catalog/api";
+import { getDeck } from "@/decks";
+import type { DeckModule } from "@/decks/types";
+import { useBrowserSession, type BrowserSessionState } from "@/auth/session";
+import { catalogDeckRuntime } from "@/catalog/runtime";
 import { navigate } from "./router";
 
-/**
- * Resolve a visible catalog deck only when the ordinary runtime does not already know its id.
- * Once registered, every existing deck surface treats it exactly like any other validated deck.
- */
-export function RemoteDeckBoundary({ deckId, children }: { deckId: string; children: React.ReactNode }) {
-  const [state, setState] = useState<"ready" | "loading" | "missing" | "error">(() => getDeck(deckId) ? "ready" : "loading");
-  const [message, setMessage] = useState("");
+type Resolution = {
+  deckId: string;
+  routeKey: string;
+  session: BrowserSessionState;
+} & ({ status: "ready"; deck: DeckModule } | { status: "missing" | "error"; message: string });
+
+/** Catalog snapshots are revalidated on every route/session boundary. Only bundled decks and
+ * browser-local imports bypass the catalog. Never render a previous route/session's resolution. */
+export function RemoteDeckBoundary({ deckId, routeKey, children }: { deckId: string; routeKey: string; children: React.ReactNode }) {
+  const { session } = useBrowserSession();
+  const [resolution, setResolution] = useState<Resolution | null>(null);
 
   useEffect(() => {
-    if (getDeck(deckId)) { setState("ready"); return; }
+    if (catalogDeckRuntime.localDeck(deckId) || session.status === "loading") return;
     const controller = new AbortController();
-    setState("loading");
-    setMessage("");
-    void getSharedDeck(deckId, controller.signal).then((remote) => {
-      if (controller.signal.aborted) return;
-      registerDeck({
-        data: remote.manifest.data,
-        tagline: remote.manifest.tagline,
-        spreads: remote.manifest.spreads,
-        custom: true,
-        runtimeId: remote.id,
-      }, { replaceExisting: true });
-      setState("ready");
+    void catalogDeckRuntime.resolve(deckId, controller.signal).then((deck) => {
+      if (!controller.signal.aborted) setResolution({ deckId, routeKey, session, status: "ready", deck });
     }).catch((error: unknown) => {
       if (controller.signal.aborted) return;
       const status = typeof error === "object" && error && "status" in error ? (error as { status?: unknown }).status : undefined;
-      setMessage(error instanceof Error ? error.message : "Unable to load this deck.");
-      setState(status === 404 ? "missing" : "error");
+      setResolution({
+        deckId, routeKey, session,
+        status: status === 404 || status === 403 || status === 401 ? "missing" : "error",
+        message: error instanceof Error ? error.message : "Unable to load this deck.",
+      });
     });
     return () => controller.abort();
-  }, [deckId]);
+  }, [deckId, routeKey, session]);
 
-  if (state === "ready") return <>{children}</>;
-  if (state === "loading") return <DeckStatus title="Opening deck…" body="Resolving this shared deck from the Generative Arcana catalog." />;
-  if (state === "missing") return <DeckStatus title="Deck unavailable" body="This deck does not exist or is not visible to you." />;
-  return <DeckStatus title="Couldn’t open deck" body={message || "The catalog could not be reached."} />;
+  if (catalogDeckRuntime.localDeck(deckId)) return <>{children}</>;
+  const current = resolution?.deckId === deckId && resolution.routeKey === routeKey && resolution.session === session ? resolution : null;
+  if (!current || session.status === "loading") return <DeckStatus title="Opening deck…" body="Checking the latest deck and your access in the Generative Arcana catalog." />;
+  if (current.status === "ready" && getDeck(deckId) === current.deck) return <>{children}</>;
+  if (current.status === "missing") return <DeckStatus title="Deck unavailable" body="This deck does not exist or is not visible to you." />;
+  return <DeckStatus title="Couldn’t open deck" body={current.status === "error" ? current.message : "The catalog could not be reached."} />;
 }
 
 function DeckStatus({ title, body }: { title: string; body: string }) {
