@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { Client } from 'pg';
 import { inspectStagingTarget, parsePreflightArguments, readOnlyNeonConnection, runStagingPreflight, type TargetMetadata } from './staging-preflight.js';
 
@@ -22,7 +24,14 @@ assert.equal(actualDriver.options, '-c search_path=public -c default_transaction
 assert.equal(actualDriver.port, 5432);
 assert.equal(actualDriver.database, 'arcana');
 assert.notEqual(actualDriver.ssl, false, 'TLS remains enabled in the actual driver configuration');
+assert.notEqual((actualDriver.ssl as { rejectUnauthorized?: boolean }).rejectUnauthorized, false, 'certificate verification cannot be disabled');
+assert.equal(new URL(connection.connectionString).searchParams.get('sslmode'), 'verify-full');
 assert.deepEqual(parsePreflightArguments(['--origin', 'https://preview.example/', '--out', '/private/new.json']), { origin: 'https://preview.example', out: '/private/new.json' });
+assert.deepEqual(parsePreflightArguments(['--target', 'production', '--origin', 'https://production.example/', '--out', '/private/new.json']), { origin: 'https://production.example', out: '/private/new.json', target: 'production' });
+assert.equal(parsePreflightArguments(['--origin', 'https://preview.example', '--out', 'new.json', '--target', 'staging']).target, 'staging');
+for (const flags of [['--target', 'unknown'], ['--target', 'production', '--target', 'staging'], ['--target', 'production', '--apply'], ['--backup-ref', 'unused']]) {
+  assert.throws(() => parsePreflightArguments(['--origin', 'https://production.example', '--out', 'file', ...flags]));
+}
 for (const args of [[], ['--apply'], ['--origin', 'http://preview.example', '--out', 'file'], ['--origin', 'https://secret@example.com', '--out', 'file'], ['--origin', 'https://preview.example/path', '--out', 'file'], ['--origin', 'https://preview.example', '--out', 'file', '--out', 'other']]) assert.throws(() => parsePreflightArguments(args));
 
 const metadata = { database: 'arcana', schema: 'public', role: 'migrator', read_only: 'on', default_read_only: 'on', managed_auth_present: true, arcana_tables: 0 };
@@ -62,6 +71,42 @@ assert.ok(reports.join('\n').includes('ep-test.neon.tech'));
 assert.ok(!reports.join('\n').includes('TEST_ONLY_PASSWORD'));
 assert.ok(!reports.join('\n').includes('postgresql://'));
 assert.ok(!reports.join('\n').includes('options='));
+assert.match(reports.join('\n'), /feature-branch Preview/);
+
+reports.length = 0;
+const productionResult = await runStagingPreflight({ target: 'production', origin: 'https://production.example', out: '/private/production.json' }, fakeSecret, {
+  inspect: async (value) => { assert.equal(value, connection.connectionString); return { ...metadata, arcana_tables: 13 }; },
+  plan: async (args, env) => {
+    assert.deepEqual(args, ['plan', '--out', '/private/production.json'], 'production can only generate a plan');
+    assert.equal(env?.BETTER_AUTH_DATABASE_URL, connection.connectionString);
+    assert.equal(env?.DATABASE_URL, connection.connectionString);
+    assert.equal(env?.BETTER_AUTH_URL, 'https://production.example');
+    assert.equal(env?.MCP_OAUTH_RESOURCE, 'https://production.example/mcp');
+    assert.equal(Object.keys(env ?? {}).length, 4);
+    return 2;
+  }, report: (message) => reports.push(message),
+});
+assert.equal(productionResult, 2, 'diagnostics preserve their non-success status');
+assert.match(reports.join('\n'), /effective Production auth connection/);
+assert.match(reports.join('\n'), /cannot establish which Neon project or branch/);
+assert.match(reports.join('\n'), /No apply is permitted/);
+assert.ok(!/Preview|staging|TEST_ONLY_PASSWORD|postgresql:\/\//.test(reports.join('\n')));
+await assert.rejects(runStagingPreflight({ target: 'production', origin: 'https://production.example', out: 'unused.json' }, undefined, {
+  inspect: async () => { assert.fail('missing production secret must fail before connecting'); },
+  plan: async () => { assert.fail('missing production secret must never plan'); },
+}));
+
+// The CLI never falls back to a differently scoped or runtime connection.
+for (const target of ['staging', 'production']) {
+  const otherTarget = target === 'production' ? 'STAGING' : 'PRODUCTION';
+  const cli = spawnSync(process.execPath, ['--import', 'tsx', 'scripts/staging-preflight.ts', '--target', target, '--origin', 'https://production.example', '--out', 'must-not-exist.json'], {
+    cwd: fileURLToPath(new URL('../', import.meta.url)), encoding: 'utf8',
+    env: { PATH: process.env.PATH, HOME: process.env.HOME, [`ARCANA_${otherTarget}_DATABASE_URL`]: 'INVALID_TEST_ONLY_CONNECTION', DATABASE_URL: 'INVALID_TEST_ONLY_RUNTIME_CONNECTION', BETTER_AUTH_DATABASE_URL: 'INVALID_TEST_ONLY_RUNTIME_CONNECTION' },
+  });
+  assert.equal(cli.status, 1);
+  assert.match(cli.stderr, /A Neon connection is required through the local secret prompt/);
+  assert.ok(!cli.stderr.includes('INVALID_TEST_ONLY'), 'driver/input details must not leak');
+}
 
 // Exercise the actual PostgreSQL inspection and read-only checks without a live database.
 const { PGlite } = await import('@electric-sql/pglite');
@@ -78,4 +123,4 @@ try {
   assert.equal(target.arcana_tables, 0);
   await assert.rejects(db.exec('CREATE TABLE must_not_be_created (id text)'), /read.only/i);
 } finally { await db.close(); }
-console.log('Staging preflight passed: local-secret validation, TLS Neon target, read-only transactions/planning, managed-schema rejection, cleanup, and secret-free summaries.');
+console.log('Staging/production preflight passed: local-secret validation, TLS Neon target, read-only transactions/planning, managed-schema rejection, cleanup, and secret-free target-specific summaries.');

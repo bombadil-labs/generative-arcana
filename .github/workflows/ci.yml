@@ -18,7 +18,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - run: node --test tools/test/smoke-production.test.mjs
+      - run: node --test tools/test/smoke-production.test.mjs tools/test/prepare-production-auth.test.mjs
       - run: node tools/check-authoring-hosts.mjs
       - run: node tools/audit-deck-v2.mjs --check --require-enriched=finalfantasy,deep-time,evolution,ultima,byrne,ulysses,ultima-octave
 

@@ -125,6 +125,24 @@ as Arcana configuration, or infer identity ownership from matching email address
 
 ## Schema review and application
 
+For a production target, use the production-labeled **read-only** WSL/Linux helper with Node.js 24:
+
+```bash
+bash tools/prepare-production-auth.sh https://generative-arcana.vercel.app
+```
+
+Enter the unpooled/direct Neon connection for the **effective Production auth database** only at
+the hidden local terminal prompt, never in chat or a command argument. If Production has a separate
+`BETTER_AUTH_DATABASE_URL`, use that target rather than assuming `DATABASE_URL` supplies auth.
+The helper clears inherited database/auth/mail and PostgreSQL driver overrides before installing
+dependencies and reading the secret. It reuses the strict read-only Neon inspection below, labels
+the target comparison as Production, and writes a new private mode-0600 auth plan under
+`~/arcana-production-plan.*`. It does not change environment variables in Vercel, create credentials,
+apply either schema, or send email. A successful preflight is review evidence, not production activation
+or full domain-schema validation. Review the auth plan and domain migration separately; obtain target
+and migration approval plus a verified restore point before any production apply. The disposable
+staging exception and its apply helper are never a production path.
+
 For a new isolated staging target, the WSL/Linux helper bundles installation, hidden local secret
 entry, read-only target inspection and auth-plan generation. Use Node.js 24 and the current branch:
 
