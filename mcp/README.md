@@ -23,19 +23,67 @@ public/unlisted catalog resources keep their existing behavior; no user-owned ca
 
 ## Complete authoring method over MCP
 
-Before constructing a deck, call `get_deck_authoring_guide({})`. It returns the complete canonical
-skill, all references and strategies (including schema and examples), and the linked authoring
-contracts as one text, with repository-relative filename headers. It is public and read-only in
-both stdio and HTTP; no account or rendering capability is required. The same full text is a
+Before planning or constructing a deck, call `get_deck_authoring_guide({})`. With no arguments
+it returns all 23 canonical source files verbatim: the complete skill, references and strategies
+(including schema and examples), and the reviewed supporting authoring contracts, with
+repository-relative filename headers. It is public and read-only in both stdio and HTTP; no
+account or rendering capability is required. The same full text is a
 listed resource at `arcana://authoring/guide` (`text/plain`). `get_deck_authoring_spec` links to both
 surfaces and remains the compact machine-readable validation contract, not the authoring method.
 
-The default tool result is the entire guide. Hosts with output limits can request
-`{ offset: 0, maxChars: 12000 }` and continue at `structuredContent.range.nextOffset` until null.
-Offsets/counts are Unicode code points; concatenate the text blocks without separators. The full
-text's SHA-256, byte length, source-inventory digest and per-file hashes let clients verify that
-all chunks belong to the same version. The source method is not rewritten or restricted to a
-particular image/program renderer.
+Broad reading remains the default: planning needs the method before selecting strategies.
+Use the same tool for each of these retrieval patterns:
+
+- **Full:** omit arguments (or pass `{}`) for the complete guide, including its preamble.
+- **Discovery and whole files:** use `{ toc: true }` for a compact TOC with bundle format/hash,
+  total size, and every exact source path, source size, and purpose. Then use
+  `{ files: ["skill/generative-arcana/SKILL.md", "skill/generative-arcana/strategies/index.md"] }`
+  to retrieve whole files before choosing strategies. Batch further files using the TOC's exact
+  repository-relative paths. Results always use canonical order, regardless of request order,
+  and retain the full guide's filename headers. They omit the preamble and join the framed
+  sections with one newline between each pair (`N - 1` separator characters for `N` files).
+- **Legacy chunks:** `offset` and/or `maxChars` retain their original behavior for existing
+  clients or a single file too large for a host response. Offsets/counts are Unicode code points
+  in the complete guide, never file-relative. To stream the full guide, start with
+  `{ offset: 0, maxChars: 12000 }`, then continue at `range.nextOffset` until null; concatenate
+  chunks without separators. For an oversized file, start at its `section.offset`, cap each
+  request to its remaining `section.chars`, and stop when that section is complete.
+  `range.nextOffset` tracks the complete guide, so it can remain non-null at a file boundary.
+
+Do not combine `toc`, `files`, or legacy chunk parameters, even an explicit `offset: 0`.
+`toc` accepts only `true`; empty selections, duplicate paths, and unknown paths are rejected.
+There are no filename aliases or additional per-file tools. The method is not rewritten or
+restricted to a particular image/program renderer.
+
+### Response metadata and version checks
+
+Every mode returns the complete inventory in `structuredContent.files`, with each file's
+`path`, `purpose`, `sha256`, source `bytes` and `chars`, and `section: { offset, chars, bytes }`.
+Source sizes exclude filename headers; `chars` counts Unicode code points. Section sizes cover
+that file's complete framed section (headers and framing newlines), excluding the separator
+between sections; its offset is measured in Unicode code points from the complete guide's start.
+Use section sizes to budget whole-file batches, allowing for the intervening separator newlines.
+Also reserve space for the structured inventory and protocol envelope; section sizes and
+`returnedByteLength` measure returned text, not the entire tool response.
+
+`mode` is `full`, `toc`, `files`, or `chunk`. `selectedPaths` appears only in `files` mode and
+lists canonical return order. `range` appears only in `full`/`chunk` mode and reports `offset`,
+`returnedChars`, `totalChars`, and `nextOffset`. `returnedByteLength` is always the actual returned
+text's UTF-8 size; global `byteLength` is always the complete guide's UTF-8 size.
+
+Global `sha256` identifies the complete framed guide, and `sourceDigest` identifies the canonical
+source inventory, in every mode; neither identifies the TOC or a selected subset. `sourceDigest`
+is SHA-256 of the JSON-serialized ordered `{ path, bytes, sha256 }` entries only. Discovery labels
+such as `purpose` do not enter either hash, so editing a purpose alone changes neither digest.
+`formatVersion: 1` versions the bundle framing, not the tool API, and remains unchanged.
+
+An installed skill can use the TOC to compare source hashes before fetching changed files. Verify
+**every** inventory entry, including `docs/contracts-and-readings.md`, `docs/deck-manifest.md`,
+`docs/schema-v2.md`, and `docs/visual-grammar.md`; a matching skill directory alone does not prove
+that the complete guide matches. Keep global hashes consistent across batches/chunks, and start
+over if the guide changes during retrieval.
+
+### Building and inclusion policy
 
 Run `npm run build --prefix mcp` from the repository root to generate
 `mcp/generated/authoring-guide.txt` and its inventory JSON. `node tools/build-authoring-guide.mjs
@@ -291,6 +339,7 @@ Available anonymously over HTTP and over stdio:
 - `cast_reading`
 - `resolve_reading`
 - `interpretation_context`
+- `get_deck_authoring_guide`
 - `get_deck_authoring_spec`
 - `validate_deck_manifest`
 - `list_visual_packs`

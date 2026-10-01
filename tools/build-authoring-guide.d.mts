@@ -7,6 +7,16 @@ export interface AuthoringGuideMetadata {
   files: Array<{ path: string; bytes: number; sha256: string }>;
 }
 export interface AuthoringGuideBundle { text: string; metadata: AuthoringGuideMetadata }
+export interface AuthoringGuideSection {
+  path: string;
+  bytes: number;
+  sha256: string;
+  purpose: string;
+  chars: number;
+  /** Whole filename-delimited section; offset/chars are Unicode code points in the full bundle. */
+  section: { offset: number; chars: number; bytes: number };
+  text: string;
+}
 export const SOURCE_ROOT: string;
 export const SUPPORT_DOCS: string[];
 export const EXCLUDED_NAVIGATION: string[];
@@ -15,3 +25,4 @@ export function validateReferences(sources: Array<{ path: string; text: string }
 export function buildAuthoringGuide(root?: string): AuthoringGuideBundle;
 export function readBuiltAuthoringGuide(root?: string): AuthoringGuideBundle;
 export function loadAuthoringGuide(root?: string): AuthoringGuideBundle;
+export function describeAuthoringGuide(bundle: AuthoringGuideBundle): AuthoringGuideSection[];

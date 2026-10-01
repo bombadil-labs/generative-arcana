@@ -6,7 +6,7 @@ import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
-import { readBuiltAuthoringGuide, SOURCE_ROOT } from "./build-authoring-guide.mjs";
+import { describeAuthoringGuide, readBuiltAuthoringGuide, SOURCE_ROOT } from "./build-authoring-guide.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 assert.equal(existsSync(join(root, SOURCE_ROOT)), false, "Run this check in the final packaged runtime, without canonical source directories");
@@ -50,9 +50,23 @@ try {
   const guide = await call("tools/call", { name: "get_deck_authoring_guide", arguments: {} });
   assert.equal(guide.isError, undefined);
   assert.equal(guide.content[0].text, expected.text);
+  const sections = describeAuthoringGuide(expected);
+  const toc = await call("tools/call", { name: "get_deck_authoring_guide", arguments: { toc: true } });
+  assert.equal(toc.isError, undefined);
+  assert.equal(toc.structuredContent.mode, "toc");
+  assert.equal(toc.structuredContent.sha256, expected.metadata.sha256);
+  assert.deepEqual(toc.structuredContent.files, sections.map(({ text: _text, ...file }) => file));
+  assert.ok(toc.content[0].text.length < expected.text.length / 10);
+  const selection = await call("tools/call", { name: "get_deck_authoring_guide", arguments: { files: sections.map(({ path }) => path).reverse() } });
+  assert.equal(selection.isError, undefined);
+  assert.equal(selection.content[0].text, sections.map(({ text }) => text).join("\n"));
+  assert.deepEqual(selection.structuredContent.selectedPaths, sections.map(({ path }) => path));
+  const first = sections[0];
+  const chunk = await call("tools/call", { name: "get_deck_authoring_guide", arguments: { offset: first.section.offset, maxChars: first.section.chars } });
+  assert.equal(chunk.content[0].text, first.text);
   const resource = await call("resources/read", { uri: "arcana://authoring/guide" });
   assert.equal(resource.contents[0].text, expected.text);
-  console.log(`Packaged stdio tool/resource verified: ${expected.metadata.files.length} source files, ${expected.metadata.byteLength} bytes.`);
+  console.log(`Packaged stdio full guide/TOC/file batches/legacy range/resource verified: ${expected.metadata.files.length} source files, ${expected.metadata.byteLength} bytes.`);
 } finally {
   lines.close();
   child.stdin.end();
