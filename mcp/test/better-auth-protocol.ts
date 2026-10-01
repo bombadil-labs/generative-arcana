@@ -4,8 +4,10 @@ import { symmetricDecrypt } from "better-auth/crypto";
 import { Readable } from "node:stream";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { fetchClientMetadataResource } from "@better-auth/cimd/node";
-import { createArcanaBetterAuth, createBetterAuthConfigurationFromEnv, AUTH_TABLE_NAMES } from "../src/betterAuth.js";
+import { Pool, types } from "pg";
+import { createArcanaBetterAuth, createArcanaBetterAuthOptions, createBetterAuthConfigurationFromEnv, AUTH_TABLE_NAMES } from "../src/betterAuth.js";
 import { createAuthEmailSender } from "../src/authEmail.js";
+import { AUTH_POSTGRES_TYPES } from "../src/authPostgres.js";
 import { createBetterAuthHarness, AUTH_TEST_ORIGIN, AUTH_TEST_PASSWORD } from "./better-auth-fixtures.js";
 
 const documents = new Map<string, Record<string, unknown>>();
@@ -23,6 +25,16 @@ const oauthFailure = async (response: Response, error: string) => {
   else { const body = await response.json(); assert.equal(body.error, error, JSON.stringify(body)); }
 };
 try {
+  const timestamp = "1790867532395";
+  assert.equal(types.getTypeParser(types.builtins.INT8, "text")(timestamp), timestamp, "global pg int8 parser must remain unchanged");
+  assert.equal(AUTH_POSTGRES_TYPES.getTypeParser(types.builtins.INT8, "text")(timestamp), BigInt(timestamp));
+  assert.equal(AUTH_POSTGRES_TYPES.getTypeParser(types.builtins.INT8)("9223372036854775807"), 9223372036854775807n, "int8 decoding must not lose precision");
+  assert.equal(AUTH_POSTGRES_TYPES.getTypeParser(types.builtins.INT4, "text"), types.getTypeParser(types.builtins.INT4, "text"), "count stays a normal integer");
+  assert.equal(AUTH_POSTGRES_TYPES.getTypeParser(types.builtins.INT8, "binary"), types.getTypeParser(types.builtins.INT8, "binary"));
+  const poolOptions = createArcanaBetterAuthOptions({ baseURL: AUTH_TEST_ORIGIN, resource: `${AUTH_TEST_ORIGIN}/mcp`, secret: "test-only-not-a-production-secret-0123456789", databaseUrl: "postgres://localhost/unused_test" }, { sendEmail: async () => {} });
+  assert.ok(poolOptions.database instanceof Pool);
+  assert.equal(poolOptions.database.options.types, AUTH_POSTGRES_TYPES, "production auth pool must use the scoped parser");
+  await poolOptions.database.end(); // Pool construction does not connect.
   assert.throws(() => createArcanaBetterAuth({ baseURL: AUTH_TEST_ORIGIN, resource: `${AUTH_TEST_ORIGIN}/mcp`, secret: "short" }), /32/);
   assert.throws(() => createArcanaBetterAuth({ baseURL: AUTH_TEST_ORIGIN, resource: `${AUTH_TEST_ORIGIN}/mcp`, secret: "x".repeat(32) }), /SMTP/);
   assert.throws(() => createAuthEmailSender({ host: "smtp.example", from: "arcana@example", port: 587, secure: false, user: "alone" }), /together/);
@@ -175,7 +187,29 @@ try {
 
   const rateResponses = await Promise.all(Array.from({ length: 8 }, () => h.request("/api/auth/sign-in/email", { ip: "203.0.113.77", body: { email: "absent@example.test", password: AUTH_TEST_PASSWORD } })));
   assert.equal(rateResponses.filter((r) => r.status === 429).length, 3);
+  for (const response of rateResponses.filter((r) => r.status === 429)) {
+    const retryAfter = Number(response.headers.get("x-retry-after"));
+    assert.ok(retryAfter > 0 && retryAfter <= 60, "pg int8 timestamps must yield a duration, not string concatenation");
+  }
   const limits = await h.pg.client.query<{ count: number }>(`SELECT count(*) AS count FROM ${AUTH_TABLE_NAMES.rateLimit}`); assert.ok(Number(limits.rows[0].count) > 0);
+
+  const realNow = Date.now;
+  const windowStart = realNow();
+  let clock = windowStart + 59_999;
+  Date.now = () => clock;
+  try {
+    const key = "203.0.113.77|/sign-in/email";
+    await h.pg.client.query(`UPDATE ${AUTH_TABLE_NAMES.rateLimit} SET count = 5, "lastRequest" = $1 WHERE key = $2`, [windowStart, key]);
+    const requestAtBoundary = () => h.request("/api/auth/sign-in/email", { ip: "203.0.113.77", body: { email: "absent@example.test", password: AUTH_TEST_PASSWORD } });
+    const beforeExpiry = await requestAtBoundary();
+    assert.equal(beforeExpiry.status, 429);
+    assert.equal(beforeExpiry.headers.get("x-retry-after"), "1", "sub-second remainder rounds up");
+    const readCounter = async () => (await h.pg.client.query<{ count: number; lastRequest: bigint }>(`SELECT count, "lastRequest" FROM ${AUTH_TABLE_NAMES.rateLimit} WHERE key = $1`, [key])).rows[0];
+    assert.deepEqual(await readCounter(), { count: 5, lastRequest: BigInt(windowStart) }, "rejected requests must not extend the window");
+    clock = windowStart + 60_000;
+    assert.equal((await requestAtBoundary()).status, 401, "a request at the exact boundary starts a new window");
+    assert.deepEqual(await readCounter(), { count: 1, lastRequest: BigInt(clock) }, "expired windows reset the counter and millisecond timestamp");
+  } finally { Date.now = realNow; }
 
   // Real CIMD registration goes through Better Auth; only HTTPS network bytes are deterministic.
   const cimdClient = "https://connector.example/client.json";
@@ -234,6 +268,10 @@ try {
     ? h.request("/api/auth/sign-in/email", { ip: "203.0.113.105", body: { email: "absent@example.test", password: AUTH_TEST_PASSWORD } })
     : failingMailRequest("sign-in/email", { email: "absent@example.test", password: AUTH_TEST_PASSWORD }, "203.0.113.105")));
   assert.equal(horizontalLimits.filter((response) => response.status === 429).length, 3, "two auth instances must share one atomic database rate limit");
+  assert.ok(horizontalLimits.filter((response) => response.status === 429).every((response) => {
+    const retryAfter = Number(response.headers.get("x-retry-after"));
+    return retryAfter > 0 && retryAfter <= 60;
+  }), "shared rate limits must return bounded retry durations");
   await failingMailRuntime.close();
 
 

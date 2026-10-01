@@ -5,11 +5,15 @@ import { PostgresDialect, type PostgresPoolClient } from "kysely";
 import { getMigrations } from "better-auth/db/migration";
 import { createArcanaBetterAuth, ARCANA_OAUTH_SCOPES, type ArcanaBetterAuth } from "../src/betterAuth.js";
 import type { AuthEmail } from "../src/authEmail.js";
+import { AUTH_POSTGRES_TYPES } from "../src/authPostgres.js";
+import { types } from "pg";
 
 export const AUTH_TEST_ORIGIN = "https://arcana.example";
 export const AUTH_TEST_PASSWORD = "correct horse battery staple 123";
 export async function createBetterAuthHarness(dependencies: Pick<import("../src/betterAuth.js").BetterAuthDependencies, "fetchClientMetadata"> = {}) {
-  const client = await PGlite.create();
+  // PGlite's default int8 parser returns numbers, unlike the production pg
+  // driver. Exercise the auth pool's actual parser to catch timestamp regressions.
+  const client = await PGlite.create({ parsers: { [types.builtins.INT8]: AUTH_POSTGRES_TYPES.getTypeParser(types.builtins.INT8, "text") } });
   let queue = Promise.resolve();
   const dialect = new PostgresDialect({ pool: {
     async connect() {

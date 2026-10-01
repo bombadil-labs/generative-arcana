@@ -14,6 +14,7 @@ import { Pool } from "pg";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { getMigrations } from "better-auth/db/migration";
 import { createAuthEmailSender, createAuthSmtpConfigurationFromEnv, type AuthEmailSender, type AuthSmtpConfiguration } from "./authEmail.js";
+import { AUTH_POSTGRES_TYPES } from "./authPostgres.js";
 import type { BrowserSessionAuthenticator } from "./browserSession.js";
 import { OAuthPrincipalError, type BearerIdentityVerifier } from "./oauthIdentity.js";
 
@@ -79,7 +80,7 @@ export function createArcanaBetterAuthOptions(config: BetterAuthConfiguration, d
     try { await sender(message); }
     catch { const state = emailDeliveryContext.getStore(); if (state) state.failed = true; throw new Error("Authentication email delivery failed."); }
   };
-  const pool = dependencies.database ? undefined : new Pool({ connectionString: required(config.databaseUrl, "Better Auth database URL"), max: 5, connectionTimeoutMillis: 10_000, query_timeout: 10_000, statement_timeout: 10_000 });
+  const pool = dependencies.database ? undefined : new Pool({ connectionString: required(config.databaseUrl, "Better Auth database URL"), types: AUTH_POSTGRES_TYPES, max: 5, connectionTimeoutMillis: 10_000, query_timeout: 10_000, statement_timeout: 10_000 });
   const database = dependencies.database ?? pool!;
   const options = {
     appName: "Generative Arcana", baseURL, basePath: BETTER_AUTH_BASE_PATH,
