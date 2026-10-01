@@ -149,3 +149,25 @@ client registration, provision client credentials, or authorize a client themsel
 plans and workspace policies vary; the panel links to current official guides. Its first prompt reads
 the complete authoring guide and checks the personal library without creating or modifying a deck.
 The component tests cover session gating, canonical metadata, clipboard failures/retries and logout.
+
+## Account card artwork
+
+Each owned deck in **My Decks** has an **Artwork** action at `#/deck/<resource-id>/artwork`.
+Choose a card and upload one PNG, JPEG, or WebP (up to 3,000,000 bytes / 16 megapixels).
+The server verifies ownership, raster content, revision, and the previous artwork ID, then
+re-encodes the image. SVG, animation, and executable rendering code are not accepted.
+A replacement conflict refreshes the card list and requires a new explicit selection/upload.
+
+The browser keeps artwork separate from deck manifests and the trusted visual-pack registry.
+A disposable catalog-route store fetches one access-checked metadata catalog, then version-pinned
+same-origin image bytes for cards being displayed. Only validated WebP responses become object
+URLs. Raster artwork takes precedence in the grid, card detail, and readings; unavailable or
+failed images retain the semantic card face. Leaving the route or changing authenticated account
+aborts work and revokes its object URLs. Deployments without artwork storage return to that
+semantic fallback and show a clear upload-unavailable error.
+
+Authenticated `/auth/session` responses include a non-secret stable `accountId`. A focus refresh
+for the same ID/profile preserves pending work, including native file-picker selections. Missing
+identity, account changes, logout, or failed session verification never preserve authenticated
+snapshots based only on email/display name. Artwork requests and image bytes use `no-store` and
+never follow returned external URLs or redirects.

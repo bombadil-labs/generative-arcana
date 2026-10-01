@@ -359,3 +359,9 @@ library. They are discoverable before login in OAuth mode, returning an OAuth ch
 needed; non-OAuth anonymous filtering intentionally omits protected tools.
 
 Symbolic tools delegate to the same `ArcanaEngine` and `ArcanaToolAdapter`; auth and persistence select host state but do not redefine symbolic behavior. Visual tools consume the same stable deck/card identities through a host-owned visual asset store.
+
+### Saved static card artwork
+
+Opt-in private card artwork can be uploaded through `set_card_artwork` (actual base64 PNG/JPEG/WebP bytes, maximum 1 MB) or the signed-in website (maximum 3 MB). `get_card_artwork` returns the verified image plus separate visual-pack metadata; existing card-art tools also resolve saved artwork. Ownership, deck scopes, current visibility and optimistic version checks apply. Automatic ChatGPT/Claude generated-file transfer, SVG rasterization and untrusted program execution are not implemented.
+
+See [configuration, lifecycle, isolated-preview activation and limits](../docs/card-artwork.md). The feature is disabled without explicit server-only configuration; it never provisions a bucket, credentials or database schema at startup.

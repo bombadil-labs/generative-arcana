@@ -4,6 +4,7 @@ import { isIllustrated, listPacks } from "@/runtime/defineCard";
 import { DeckGrid } from "@/components/DeckGrid";
 import { navigate } from "./router";
 import { getPackId, setPackId } from "./packPref";
+import { useArtworkStore, useArtworkVersion } from "../artwork/context";
 import type { CardData } from "@/runtime/types";
 
 type Named = { slug?: string; name: string; index?: number };
@@ -28,6 +29,8 @@ function numericKind(numStr: string): "identity" | "prime" | "composite" {
 
 export function CardBrowser({ deckId }: { deckId: string }) {
   const deck = getDeck(deckId);
+  const artwork = useArtworkStore();
+  const artworkVersion = useArtworkVersion();
   const [q, setQ] = useState("");
   const [arcana, setArcana] = useState("");
   const [suit, setSuit] = useState("");
@@ -60,10 +63,10 @@ export function CardBrowser({ deckId }: { deckId: string }) {
       if (rank && c.rank_slug !== rank) return false;
       if (virtue && c.station_slug !== virtue) return false;
       if (comp && numericKind(c.number) !== comp) return false;
-      if (illustratedOnly && !isIllustrated(deckId, c.slug)) return false;
+      if (illustratedOnly && !artwork?.has(c.slug) && !isIllustrated(deckId, c.slug)) return false;
       return true;
     });
-  }, [deck, q, arcana, suit, rank, virtue, comp, illustratedOnly]);
+  }, [deck, q, arcana, suit, rank, virtue, comp, illustratedOnly, artwork, artworkVersion]);
 
   if (!deck) {
     return (
@@ -150,7 +153,7 @@ export function CardBrowser({ deckId }: { deckId: string }) {
       </div>
 
       {filtered.length ? (
-        <DeckGrid cards={filtered} deck={deck.data} deckId={deckId} prefer={prefer} minColPx={150} contextLabel={hasFilters ? "filtered" : "deck order"} />
+        <DeckGrid cards={filtered} deck={deck.data} deckId={deck.id} prefer={prefer} minColPx={150} contextLabel={hasFilters ? "filtered" : "deck order"} />
       ) : (
         <div style={{ textAlign: "center", padding: "80px 20px", color: "var(--ink-3)" }}>
           <div style={{ fontFamily: "var(--font-display)", fontSize: 24, color: "var(--ink-2)", marginBottom: "var(--s-2)" }}>No cards match</div>

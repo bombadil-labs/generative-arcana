@@ -7,7 +7,8 @@
 import { TarotCard } from "./TarotCard";
 import { RawP5Card } from "./RawP5Card";
 import { CardPlaceholder } from "./CardPlaceholder";
-import { resolveVisual } from "@/runtime/defineCard";
+import { resolveVisual } from "../runtime/defineCard";
+import { useCardArtwork } from "../artwork/context";
 import type { CardData } from "@/runtime/types";
 import type { DeckDataFile } from "@/decks/types";
 
@@ -27,6 +28,11 @@ export interface CardArtProps {
 }
 
 export function CardArt({ card, deckId, deck, prefer, mode = "live", paused, onSignal }: CardArtProps) {
+  const { state: artwork, fail } = useCardArtwork(deckId, card.slug);
+  if (artwork.status === "ready") {
+    return <img src={artwork.url} alt={`${card.name} artwork`} onError={fail} loading="lazy" draggable={false}
+      style={{ ...FILL, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />;
+  }
   const visual = deckId ? resolveVisual(deckId, card.slug, prefer) : null;
 
   if (visual?.kind === "kit") {

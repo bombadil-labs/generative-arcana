@@ -141,6 +141,8 @@ jobs:
             command: npm run test:oauth-identity --prefix mcp
           - check: hardening
             command: npm run test:hardening --prefix mcp
+          - check: saved card artwork
+            command: npm run test:card-artwork --prefix mcp
           - check: visual assets
             command: npm run test:visuals --prefix mcp
           - check: golden eval

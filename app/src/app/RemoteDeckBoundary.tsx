@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getDeck } from "@/decks";
 import type { DeckModule } from "@/decks/types";
 import { useBrowserSession, type BrowserSessionState } from "@/auth/session";
 import { catalogDeckRuntime } from "@/catalog/runtime";
+import { getSharedDeck } from "../catalog/api";
 import { navigate } from "./router";
+import { CatalogArtworkProvider } from "../artwork/context";
 
 type Resolution = {
   deckId: string;
@@ -16,6 +18,9 @@ type Resolution = {
 export function RemoteDeckBoundary({ deckId, routeKey, children }: { deckId: string; routeKey: string; children: React.ReactNode }) {
   const { session } = useBrowserSession();
   const [resolution, setResolution] = useState<Resolution | null>(null);
+  const [refresh, setRefresh] = useState(0);
+  const retry = useCallback(() => { setResolution(null); setRefresh((value) => value + 1); }, []);
+  const current = resolution?.deckId === deckId && resolution.routeKey === routeKey && resolution.session === session ? resolution : null;
 
   useEffect(() => {
     if (catalogDeckRuntime.localDeck(deckId) || session.status === "loading") return;
@@ -32,22 +37,75 @@ export function RemoteDeckBoundary({ deckId, routeKey, children }: { deckId: str
       });
     });
     return () => controller.abort();
-  }, [deckId, routeKey, session]);
+  }, [deckId, routeKey, session, refresh]);
+
+  useEffect(() => {
+    if (!current || current.status === "ready") return;
+    // A failed permission/network check remains fail-closed, but is not a terminal route state.
+    const onVisible = () => { if (document.visibilityState === "visible") retry(); };
+    window.addEventListener("focus", retry);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", retry);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [current, retry]);
+
+  useEffect(() => {
+    if (!current || current.status !== "ready" || getDeck(deckId) !== current.deck) return;
+    const source = catalogDeckRuntime.source(current.deck);
+    if (!source) return;
+    let controller: AbortController | null = null;
+    const revalidate = () => {
+      controller?.abort();
+      const check = new AbortController(); controller = check;
+      const isCurrent = () => !check.signal.aborted && getDeck(deckId) === current.deck;
+      // A read check preserves the exact snapshot when access/revision are unchanged. In particular,
+      // closing a file picker must not unmount its owner editor or discard a selected upload.
+      void getSharedDeck(source.id, check.signal).then((remote) => {
+        if (!isCurrent()) return;
+        if (remote.id !== source.id) throw new Error("The catalog returned a different deck identity.");
+        if (remote.revision === source.revision) return;
+        catalogDeckRuntime.invalidate(current.deck);
+        setResolution(null);
+        setRefresh((value) => value + 1);
+      }).catch((error: unknown) => {
+        if (!isCurrent()) return;
+        catalogDeckRuntime.invalidate(current.deck);
+        const status = error && typeof error === "object" && "status" in error ? error.status : undefined;
+        setResolution({ deckId, routeKey, session,
+          status: status === 401 || status === 403 || status === 404 ? "missing" : "error",
+          message: error instanceof Error ? error.message : "Unable to recheck this deck.",
+        });
+      });
+    };
+    const onVisible = () => { if (document.visibilityState === "visible") revalidate(); };
+    window.addEventListener("focus", revalidate);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      controller?.abort();
+      window.removeEventListener("focus", revalidate);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [current, deckId, routeKey, session]);
 
   if (catalogDeckRuntime.localDeck(deckId)) return <>{children}</>;
-  const current = resolution?.deckId === deckId && resolution.routeKey === routeKey && resolution.session === session ? resolution : null;
   if (!current || session.status === "loading") return <DeckStatus title="Opening deck…" body="Checking the latest deck and your access in the Generative Arcana catalog." />;
-  if (current.status === "ready" && getDeck(deckId) === current.deck) return <>{children}</>;
-  if (current.status === "missing") return <DeckStatus title="Deck unavailable" body="This deck does not exist or is not visible to you." />;
-  return <DeckStatus title="Couldn’t open deck" body={current.status === "error" ? current.message : "The catalog could not be reached."} />;
+  if (current.status === "ready" && getDeck(deckId) === current.deck) {
+    const source = catalogDeckRuntime.source(current.deck)!;
+    return <CatalogArtworkProvider deckId={source.id} deckRevision={source.revision}>{children}</CatalogArtworkProvider>;
+  }
+  if (current.status === "missing") return <DeckStatus title="Deck unavailable" body="This deck does not exist or is not visible to you." onRetry={retry} />;
+  return <DeckStatus title="Couldn’t open deck" body={current.status === "error" ? current.message : "The catalog could not be reached."} onRetry={retry} />;
 }
 
-function DeckStatus({ title, body }: { title: string; body: string }) {
+function DeckStatus({ title, body, onRetry }: { title: string; body: string; onRetry?: () => void }) {
   return (
     <div style={{ maxWidth: 760, margin: "0 auto", padding: "clamp(32px,8vw,96px) clamp(16px,4vw,28px)" }}>
       <div style={{ font: "400 12px/1.4 var(--font-mono)", letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--ink-3)" }}>Community library</div>
       <h1 style={{ font: "400 clamp(32px,5vw,56px)/1.05 var(--font-display)", margin: "var(--s-3) 0", color: "var(--ink)" }}>{title}</h1>
       <p style={{ font: "400 16px/1.6 var(--font-body)", color: "var(--ink-2)", maxWidth: "58ch" }}>{body}</p>
+      {onRetry && <button type="button" onClick={onRetry} style={{ ...backButton, marginRight: 12 }}>Try again</button>}
       <button onClick={() => navigate("/community")} style={backButton}>← Community decks</button>
     </div>
   );

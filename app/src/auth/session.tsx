@@ -11,7 +11,7 @@ export interface BrowserAccount {
 export type BrowserSessionState =
   | { status: "loading" }
   | { status: "anonymous" }
-  | { status: "authenticated"; user: BrowserAccount; mcpUrl?: string }
+  | { status: "authenticated"; accountId?: string; user: BrowserAccount; mcpUrl?: string }
   | { status: "unavailable"; message: string }
   | { status: "error"; message: string };
 
@@ -40,15 +40,18 @@ export function BrowserSessionProvider({ children }: { children: React.ReactNode
         setSession({ status: "unavailable", message: "Accounts are not available on this deployment. You can still load your own deck JSON from the home page." });
         return;
       }
-      const body = await response.json() as { authenticated?: unknown; user?: BrowserAccount; mcpUrl?: unknown; message?: unknown };
+      const body = await response.json() as { authenticated?: unknown; accountId?: unknown; user?: BrowserAccount; mcpUrl?: unknown; message?: unknown };
       if (id !== requestId.current) return;
       if (!response.ok) {
         setSession({ status: "error", message: typeof body.message === "string" ? body.message : `Session request failed (${response.status}).` });
         return;
       }
-      setSession(body.authenticated === true
-        ? { status: "authenticated", user: body.user ?? {}, mcpUrl: validatedMcpUrl(body.mcpUrl) }
-        : { status: "anonymous" });
+      const next: BrowserSessionState = body.authenticated === true
+        ? { status: "authenticated", accountId: typeof body.accountId === "string" && body.accountId ? body.accountId : undefined, user: body.user ?? {}, mcpUrl: validatedMcpUrl(body.mcpUrl) }
+        : { status: "anonymous" };
+      // Focus refresh (including closing a native file picker) must not reset pending work.
+      // Only the verified opaque account identity can establish continuity; email/name cannot.
+      setSession((previous) => sameAuthenticatedAccount(previous, next) ? previous : next);
     } catch {
       if (id === requestId.current) setSession({ status: "error", message: "Unable to check your account. Check your connection and try again." });
     }
@@ -88,6 +91,15 @@ export function useBrowserSession(): BrowserSessionContextValue {
   const value = useContext(BrowserSessionContext);
   if (!value) throw new Error("useBrowserSession must be used inside BrowserSessionProvider.");
   return value;
+}
+
+function sameAuthenticatedAccount(previous: BrowserSessionState, next: BrowserSessionState): boolean {
+  if (previous.status !== "authenticated" || next.status !== "authenticated" || !previous.accountId || previous.accountId !== next.accountId) return false;
+  return previous.user.email === next.user.email
+    && previous.user.displayName === next.user.displayName
+    && previous.user.emailVerified === next.user.emailVerified
+    && previous.user.avatarUrl === next.user.avatarUrl
+    && previous.mcpUrl === next.mcpUrl;
 }
 
 /** The server supplies its canonical OAuth resource, which may differ from a browser alias. */

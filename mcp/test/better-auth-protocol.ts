@@ -66,6 +66,8 @@ try {
   const aliceSession = await (await h.request("/auth/session", { cookie: alice.cookie })).json();
   assert.equal(aliceSession.authenticated, true); assert.equal(aliceSession.user.emailVerified, true);
   assert.equal(aliceSession.mcpUrl, h.runtime.resource, "signed-in setup uses the configured canonical resource");
+
+  assert.equal(aliceSession.accountId, alice.user.id, "browser continuity uses account identity, never an email or a session secret");
   const signedIn = await h.request("/api/auth/sign-in/email", { body: { email: alice.user.email, password: AUTH_TEST_PASSWORD } });
   const cookieHeader = signedIn.headers.getSetCookie().find((value) => value.includes("session_token"))!;
   assert.match(cookieHeader, /HttpOnly/i); assert.match(cookieHeader, /Secure/i); assert.match(cookieHeader, /SameSite=Lax/i);

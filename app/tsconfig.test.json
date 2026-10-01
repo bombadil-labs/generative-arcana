@@ -38,6 +38,10 @@
     "src/auth/Account.tsx",
     "src/components/cardMeta.tsx",
     "src/components/safeSvg.ts",
-    "src/components/CardPlaceholder.tsx"
+    "src/components/CardPlaceholder.tsx",
+    "src/artwork/api.ts",
+    "src/artwork/store.ts",
+    "src/artwork/context.tsx",
+    "src/components/CardArt.tsx"
   ]
 }

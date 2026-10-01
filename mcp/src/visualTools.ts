@@ -1,3 +1,4 @@
+import { ArtworkError, type CardArtworkService } from "./cardArtwork";
 import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import type { CardData } from "../../app/src/decks/card";
@@ -20,6 +21,8 @@ export type ArcanaVisualToolName = typeof ARCANA_VISUAL_TOOL_NAMES[number];
 export interface RegisterArcanaVisualToolsOptions {
   adapter: ArcanaToolAdapter;
   visuals: ServerVisualStore;
+  artwork?: CardArtworkService;
+  viewerId?: string | null;
   onToolCall?: ArcanaToolCallObserver;
   securitySchemes?: readonly ToolSecurityScheme[];
 }
@@ -43,6 +46,29 @@ const readOnlyAnnotations = {
 /** Register Node-host visual capabilities without coupling presentation to ArcanaEngine internals. */
 export function registerArcanaVisualTools(server: McpServer, options: RegisterArcanaVisualToolsOptions): void {
   const { adapter, visuals, onToolCall } = options;
+  const listPacks = async (deckId: string) => {
+    const existing = visuals.listPacks(deckId);
+    if (!options.artwork) return existing;
+    try {
+      const cards = await options.artwork.readableCards(options.viewerId ?? null, deckId);
+      const count = cards.cards.filter(card => card.artwork).length;
+      return count ? [...existing, { deckId, id: "saved-artwork", label: "Saved card artwork", renderer: "static-image" as const, mimeType: "image/webp", complete: count === cards.cards.length, cardCount: count }] : existing;
+    } catch (error) {
+      if (error instanceof ArtworkError && error.status === 404) return existing;
+      throw new Error("Saved artwork is temporarily unavailable.");
+    }
+  };
+  const loadCardArt = async (deckId: string, cardSlug: string, packId?: string) => {
+    if (options.artwork && (!packId || packId === "saved-artwork")) {
+      try {
+        const { metadata, bytes } = await options.artwork.image(options.viewerId ?? null, deckId, cardSlug);
+        return { deckId, cardSlug, packId: "saved-artwork", packLabel: "Saved card artwork", mimeType: metadata.mediaType, data: Buffer.from(bytes) };
+      } catch (error) {
+        if (!(error instanceof ArtworkError && error.status === 404)) throw new Error("Saved artwork is temporarily unavailable.");
+      }
+    }
+    return visuals.loadCardArt(deckId, cardSlug, packId);
+  };
   const authMeta = options.securitySchemes ? { securitySchemes: options.securitySchemes } : undefined;
   registerArcanaSpreadWidget(server);
 
@@ -57,7 +83,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
     async (input: unknown) => observed("list_visual_packs", onToolCall, async () => {
       const { deckId } = input as { deckId: string };
       await adapter.call("get_deck", { deckId });
-      const result = visuals.listPacks(deckId);
+      const result = await listPacks(deckId);
       return {
         content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
         structuredContent: { result },
@@ -81,7 +107,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
       const { deckId, cardSlug, packId } = input as { deckId: string; cardSlug: string; packId?: string };
       const card = await adapter.call("get_card", { deckId, cardSlug }) as CardData;
 
-      const art = await visuals.loadCardArt(deckId, cardSlug, packId);
+      const art = await loadCardArt(deckId, cardSlug, packId);
       if (!art) throw visualLookupError(deckId, visuals);
 
       const result = {
@@ -140,7 +166,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
         };
       }
 
-      const staticPacks = visuals.listPacks(reading.deckId).filter((pack) => pack.renderer === "static-image");
+      const staticPacks = (await listPacks(reading.deckId)).filter((pack) => pack.renderer === "static-image");
       if (!staticPacks.length) throw noVisualError(reading.deckId, reading.spread.id);
 
       const content: Array<
@@ -161,7 +187,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
       }> = [];
 
       for (const [index, placement] of reading.placements.entries()) {
-        const art = await visuals.loadCardArt(reading.deckId, placement.card.slug, packId);
+        const art = await loadCardArt(reading.deckId, placement.card.slug, packId);
         if (!art) {
           throw new Error(`Visual pack for deck “${reading.deckId}” is missing art for card “${placement.card.slug}”.`);
         }
