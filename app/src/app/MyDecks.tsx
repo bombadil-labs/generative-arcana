@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useBrowserSession } from "@/auth/session";
+import { McpSetup } from "@/auth/McpSetup";
 import { validateAuthoringArtifact } from "@/authoring/api";
 import type { DeckAuthoringValidation } from "@/decks/authoring";
 import { unregisterDeck } from "@/decks";
@@ -200,6 +201,8 @@ function AuthenticatedLibrary({ user }: { user: { displayName?: string; email?: 
           <div style={{ marginLeft: "auto", fontSize: 12 }}><a href="#/account/connections">Manage account</a></div>
         </div>
       </header>
+
+      <McpSetup />
 
       <section style={section}>
         <div style={sectionHeadingRow}>

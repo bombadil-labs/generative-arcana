@@ -135,3 +135,17 @@ Legacy built-in links are marked unverified; legacy custom links are refused rat
 
 See [the contract and protocol notes](../docs/contracts-and-readings.md) for compatibility, limits,
 and validation boundaries. CI runs the tests, full application typecheck, and production build.
+
+## Signed-in MCP setup
+
+My Decks and Account → Connected clients show the Claude/ChatGPT setup panel only after the
+session service confirms sign-in. `/auth/session` supplies the canonical `mcpUrl` from the server’s
+validated OAuth resource configuration; the browser must not infer it from an alias, a preview
+build hostname, or a hard-coded production address. Missing/invalid metadata shows an actionable
+error instead of a guessed endpoint. Static deployments without accounts do not show the panel.
+
+The instructions use Arcana’s existing CIMD/published-client identity flow and do not enable dynamic
+client registration, provision client credentials, or authorize a client themselves. Host UI labels,
+plans and workspace policies vary; the panel links to current official guides. Its first prompt reads
+the complete authoring guide and checks the personal library without creating or modifying a deck.
+The component tests cover session gating, canonical metadata, clipboard failures/retries and logout.

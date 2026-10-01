@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { accountError, accountHref, accountRequest, AccountRequestError, safeAccountReturnTo, validatedOAuthRedirect, type AccountPage, type AccountRoute, type OAuthContext } from "./api";
 import { useBrowserSession } from "./session";
+import { McpSetup } from "./McpSetup";
 
 interface AuthResult { redirect?: boolean; url?: string }
 interface ConnectedClient { id: string; clientId: string; name: string; scopes: string[]; createdAt?: string }
@@ -337,6 +338,7 @@ function Connections() {
     {session.status === "unavailable" && <Notice error>{session.message}</Notice>}
     {session.status === "error" && <Notice error>{session.message} <button className="account-text-button" onClick={() => void refresh()}>Try again</button></Notice>}
     {session.status === "authenticated" && <>
+      <McpSetup />
       <p className="account-muted">Signing out also ends connections authorized during this sign-in. You can reconnect after signing in again.</p>
       <div className="account-identity"><span>{session.user.displayName || session.user.email || "Your account"}{session.user.displayName && session.user.email && <small>{session.user.email}</small>}</span><SignOutButton /></div>
       {loadError && <Notice error>{loadError} <button className="account-text-button" onClick={() => setAttempt((n) => n + 1)}>Try again</button></Notice>}

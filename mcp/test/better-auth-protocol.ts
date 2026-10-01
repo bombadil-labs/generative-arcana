@@ -62,8 +62,10 @@ try {
   assert.equal(notLoggedIn.status, 403);
   assert.ok(!notLoggedIn.headers.getSetCookie().some((cookie) => cookie.includes("session_token")));
   const alice = await h.signupVerify("alice@example.test");
+  assert.deepEqual(await (await h.request("/auth/session")).json(), { authenticated: false });
   const aliceSession = await (await h.request("/auth/session", { cookie: alice.cookie })).json();
   assert.equal(aliceSession.authenticated, true); assert.equal(aliceSession.user.emailVerified, true);
+  assert.equal(aliceSession.mcpUrl, h.runtime.resource, "signed-in setup uses the configured canonical resource");
   const signedIn = await h.request("/api/auth/sign-in/email", { body: { email: alice.user.email, password: AUTH_TEST_PASSWORD } });
   const cookieHeader = signedIn.headers.getSetCookie().find((value) => value.includes("session_token"))!;
   assert.match(cookieHeader, /HttpOnly/i); assert.match(cookieHeader, /Secure/i); assert.match(cookieHeader, /SameSite=Lax/i);
