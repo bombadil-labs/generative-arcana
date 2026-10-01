@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 2,
+  "tagline": "A neutral single-card artwork check.",
+  "data": {
+    "name": "Artwork Preview Check",
+    "slug": "artwork-preview-check",
+    "version": "1.0.0",
+    "theme": {
+      "name": "Shapes",
+      "description": "Simple shapes explore attention and balance.",
+      "creator": "Artwork preview test"
+    },
+    "visual_language": {
+      "medium": "Ink",
+      "surface": "Plain paper",
+      "avoid": [
+        "lettering"
+      ]
+    },
+    "minor_number_origin": "rank",
+    "suits": {
+      "lines": {
+        "name": "Lines",
+        "index": 0,
+        "visual_grammar": {
+          "composition": "A horizontal field of simple lines."
+        }
+      }
+    },
+    "ranks": {
+      "one": {
+        "name": "One",
+        "index": 0,
+        "numeric_value": 1
+      },
+      "four": {
+        "name": "Four",
+        "index": 1,
+        "numeric_value": 4,
+        "visual_content": "Four equal marks.",
+        "visual_form": {
+          "composition_law": "A balanced square."
+        }
+      }
+    },
+    "transversal": {
+      "name": "Attention",
+      "description": "One quiet station.",
+      "stations": {
+        "still": {
+          "name": "Still",
+          "index": 0,
+          "visual_environment": {
+            "palette": "Gray and white."
+          }
+        }
+      }
+    },
+    "major_arcana": {
+      "story": "A shape finds its place.",
+      "visual_grammar": {
+        "composition": "One centered arrangement."
+      }
+    },
+    "cards": {
+      "major-0": {
+        "slug": "major-0",
+        "name": "An Open Circle",
+        "number": "0",
+        "arcana": "major",
+        "station_slug": "still",
+        "meaning": {
+          "upright": "Notice the space available.",
+          "inverted": "Consider what is overlooked."
+        },
+        "visuals": {
+          "detailed_description": "A single open circle on plain paper."
+        }
+      }
+    }
+  }
+}

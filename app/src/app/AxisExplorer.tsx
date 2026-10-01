@@ -13,15 +13,10 @@
  */
 import { useState, useEffect, useRef, Fragment } from "react";
 import { Svg, omega, facVar, facWord } from "@/components/cardMeta";
-import type { DeckDataFile } from "@/decks/types";
+import type { AxisMeaning, DeckDataFile, SuitEntry, TransversalData } from "@/decks/types";
 
-type Meaning = { upright?: string[]; inverted?: string[] };
-type Suit = { index: number; name: string; slug: string; description: string; symbol?: { svg?: string }; meaning?: Meaning; visual_style?: string };
-type Rank = { index: number; numeric_value: number; name: string; symbol?: string; description?: string; question?: string };
-type Station = { index: number; slug: string; name: string; description?: string; meaning?: Meaning; visual_motif?: string };
-type Transversal = { name: string; description: string; ordering_rationale?: string; suit_stride?: number; stations: Record<string, Station> };
-type MajorArcana = { story?: string; visual_style?: string; symbol?: { svg?: string } };
-type Card = { arcana: string; number: string; name: string };
+// Axis identity comes from its map key; prose and numeric metadata stay optional.
+type Suit = SuitEntry & { slug: string };
 
 const GOLD = "var(--accent)", TEXT = "var(--ink-2)", MUTE = "var(--ink-3)", PANEL = "var(--card)", LINE = "var(--line)";
 
@@ -76,7 +71,7 @@ export function AxisExplorer({ deck }: { deck: DeckDataFile }) {
       <div role="tabpanel" id={`axis-panel-${active}`} aria-labelledby={`axis-tab-${active}`}>
         {active === 0 && <SuitsPanel deck={deck} />}
         {active === 1 && <RanksPanel deck={deck} />}
-        {active === 2 && <TransversalPanel tx={deck.transversal as Transversal} suitCount={Object.keys(deck.suits).length} />}
+        {active === 2 && <TransversalPanel tx={deck.transversal} suitCount={Object.keys(deck.suits).length} />}
         {active === 3 && <PrimePanel deck={deck} />}
       </div>
     </div>
@@ -87,7 +82,7 @@ export function AxisExplorer({ deck }: { deck: DeckDataFile }) {
 function Lead({ children }: { children: React.ReactNode }) {
   return <p style={{ ...body, color: MUTE, margin: "0 0 18px", maxWidth: 720 }}>{children}</p>;
 }
-function Means({ m }: { m?: Meaning }) {
+function Means({ m }: { m?: AxisMeaning }) {
   if (!m?.upright?.length && !m?.inverted?.length) return null;
   return (
     <div style={{ marginTop: 8, font: "400 12px/1.55 var(--font-body)" }}>
@@ -115,7 +110,7 @@ function dialectic(deck: DeckDataFile, suits: Suit[]): DialecticView | null {
   }
   // fallback: parse "A x B." prefix from descriptions
   const parsed = suits.map((s) => {
-    const m = s.description.match(/^\s*([A-Za-z]+)\s*[x×]\s*([A-Za-z]+)\b/);
+    const m = s.description?.match(/^\s*([A-Za-z]+)\s*[x×]\s*([A-Za-z]+)\b/);
     return m ? { s, a: m[1], b: m[2] } : null;
   });
   if (parsed.some((p) => !p)) return null;
@@ -134,7 +129,7 @@ function SuitCard({ s }: { s: Suit }) {
         {s.symbol?.svg && <span style={{ color: "var(--accent)" }}><Svg svg={s.symbol.svg} size={24} /></span>}
         <span style={{ font: "400 18px/1 var(--font-display)", color: "var(--ink)" }}>{s.name}</span>
       </div>
-      <p style={{ ...body, margin: "9px 0 0" }}>{s.description}</p>
+      {s.description && <p style={{ ...body, margin: "9px 0 0" }}>{s.description}</p>}
       <Means m={s.meaning} />
       {s.visual_style && <p style={{ ...mutedItalic, margin: "9px 0 0" }}>{s.visual_style}</p>}
     </div>
@@ -142,8 +137,8 @@ function SuitCard({ s }: { s: Suit }) {
 }
 
 function SuitsPanel({ deck }: { deck: DeckDataFile }) {
-  const suits = (Object.values(deck.suits) as Suit[]).sort((a, b) => a.index - b.index);
-  const ma = deck.major_arcana as MajorArcana | undefined;
+  const suits = Object.entries(deck.suits).map(([slug, suit]) => ({ ...suit, slug })).sort((a, b) => a.index - b.index);
+  const ma = deck.major_arcana;
   const di = dialectic(deck, suits);
   const narrow = useNarrow();
   return (
@@ -194,8 +189,9 @@ function AxisLabel({ text, vertical }: { text: string; vertical?: boolean }) {
 
 // ── Axis 2: Ranks ─────────────────────────────────────────────────────────────
 function RanksPanel({ deck }: { deck: DeckDataFile }) {
-  const ranks = (Object.values(deck.ranks) as Rank[]).sort((a, b) => a.index - b.index);
-  const majors = (Object.values(deck.cards) as Card[])
+  const ranks = Object.values(deck.ranks).sort((a, b) => a.index - b.index);
+  const hasRankNumbers = ranks.length > 0 && ranks.every((rank) => rank.numeric_value !== undefined);
+  const majors = Object.values(deck.cards)
     .filter((c) => c.arcana === "major")
     .map((c) => ({ n: parseInt(c.number, 10), name: c.name }))
     .sort((a, b) => a.n - b.n);
@@ -208,13 +204,13 @@ function RanksPanel({ deck }: { deck: DeckDataFile }) {
         fixed position in the arc. Both numbering systems are shown below.
       </Lead>
 
-      <SubHead>Minor ranks{ranks.length ? ` · ${ranks[0].numeric_value}–${ranks[ranks.length - 1].numeric_value}` : ""}</SubHead>
+      <SubHead>Minor ranks{hasRankNumbers ? ` · ${ranks[0].numeric_value}–${ranks[ranks.length - 1].numeric_value}` : ""}</SubHead>
       <div style={{ display: "flex", flexDirection: "column", marginBottom: 26 }}>
         {ranks.map((r) => (
           <div key={r.index} style={{ display: "flex", gap: 14, padding: "11px 0", borderTop: `1px solid ${LINE}` }}>
             <div style={{ flex: "0 0 56px", textAlign: "right" }}>
-              <div style={{ font: "400 20px/1 var(--font-display)", color: GOLD }}>{r.symbol || r.numeric_value}</div>
-              <div style={{ font: "400 10px/1.4 var(--font-mono)", color: MUTE }}>{r.numeric_value}</div>
+              <div style={{ font: "400 20px/1 var(--font-display)", color: GOLD }}>{r.symbol || (r.numeric_value ?? "—")}</div>
+              {r.numeric_value !== undefined && <div style={{ font: "400 10px/1.4 var(--font-mono)", color: MUTE }}>{r.numeric_value}</div>}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ font: "400 16px/1.2 var(--font-display)", color: "var(--ink)" }}>{r.name}</div>
@@ -242,9 +238,9 @@ function RanksPanel({ deck }: { deck: DeckDataFile }) {
 }
 
 // ── Axis 3: Transversal ───────────────────────────────────────────────────────
-function TransversalPanel({ tx, suitCount }: { tx: Transversal; suitCount: number }) {
+function TransversalPanel({ tx, suitCount }: { tx: TransversalData; suitCount: number }) {
   void suitCount;
-  const stations = (Object.values(tx.stations) as Station[]).sort((a, b) => a.index - b.index);
+  const stations = Object.entries(tx.stations).map(([slug, station]) => ({ ...station, slug })).sort((a, b) => a.index - b.index);
   const k = tx.suit_stride ?? 1;
   return (
     <div>
@@ -316,7 +312,7 @@ function NumCell({ n }: { n: number }) {
 }
 
 function PrimePanel({ deck }: { deck: DeckDataFile }) {
-  const cards = Object.values(deck.cards) as Card[];
+  const cards = Object.values(deck.cards);
   const majors = [...new Set(cards.filter((c) => c.arcana === "major").map((c) => parseInt(c.number, 10)))].sort((a, b) => a - b);
   // the minor number-set is whatever numbers the minors actually carry — usually the ranks 1–14, but a
   // deck can number them otherwise (e.g. the Ultima Octave's minors are numbered 0–7 by their virtue's value).

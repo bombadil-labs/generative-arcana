@@ -11,10 +11,6 @@ import { AxisGlyph, rankLabel, suitLabel, omega, facVar } from "./cardMeta";
 import type { CardData } from "@/runtime/types";
 import type { DeckDataFile } from "@/decks/types";
 
-type Meaning = { upright: string[]; inverted: string[] };
-type StationInfo = { name: string; description?: string; meaning: Meaning };
-type AxisInfo = { name: string };
-
 const CARD_W = 240;
 const CARD_H = Math.round(CARD_W / 0.66); // ≈ 364 — text column matches this so the modal is constant-height
 
@@ -94,17 +90,17 @@ export function CardModal({ cards, index, onNavigate, onClose, contextLabel, dec
 
   if (!card) return null;
 
-  const transversal = deck?.transversal as { name?: string; stations?: Record<string, StationInfo> } | undefined;
+  const transversal = deck?.transversal;
   const station = transversal?.stations?.[card.station_slug];
-  const suit = card.suit_slug ? (deck?.suits as Record<string, AxisInfo> | undefined)?.[card.suit_slug] : undefined;
-  const rank = card.rank_slug ? (deck?.ranks as Record<string, AxisInfo & { description?: string; question?: string }> | undefined)?.[card.rank_slug] : undefined;
+  const suit = card.suit_slug ? deck?.suits[card.suit_slug] : undefined;
+  const rank = card.rank_slug ? deck?.ranks[card.rank_slug] : undefined;
 
   const isMajor = card.arcana === "major";
   const suitName = isMajor ? "Major Arcana" : (suit?.name ?? suitLabel(deck, card.suit_slug) ?? "—");
   const rankName = isMajor ? "—" : (rankLabel(deck, card.rank_slug) || "—");
   const rankQ = isMajor ? null : rankQuestion(rank, suitName);
   const virtueName = station?.name ?? card.station_slug;
-  const virtueDesc = station?.description ?? station?.meaning.upright.slice(0, 3).join(", ");
+  const virtueDesc = station?.description ?? station?.meaning?.upright.slice(0, 3).join(", ");
   const subtitle = isMajor ? `Major Arcana · ${card.number}` : `${rankName} of ${suitName}`;
   const o = omega(parseInt(card.number, 10));
 
