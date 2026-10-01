@@ -53,7 +53,9 @@
     "test:better-auth-ownership": "tsx test/better-auth-ownership.ts",
     "test:retired-decks": "tsx test/retired-bundled-decks.ts",
     "test:retired-assets": "tsx test/retired-assets.ts",
-    "test:http-tool-auth": "tsx test/http-tool-auth.ts"
+    "test:http-tool-auth": "tsx test/http-tool-auth.ts",
+    "build": "node ../tools/build-authoring-guide.mjs",
+    "test:authoring-guide": "node --test ../tools/test/authoring-guide.test.mjs && npm run build && node ../tools/build-authoring-guide.mjs --check && node --import tsx test/authoring-guide.ts"
   },
   "dependencies": {
     "@better-auth/cimd": "1.7.7",

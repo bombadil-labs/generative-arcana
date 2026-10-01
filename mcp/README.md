@@ -10,14 +10,46 @@ Headless MCP transports for the Generative Arcana engine. The MCP layer owns no 
 - [Self-hosted Better Auth + Neon configuration](../docs/better-auth-deployment.md)
 - [Production acceptance evidence](../docs/production-launch-checklist.md)
 
-The last public audit (2026-09-30 UTC) found alpha bearer auth enabled, browser auth disabled, and
-`/readyz` returning 503. The implementation supports real accounts, but production activation and
-real authenticated Claude/ChatGPT/web end-to-end evidence remain outstanding. Local test results
-and the setup instructions below are not proof that signup is available in production.
+**Account launch status (2026-10-01 UTC):** production accounts and readiness are live at
+[`c2cf91a`](https://github.com/bombadil-labs/generative-arcana/commit/c2cf91a2e19b43d76b5db7c6c1e394a177b0740b).
+Browser login and real Claude OAuth/private-library reads have been verified. ChatGPT connection
+setup, host-driven deck creation/import, and full cross-host persistence acceptance remain pending.
+This is not a claim that all [launch acceptance and recovery checks](../docs/production-launch-checklist.md)
+have passed; the dated September 30 audit remains historical evidence.
 
 Legacy pre-built decks and their art are no longer installed by default or included in production
 containers. Old bundled IDs and reading links fail as unavailable. User imports and authorized
 public/unlisted catalog resources keep their existing behavior; no user-owned catalog rows are removed.
+
+## Complete authoring method over MCP
+
+Before constructing a deck, call `get_deck_authoring_guide({})`. It returns the complete canonical
+skill, all references and strategies (including schema and examples), and the linked authoring
+contracts as one text, with repository-relative filename headers. It is public and read-only in
+both stdio and HTTP; no account or rendering capability is required. The same full text is a
+listed resource at `arcana://authoring/guide` (`text/plain`). `get_deck_authoring_spec` links to both
+surfaces and remains the compact machine-readable validation contract, not the authoring method.
+
+The default tool result is the entire guide. Hosts with output limits can request
+`{ offset: 0, maxChars: 12000 }` and continue at `structuredContent.range.nextOffset` until null.
+Offsets/counts are Unicode code points; concatenate the text blocks without separators. The full
+text's SHA-256, byte length, source-inventory digest and per-file hashes let clients verify that
+all chunks belong to the same version. The source method is not rewritten or restricted to a
+particular image/program renderer.
+
+Run `npm run build --prefix mcp` from the repository root to generate
+`mcp/generated/authoring-guide.txt` and its inventory JSON. `node tools/build-authoring-guide.mjs
+--check` rejects stale output. Both Docker builds generate the same artifact in a source-only
+build stage and copy only the bundle plus loader into the final image; no archived deck corpus
+is added. Local source checkouts read canonical files directly, so existing stdio/dev commands
+work without a prior build. Packaged runtimes fail closed if the bundle is missing/corrupt.
+
+Inclusion policy: every text file under `skill/generative-arcana/`, with `SKILL.md` first and the
+rest sorted by repository-relative filename, followed by the reviewed support documents listed
+in `tools/build-authoring-guide.mjs`. References between those sources are checked transitively.
+Operational onboarding/deployment navigation and implementation-code pointers are not embedded;
+new outside-package authoring references fail the build pending an explicit inclusion review.
+No source instructions are copied into a second hand-maintained guide.
 
 ## Local stdio
 

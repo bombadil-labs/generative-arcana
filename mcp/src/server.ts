@@ -17,6 +17,7 @@ import { createStaticVisualStore, type ServerVisualStore } from "./staticVisuals
 import { registerArcanaVisualTools } from "./visualTools";
 import { registerArcanaCatalogTools } from "./catalogTools";
 import type { UserDeckCatalogRepository } from "./userDeckCatalog";
+import { registerAuthoringGuide } from "./authoringGuide";
 
 export { createArcanaAdapter } from "./hostStore";
 
@@ -118,6 +119,7 @@ export function createArcanaMcpServer(options: ArcanaMcpServerOptions = {}): Mcp
   const includeStatefulTools = options.includeStatefulTools ?? true;
   const visuals = options.visuals ?? createStaticVisualStore();
   const server = new McpServer({ name: "generative-arcana", version: ARCANA_MCP_VERSION });
+  registerAuthoringGuide(server, options.onToolCall);
   const readSchemes = options.oauth ? optionalOAuthSecuritySchemes(options.oauth.readScopes) : undefined;
 
   for (const definition of adapter.definitions()) {

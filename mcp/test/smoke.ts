@@ -3,6 +3,7 @@ import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import type { RenderableCard } from "../../app/src/decks/renderSpec";
 import { createArcanaMcpServer } from "../src/server";
+import { assertAuthoringGuide } from "./authoring-guide-contract";
 import { assertFormerDecksUnavailable, neutralManifest, neutralVisualStore, TEST_DECK_ID, textContent, toolResult } from "./protocol-fixtures";
 
 const SPREAD_WIDGET_URI = "ui://arcana/spread/v2.html";
@@ -32,6 +33,7 @@ async function main(): Promise<void> {
 
   try {
     await withTimeout(client.connect(transport), 10_000, "stdio MCP connect");
+    await assertAuthoringGuide(client);
 
     const listed = await withTimeout(client.listTools(), 5_000, "stdio tools/list");
     const names = new Set(listed.tools.map((tool) => tool.name));

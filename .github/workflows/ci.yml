@@ -20,6 +20,8 @@ jobs:
           node-version: 24
       - run: node --test tools/test/smoke-production.test.mjs tools/test/prepare-production-auth.test.mjs
       - run: node tools/check-authoring-hosts.mjs
+      - run: node --test tools/test/authoring-guide.test.mjs
+      - run: node tools/build-authoring-guide.mjs && node tools/build-authoring-guide.mjs --check
       - run: node tools/audit-deck-v2.mjs --check --require-enriched=finalfantasy,deep-time,evolution,ultima,byrne,ulysses,ultima-octave
 
   app:
@@ -96,6 +98,8 @@ jobs:
             command: npm run test:browser-session --prefix mcp
           - check: cross-host account flow
             command: npm run test:cross-host-account --prefix mcp
+          - check: complete authoring guide
+            command: npm run test:authoring-guide --prefix mcp
           - check: authoring API
             command: npm run test:authoring-api --prefix mcp
           - check: Deep Time v2 render projection
@@ -144,6 +148,7 @@ jobs:
         with:
           node-version: 24
       - run: npm ci --prefix mcp
+      - run: npm run build --prefix mcp
       - name: Run validation
         run: ${{ matrix.command }}
 

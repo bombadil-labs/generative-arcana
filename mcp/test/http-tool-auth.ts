@@ -94,6 +94,7 @@ async function main(): Promise<void> {
     for (const token of [undefined, "unscoped", "writer"]) {
       await toolSuccess(await post(call("list_decks"), token));
       await toolSuccess(await post(call("get_deck_authoring_spec"), token));
+      await toolSuccess(await post(call("get_deck_authoring_guide"), token));
       await toolSuccess(await post(call("validate_deck_manifest", { manifest: neutralManifest() }), token));
       await toolSuccess(await post(call("list_public_decks"), token));
       await toolSuccess(await post(call("get_shared_deck", { deckId: publicDeck.id }), token));
