@@ -200,32 +200,10 @@ export class StaticVisualStore implements ServerVisualStore {
   }
 }
 
-export function createBundledStaticVisualStore(): StaticVisualStore {
-  return new StaticVisualStore(
-    [
-      {
-        deckId: "final-fantasy-tarot",
-        id: "pixel",
-        label: "Pixel",
-        description: "Chibi pixel art, each card lit by its element.",
-        mimeType: "image/png",
-        extension: ".png",
-        directory: new URL("../../app/src/decks/finalfantasy/pixel/", import.meta.url),
-        complete: true,
-        cardCount: 78,
-      },
-    ],
-    [
-      {
-        deckId: "deep-time",
-        id: "core-sample",
-        label: "Core Sample",
-        description: "A Living Spread that composes the five dealt layers into one animated geological column.",
-        format: "generative-arcana/deep-time-core-sample@1",
-        spreadIds: ["core-sample"],
-      },
-    ],
-  );
+/** Hosts start with no shipped card art or deck-specific scene packs.
+ * Custom deployments may supply explicit definitions through StaticVisualStore. */
+export function createStaticVisualStore(): StaticVisualStore {
+  return new StaticVisualStore([]);
 }
 
 function isMissingFile(error: unknown): boolean {

@@ -2,7 +2,7 @@
   "name": "arcana-deck-app",
   "version": "0.1.0",
   "private": true,
-  "description": "A static deck browser & reading composer for custom tarot decks (animated p5.js cards as React components). Bundles the Ultima Tarot deck.",
+  "description": "A deck browser and reading composer for user-created tarot decks, with browser-local imports and account libraries.",
   "type": "module",
   "scripts": {
     "dev": "vite",

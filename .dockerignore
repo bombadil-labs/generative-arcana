@@ -1,0 +1,17 @@
+**/node_modules
+**/.test-build
+**/dist
+.git
+.github
+# Historical corpus and artwork remain local repository sources, never image layers.
+decks
+app/src/decks/byrne
+app/src/decks/deep-time
+app/src/decks/evolution
+app/src/decks/finalfantasy
+app/src/decks/ultima
+app/src/decks/ultima-octave
+app/src/decks/ulysses
+app/src/decks/bundled.ts
+app/src/decks/composeBundledDeckData.ts
+**/*.zip

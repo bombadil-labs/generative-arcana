@@ -1,5 +1,4 @@
 import { DeckRegistry } from "../../app/src/decks/registry.js";
-import { registerBundledDecks } from "../../app/src/decks/bundled.js";
 import { ArcanaEngine } from "../../app/src/engine/ArcanaEngine.js";
 import { ArcanaToolAdapter } from "../../app/src/mcp/ArcanaToolAdapter.js";
 import { PersistingArcanaToolAdapter, restoreArcanaHostState, type ArcanaHostStateRepository } from "./hostState.js";
@@ -12,10 +11,9 @@ export interface ArcanaHostStore {
   delete(scopeId: string): boolean | Promise<boolean>;
 }
 
-/** New isolated host containing the shipped symbolic corpus. */
-export function createBundledArcanaAdapter(): ArcanaToolAdapter {
+/** New isolated host. Decks enter only through user imports or the authorized catalog. */
+export function createArcanaAdapter(): ArcanaToolAdapter {
   const registry = new DeckRegistry();
-  registerBundledDecks(registry);
   return new ArcanaToolAdapter(new ArcanaEngine(registry));
 }
 
@@ -23,7 +21,7 @@ export function createBundledArcanaAdapter(): ArcanaToolAdapter {
 export class InMemoryArcanaHostStore implements ArcanaHostStore {
   private readonly hosts = new Map<string, ArcanaToolAdapter>();
 
-  constructor(private readonly createHost: ArcanaHostFactory = createBundledArcanaAdapter) {}
+  constructor(private readonly createHost: ArcanaHostFactory = createArcanaAdapter) {}
 
   get(scopeId: string): ArcanaToolAdapter {
     const key = requireScopeId(scopeId);
@@ -51,14 +49,15 @@ export class InMemoryArcanaHostStore implements ArcanaHostStore {
  * Durable principal-scoped host store.
  *
  * Hosts are cached in-process. Legacy callers restore/persist the old host-state snapshot; callers
- * that provide a deck catalog migrate once and thereafter reconstruct custom decks from first-class rows.
+ * that provide a deck catalog migrate once and reconcile owned rows before every adapter call.
+ * The cache retains execution contexts, not authority over catalog contents or deleted resources.
  */
 export class PersistentArcanaHostStore implements ArcanaHostStore {
   private readonly hosts = new Map<string, Promise<ArcanaToolAdapter>>();
 
   constructor(
     private readonly repository: ArcanaHostStateRepository,
-    private readonly createHost: ArcanaHostFactory = createBundledArcanaAdapter,
+    private readonly createHost: ArcanaHostFactory = createArcanaAdapter,
     private readonly deckCatalog?: UserDeckCatalogRepository,
   ) {}
 

@@ -1,6 +1,7 @@
 /**
- * Deck domain surface + the list of bundled decks.
- * Add a bundled deck by dropping a folder under ./<id>/ and importing its index here.
+ * Side-effect-free deck domain surface.
+ * The public app starts with an empty registry; decks enter through user imports or the catalog.
+ * Historical deck modules remain in source, but must not be imported by the public runtime.
  */
 export * from "./registry";
 export * from "./manifest";
@@ -15,11 +16,3 @@ export type {
   RankVisualForm,
   StationVisualEnvironment,
 } from "./types";
-
-import "./ultima"; // registers the Ultima deck (+ its sketches)
-import "./byrne"; // registers the Byrne Journey Tarot (placeholder visuals)
-import "./ulysses"; // registers the Ulysses Tarot (placeholder visuals)
-import "./finalfantasy"; // registers the Final Fantasy Tarot (Pixel chibi skin)
-import "./evolution"; // registers the Evolution and Consciousness Tarot (Lumen skin)
-import "./ultima-octave"; // registers the Ultima Octave Tarot (data-complete; skin pending)
-import "./deep-time"; // registers the Deep Time Tarot (Core Sample generative skin)

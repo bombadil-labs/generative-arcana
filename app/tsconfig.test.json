@@ -32,6 +32,9 @@
     "src/runtime/spreadSceneData.ts",
     "src/visuals/manifest.ts",
     "src/catalog/api.ts",
-    "src/authoring/api.ts"
+    "src/catalog/runtime.ts",
+    "src/authoring/api.ts",
+    "src/auth/api.ts",
+    "src/auth/Account.tsx"
   ]
 }

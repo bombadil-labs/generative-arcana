@@ -17,11 +17,133 @@ skill/generative-arcana/
 
 The runtime-shaped source of truth remains the shared domain code and `DeckManifest` validator. The bundle describes **how to author well**; `get_deck_authoring_spec` / `validate_deck_manifest` say whether the resulting artifact is valid for the current platform contract.
 
-## ChatGPT
+## Production account prerequisite
 
-The portable `skill/generative-arcana/` directory is the ChatGPT-facing skill bundle. No OpenAI-specific field belongs in `DeckManifest`; the host may supply reasoning, tools, file output, and image generation around the common workflow.
+- Web app: https://generative-arcana.vercel.app/
+- MCP URL: `https://generative-arcana.vercel.app/mcp`
+- Library: [My Decks](https://generative-arcana.vercel.app/#/my-decks)
 
-When the Generative Arcana MCP is connected, the workflow validates before delivery and treats import as a separate explicit mutation.
+**Not yet verified:** the 2026-09-30 public audit found production browser sign-in disabled and MCP
+in private-alpha mode. The flow below applies once the deployment is account-enabled and the
+[launch acceptance checklist](production-launch-checklist.md) passes. “Accounts aren’t configured
+yet” or `/readyz` HTTP 503 is an operator setup blocker; do not distribute an alpha secret as a
+friend-account workaround.
+
+These onboarding steps describe the self-hosted Better Auth account path after the operator
+activates and verifies it.
+
+Create/sign into your Generative Arcana account from My Decks and verify your email. Then authorize the
+**same Generative Arcana account** in both hosts. Your Claude/OpenAI account selects the host;
+your Arcana login selects the deck library. Email similarity alone does not link accounts.
+
+## Claude remote custom connector
+
+1. In Claude, open **Settings → Connectors → Add custom connector** (workspace controls may require
+   an owner/admin to add it first).
+2. Enter a name such as **Generative Arcana** and the remote MCP URL above.
+3. Complete **Connect** and the provider's login/consent flow using your Arcana account. If the
+   deployment uses a pre-registered OAuth client, its operator supplies that client's ID/secret
+   through Claude's **Advanced settings**; do not put them in conversation messages.
+4. Enable the connector for the conversation and ask for `list_my_decks` before saving anything.
+   Use the common authoring workflow below.
+
+Claude's current documentation makes custom remote connectors available across plans; Free is
+limited to one custom connector. Team/Enterprise workspace controls still apply. Check the current
+[remote connector setup](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp)
+and [plan/connector availability](https://support.claude.com/en/articles/11176164-use-connectors-to-extend-claude-s-capabilities).
+These host capabilities are not evidence that Arcana's production OAuth has been tested.
+
+## ChatGPT custom MCP connection
+
+Use a ChatGPT account/workspace with its supported **custom MCP / developer-mode** surface enabled.
+Workspace administrators may need to permit custom connections and write actions. The ordinary
+chat composer or a public app-directory listing is not proof that a custom server can be installed.
+
+1. Open the host's app/connector management settings and enable developer mode where required.
+2. Create a custom connection with `https://generative-arcana.vercel.app/mcp` and choose OAuth.
+   Use the configured dynamic-client path, or the operator-provided pre-registered client where
+   supported. Copy any connection-specific OAuth callback from the management UI; the operator
+   must allowlist that exact callback in the corresponding provider application.
+3. Connect and consent using the same Arcana account as the web app and Claude.
+4. Add/enable the connection in a new conversation, confirm `list_my_decks`, then follow the
+   workflow below. Allow an explicitly requested import/write when the host asks.
+
+The current [OpenAI MCP authentication guide](https://developers.openai.com/plugins/build/auth)
+documents OAuth and client-identification/registration requirements. Plan, workspace policy, and
+rollout can affect which setup UI is available; record the actual supported product/surface in the
+[acceptance checklist](production-launch-checklist.md). A direct API bearer-token smoke does not
+verify ChatGPT end-user login or tool approvals.
+
+The portable `skill/generative-arcana/` directory is the host-neutral authoring bundle. Use it in a
+host that supports skills, or have the model consult `get_deck_authoring_spec` through MCP. A custom
+skill package alone does not create an OAuth connection or save to an account. No OpenAI-specific
+field belongs in `DeckManifest`.
+
+## Author → validate → explicitly import
+
+A prompt that makes the intended save explicit:
+
+> Design a deep-sea mythology tarot deck. First get the Generative Arcana authoring spec, then
+> create a canonical schema-v2 manifest and repair it until validation succeeds. Show me the
+> summary before importing it into my private library. Do not replace or publish an existing deck.
+
+The complete tool flow is:
+
+1. Call `get_deck_authoring_spec` and follow the portable authoring guidance.
+2. Produce a canonical `DeckManifest` with `schemaVersion: 2`, `data`, `tagline`, and optional `spreads`.
+   Ownership, visibility, revision, and provider IDs do not belong inside the manifest.
+3. Call `validate_deck_manifest({ manifest })`; repair until `valid: true` and `canonical: true`.
+   Validation is stateless and does not save the deck.
+4. After you approve saving it, explicitly call `import_deck({ manifest })`. New catalog decks start private. Save the returned
+   stable resource ID and confirm it with `list_my_decks`; do not substitute the authored slug.
+5. Use that resource ID with `get_deck`, `list_spreads`, and `cast_reading`; use the resulting token
+   with `resolve_reading` / `render_reading`. A host without the richer visual UI can still use the
+   structured reading and supported image/text fallback.
+6. Open My Decks while signed into the same account, select the deck, and deal in the browser.
+   Reconnect/refresh the other host and verify it sees the same ID and latest contents.
+
+For a revision, retain the authored slug, validate the changed manifest, then explicitly request
+`import_deck({ manifest, replaceExisting: true })`. Replacement preserves the resource ID and
+publication state and advances the catalog revision. A duplicate import without that flag fails;
+it must not be silently treated as permission to replace. Use a new slug for a distinct deck.
+
+No separate server-side `generate_deck` tool is necessary: the host model authors the content and
+Arcana validates/persists the common manifest. See [validation](authoring-validation.md) and
+[manifest identity](deck-manifest.md).
+
+## Sharing and storage
+
+- **Browser-local paste on the landing page:** current page runtime only. It is not an account save;
+  after a full reload or on another browser, import the original JSON again.
+- **My Decks / authenticated MCP import:** account-owned server catalog entry, private by default.
+  With the production Neon deployment configured, it should survive refresh, reconnect, and restart;
+  that behavior still requires the recorded live acceptance evidence.
+- **Unlisted:** deliberately choose it in My Decks or call `set_deck_visibility` with the deck ID.
+  Anyone with the stable link/ID can resolve it; it is absent from Community/public discovery.
+- **Public:** also discoverable in Community. Private links grant no access to another user.
+
+Use the catalog's stable resource link/ID for account decks; visible shared decks do not require
+recipient-side JSON import. Re-privatizing/deleting blocks future unauthorized catalog reads, not
+copies or prompts already received. Reading links contain questions and card selections, not a
+full deck or encrypted data. A replacement can invalidate an old link's deck fingerprint, so keep
+the original manifest when archiving a reading. See [reading contracts](contracts-and-readings.md).
+
+## Connection troubleshooting
+
+- **Protected tools missing:** first check account readiness. Non-OAuth anonymous deployments
+  intentionally omit them. In OAuth mode they should be advertised before login; refresh/reconnect
+  the host after a deployment or tool change.
+- **Login works but import is denied:** verify actual `decks:read` and `decks:write` grants and the
+  exact MCP audience. Verify the selected client-identification/registration path and consent;
+  do not substitute OIDC identity scopes for deck permissions.
+- **Web and host show different libraries:** check the selected Arcana account, issuer/subject
+  mapping, production versus preview environment, and stable resource ID. Do not publish a private
+  deck or weaken ownership checks to hide an identity mismatch.
+- **Discovery looks like HTML:** the host is not receiving valid OAuth metadata. Check the
+  deployment/routing rather than retrying credentials.
+
+Operators should use the [deployment guide](better-auth-deployment.md); never paste access
+credentials into a chat or bug report.
 
 ## Claude Code / repository agents
 

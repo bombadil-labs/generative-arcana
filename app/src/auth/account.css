@@ -1,0 +1,28 @@
+.account-page { max-width: 680px; margin: 0 auto; padding: clamp(24px, 6vw, 72px) 16px 64px; }
+.account-card { padding: clamp(22px, 5vw, 40px); background: var(--card); border: 1px solid var(--line); border-radius: var(--r-3); box-shadow: var(--e-1); }
+.account-card h1 { margin: 0; font: 400 clamp(32px, 5vw, 46px)/1.1 var(--font-display); letter-spacing: -.015em; }
+.account-card h2 { margin: 0 0 8px; font: 400 24px/1.2 var(--font-display); overflow-wrap: anywhere; }
+.account-eyebrow { font: 400 10px/1.6 var(--font-mono); text-transform: uppercase; color: var(--ink-2); letter-spacing: .09em; margin-bottom: 14px; }
+.account-lede, .account-muted { color: var(--ink-2); font-size: 14px; }
+.account-form { display: grid; gap: 18px; margin-top: 26px; }
+.account-field { display: grid; gap: 7px; font-weight: 600; font-size: 13px; }
+.account-field input { width: 100%; min-height: 46px; border: 1px solid var(--line-2); border-radius: var(--r-2); padding: 11px 12px; background: var(--paper); color: var(--ink); font: 400 16px/1.35 var(--font-body); }
+.account-field small { font-weight: 400; color: var(--ink-2); font-size: 12px; }
+.account-button { border: 1px solid transparent; border-radius: var(--r-2); padding: 12px 16px; font: 600 13px/1.35 var(--font-body); background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+.account-button:hover:not(:disabled) { background: var(--accent-2); }
+.account-secondary { background: var(--paper); color: var(--ink); border-color: var(--line-2); }
+.account-secondary:hover:not(:disabled) { background: var(--paper-2); }
+.account-button:disabled, .account-text-button:disabled, .account-field input:disabled { opacity: .55; cursor: not-allowed; }
+.account-text-button { background: none; padding: 4px; border: none; color: var(--accent); text-decoration: underline; font: inherit; cursor: pointer; }
+.account-notice { margin-top: 18px; padding: 13px 14px; border: 1px solid var(--line-2); border-radius: var(--r-2); background: var(--paper); font-size: 13px; overflow-wrap: anywhere; }
+.account-form .account-notice { margin-top: 0; }
+.account-error { border-color: var(--error); }
+.account-links { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 20px; margin-top: 24px; font-size: 13px; }
+.account-public { text-align: center; font-size: 12px; color: var(--ink-2); line-height: 1.9; margin-top: 22px; }
+.account-client { margin-top: 22px; padding: 18px; border: 1px solid var(--line); border-radius: var(--r-2); background: var(--paper); }
+.account-code { font: 400 11px/1.7 var(--font-mono); color: var(--ink-2); overflow-wrap: anywhere; }
+.account-scopes { padding-left: 21px; font-size: 14px; }
+.account-scopes li { margin: 12px 0; }
+.account-scopes small, .account-identity small { display: block; color: var(--ink-2); font-size: 11px; overflow-wrap: anywhere; }
+.account-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.account-identity { display: flex; justify-content: space-between; gap: 14px; align-items: center; margin-top: 20px; font-size: 13px; overflow-wrap: anywhere; }

@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { DeckModule } from "../../app/src/decks/types.js";
+import { DeckRegistry } from "../../app/src/decks/registry.js";
+import { ArcanaEngine } from "../../app/src/engine/ArcanaEngine.js";
 import { createDeckManifest, snapshotDeckManifest, validateDeckManifest } from "../../app/src/decks/manifest.js";
 import type { ImportDeckOptions } from "../../app/src/engine/types.js";
 import type { DeckVisibility, UserDeckManifest, UserDeckRecord } from "../../app/src/decks/catalog.js";
@@ -73,7 +75,8 @@ export async function migrateLegacyCustomDecks(
  * stable resource id. This avoids briefly treating the mutable authored slug as canonical identity.
  */
 export class CatalogPersistingArcanaToolAdapter extends ArcanaToolAdapter {
-  private importTail: Promise<void> = Promise.resolve();
+  private operationTail: Promise<void> = Promise.resolve();
+  private readonly revisions = new Map<string, number>();
 
   constructor(
     adapter: ArcanaToolAdapter,
@@ -84,12 +87,48 @@ export class CatalogPersistingArcanaToolAdapter extends ArcanaToolAdapter {
   }
 
   override async call(name: ArcanaToolName, input: unknown = {}): Promise<unknown> {
-    if (name !== "import_deck") return super.call(name, input);
-
-    const operation = this.importTail.then(() => this.importCatalogDeck(input));
-    // Keep later imports serialized even when one operation fails.
-    this.importTail = operation.then(() => undefined, () => undefined);
+    // The cached host is an execution context, never the source of truth for owned decks. Refresh
+    // on every call (including an already-open MCP connection), without a stale-on-error fallback.
+    // Serialize refresh/read/import together so a slow snapshot cannot clobber a newer local write.
+    const operation = this.operationTail.then(async () => {
+      await this.refreshOwnedDecks();
+      return name === "import_deck" ? this.importCatalogDeck(input) : super.call(name, input);
+    });
+    this.operationTail = operation.then(() => undefined, () => undefined);
     return operation;
+  }
+
+  private async refreshOwnedDecks(): Promise<void> {
+    const records = await this.catalog.listOwned(this.ownerId);
+    const ids = new Set<string>();
+    const changed: UserDeckRecord[] = [];
+    for (const record of records) {
+      if (record.ownerId !== this.ownerId) throw new Error("User deck catalog returned a deck owned by another principal.");
+      if (ids.has(record.id)) throw new Error("User deck catalog returned duplicate resource ids.");
+      ids.add(record.id);
+      const local = this.engine.getDeck(record.id);
+      if (local && !local.custom) throw new Error("User deck catalog resource conflicts with a bundled deck.");
+      if (!local || this.revisions.get(record.id) !== record.revision) changed.push(record);
+    }
+
+    // Validate the entire changed snapshot before touching the live registry. A broken row must
+    // fail the call, not leave a partly refreshed registry or expose a previously deleted deck.
+    const staging = new ArcanaToolAdapter(new ArcanaEngine(new DeckRegistry()));
+    restoreUserDeckRecords(staging, this.ownerId, changed);
+    for (const deck of this.engine.listDecks()) {
+      if (deck.custom && !ids.has(deck.id)) this.engine.removeCustomDeck(deck.id);
+    }
+    for (const deck of staging.engine.listDecks()) {
+      this.engine.importDeck(deck.data, {
+        tagline: deck.tagline,
+        ...(deck.spreads ? { spreads: deck.spreads } : {}),
+        runtimeId: deck.id,
+        aliases: deck.aliases,
+        replaceExisting: true,
+      });
+    }
+    this.revisions.clear();
+    for (const record of records) this.revisions.set(record.id, record.revision);
   }
 
   private async importCatalogDeck(input: unknown): Promise<unknown> {
@@ -106,6 +145,7 @@ export class CatalogPersistingArcanaToolAdapter extends ArcanaToolAdapter {
       aliases: [record.slug],
       replaceExisting: !!request.options.replaceExisting,
     });
+    this.revisions.set(record.id, record.revision);
     return {
       id: deck.id,
       slug: deck.data.slug,

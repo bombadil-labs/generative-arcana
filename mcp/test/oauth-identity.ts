@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
-import { createBundledArcanaAdapter } from "../src/hostStore";
+import { createArcanaAdapter } from "../src/hostStore";
 import {
   InMemoryExternalIdentityRepository,
   OAuthPrincipalError,
@@ -131,7 +131,7 @@ async function metadataContract(): Promise<void> {
 
 async function toolAuthContract(): Promise<void> {
   const server = createArcanaMcpServer({
-    adapter: createBundledArcanaAdapter(),
+    adapter: createArcanaAdapter(),
     includeStatefulTools: false,
     oauth: {
       principal: null,

@@ -30,7 +30,8 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run typecheck
-      - run: npm run build   # vite reads ../decks for deck data
+      - run: npm run build
+      - run: node ../tools/check-public-distribution.mjs
       - uses: actions/upload-pages-artifact@v3
         with:
           path: app/dist

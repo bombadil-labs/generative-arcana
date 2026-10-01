@@ -8,7 +8,9 @@ import type { UserDeckCatalogRepository } from "./userDeckCatalog.js";
 /**
  * Read-through adapter for shared catalog decks.
  *
- * Local/bundled/owned decks always win. A visible catalog resource that is not local is validated
+ * Bundled/local identities retain precedence; catalog-backed local adapters refresh owned decks
+ * before executing each call, so this delegation must not bypass their call boundary. A visible
+ * catalog resource that is not local is validated
  * into an isolated scratch engine for exactly one call, so shared use never mutates the caller's
  * host registry, ownership, or durable state.
  */

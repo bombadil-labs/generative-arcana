@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import deepTime from "../../decks/deep-time/deck.json";
 import type { DeckDataFile } from "../../app/src/decks/types";
-import { createBundledArcanaAdapter } from "../src/hostStore";
+import { createArcanaAdapter } from "../src/hostStore";
 import { createArcanaMcpServer, type ArcanaMcpServerOptions } from "../src/server";
 import { InMemoryUserDeckCatalogRepository, restoreUserDeckRecords } from "../src/userDeckCatalog";
 
@@ -61,7 +61,7 @@ async function main(): Promise<void> {
     await anonymous.close();
   }
 
-  const aliceAdapter = createBundledArcanaAdapter();
+  const aliceAdapter = createArcanaAdapter();
   restoreUserDeckRecords(aliceAdapter, "alice", await catalog.listOwned("alice"));
   const alice = await connect({
     adapter: aliceAdapter,
@@ -98,6 +98,29 @@ async function main(): Promise<void> {
   } finally {
     await alice.close();
   }
+
+  const secret = await catalog.createImported("alice", manifest("scope-private", "Scope Private"));
+  const hydrated = createArcanaAdapter();
+  await hydrated.call("import_deck", { data: secret.manifest.data });
+  const noRead = await connect({
+    adapter: hydrated,
+    catalog,
+    principal: { id: "alice", scopes: ["openid", "decks:write"] },
+    oauth: { principal: { id: "alice", scopes: ["openid", "decks:write"] }, ...OAUTH },
+    includeStatefulTools: true,
+  });
+  try {
+    const listed = await noRead.client.callTool({ name: "list_decks", arguments: {} });
+    assert.equal(listed.isError, undefined, "public tools remain usable without private read scope");
+    assert.equal(JSON.stringify(listed).includes("Scope Private"), false, "hydrated private adapter must not leak to a scope-limited client");
+    for (const deckId of [secret.id, secret.slug]) {
+      const privateRead = await noRead.client.callTool({ name: "get_deck", arguments: { deckId } });
+      assert.equal(privateRead.isError, true, "neither catalog ids nor hydrated slugs bypass read scope");
+    }
+    assert.equal((await noRead.client.callTool({ name: "list_my_decks", arguments: {} })).isError, true);
+    assert.equal((await noRead.client.callTool({ name: "get_shared_deck", arguments: { deckId: secret.id } })).isError, true);
+    assert.equal((await noRead.client.callTool({ name: "get_shared_deck", arguments: { deckId: bobPublic.id } })).isError, undefined);
+  } finally { await noRead.close(); }
 
   const reader = await connect({
     catalog,

@@ -35,20 +35,48 @@
     "test:ultima-v2": "tsx test/ultima-v2.ts",
     "test:byrne-v2": "tsx test/byrne-v2.ts",
     "test:ulysses-v2": "tsx test/ulysses-v2.ts",
-    "test:ultima-octave-v2": "tsx test/ultima-octave-v2.ts"
+    "test:ultima-octave-v2": "tsx test/ultima-octave-v2.ts",
+    "test:catalog-freshness": "tsx test/catalog-freshness.ts",
+    "test:deployment-readiness": "tsx test/deployment-readiness.ts",
+    "test:better-auth": "tsx test/better-auth-protocol.ts",
+    "test:auth-email": "tsx test/auth-email.ts",
+    "db:auth:plan": "tsx scripts/auth-schema.ts plan",
+    "db:auth:check": "tsx scripts/auth-schema.ts check",
+    "db:auth:apply": "tsx scripts/auth-schema.ts apply",
+    "test:auth-schema": "tsx scripts/auth-schema.test.ts",
+    "test:staging-preflight": "tsx scripts/staging-preflight.test.ts",
+    "db:staging:preflight": "tsx scripts/staging-preflight.ts",
+    "db:migrate:domain": "tsx scripts/migrate-domain.ts",
+    "auth:link-identity": "tsx scripts/link-identity.ts",
+    "db:prune-rate-limits": "tsx scripts/prune-rate-limits.ts",
+    "test:domain-migrations": "tsx test/domain-migrations.ts",
+    "test:better-auth-ownership": "tsx test/better-auth-ownership.ts",
+    "test:retired-decks": "tsx test/retired-bundled-decks.ts",
+    "test:retired-assets": "tsx test/retired-assets.ts",
+    "test:http-tool-auth": "tsx test/http-tool-auth.ts"
   },
   "dependencies": {
-    "@modelcontextprotocol/server": "^2.0.0",
+    "@better-auth/cimd": "1.7.7",
+    "@better-auth/core": "1.7.7",
+    "@better-auth/mcp": "1.7.7",
+    "@better-auth/oauth-provider": "1.7.7",
     "@modelcontextprotocol/node": "^2.0.0",
+    "@modelcontextprotocol/server": "^2.0.0",
     "@neondatabase/serverless": "^1.0.0",
-    "tsx": "^4.20.0",
-    "zod": "^4.0.0",
+    "better-auth": "1.7.7",
     "jose": "^6.1.0",
-    "@workos-inc/node": "^10.7.0"
+    "nodemailer": "10.0.13",
+    "pg": "8.23.1",
+    "tsx": "^4.20.0",
+    "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "@modelcontextprotocol/client": "^2.0.0",
-    "typescript": "^5.9.0",
-    "@types/node": "^24.0.0"
+    "@types/node": "^24.0.0",
+    "@types/nodemailer": "8.0.2",
+    "@types/pg": "8.23.1",
+    "kysely": "0.29.6",
+    "typescript": "^5.9.0"
   }
 }

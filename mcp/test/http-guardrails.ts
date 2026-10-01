@@ -9,7 +9,8 @@ const health = new URL(`http://127.0.0.1:${port}/healthz`);
 const ready = new URL(`http://127.0.0.1:${port}/readyz`);
 
 async function main(): Promise<void> {
-  assert.equal(accountDeploymentReadiness({ durableCatalog: true, mcpOAuth: true, browserAuth: true, webApp: true, alphaAuth: false }).productionAccounts, true);
+  assert.equal(accountDeploymentReadiness({ durableCatalog: true, mcpOAuth: true, browserAuth: true, webApp: true, alphaAuth: false }).configurationReady, true);
+  assert.equal(accountDeploymentReadiness({ durableCatalog: true, mcpOAuth: true, browserAuth: true, webApp: true, alphaAuth: false }).productionAccounts, false, "configuration alone is not dependency health");
   assert.equal(accountDeploymentReadiness({ durableCatalog: true, mcpOAuth: true, browserAuth: true, webApp: true, alphaAuth: true }).productionAccounts, false);
   const child = spawn(process.execPath, ["--import", "tsx", "src/http.ts"], {
     env: {

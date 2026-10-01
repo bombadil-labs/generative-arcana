@@ -17,7 +17,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
+      - run: node --test tools/test/smoke-production.test.mjs tools/test/prepare-production-auth.test.mjs
       - run: node tools/check-authoring-hosts.mjs
       - run: node tools/audit-deck-v2.mjs --check --require-enriched=finalfantasy,deep-time,evolution,ultima,byrne,ulysses,ultima-octave
 
@@ -34,7 +35,9 @@ jobs:
           - check: typecheck
             command: npm run typecheck
           - check: build
-            command: npm run build
+            command: npm run build && node ../tools/check-public-distribution.mjs
+          - check: public asset routes
+            command: node --test tests/public-distribution.test.mjs
     defaults:
       run:
         working-directory: app
@@ -59,12 +62,32 @@ jobs:
         include:
           - check: typecheck
             command: npm run typecheck --prefix mcp
+          - check: dependency security
+            command: npm audit --prefix mcp --omit=dev --audit-level=high
           - check: host store
             command: npm run test:host-store --prefix mcp
           - check: durable state
             command: npm run test:durable-state --prefix mcp
+          - check: retired bundled decks
+            command: npm run test:retired-decks --prefix mcp
           - check: deck catalog
             command: npm run test:deck-catalog --prefix mcp
+          - check: catalog freshness
+            command: npm run test:catalog-freshness --prefix mcp
+          - check: deployment readiness
+            command: npm run test:deployment-readiness --prefix mcp
+          - check: auth email configuration
+            command: npm run test:auth-email --prefix mcp
+          - check: Better Auth real protocol
+            command: npm run test:better-auth --prefix mcp
+          - check: Better Auth account ownership
+            command: npm run test:better-auth-ownership --prefix mcp
+          - check: domain migrations and shared rate limits
+            command: npm run test:domain-migrations --prefix mcp
+          - check: auth migration review guards
+            command: npm run test:auth-schema --prefix mcp
+          - check: staging read-only preflight
+            command: npm run test:staging-preflight --prefix mcp
           - check: catalog tools
             command: npm run test:catalog-tools --prefix mcp
           - check: web catalog API
@@ -89,12 +112,16 @@ jobs:
             command: npm run test:ultima-octave-v2 --prefix mcp
           - check: web app static serving
             command: npm run test:web-app-static --prefix mcp
+          - check: retired public assets
+            command: npm run test:retired-assets --prefix mcp
           - check: shared decks
             command: npm run test:shared-decks --prefix mcp
           - check: principal resolver
             command: npm run test:principal --prefix mcp
           - check: alpha auth
             command: npm run test:alpha-auth --prefix mcp
+          - check: HTTP lazy authorization
+            command: npm run test:http-tool-auth --prefix mcp
           - check: OAuth identity
             command: npm run test:oauth-identity --prefix mcp
           - check: hardening
@@ -115,8 +142,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-      - run: npm install --prefix mcp
+          node-version: 24
+      - run: npm ci --prefix mcp
       - name: Run validation
         run: ${{ matrix.command }}
 

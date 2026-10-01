@@ -12,7 +12,6 @@ type NeonSql = (strings: TemplateStringsArray, ...params: unknown[]) => Promise<
  */
 export class NeonExternalIdentityRepository implements ExternalIdentityRepository {
   private readonly sql: NeonSql;
-  private ready?: Promise<void>;
 
   constructor(connectionString: string, sql?: NeonSql) {
     if (!connectionString.trim()) throw new Error("DATABASE_URL must be non-empty.");
@@ -20,7 +19,6 @@ export class NeonExternalIdentityRepository implements ExternalIdentityRepositor
   }
 
   async resolveOrCreate(identity: ExternalIdentity): Promise<string> {
-    await this.ensureSchema();
     const issuer = requireText(identity.issuer, "issuer");
     const subject = requireText(identity.subject, "subject");
     const proposedId = `usr_${randomUUID()}`;
@@ -38,25 +36,7 @@ export class NeonExternalIdentityRepository implements ExternalIdentityRepositor
     return principalId;
   }
 
-  private ensureSchema(): Promise<void> {
-    this.ready ??= (async () => {
-      await this.sql`
-        CREATE TABLE IF NOT EXISTS arcana_external_identities (
-          issuer text NOT NULL,
-          subject text NOT NULL,
-          principal_id text NOT NULL UNIQUE,
-          created_at timestamptz NOT NULL DEFAULT now(),
-          updated_at timestamptz NOT NULL DEFAULT now(),
-          PRIMARY KEY (issuer, subject)
-        )
-      `;
-      await this.sql`
-        CREATE INDEX IF NOT EXISTS arcana_external_identities_principal_idx
-        ON arcana_external_identities (principal_id)
-      `;
-    })();
-    return this.ready;
-  }
+
 }
 
 function requireText(value: string, label: string): string {

@@ -33,6 +33,7 @@
     "../app/src/engine/ArcanaEngine.ts",
     "../app/src/engine/index.ts",
     "../app/src/mcp/ArcanaToolAdapter.ts",
-    "../app/src/mcp/index.ts"
+    "../app/src/mcp/index.ts",
+    "scripts/**/*.ts"
   ]
 }

@@ -1,5 +1,8 @@
-import { useEffect, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, type CSSProperties } from "react";
 import { useBrowserSession } from "@/auth/session";
+import { Account } from "@/auth/Account";
+import { parseAccountRoute } from "@/auth/api";
+import { catalogDeckRuntime } from "@/catalog/runtime";
 import { useHashRoute, navigate } from "./router";
 import { Landing } from "./Landing";
 import { Community } from "./Community";
@@ -11,8 +14,8 @@ import { RemoteDeckBoundary } from "./RemoteDeckBoundary";
 
 /**
  * App shell + hash router. Deck routes use the canonical runtime/resource id. If an id is not
- * registered locally, RemoteDeckBoundary may resolve a visible shared deck from the catalog before
- * handing it to the same About/Browse/Reading surfaces used by bundled and locally imported decks.
+ * browser-local, RemoteDeckBoundary revalidates its current catalog access and revision
+ * before handing it to the About/Browse/Reading surfaces.
  */
 type Tab = "about" | "browse" | "read";
 
@@ -20,16 +23,21 @@ export function App() {
   const route = useHashRoute();
   const { session } = useBrowserSession();
 
+  // Clear authenticated snapshots before the new session's passive loading effects start.
+  useLayoutEffect(() => { catalogDeckRuntime.clear(); }, [session]);
+
   let content: React.ReactNode;
   let m: RegExpMatchArray | null;
   let deckId: string | null = null;
   let tab: Tab | null = null;
-  if (route.match(/^\/community\/?$/)) content = <Community />;
-  else if (route.match(/^\/my-decks\/?$/)) content = <MyDecks />;
-  else if ((m = route.match(/^\/deck\/([^/]+)\/browse\/?$/))) { deckId = m[1]; tab = "browse"; content = <RemoteDeckBoundary deckId={deckId}><CardBrowser deckId={deckId} /></RemoteDeckBoundary>; }
-  else if ((m = route.match(/^\/deck\/([^/]+)\/read\/?$/))) { deckId = m[1]; tab = "read"; content = <RemoteDeckBoundary deckId={deckId}><Reading deckId={deckId} /></RemoteDeckBoundary>; }
-  else if ((m = route.match(/^\/deck\/([^/]+)\/r\/(.+)$/))) { deckId = m[1]; tab = "read"; content = <RemoteDeckBoundary deckId={deckId}><Reading deckId={deckId} token={m[2]} /></RemoteDeckBoundary>; }
-  else if ((m = route.match(/^\/deck\/([^/]+)\/?$/))) { deckId = m[1]; tab = "about"; content = <RemoteDeckBoundary deckId={deckId}><DeckHome deckId={deckId} /></RemoteDeckBoundary>; }
+  const accountRoute = parseAccountRoute(route, window.location.search);
+  if (accountRoute) content = <Account key={route} route={accountRoute} />;
+  else if (route.match(/^\/community\/?$/)) content = <Community />;
+  else if (route.match(/^\/my-decks\/?$/)) content = <MyDecks key={session.status === "authenticated" ? session.user.email : session.status} />;
+  else if ((m = route.match(/^\/deck\/([^/]+)\/browse\/?$/))) { deckId = m[1]; tab = "browse"; content = <RemoteDeckBoundary deckId={deckId} routeKey={route}><CardBrowser deckId={deckId} /></RemoteDeckBoundary>; }
+  else if ((m = route.match(/^\/deck\/([^/]+)\/read\/?$/))) { deckId = m[1]; tab = "read"; content = <RemoteDeckBoundary deckId={deckId} routeKey={route}><Reading deckId={deckId} /></RemoteDeckBoundary>; }
+  else if ((m = route.match(/^\/deck\/([^/]+)\/r\/(.+)$/))) { deckId = m[1]; tab = "read"; content = <RemoteDeckBoundary deckId={deckId} routeKey={route}><Reading deckId={deckId} token={m[2]} /></RemoteDeckBoundary>; }
+  else if ((m = route.match(/^\/deck\/([^/]+)\/?$/))) { deckId = m[1]; tab = "about"; content = <RemoteDeckBoundary deckId={deckId} routeKey={route}><DeckHome deckId={deckId} /></RemoteDeckBoundary>; }
   else content = <Landing />;
 
   useEffect(() => {
@@ -56,6 +64,7 @@ export function App() {
           </button>
           {!deckId && <button onClick={() => navigate("/community")} style={libraryLink} aria-current={route.match(/^\/community\/?$/) ? "page" : undefined}>Community</button>}
           <button onClick={() => navigate("/my-decks")} style={libraryLink} aria-current={route.match(/^\/my-decks\/?$/) ? "page" : undefined}>{accountLabel}</button>
+          <button onClick={() => navigate(session.status === "authenticated" ? "/account/connections" : "/account/login")} style={libraryLink} aria-current={accountRoute ? "page" : undefined}>{session.status === "authenticated" ? "Account" : "Sign in"}</button>
         </div>
         {tabs.length > 0 && (
           <nav aria-label="Deck sections" style={{ display: "flex", gap: 4 }}>

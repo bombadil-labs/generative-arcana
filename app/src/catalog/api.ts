@@ -25,7 +25,7 @@ export async function listPublicDecks(signal?: AbortSignal): Promise<CatalogDeck
 }
 
 export async function getSharedDeck(id: string, signal?: AbortSignal): Promise<SharedCatalogDeck> {
-  return requestJson<SharedCatalogDeck>(`/api/decks/${encodeURIComponent(id)}`, { signal });
+  return requestJson<SharedCatalogDeck>(`/api/decks/${encodeURIComponent(id)}`, { signal, cache: "no-store" });
 }
 
 export async function listMyDecks(signal?: AbortSignal): Promise<CatalogDeckSummary[]> {
