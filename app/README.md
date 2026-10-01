@@ -1,8 +1,10 @@
 # app — the Generative Arcana renderer
 
-A static deck browser & reading composer for custom tarot decks. It renders decks from the top-level
-**`../decks/`** corpus (portable, renderer-agnostic JSON) and gives each one one or more visual
-**skins**. The whole thing builds to static files for **GitHub Pages**.
+A static deck browser & reading composer for custom tarot decks. The public app starts empty:
+import your own JSON or open an authorized account/Community deck. The seven historical decks,
+their skins, and the top-level **`../decks/`** corpus remain repository-only archives and regression
+fixtures; the build rejects imports of those sources. The client builds to static files for
+**GitHub Pages** or the full Node service.
 
 Read **[PRINCIPLES.md](./PRINCIPLES.md)** for the Ultima p5 illustration spec.
 
@@ -26,9 +28,9 @@ registry + resolver live in `runtime/defineCard.ts` (`registerPack` / `registerI
 ```
 app/                            # the renderer
   index.html                    # mounts src/main.tsx
-  vite.config.ts                # base "./", "@" -> src, "@decks" -> ../decks (the data corpus)
+  vite.config.ts                # base "./", "@" -> src, public distribution guard
   src/
-    main.tsx                    # entry: imports design tokens, registers decks, renders <App>
+    main.tsx                    # entry: imports design tokens, renders <App> (empty default catalog)
     app/                        # the shell — hash router + screens
       App.tsx router.ts Landing.tsx DeckHome.tsx AxisExplorer.tsx CardBrowser.tsx Reading.tsx packPref.ts
     runtime/                    # the skin registry (defineCard) + the p5 kit engine (no React)
@@ -65,7 +67,12 @@ GitHub Pages: push to `main`; the workflow builds `app/` and deploys `dist/`. `b
 any `/<repo>/` path, and **hash routing** needs no 404/SPA-fallback — and (key for readings) a
 `#fragment` is never sent to a server, so reading URLs stay client-side.
 
-## Adding a deck
+## Archived developer registration workflow
+
+The following describes historical source registration. It is not the public import path, and the
+seven retired source directories must not be reintroduced into a public build. New user decks use
+My Decks or MCP `import_deck`, with the same runtime validation and generic metadata/spreads.
+
 
 1. Drop the data: `../decks/<id>/deck.json` (run the generative-arcana skill).
 2. Add a skin (optional): `src/decks/<id>/cards.ts` — register a static-image pack

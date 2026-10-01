@@ -35,7 +35,9 @@ jobs:
           - check: typecheck
             command: npm run typecheck
           - check: build
-            command: npm run build
+            command: npm run build && node ../tools/check-public-distribution.mjs
+          - check: public asset routes
+            command: node --test tests/public-distribution.test.mjs
     defaults:
       run:
         working-directory: app
@@ -66,6 +68,8 @@ jobs:
             command: npm run test:host-store --prefix mcp
           - check: durable state
             command: npm run test:durable-state --prefix mcp
+          - check: retired bundled decks
+            command: npm run test:retired-decks --prefix mcp
           - check: deck catalog
             command: npm run test:deck-catalog --prefix mcp
           - check: catalog freshness
@@ -108,12 +112,16 @@ jobs:
             command: npm run test:ultima-octave-v2 --prefix mcp
           - check: web app static serving
             command: npm run test:web-app-static --prefix mcp
+          - check: retired public assets
+            command: npm run test:retired-assets --prefix mcp
           - check: shared decks
             command: npm run test:shared-decks --prefix mcp
           - check: principal resolver
             command: npm run test:principal --prefix mcp
           - check: alpha auth
             command: npm run test:alpha-auth --prefix mcp
+          - check: HTTP lazy authorization
+            command: npm run test:http-tool-auth --prefix mcp
           - check: OAuth identity
             command: npm run test:oauth-identity --prefix mcp
           - check: hardening

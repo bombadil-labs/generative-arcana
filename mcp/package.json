@@ -50,7 +50,10 @@
     "auth:link-identity": "tsx scripts/link-identity.ts",
     "db:prune-rate-limits": "tsx scripts/prune-rate-limits.ts",
     "test:domain-migrations": "tsx test/domain-migrations.ts",
-    "test:better-auth-ownership": "tsx test/better-auth-ownership.ts"
+    "test:better-auth-ownership": "tsx test/better-auth-ownership.ts",
+    "test:retired-decks": "tsx test/retired-bundled-decks.ts",
+    "test:retired-assets": "tsx test/retired-assets.ts",
+    "test:http-tool-auth": "tsx test/http-tool-auth.ts"
   },
   "dependencies": {
     "@better-auth/cimd": "1.7.7",

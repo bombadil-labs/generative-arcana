@@ -4,7 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
-import deepTime from "../../decks/deep-time/deck.json";
+import { assertFormerDecksUnavailable, neutralManifest, textContent, toolResult } from "./protocol-fixtures";
 
 const port = 44000 + (process.pid % 1000);
 const endpoint = new URL(`http://127.0.0.1:${port}/mcp`);
@@ -15,11 +15,12 @@ const customSlug = "authenticated-restart-deck";
 async function main(): Promise<void> {
   const stateDir = await mkdtemp(join(tmpdir(), "generative-arcana-http-auth-"));
   try {
+    let readingToken = "";
     let server = spawnServer(stateDir);
     try {
       await waitForHealth(server.child, health, () => server.stderr);
       await assertAnonymousSurface();
-      await importAuthenticatedDeck();
+      readingToken = await importAuthenticatedDeck();
     } finally {
       await stopChild(server.child);
     }
@@ -28,7 +29,7 @@ async function main(): Promise<void> {
     server = spawnServer(stateDir);
     try {
       await waitForHealth(server.child, health, () => server.stderr);
-      await assertAuthenticatedDeckRestored();
+      await assertAuthenticatedDeckRestored(readingToken);
     } finally {
       await stopChild(server.child);
     }
@@ -41,33 +42,59 @@ async function assertAnonymousSurface(): Promise<void> {
   await withClient(undefined, async (client) => {
     const tools = await client.listTools();
     assert.equal(tools.tools.some((tool) => tool.name === "import_deck"), false);
+    assert.deepEqual(toolResult(await client.callTool({ name: "list_decks", arguments: {} })), []);
+    await assertFormerDecksUnavailable(client);
   });
 }
 
-async function importAuthenticatedDeck(): Promise<void> {
+async function importAuthenticatedDeck(): Promise<string> {
+  let readingToken = "";
   await withClient(token, async (client) => {
     const tools = await client.listTools();
     assert.equal(tools.tools.some((tool) => tool.name === "import_deck"), true, "authenticated HTTP must expose import_deck");
+    assert.deepEqual(toolResult(await client.callTool({ name: "list_decks", arguments: {} })), [], "fresh authenticated hosts also start empty");
 
-    const custom = structuredClone(deepTime);
-    custom.slug = customSlug;
-    custom.name = "Authenticated Restart Deck";
-    const imported = await client.callTool({ name: "import_deck", arguments: { data: custom, tagline: "persist me" } });
-    assert.equal(imported.isError, undefined);
-
+    const imported = toolResult<{ id: string }>(await client.callTool({
+      name: "import_deck", arguments: { manifest: neutralManifest(customSlug) },
+    }));
+    assert.equal(imported.id, customSlug);
     const listed = await client.callTool({ name: "list_decks", arguments: {} });
-    assert.ok(readDeckIds(listed).has(customSlug));
+    assert.deepEqual(readDeckIds(listed), new Set([customSlug]));
+
+    const reading = toolResult<{ token: string; deckId: string; placements: unknown[] }>(await client.callTool({
+      name: "cast_reading", arguments: { deckId: customSlug, spread: "three-card", question: "Keep this reading across restart." },
+    }));
+    assert.equal(reading.deckId, customSlug);
+    assert.equal(reading.placements.length, 3);
+    readingToken = reading.token;
+    const resolved = toolResult(await client.callTool({ name: "resolve_reading", arguments: { token: readingToken } }));
+    assert.deepEqual(resolved, reading);
   });
+  return readingToken;
 }
 
-async function assertAuthenticatedDeckRestored(): Promise<void> {
+async function assertAuthenticatedDeckRestored(readingToken: string): Promise<void> {
   await withClient(token, async (client) => {
     const listed = await client.callTool({ name: "list_decks", arguments: {} });
-    assert.ok(readDeckIds(listed).has(customSlug), "authenticated custom deck must survive HTTP server restart");
+    assert.deepEqual(readDeckIds(listed), new Set([customSlug]), "only the explicitly imported deck must survive HTTP server restart");
+    const restored = toolResult<{ token: string; deckId: string; question: string; placements: unknown[] }>(await client.callTool({
+      name: "resolve_reading", arguments: { token: readingToken },
+    }));
+    assert.equal(restored.token, readingToken);
+    assert.equal(restored.deckId, customSlug);
+    assert.equal(restored.question, "Keep this reading across restart.");
+    assert.equal(restored.placements.length, 3);
+    assert.deepEqual(toolResult(await client.callTool({ name: "list_visual_packs", arguments: { deckId: customSlug } })), []);
+    const rendered = await client.callTool({ name: "render_reading", arguments: { token: readingToken } });
+    assert.equal(rendered.isError, true);
+    assert.match(textContent(rendered), /no server-renderable visual/);
   });
   await withClient(undefined, async (client) => {
     const listed = await client.callTool({ name: "list_decks", arguments: {} });
-    assert.equal(readDeckIds(listed).has(customSlug), false, "anonymous surface must not see authenticated principal state");
+    assert.deepEqual(readDeckIds(listed), new Set(), "anonymous surface must remain empty after authenticated import/restart");
+    const privateReading = await client.callTool({ name: "resolve_reading", arguments: { token: readingToken } });
+    assert.equal(privateReading.isError, true, "anonymous callers must not resolve an authenticated deck's reading");
+    assert.match(textContent(privateReading), /unknown deck/i);
   });
 }
 
@@ -86,9 +113,7 @@ async function withClient(tokenValue: string | undefined, fn: (client: Client) =
 }
 
 function readDeckIds(result: Awaited<ReturnType<Client["callTool"]>>): Set<string> {
-  const text = result.content.find((part) => part.type === "text");
-  assert.ok(text && text.type === "text", "tool result returned no text content");
-  return new Set((JSON.parse(text.text) as Array<{ id: string }>).map((deck) => deck.id));
+  return new Set(toolResult<Array<{ id: string }>>(result).map((deck) => deck.id));
 }
 
 function spawnServer(stateDir: string): { child: ChildProcess; stderr: string } {

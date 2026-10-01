@@ -14,7 +14,8 @@ test("account forms render accessible inputs, browser autofill hints and public 
   assert.match(signup, /name="name" autoComplete="name"/);
   assert.match(signup, /type="email" autoComplete="email" required=""/);
   assert.match(signup, /type="password" autoComplete="new-password" required="" minLength="12" maxLength="128"/);
-  assert.match(signup, /The bundled decks are always available without an account/);
+  assert.match(signup, /Browser-local JSON imports work without an account/);
+  assert.doesNotMatch(signup, /bundled decks/);
   assert.match(render("login"), /autoComplete="current-password"/);
   assert.match(render("forgot-password"), /Send reset link/);
   assert.match(render("verify-email"), /Send verification email/);

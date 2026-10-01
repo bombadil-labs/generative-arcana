@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
+import { assertFormerDecksUnavailable, toolResult } from "./protocol-fixtures";
 
 const SPREAD_WIDGET_URI = "ui://arcana/spread/v2.html";
 
@@ -61,21 +62,8 @@ async function main(): Promise<void> {
       assert.deepEqual(widgetMeta?.ui?.csp?.resourceDomains, []);
 
       const result = await withTimeout(client.callTool({ name: "list_decks", arguments: {} }), 5_000, "HTTP list_decks");
-      assert.equal(result.isError, undefined);
-      const text = result.content.find((part) => part.type === "text");
-      assert.ok(text && text.type === "text", "list_decks returned no text content over HTTP");
-      const decks = JSON.parse(text.text) as Array<{ id: string }>;
-      assert.equal(decks.length, 7);
-
-      const art = await withTimeout(client.callTool({
-        name: "get_card_art",
-        arguments: { deckId: "final-fantasy-tarot", cardSlug: "major-0" },
-      }), 5_000, "HTTP get_card_art");
-      assert.equal(art.isError, undefined);
-      const image = art.content.find((part) => part.type === "image");
-      assert.ok(image && image.type === "image", "get_card_art returned no image content over HTTP");
-      assert.equal(image.mimeType, "image/png");
-      assert.ok(image.data.startsWith("iVBORw0KGgo"), "HTTP card art is not PNG data");
+      assert.deepEqual(toolResult(result), [], "anonymous HTTP must start with an empty deck catalog");
+      await assertFormerDecksUnavailable(client);
     } finally {
       await withTimeout(transport.terminateSession(), 2_000, "HTTP session termination").catch(() => undefined);
       await withTimeout(client.close(), 2_000, "HTTP client close").catch(() => undefined);

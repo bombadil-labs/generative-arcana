@@ -6,10 +6,10 @@ COPY mcp/package.json mcp/package-lock.json ./mcp/
 RUN cd mcp && npm ci --omit=dev
 
 COPY app/src ./app/src
-COPY decks ./decks
 COPY mcp/src ./mcp/src
 COPY mcp/tsconfig.json ./mcp/tsconfig.json
-RUN test -f ./app/src/decks/finalfantasy/pixel/major-0.png
+COPY tools/check-public-distribution.mjs ./tools/check-public-distribution.mjs
+RUN node tools/check-public-distribution.mjs --runtime /srv
 
 WORKDIR /srv/mcp
 ENV NODE_ENV=production

@@ -61,7 +61,7 @@ export function Account({ route }: { route: AccountRoute }) {
     case "consent": content = <Consent {...props} />; break;
     case "connections": content = <Connections key={session.status === "authenticated" ? session.user.email : session.status} />; break;
   }
-  return <div className="account-page"><div className="account-card">{content}</div><p className="account-public"><a href="#/">Explore decks</a> · <a href="#/community">Community</a><br />The bundled decks are always available without an account.</p></div>;
+  return <div className="account-page"><div className="account-card">{content}</div><p className="account-public"><a href="#/">Load your own deck</a> · <a href="#/community">Community</a><br />Browser-local JSON imports work without an account.</p></div>;
 }
 
 type PageProps = { params: URLSearchParams; continuation: URLSearchParams; oauthQuery: string | null };

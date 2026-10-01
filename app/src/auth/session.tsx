@@ -37,7 +37,7 @@ export function BrowserSessionProvider({ children }: { children: React.ReactNode
       });
       if (id !== requestId.current) return;
       if (response.status === 404 || response.status === 503 || !response.headers.get("content-type")?.includes("application/json")) {
-        setSession({ status: "unavailable", message: "Accounts are not available on this deployment. Bundled decks remain available without an account." });
+        setSession({ status: "unavailable", message: "Accounts are not available on this deployment. You can still load your own deck JSON from the home page." });
         return;
       }
       const body = await response.json() as { authenticated?: unknown; user?: BrowserAccount; message?: unknown };

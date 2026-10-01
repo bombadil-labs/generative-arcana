@@ -83,10 +83,11 @@ universal.
 
 ## Bundled decks and launch content
 
-The seven bundled decks currently ship in the production app and service as reference content.
-They are distinct from user-published catalog records: appearing in the bundled picker does not create
-an owner or imply a Community publication. The public catalog should contain only deliberately
-published resources. Retiring or curating the bundled picker is a separate product decision.
+The seven legacy bundled decks are retired from the public app and service. Their source remains
+in the repository for recovery and regression tests but is excluded from public builds and production
+containers. Default registries and visual stores are empty; old IDs, reading links, and asset URLs
+no longer resolve. User-owned deck records are untouched. Community contains only deliberately
+published user resources.
 
 ## Account/auth boundary
 

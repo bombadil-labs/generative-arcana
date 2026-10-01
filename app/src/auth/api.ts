@@ -26,7 +26,7 @@ export async function accountRequest<T = Record<string, unknown>>(
   const isJson = response.headers.get("content-type")?.includes("application/json");
   if (!isJson) {
     throw new AccountRequestError(response.status === 404 || response.status === 503 || response.ok
-      ? "Accounts are not available on this deployment. You can still explore the bundled decks."
+      ? "Accounts are not available on this deployment. You can still load your own deck JSON from the home page."
       : `The account service could not complete this request (${response.status}). Try again.`, response.status);
   }
   const body = await response.json() as Record<string, unknown> | null;

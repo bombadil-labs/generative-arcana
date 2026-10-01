@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import deepTime from "../../decks/deep-time/deck.json";
-import { createBundledArcanaAdapter, InMemoryArcanaHostStore } from "../src/hostStore";
+import { createArcanaAdapter, InMemoryArcanaHostStore } from "../src/hostStore";
 import { resolveArcanaRequestAccess, type PrincipalResolver, type PrincipalRequest } from "../src/principal";
 
 const request: PrincipalRequest = {
@@ -10,7 +10,7 @@ const request: PrincipalRequest = {
 };
 
 async function main(): Promise<void> {
-  const anonymous = createBundledArcanaAdapter();
+  const anonymous = createArcanaAdapter();
   const hosts = new InMemoryArcanaHostStore();
 
   const anonymousAccess = await resolveArcanaRequestAccess(request, anonymous, hosts);

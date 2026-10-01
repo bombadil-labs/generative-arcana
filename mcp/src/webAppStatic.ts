@@ -1,6 +1,7 @@
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { extname, resolve, sep } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { isArchivedPublicPath } from "../../app/src/distributionPolicy";
 
 /** Serve the built Vite application without coupling the app or domain to the HTTP transport. */
 export function serveArcanaWebApp(
@@ -16,14 +17,16 @@ export function serveArcanaWebApp(
   let pathname: string;
   try { pathname = decodeURIComponent(url.pathname); }
   catch { return false; }
-  if (pathname.includes("\0") || isArcanaMachinePath(pathname)) return false;
+  if (pathname.includes("\0") || isArcanaMachinePath(pathname) || isArchivedPublicPath(pathname)) return false;
 
   const relative = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
   const requested = resolve(root, relative);
   const withinRoot = requested === root || requested.startsWith(`${root}${sep}`);
   if (!withinRoot) return false;
 
-  const file = regularFile(requested) ? requested : resolve(root, "index.html");
+  const exists = regularFile(requested);
+  if (!exists && (extname(pathname) || pathname.startsWith("/assets/"))) return false;
+  const file = exists ? requested : resolve(root, "index.html");
   if (!regularFile(file)) return false;
 
   const headers: Record<string, string> = {

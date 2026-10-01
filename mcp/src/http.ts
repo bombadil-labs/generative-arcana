@@ -25,7 +25,7 @@ import {
   type OAuthResourceConfiguration,
 } from "./oauthResource";
 import {
-  createBundledArcanaAdapter,
+  createArcanaAdapter,
   InMemoryArcanaHostStore,
   PersistentArcanaHostStore,
   type ArcanaHostStore,
@@ -42,6 +42,7 @@ import { requestClientIp } from "./requestIp";
 import { serveArcanaWebApp } from "./webAppStatic";
 import { accountDeploymentReadiness, createDeploymentDependencyMonitor, deploymentBuildIdentity } from "./deploymentReadiness";
 import { createArcanaAuthoringRequestHandler, isArcanaAuthoringPath } from "./authoringApi";
+import { withArcanaHttpToolAuthorization, type ArcanaHttpOAuthOptions } from "./httpToolAuthorization";
 
 const port = envPort(process.env.PORT, 3000);
 const host = process.env.HOST?.trim() || "127.0.0.1";
@@ -128,6 +129,7 @@ if (alphaToken && stateMode === "memory") {
 }
 
 const requestHandler = createArcanaHttpRequestHandler({
+  maxRequestBytes,
   principalResolver,
   hosts,
   ...(catalog ? { catalog } : {}),
@@ -313,23 +315,21 @@ async function shutdown(signal: string) {
 process.once("SIGINT", () => void shutdown("SIGINT"));
 process.once("SIGTERM", () => void shutdown("SIGTERM"));
 
-export interface ArcanaHttpOAuthOptions {
-  resourceMetadataUrl: string;
-  readScopes: readonly string[];
-  writeScopes: readonly string[];
-}
+export type { ArcanaHttpOAuthOptions } from "./httpToolAuthorization";
 
 export interface ArcanaHttpRequestHandlerOptions {
   principalResolver?: PrincipalResolver;
   hosts?: ArcanaHostStore;
   catalog?: UserDeckCatalogRepository;
   oauth?: ArcanaHttpOAuthOptions;
+  maxRequestBytes?: number;
 }
 
 /** Node request handler whose state policy is selected per request. */
 export function createArcanaHttpRequestHandler(options: ArcanaHttpRequestHandlerOptions = {}) {
-  const anonymousAdapter = createBundledArcanaAdapter();
+  const anonymousAdapter = createArcanaAdapter();
   const hosts = options.hosts ?? new InMemoryArcanaHostStore();
+  const maxRequestBodySize = options.maxRequestBytes ?? 4_000_000;
 
   return async (req: IncomingMessage, res: ServerResponse) => {
     try {
@@ -353,8 +353,11 @@ export function createArcanaHttpRequestHandler(options: ArcanaHttpRequestHandler
             }
           : undefined,
         onToolCall: jsonToolCallObserver({ transport: "http", principalId: access.principal?.id }),
-      }));
-      const nodeHandler = toNodeHandler(handler);
+      }), { maxRequestBodySize });
+      const nodeHandler = toNodeHandler(
+        withArcanaHttpToolAuthorization(handler, access.principal, options.oauth),
+        { maxRequestBodySize },
+      );
       res.once("finish", () => void handler.close());
       res.once("close", () => void handler.close());
       await nodeHandler(req, res);
@@ -397,7 +400,7 @@ function createHostStore(options: { databaseUrl?: string; stateDir?: string }): 
     return {
       hosts: new PersistentArcanaHostStore(
         new NeonArcanaHostStateRepository(options.databaseUrl),
-        createBundledArcanaAdapter,
+        createArcanaAdapter,
         catalog,
       ),
       catalog,

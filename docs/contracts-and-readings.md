@@ -72,8 +72,10 @@ a named spread later cannot change an existing interpretation.
 
 ## Compatibility and availability
 
-Well-formed **v1 built-in** links still resolve using the existing bundled order. The UI explicitly
-warns that these index-based links do not establish the original deck revision. **V1 custom** links
+Legacy bundled decks are no longer installed by the public app or service, so their old v1 and v2
+reading links cannot resolve there. The engine still supports **v1 built-in** fixtures when explicitly
+registered by a test/local host, with a warning that index-based links do not establish the original
+deck revision. **V1 custom** links
 are refused: the old importer relied on JSON property order, which cannot be safely reconstructed
 from a newly imported file. Cast a new reading to obtain a v2 link.
 

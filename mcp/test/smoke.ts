@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
-import { Client } from "@modelcontextprotocol/client";
+import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
+import type { RenderableCard } from "../../app/src/decks/renderSpec";
+import { createArcanaMcpServer } from "../src/server";
+import { assertFormerDecksUnavailable, neutralManifest, neutralVisualStore, TEST_DECK_ID, textContent, toolResult } from "./protocol-fixtures";
 
 const SPREAD_WIDGET_URI = "ui://arcana/spread/v2.html";
 
@@ -18,16 +21,6 @@ const REQUIRED_TOOLS = [
   "get_card_art",
   "render_reading",
   "import_deck",
-];
-
-const BUNDLED_DECK_IDS = [
-  "byrne-journey-tarot",
-  "deep-time",
-  "evolution-and-consciousness",
-  "final-fantasy-tarot",
-  "ultima-octave",
-  "ultima-tarot",
-  "ulysses-tarot",
 ];
 
 async function main(): Promise<void> {
@@ -61,91 +54,119 @@ async function main(): Promise<void> {
     assert.deepEqual(widgetMeta?.ui?.csp?.resourceDomains, []);
 
     const result = await withTimeout(client.callTool({ name: "list_decks", arguments: {} }), 5_000, "stdio list_decks");
-    assert.equal(result.isError, undefined);
-    const text = result.content.find((part) => part.type === "text");
-    assert.ok(text && text.type === "text", "list_decks returned no text content");
+    assert.deepEqual(toolResult(result), [], "default stdio must start with no bundled decks");
+    await assertFormerDecksUnavailable(client);
 
-    const decks = JSON.parse(text.text) as Array<{ id: string }>;
-    assert.equal(decks.length, BUNDLED_DECK_IDS.length);
-    assert.deepEqual(new Set(decks.map((deck) => deck.id)), new Set(BUNDLED_DECK_IDS));
-
-    const minorCard = await withTimeout(client.callTool({
-      name: "get_card",
-      arguments: { deckId: "final-fantasy-tarot", cardSlug: "chocobo-4" },
-    }), 5_000, "stdio get_card Final Fantasy minor render spec");
-    assert.equal(minorCard.isError, undefined);
-    const minor = (minorCard.structuredContent as { result?: any } | undefined)?.result;
-    assert.equal(minor?.render?.deck?.version, "2.1.0");
-    assert.match(minor?.render?.render?.material?.medium ?? "", /gouache/i);
-    assert.match(minor?.render?.render?.material?.surface ?? "", /paper tooth/i);
-    assert.match(minor?.render?.render?.form?.familyComposition ?? "", /horizon|field|road/i);
-    assert.equal(minor?.render?.render?.form?.rank?.composition_law, "Visibly broken order.");
-    assert.match(minor?.render?.render?.legacy?.rankContent ?? "", /stable suit-structure/i);
-    assert.match(minor?.render?.render?.environment?.palette ?? "", /Frost blue/i);
-    assert.match(minor?.render?.render?.scene?.description ?? "", /chocobo/i);
-    assert.ok(minor?.render?.render?.avoid?.includes("chibi proportions"));
-
-    const majorCard = await withTimeout(client.callTool({
-      name: "get_card",
-      arguments: { deckId: "final-fantasy-tarot", cardSlug: "major-6" },
-    }), 5_000, "stdio get_card Final Fantasy major render spec");
-    assert.equal(majorCard.isError, undefined);
-    const major = (majorCard.structuredContent as { result?: any } | undefined)?.result;
-    assert.match(major?.render?.render?.form?.familyComposition ?? "", /box-art|poster/i);
-    assert.match(major?.render?.render?.form?.numericLogic ?? "", /dyadic|triadic/i);
-    assert.match(major?.render?.context?.number?.factorization?.gloss ?? "", /Two times three/i);
-
-    const packs = await withTimeout(client.callTool({
-      name: "list_visual_packs",
-      arguments: { deckId: "final-fantasy-tarot" },
-    }), 5_000, "stdio list_visual_packs");
-    assert.equal(packs.isError, undefined);
-    const packsText = packs.content.find((part) => part.type === "text");
-    assert.ok(packsText && packsText.type === "text", "list_visual_packs returned no text content");
-    const parsedPacks = JSON.parse(packsText.text) as Array<{ id: string; renderer: string; complete: boolean }>;
-    assert.deepEqual(parsedPacks.map((pack) => pack.id), ["pixel"]);
-    assert.equal(parsedPacks[0]?.renderer, "static-image");
-    assert.equal(parsedPacks[0]?.complete, true);
-
-    const cardArt = await withTimeout(client.callTool({
-      name: "get_card_art",
-      arguments: { deckId: "final-fantasy-tarot", cardSlug: "major-0" },
-    }), 5_000, "stdio get_card_art");
-    assert.equal(cardArt.isError, undefined);
-    const cardImage = cardArt.content.find((part) => part.type === "image");
-    assert.ok(cardImage && cardImage.type === "image", "get_card_art returned no image content");
-    assert.equal(cardImage.mimeType, "image/png");
-    assert.ok(cardImage.data.startsWith("iVBORw0KGgo"), "get_card_art image is not PNG data");
-
-    const cast = await withTimeout(client.callTool({
-      name: "cast_reading",
-      arguments: { deckId: "final-fantasy-tarot", spread: "three-card", question: "Visual protocol smoke test" },
-    }), 5_000, "stdio cast_reading for render");
-    assert.equal(cast.isError, undefined);
-    const castText = cast.content.find((part) => part.type === "text");
-    assert.ok(castText && castText.type === "text", "cast_reading returned no text content");
-    const reading = JSON.parse(castText.text) as { token: string };
-
-    const rendered = await withTimeout(client.callTool({
-      name: "render_reading",
-      arguments: { token: reading.token },
-    }), 5_000, "stdio render_reading");
-    assert.equal(rendered.isError, undefined);
-    const renderedImages = rendered.content.filter((part) => part.type === "image");
-    assert.equal(renderedImages.length, 3, "three-card render should return three images");
-    for (const image of renderedImages) {
-      assert.equal(image.type, "image");
-      assert.equal(image.mimeType, "image/png");
-      assert.ok(image.data.startsWith("iVBORw0KGgo"), "rendered reading image is not PNG data");
-    }
-    const structured = rendered.structuredContent as {
-      result?: { layout?: { kind?: string }; placements?: Array<{ positionPrompt?: string }> };
-    } | undefined;
-    assert.equal(structured?.result?.layout?.kind, "flow");
-    assert.equal(structured?.result?.placements?.length, 3);
-    assert.ok(structured?.result?.placements?.every((placement) => !!placement.positionPrompt), "rendered positions should carry their authored prompts");
+    const reading = await importAndCastNeutralDeck(client);
+    const packs = await client.callTool({ name: "list_visual_packs", arguments: { deckId: TEST_DECK_ID } });
+    assert.deepEqual(toolResult(packs), [], "importing a deck must not implicitly add a visual pack");
+    const art = await client.callTool({ name: "get_card_art", arguments: { deckId: TEST_DECK_ID, cardSlug: "major-0" } });
+    assert.equal(art.isError, true);
+    assert.match(textContent(art), /no server-renderable card-art pack/);
+    const rendered = await client.callTool({ name: "render_reading", arguments: { token: reading.token } });
+    assert.equal(rendered.isError, true);
+    assert.match(textContent(rendered), /no server-renderable visual/);
+    const resolvedAfterRender = toolResult<Reading>(await client.callTool({ name: "resolve_reading", arguments: { token: reading.token } }));
+    assert.deepEqual(resolvedAfterRender, reading, "missing art must not alter the symbolic reading");
   } finally {
     await withTimeout(client.close(), 3_000, "stdio client close").catch(() => undefined);
+  }
+  await assertExplicitVisualProtocol();
+}
+
+interface Reading {
+  token: string;
+  deckId: string;
+  question: string;
+  placements: Array<{ card: { slug: string }; position: { name: string; prompt: string }; reversed: boolean }>;
+}
+
+async function importAndCastNeutralDeck(client: Client): Promise<Reading> {
+  const imported = toolResult<{ id: string; custom: boolean; cardCount: number }>(await client.callTool({
+    name: "import_deck", arguments: { manifest: neutralManifest() },
+  }));
+  assert.equal(imported.id, TEST_DECK_ID);
+  assert.equal(imported.custom, true);
+  assert.equal(imported.cardCount, 4);
+  const decks = toolResult<Array<{ id: string }>>(await client.callTool({ name: "list_decks", arguments: {} }));
+  assert.deepEqual(decks.map((deck) => deck.id), [TEST_DECK_ID]);
+
+  const minor = toolResult<RenderableCard>(await client.callTool({
+    name: "get_card", arguments: { deckId: TEST_DECK_ID, cardSlug: "lines-4" },
+  }));
+  assert.equal(minor.render.deck.version, "1.0.0");
+  assert.equal(minor.render.render.material.medium, "Ink");
+  assert.equal(minor.render.render.material.surface, "Plain paper");
+  assert.equal(minor.render.render.form.familyComposition, "A horizontal field of simple lines.");
+  assert.equal(minor.render.render.form.rank?.composition_law, "A balanced square.");
+  assert.equal(minor.render.render.legacy.rankContent, "Four equal marks.");
+  assert.equal(minor.render.render.environment?.palette, "Gray and white.");
+  assert.equal(minor.render.render.scene.description, "Four lines form a simple square.");
+  assert.deepEqual(minor.render.render.avoid, ["lettering"]);
+
+  const major = toolResult<RenderableCard>(await client.callTool({
+    name: "get_card", arguments: { deckId: TEST_DECK_ID, cardSlug: "major-6" },
+  }));
+  assert.equal(major.render.render.form.familyComposition, "One centered arrangement.");
+  assert.equal(major.render.render.form.numericLogic, "Pair two triangular groups.");
+  assert.equal(major.render.context.number.factorization?.gloss, "Two groups of three.");
+
+  const reading = toolResult<Reading>(await client.callTool({
+    name: "cast_reading",
+    arguments: { deckId: TEST_DECK_ID, spread: "three-card", question: "Protocol smoke test", reversalRate: 0 },
+  }));
+  assert.equal(reading.deckId, TEST_DECK_ID);
+  assert.equal(reading.placements.length, 3);
+  assert.equal(new Set(reading.placements.map((placement) => placement.card.slug)).size, 3);
+  assert.ok(reading.placements.every((placement) => !placement.reversed && !!placement.position.prompt));
+  const resolved = toolResult<Reading>(await client.callTool({ name: "resolve_reading", arguments: { token: reading.token } }));
+  assert.deepEqual(resolved, reading, "cast and resolved reading must preserve all authored placements");
+  const context = toolResult<{ context: string }>(await client.callTool({ name: "interpretation_context", arguments: { token: reading.token } }));
+  assert.ok(context.context.includes(reading.question));
+  return reading;
+}
+
+async function assertExplicitVisualProtocol(): Promise<void> {
+  // The real stdio host above stays empty by default. Only this test server receives fixture art.
+  const server = createArcanaMcpServer({ visuals: neutralVisualStore() });
+  const client = new Client({ name: "neutral-visual-protocol", version: "0.2.0" });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  try {
+    await withTimeout(Promise.all([server.connect(serverTransport), client.connect(clientTransport)]), 5_000, "fixture visual MCP connect");
+    assert.deepEqual(toolResult(await client.callTool({ name: "list_decks", arguments: {} })), []);
+    const reading = await importAndCastNeutralDeck(client);
+    const packs = toolResult<Array<{ id: string; renderer: string; complete: boolean }>>(await client.callTool({
+      name: "list_visual_packs", arguments: { deckId: TEST_DECK_ID },
+    }));
+    assert.deepEqual(packs.map((pack) => pack.id), ["test-png"]);
+    assert.equal(packs[0]?.renderer, "static-image");
+    assert.equal(packs[0]?.complete, true);
+
+    const art = await client.callTool({ name: "get_card_art", arguments: { deckId: TEST_DECK_ID, cardSlug: "major-0" } });
+    assert.equal(art.isError, undefined);
+    const cardImage = art.content.find((part) => part.type === "image");
+    assert.ok(cardImage && cardImage.type === "image");
+    assert.equal(cardImage.mimeType, "image/png");
+    assert.ok(cardImage.data.startsWith("iVBORw0KGgo"));
+
+    const rendered = await client.callTool({ name: "render_reading", arguments: { token: reading.token } });
+    assert.equal(rendered.isError, undefined);
+    const images = rendered.content.filter((part) => part.type === "image");
+    assert.equal(images.length, 3, "three-card render should return three fixture images");
+    for (const image of images) {
+      assert.equal(image.mimeType, "image/png");
+      assert.ok(image.data.startsWith("iVBORw0KGgo"));
+    }
+    const structured = rendered.structuredContent as {
+      result?: { token?: string; layout?: { kind?: string }; placements?: Array<{ cardSlug: string; positionPrompt: string }> };
+    } | undefined;
+    assert.equal(structured?.result?.token, reading.token, "rendering must never recast the reading");
+    assert.equal(structured?.result?.layout?.kind, "flow");
+    assert.deepEqual(structured?.result?.placements?.map((placement) => placement.cardSlug), reading.placements.map((placement) => placement.card.slug));
+    assert.deepEqual(structured?.result?.placements?.map((placement) => placement.positionPrompt), reading.placements.map((placement) => placement.position.prompt));
+  } finally {
+    await withTimeout(client.close(), 2_000, "fixture client close").catch(() => undefined);
+    await withTimeout(server.close(), 2_000, "fixture server close").catch(() => undefined);
   }
 }
 

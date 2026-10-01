@@ -14,7 +14,7 @@ import { RemoteDeckBoundary } from "./RemoteDeckBoundary";
 
 /**
  * App shell + hash router. Deck routes use the canonical runtime/resource id. If an id is not
- * browser-local or bundled, RemoteDeckBoundary revalidates its current catalog access and revision
+ * browser-local, RemoteDeckBoundary revalidates its current catalog access and revision
  * before handing it to the About/Browse/Reading surfaces.
  */
 type Tab = "about" | "browse" | "read";

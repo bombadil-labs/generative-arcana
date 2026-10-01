@@ -5,7 +5,7 @@ import { DeckRegistry } from "../../app/src/decks/registry";
 import type { DeckDataFile } from "../../app/src/decks/types";
 import { ArcanaEngine } from "../../app/src/engine/ArcanaEngine";
 import { ArcanaToolAdapter } from "../../app/src/mcp/ArcanaToolAdapter";
-import { createBundledArcanaAdapter } from "../src/hostStore";
+import { createArcanaAdapter } from "../src/hostStore";
 import { createArcanaMcpServer, type ArcanaMcpServerOptions } from "../src/server";
 import { InMemoryUserDeckCatalogRepository } from "../src/userDeckCatalog";
 
@@ -17,7 +17,7 @@ async function main(): Promise<void> {
   await catalog.setVisibility("author", publicDeck.id, "public");
   await catalog.setVisibility("author", unlistedDeck.id, "unlisted");
 
-  const local = createBundledArcanaAdapter();
+  const local = createArcanaAdapter();
   assert.equal(local.engine.getDeck(publicDeck.id), undefined);
 
   const anonymous = await connect({
@@ -131,7 +131,7 @@ async function main(): Promise<void> {
   }
 
   const owner = await connect({
-    adapter: createBundledArcanaAdapter(),
+    adapter: createArcanaAdapter(),
     catalog,
     principal: { id: "author" },
     includeStatefulTools: false,

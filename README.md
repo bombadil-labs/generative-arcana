@@ -65,7 +65,6 @@ then **Import deck**. Replacement has its own explicit checkbox.
 
 | Kind | Storage and availability | Sharing |
 |------|--------------------------|---------|
-| Bundled deck | Shipped with the app/service | Open by its bundled ID |
 | Browser-local pasted deck | Current browser page runtime; not an account save and lost on a full reload | Recipient needs the same original JSON |
 | Private account deck | Server-side catalog in Neon when production accounts are configured; owned by your account | Owner must sign in; the link grants no access |
 | Unlisted/public account deck | Same durable catalog record, with intentional visibility | Resolves by stable resource ID without a local re-import; public also appears in Community |
@@ -75,10 +74,13 @@ an exact deck fingerprint; replacing a deck can make an old reading fail with a 
 Keep the original manifest for archival use. Anyone who has a reading link can decode its question
 and selections; a URL fragment is not encryption. See [reading-link contracts](docs/contracts-and-readings.md).
 
-## The decks
+## Archived reference decks
 
-Seven bundled decks — and, more to the point, **four different topologies**, which is the real proof that
-the engine generalizes:
+The seven legacy decks are retained in repository source for recovery and regression tests. They are
+**not shipped in browser builds or production containers**, registered by the app/MCP service, or
+available through their old public IDs, reading links, or art URLs. User-owned catalog records are
+unchanged. New deployments start with no pre-built decks; import your own manifest or browse
+deliberately published Community decks. The archive demonstrates four different topologies:
 
 | Deck | Cards | Transversal | Skin | Topology |
 |------|------:|-------------|------|----------|
@@ -151,7 +153,7 @@ npm test           # data/import/reading regression tests; includes the full dec
 - **[app/README.md](./app/README.md)** — architecture, the visual-skin system, adding a deck or skin.
 - **[app/PRINCIPLES.md](./app/PRINCIPLES.md)** — the Ultima p5 illustration spec (suit = line, virtue = light, number = composition).
 
-Flow: **Landing** (pick a bundled deck or paste your own `deck.json`) → an **About** page with a
+Flow: **Landing** (import your own manifest, open My Decks, or explore Community) → an **About** page with a
 four-axis explorer → a filterable **card browser** with a skin selector → a **reading** composer (ask a
 question, choose a spread, deal — inversion-aware — and get a compact shareable URL plus a self-contained
 LLM prompt). Browser-dealt reading tokens live in the URL fragment; account imports, catalog reads,
@@ -184,9 +186,9 @@ Follow the [Better Auth + Neon deployment guide](docs/better-auth-deployment.md)
 ## Optional static build (GitHub Pages)
 
 Pushing to `main` runs [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml), which builds
-`app/` (Vite reads `../decks` for deck data) and publishes it. Enable Pages with **Source: GitHub
+`app/` and publishes the client without the archived reference decks. Enable Pages with **Source: GitHub
 Actions**. The build uses a relative base, so it works under `https://<user>.github.io/generative-arcana/`.
 
-GitHub Pages hosts only the static client and bundled/browser-local deck experience. It does not
+GitHub Pages hosts only the static client and browser-local deck experience. It does not
 provide the Node account, catalog, authoring API, or MCP routes; use the canonical production URL
 for those features.

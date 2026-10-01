@@ -26,20 +26,31 @@ export function Landing() {
         <h1 style={hero}>Generative Arcana</h1>
         <p style={lede}>
           A home for <em>custom tarot decks</em> — symbolic systems you can inspect, browse, read with,
-          author, and share across hosts. Explore the reference decks below, open a deck published by
-          the community, save a deck to your account in My Decks, or load deck JSON just for this browser session.
+          author, and share across hosts. Bring your own deck JSON, create a deck with an MCP-connected
+          host, or open a deck published by the community.
         </p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--s-3)", marginTop: "var(--s-4)" }}>
-          <button onClick={() => navigate("/community")} style={primaryAction}>Browse community decks →</button>
+          <button onClick={() => { setPasting((p) => !p); setError(null); }} style={primaryAction} aria-expanded={pasting} aria-controls="local-deck-import">Load browser-local JSON</button>
           <button onClick={() => navigate("/my-decks")} style={secondaryAction}>My account decks</button>
-          <button onClick={() => setPasting((p) => !p)} style={secondaryAction}>Load browser-local JSON</button>
+          <button onClick={() => navigate("/community")} style={secondaryAction}>Browse community decks →</button>
         </div>
       </header>
 
       <p style={{ ...pasteCopy, marginBottom: "var(--s-4)" }}>
-        Account decks start private. Unlisted decks open for anyone with their link; public decks also
-        appear in Community. Browser-local imports below are not uploaded and must be imported again after a reload.
+        Browser-local imports are not uploaded and must be imported again after a reload.
+        Where accounts are enabled, save a deck in My Decks for private, unlisted, or public access.
       </p>
+
+      {decks.length === 0 && (
+        <section style={emptyState} aria-labelledby="empty-library-title">
+          <h2 id="empty-library-title" style={emptyTitle}>Start with your own deck</h2>
+          <p style={pasteCopy}>
+            No decks are loaded in this browser session. Paste a deck.json using the button above,
+            or follow the authoring guide to create and validate your own deck with Claude or ChatGPT.
+          </p>
+          <a href="https://github.com/bombadil-labs/generative-arcana/blob/main/docs/authoring-hosts.md" target="_blank" rel="noopener noreferrer" style={guideLink}>Create a deck with MCP: setup and authoring guide ↗</a>
+        </section>
+      )}
 
       <div style={grid}>
         {decks.map((d) => {
@@ -59,15 +70,15 @@ export function Landing() {
           );
         })}
 
-        <button onClick={() => { setPasting((p) => !p); setError(null); }} style={pasteTile} onMouseEnter={lift} onMouseLeave={drop}>
+        {decks.length > 0 && <button onClick={() => { setPasting((p) => !p); setError(null); }} style={pasteTile} onMouseEnter={lift} onMouseLeave={drop} aria-expanded={pasting} aria-controls="local-deck-import">
           <div style={pasteInner}><div style={pasteTitle}>+ Load your own</div><div style={pasteCopy}>Paste valid deck JSON to use it in this browser session. Save it in My Decks for account access and unlisted or public sharing.</div></div>
-        </button>
+        </button>}
       </div>
 
       {pasting && (
-        <div style={{ marginTop: "var(--s-4)" }}>
-          <textarea value={text} onChange={(e) => { setText(e.target.value); setError(null); }} placeholder="Paste a deck.json here…" spellCheck={false} style={textarea} />
-          {error && <div style={errorMsg}>{error}</div>}
+        <div id="local-deck-import" style={{ marginTop: "var(--s-4)" }}>
+          <textarea aria-label="Deck JSON" value={text} onChange={(e) => { setText(e.target.value); setError(null); }} placeholder="Paste a deck.json here…" spellCheck={false} style={textarea} />
+          {error && <div role="alert" style={errorMsg}>{error}</div>}
           <div style={{ marginTop: "var(--s-3)" }}><button onClick={load} disabled={!text.trim()} style={primaryBtn(!text.trim())}>Load deck</button></div>
         </div>
       )}
@@ -91,6 +102,9 @@ const hero: React.CSSProperties = { fontFamily: "var(--font-display)", fontWeigh
 const lede: React.CSSProperties = { fontFamily: "var(--font-body)", fontWeight: 400, fontSize: "clamp(16px, 1.6vw, 19px)", lineHeight: 1.6, color: "var(--ink-2)", maxWidth: "60ch", marginTop: "var(--s-4)" };
 const primaryAction: React.CSSProperties = { all: "unset", cursor: "pointer", padding: "12px 18px", borderRadius: "var(--r-2)", font: "600 14px/1 var(--font-body)", background: "var(--accent)", color: "var(--accent-ink)", border: "1px solid var(--accent)" };
 const secondaryAction: React.CSSProperties = { ...primaryAction, background: "transparent", color: "var(--ink)", border: "1px solid var(--line-2)" };
+const emptyState: React.CSSProperties = { maxWidth: 680, padding: "var(--s-4)", border: "1px dashed var(--line-2)", borderRadius: "var(--r-3)", background: "var(--card)" };
+const emptyTitle: React.CSSProperties = { margin: 0, font: "400 27px/1.2 var(--font-display)", color: "var(--ink)" };
+const guideLink: React.CSSProperties = { display: "inline-block", marginTop: "var(--s-2)", font: "600 13px/1.5 var(--font-body)", color: "var(--accent)" };
 const grid: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(248px, 1fr))", gap: "var(--s-4)" };
 const tileBtn: React.CSSProperties = { all: "unset", cursor: "pointer", display: "block", boxSizing: "border-box", background: "var(--card)", border: "1px solid var(--line)", borderRadius: "var(--r-3)", boxShadow: "var(--e-1)", overflow: "hidden", transition: "transform var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease)" };
 const tileInner: React.CSSProperties = { display: "block" };

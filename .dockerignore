@@ -15,7 +15,3 @@ app/src/decks/ulysses
 app/src/decks/bundled.ts
 app/src/decks/composeBundledDeckData.ts
 **/*.zip
-app/src/app
-app/src/components
-app/src/styles
-app/src/runtime

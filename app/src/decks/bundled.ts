@@ -1,3 +1,4 @@
+/** Archived reference corpus for local tooling and tests only. Never import from a public runtime. */
 import ultimaJson from "../../../decks/ultima/deck.json";
 import ultimaVisualLanguage from "../../../decks/ultima/v2/visual-language.json";
 import ultimaSuits from "../../../decks/ultima/v2/suits.json";

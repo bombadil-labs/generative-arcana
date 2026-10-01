@@ -11,8 +11,8 @@ type Resolution = {
   session: BrowserSessionState;
 } & ({ status: "ready"; deck: DeckModule } | { status: "missing" | "error"; message: string });
 
-/** Catalog snapshots are revalidated on every route/session boundary. Only bundled decks and
- * browser-local imports bypass the catalog. Never render a previous route/session's resolution. */
+/** Catalog snapshots are revalidated on every route/session boundary. Browser-local imports
+ * bypass the catalog. Never render a previous route/session's resolution. */
 export function RemoteDeckBoundary({ deckId, routeKey, children }: { deckId: string; routeKey: string; children: React.ReactNode }) {
   const { session } = useBrowserSession();
   const [resolution, setResolution] = useState<Resolution | null>(null);

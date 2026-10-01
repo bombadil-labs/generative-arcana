@@ -3,7 +3,7 @@ import * as z from "zod/v4";
 import { ArcanaToolAdapter, type ArcanaToolName } from "../../app/src/mcp/ArcanaToolAdapter";
 import { MAX_QUESTION_LENGTH } from "../../app/src/reading/encode";
 import { CatalogResolvingArcanaToolAdapter } from "./catalogResolvingAdapter";
-import { createBundledArcanaAdapter } from "./hostStore";
+import { createArcanaAdapter } from "./hostStore";
 import type { ArcanaToolCallObserver } from "./observability";
 import {
   oauthToolError,
@@ -13,12 +13,12 @@ import {
 } from "./oauthResource";
 import { principalHasScopes, type ArcanaPrincipal } from "./principal";
 import { ARCANA_MCP_VERSION } from "./version";
-import { createBundledStaticVisualStore, type ServerVisualStore } from "./staticVisuals";
+import { createStaticVisualStore, type ServerVisualStore } from "./staticVisuals";
 import { registerArcanaVisualTools } from "./visualTools";
 import { registerArcanaCatalogTools } from "./catalogTools";
 import type { UserDeckCatalogRepository } from "./userDeckCatalog";
 
-export { createBundledArcanaAdapter } from "./hostStore";
+export { createArcanaAdapter } from "./hostStore";
 
 const MAX_IMPORT_JSON_CHARS = 2_000_000;
 const MAX_SPREADS = 64;
@@ -102,7 +102,7 @@ export interface ArcanaMcpServerOptions {
   oauth?: ArcanaOAuthToolContext;
   /** Payload-free observer for alpha diagnostics/metrics. */
   onToolCall?: ArcanaToolCallObserver;
-  /** Server-renderable visual assets. Defaults to the shipped static visual corpus. */
+  /** Server-renderable visual assets. No visual packs are installed by default. */
   visuals?: ServerVisualStore;
 }
 
@@ -110,13 +110,13 @@ export function createArcanaMcpServer(options: ArcanaMcpServerOptions = {}): Mcp
   const principal = options.principal ?? options.oauth?.principal ?? null;
   const canReadPrivate = !options.oauth || principalHasScopes(principal, options.oauth.readScopes);
   // Authentication alone must not expose the principal's already-hydrated private deck adapter.
-  // A client without decks:read still receives the anonymous bundled/public experience.
-  const localAdapter = canReadPrivate && options.adapter ? options.adapter : createBundledArcanaAdapter();
+  // A client without decks:read still receives the anonymous public experience.
+  const localAdapter = canReadPrivate && options.adapter ? options.adapter : createArcanaAdapter();
   const adapter = options.catalog
     ? new CatalogResolvingArcanaToolAdapter(localAdapter, options.catalog, canReadPrivate ? principal?.id ?? null : null)
     : localAdapter;
   const includeStatefulTools = options.includeStatefulTools ?? true;
-  const visuals = options.visuals ?? createBundledStaticVisualStore();
+  const visuals = options.visuals ?? createStaticVisualStore();
   const server = new McpServer({ name: "generative-arcana", version: ARCANA_MCP_VERSION });
   const readSchemes = options.oauth ? optionalOAuthSecuritySchemes(options.oauth.readScopes) : undefined;
 

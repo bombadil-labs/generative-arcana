@@ -1,6 +1,6 @@
 # Generative Arcana MCP
 
-Headless MCP transports for the Generative Arcana engine. The MCP layer owns no symbolic semantics: it loads the shipped corpus into an isolated `DeckRegistry`, creates an `ArcanaEngine`, and delegates symbolic tool calls through `ArcanaToolAdapter`. Renderer capabilities remain host-owned beside the engine; static image-backed packs can be returned as real MCP image content without importing browser-only p5/kit renderers.
+Headless MCP transports for the Generative Arcana engine. The MCP layer owns no symbolic semantics: it starts with an empty isolated `DeckRegistry`, creates an `ArcanaEngine`, and delegates symbolic tool calls through `ArcanaToolAdapter`. Renderer capabilities remain host-owned beside the engine; static image-backed packs can be returned as real MCP image content without importing browser-only p5/kit renderers.
 
 ## Production account setup
 
@@ -14,6 +14,10 @@ The last public audit (2026-09-30 UTC) found alpha bearer auth enabled, browser 
 `/readyz` returning 503. The implementation supports real accounts, but production activation and
 real authenticated Claude/ChatGPT/web end-to-end evidence remain outstanding. Local test results
 and the setup instructions below are not proof that signup is available in production.
+
+Legacy pre-built decks and their art are no longer installed by default or included in production
+containers. Old bundled IDs and reading links fail as unavailable. User imports and authorized
+public/unlisted catalog resources keep their existing behavior; no user-owned catalog rows are removed.
 
 ## Local stdio
 

@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { BrowserPrincipalResolver } from "./browserSession.js";
 import { canResolveUserDeck, type DeckVisibility, type UserDeckRecord } from "../../app/src/decks/catalog.js";
-import { createBundledArcanaAdapter, type ArcanaHostStore } from "./hostStore.js";
+import { createArcanaAdapter, type ArcanaHostStore } from "./hostStore.js";
 import { bearerChallenge } from "./oauthResource.js";
 import {
   OAuthPrincipalError,
@@ -35,7 +35,7 @@ export function isArcanaWebCatalogPath(pathname: string): boolean {
 }
 
 export function createArcanaWebCatalogRequestHandler(options: ArcanaWebCatalogHandlerOptions) {
-  const anonymousAdapter = createBundledArcanaAdapter();
+  const anonymousAdapter = createArcanaAdapter();
   const maxRequestBytes = options.maxRequestBytes ?? 4_000_000;
   const writeScopes = options.oauth ? [...new Set([...options.oauth.readScopes, ...options.oauth.writeScopes])] : [];
 
@@ -119,7 +119,7 @@ async function resolveWebAccess(
   req: IncomingMessage,
   res: ServerResponse,
   options: ArcanaWebCatalogHandlerOptions,
-  anonymousAdapter: ReturnType<typeof createBundledArcanaAdapter>,
+  anonymousAdapter: ReturnType<typeof createArcanaAdapter>,
 ): Promise<ArcanaRequestAccess> {
   // Bearer credentials retain priority. An invalid/malformed Authorization header throws and must
   // never silently fall back to a browser cookie.
