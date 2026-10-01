@@ -3,15 +3,49 @@
   "repository": "bombadil-labs/generative-arcana",
   "repositoryId": 1291398116,
   "defaultBranch": "main",
-  "vercelTeamId": null,
-  "vercelProjectId": null,
-  "neonProjectId": "dark-poetry-32860113",
-  "neonRootBranchId": null,
+  "vercelTeamId": "team_o9WQj6YpCF9JSk9wpVGfAmyb",
+  "vercelProjectId": "prj_PqzZBpZubFnrl3nmW12SmtDX3MfM",
+  "neonProjectId": "blue-pond-70470746",
+  "neonRootBranchId": "br-solitary-shape-b7f1tpxs",
   "mappingVerified": false,
-  "protectedBranches": ["main", "master", "production", "staging", "develop", "development", "feat/self-hosted-better-auth", "fix/sanitize-deck-svg"],
-  "protectedPrefixes": ["release/", "production/", "staging/"],
+  "protectedBranches": [
+    "main",
+    "master",
+    "production",
+    "staging",
+    "develop",
+    "development",
+    "feat/self-hosted-better-auth",
+    "fix/sanitize-deck-svg",
+    "chore/preview-isolation-test",
+    "dependabot/github_actions/actions/checkout-7",
+    "dependabot/github_actions/actions/setup-node-7",
+    "dependabot/npm_and_yarn/mcp/typescript-7.0.2",
+    "dependabot/npm_and_yarn/app/p5-2.3.4",
+    "dependabot/npm_and_yarn/app/multi-de36fa8f59",
+    "dependabot/github_actions/actions/upload-pages-artifact-5",
+    "dependabot/npm_and_yarn/mcp/types/node-26.6.3",
+    "dependabot/github_actions/actions/deploy-pages-5"
+  ],
+  "protectedPrefixes": [
+    "release/",
+    "production/",
+    "staging/"
+  ],
   "protectedDeploymentIds": [],
-  "protectedNeonBranchIds": [],
+  "protectedNeonBranchIds": [
+    "br-steep-heart-b7gdc818",
+    "br-solitary-shape-b7f1tpxs",
+    "br-tiny-morning-b70u6bee",
+    "br-tiny-hat-b79pt0pk",
+    "br-lively-moon-b7jebfqy",
+    "br-solitary-rain-b7j5kk6n",
+    "br-calm-paper-b733ntfe",
+    "br-calm-morning-b7siedwr",
+    "br-little-hat-b7349zo3",
+    "br-morning-bonus-b7f948g7",
+    "br-young-mode-b7f7jzif"
+  ],
   "allowVerifiedAutomaticAliases": false,
   "destructiveEnabled": false,
   "approvalEnvironment": "preview-cleanup-approved",
@@ -19,5 +53,9 @@
   "approverLogins": [],
   "maxBranchesPerRun": 3,
   "maxDeploymentsPerRun": 100,
-  "planLifetimeMinutes": 60
+  "planLifetimeMinutes": 60,
+  "excludedNeonProjectIds": [
+    "dark-poetry-32860113"
+  ],
+  "previewDeploymentNotBefore": "2026-10-01T19:40:00Z"
 }
