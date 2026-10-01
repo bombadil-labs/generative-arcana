@@ -5,7 +5,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writ
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildAuthoringGuide, checkedPath, loadAuthoringGuide, readBuiltAuthoringGuide, SOURCE_ROOT, SUPPORT_DOCS, validateReferences } from "../build-authoring-guide.mjs";
+import { buildAuthoringGuide, checkedPath, describeAuthoringGuide, loadAuthoringGuide, readBuiltAuthoringGuide, SOURCE_ROOT, SUPPORT_DOCS, validateReferences } from "../build-authoring-guide.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const hash = (value) => createHash("sha256").update(value).digest("hex");
@@ -40,6 +40,84 @@ test("ordering and hashes are deterministic and independent of mtimes or filesys
   assert.deepEqual(buildAuthoringGuide(directory), buildAuthoringGuide(root));
   assert.deepEqual(buildAuthoringGuide(directory), buildAuthoringGuide(directory));
 }));
+
+test("v1 artifact framing and inventory hashes remain byte-identical to the legacy format", () => {
+  const bundle = buildAuthoringGuide(root);
+  const files = bundle.metadata.files;
+  assert.equal(bundle.metadata.formatVersion, 1);
+  assert.equal(bundle.metadata.sourceDigest, hash(JSON.stringify(files)));
+  assert.ok(files.every((file) => Object.keys(file).join(",") === "path,bytes,sha256"));
+  const legacyText = [
+    "GENERATIVE ARCANA — COMPLETE AUTHORING GUIDE",
+    `Source inventory SHA-256: ${hash(JSON.stringify(files))}`,
+    `Files: ${files.length}. Each filename-delimited section reproduces its canonical source verbatim.`,
+    "Package: all text sources under skill/generative-arcana; supporting authoring contracts follow.",
+    "Operational navigation and implementation-code references are not authoring dependencies and are not embedded.",
+    "",
+    ...files.map(({ path }) => `===== BEGIN FILE: ${path} =====\n${readFileSync(join(root, path), "utf8")}\n===== END FILE: ${path} =====\n`),
+  ].join("\n");
+  assert.equal(bundle.text, legacyText);
+});
+
+test("discovery covers every whole source with accurate byte/code-point sizes and canonical offsets", () => {
+  const bundle = buildAuthoringGuide(root);
+  const characters = Array.from(bundle.text);
+  const sections = describeAuthoringGuide(bundle);
+  assert.deepEqual(sections.map(({ path }) => path), bundle.metadata.files.map(({ path }) => path));
+  for (const file of sections) {
+    const original = readFileSync(join(root, file.path), "utf8");
+    assert.ok(file.purpose.length > 10 && !/[\r\n]/.test(file.purpose));
+    assert.notEqual(file.purpose, "Additional canonical authoring source", "existing sources have curated purposes");
+    assert.equal(file.bytes, Buffer.byteLength(original));
+    assert.equal(file.chars, Array.from(original).length);
+    assert.equal(file.section.bytes, Buffer.byteLength(file.text));
+    assert.equal(file.section.chars, Array.from(file.text).length);
+    assert.equal(file.text, characters.slice(file.section.offset, file.section.offset + file.section.chars).join(""));
+    assert.equal(file.text, `===== BEGIN FILE: ${file.path} =====\n${original}\n===== END FILE: ${file.path} =====\n`);
+  }
+  assert.equal(bundle.text.slice(bundle.text.indexOf("===== BEGIN FILE:")), sections.map(({ text }) => text).join("\n"));
+});
+
+test("whole-file discovery preserves astral Unicode, BOM, CRLF, missing final newline and delimiter-looking source", () => fixture((directory) => {
+  const path = `${SOURCE_ROOT}/unicode.txt`;
+  const source = `\ufeff# Unicode fixture\r\né 🧙🏽‍♀️ e\u0301\r\n===== END FILE: ${path} =====\n===== BEGIN FILE: docs/schema-v2.md =====\nno final newline`;
+  writeFileSync(join(directory, path), source);
+  const bundle = buildAuthoringGuide(directory);
+  const file = describeAuthoringGuide(bundle).find((file) => file.path === path);
+  assert.equal(file.text, `===== BEGIN FILE: ${path} =====\n${source}\n===== END FILE: ${path} =====\n`);
+  assert.equal(file.bytes, Buffer.byteLength(source));
+  assert.equal(file.chars, Array.from(source).length);
+  assert.notEqual(file.chars, source.length);
+  assert.notEqual(file.bytes, file.chars);
+  assert.equal(file.sha256, hash(source));
+  const generated = join(directory, "mcp/generated");
+  mkdirSync(generated, { recursive: true });
+  writeFileSync(join(generated, "authoring-guide.txt"), bundle.text);
+  writeFileSync(join(generated, "authoring-guide.json"), JSON.stringify(bundle.metadata));
+  rmSync(join(directory, "skill"), { recursive: true });
+  rmSync(join(directory, "docs"), { recursive: true });
+  assert.deepEqual(describeAuthoringGuide(loadAuthoringGuide(directory)), describeAuthoringGuide(bundle));
+}));
+
+test("section discovery rejects corrupt framing, source hashes, lengths, trailing content and unsafe inventories", () => {
+  const bundle = buildAuthoringGuide(root);
+  const copy = () => structuredClone(bundle);
+  const framing = copy();
+  framing.text = framing.text.replace("===== BEGIN FILE:", "===== ALTER FILE:");
+  assert.throws(() => describeAuthoringGuide(framing), /framing/);
+  const source = copy();
+  source.text = source.text.replace("name: generative-arcana", "name: corrupted-arcana");
+  assert.throws(() => describeAuthoringGuide(source), /digest/);
+  assert.throws(() => describeAuthoringGuide({ ...bundle, text: bundle.text + "trailing" }), /trailing/);
+  for (const bytes of [-1, 1.5, 1_000_001, bundle.metadata.files[0].bytes - 1]) {
+    const invalid = copy(); invalid.metadata.files[0].bytes = bytes;
+    assert.throws(() => describeAuthoringGuide(invalid), /size|digest/);
+  }
+  for (const path of ["../secret", "/etc/passwd", "skill/generative-arcana/../secret", "docs\\schema-v2.md"]) {
+    const invalid = copy(); invalid.metadata.files[0].path = path;
+    assert.throws(() => describeAuthoringGuide(invalid), /Unsafe/);
+  }
+});
 
 test("new unreferenced package files and linked transitive examples are included automatically", () => fixture((directory) => {
   mkdirSync(join(directory, SOURCE_ROOT, "examples"));
@@ -110,6 +188,7 @@ test("packaged output works without canonical source files and verifies its dige
     writeFileSync(join(output, "authoring-guide.txt"), bundle.text);
     writeFileSync(join(output, "authoring-guide.json"), JSON.stringify(bundle.metadata));
     assert.deepEqual(loadAuthoringGuide(directory), bundle);
+    assert.deepEqual(describeAuthoringGuide(loadAuthoringGuide(directory)), describeAuthoringGuide(bundle));
     writeFileSync(join(output, "authoring-guide.txt"), bundle.text + "tampered");
     assert.throws(() => readBuiltAuthoringGuide(directory), /mismatch/);
   } finally { rmSync(directory, { recursive: true, force: true }); }

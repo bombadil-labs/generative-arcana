@@ -22,6 +22,44 @@ const MAX_BUNDLE_BYTES = 2_000_000;
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const digest = (value) => createHash("sha256").update(value).digest("hex");
 
+// Discovery labels only. They never replace source text or enter the source/bundle hashes.
+const PURPOSES = {
+  [`${SOURCE_ROOT}/SKILL.md`]: "Host-neutral workflow, four-axis model, staged planning, and canonical manifest delivery",
+  [`${SOURCE_ROOT}/references/integration.md`]: "Integrate declared axes, sublimated stations, numeric character, meanings, and scenes",
+  [`${SOURCE_ROOT}/references/numeric_axis.md`]: "Prime/composite interpretation, number ownership, gloss quality, and visual ancestry",
+  [`${SOURCE_ROOT}/references/schema.md`]: "Canonical manifest interfaces, normalized fields, default profile, and station walks",
+  [`${SOURCE_ROOT}/references/svg_symbols.md`]: "SVG glyph constraints, suit-symbol example, and optional station symbols",
+  [`${SOURCE_ROOT}/references/tarot_structure.md`]: "Traditional suits, majors, ranks, prime structures, and Chaldean decan baseline",
+  [`${SOURCE_ROOT}/references/validation.md`]: "Executable spec and validation loop, offline fallback, and separate authorized import",
+  [`${SOURCE_ROOT}/references/visual_language.md`]: "Layered art direction, resolved-card renderability, and visual quality stress tests",
+  [`${SOURCE_ROOT}/strategies/index.md`]: "Choose and combine per-stage strategies while preserving shared invariants",
+  [`${SOURCE_ROOT}/strategies/majors/borrowed.md`]: "Map an existing thematic set into 22 ordered major cards",
+  [`${SOURCE_ROOT}/strategies/majors/journey.md`]: "Build 22 major cards from a coherent theme-native narrative arc",
+  [`${SOURCE_ROOT}/strategies/majors/primes.md`]: "Build major archetypes and visual ancestry from identities, primes, and composites",
+  [`${SOURCE_ROOT}/strategies/ranks/manual.md`]: "Adapt a theme-native ten-stage progression and four court roles",
+  [`${SOURCE_ROOT}/strategies/ranks/prime_scaffold.md`]: "Structure rank meanings, glosses, and visual logic through factorization",
+  [`${SOURCE_ROOT}/strategies/ranks/questions.md`]: "Define suit-refracted rank questions, court progression, and formal grammar",
+  [`${SOURCE_ROOT}/strategies/suits/dialectical.md`]: "Derive four ordered suits and visual families from two crossed dialectics",
+  [`${SOURCE_ROOT}/strategies/suits/manual.md`]: "Adapt four native thematic categories into coherent ordered suits",
+  [`${SOURCE_ROOT}/strategies/transversal/chaldean.md`]: "Use seven classical planets, ordered stations, and coprime suit strides",
+  [`${SOURCE_ROOT}/strategies/transversal/themed_cycle.md`]: "Build a theme-native ordered station cycle that cross-cuts every card",
+  "docs/contracts-and-readings.md": "Runtime validation, render safety, stable reading tokens, and deck availability",
+  "docs/deck-manifest.md": "Authored manifest boundary, catalog identity, replacement, and resolved read views",
+  "docs/schema-v2.md": "Separate normalized authoring, persistence, and resolved views with migration compatibility",
+  "docs/visual-grammar.md": "Renderer-independent visual field contracts, ownership hierarchy, and compatibility",
+};
+
+function guidePreamble(files, sourceDigest) {
+  return [
+    "GENERATIVE ARCANA — COMPLETE AUTHORING GUIDE",
+    `Source inventory SHA-256: ${sourceDigest}`,
+    `Files: ${files.length}. Each filename-delimited section reproduces its canonical source verbatim.`,
+    "Package: all text sources under skill/generative-arcana; supporting authoring contracts follow.",
+    "Operational navigation and implementation-code references are not authoring dependencies and are not embedded.",
+    "", "",
+  ].join("\n");
+}
+
 /** Resolve only reviewed repository-relative paths; reject symlinks at every component. */
 export function checkedPath(root, path) {
   assert.equal(typeof path, "string");
@@ -87,15 +125,8 @@ export function buildAuthoringGuide(root = repositoryRoot) {
   validateReferences(sources);
   const files = sources.map(({ path, bytes, sha256 }) => ({ path, bytes, sha256 }));
   const sourceDigest = digest(JSON.stringify(files));
-  const text = [
-    "GENERATIVE ARCANA — COMPLETE AUTHORING GUIDE",
-    `Source inventory SHA-256: ${sourceDigest}`,
-    `Files: ${files.length}. Each filename-delimited section reproduces its canonical source verbatim.`,
-    "Package: all text sources under skill/generative-arcana; supporting authoring contracts follow.",
-    "Operational navigation and implementation-code references are not authoring dependencies and are not embedded.",
-    "",
-    ...sources.map((source) => `===== BEGIN FILE: ${source.path} =====\n${source.text}\n===== END FILE: ${source.path} =====\n`),
-  ].join("\n");
+  const text = guidePreamble(files, sourceDigest) + sources.map((source) =>
+    `===== BEGIN FILE: ${source.path} =====\n${source.text}\n===== END FILE: ${source.path} =====\n`).join("\n");
   const byteLength = Buffer.byteLength(text);
   assert.ok(byteLength <= MAX_BUNDLE_BYTES, "Authoring guide exceeds bundle size budget");
   return { text, metadata: { formatVersion: 1, sourceRoot: SOURCE_ROOT, sourceDigest, sha256: digest(text), byteLength, files } };
@@ -110,7 +141,55 @@ export function readBuiltAuthoringGuide(root = repositoryRoot) {
   assert.equal(metadata.sourceDigest, digest(JSON.stringify(metadata.files)), "Source inventory digest mismatch");
   assert.equal(metadata.byteLength, Buffer.byteLength(text), "Authoring guide length mismatch");
   assert.equal(metadata.sha256, digest(text), "Authoring guide digest mismatch");
+  describeAuthoringGuide({ text, metadata });
   return { text, metadata };
+}
+
+/** Derive whole-file sections from verified framing and byte lengths, never delimiter searches.
+ * Works without canonical files in packaged runtimes. User paths never reach the filesystem.
+ */
+export function describeAuthoringGuide({ text, metadata }) {
+  const data = Buffer.from(text, "utf8");
+  let cursor = 0;
+  let offset = 0;
+  const consume = (expected) => {
+    const bytes = Buffer.from(expected, "utf8");
+    assert.ok(data.subarray(cursor, cursor + bytes.length).equals(bytes), "Authoring guide framing mismatch");
+    cursor += bytes.length;
+    offset += Array.from(expected).length;
+  };
+  consume(guidePreamble(metadata.files, metadata.sourceDigest));
+  const paths = new Set();
+  const sections = metadata.files.map((file, index) => {
+    assert.ok(typeof file.path === "string" && /^[A-Za-z0-9_./-]+$/.test(file.path)
+      && file.path.split("/").every((part) => part && part !== "." && part !== "..")
+      && (file.path.startsWith(`${SOURCE_ROOT}/`) || SUPPORT_DOCS.includes(file.path)), "Unsafe guide inventory path");
+    assert.ok(!paths.has(file.path), "Duplicate guide inventory path");
+    paths.add(file.path);
+    assert.ok(Number.isSafeInteger(file.bytes) && file.bytes >= 0 && file.bytes <= MAX_SOURCE_BYTES, "Invalid guide source size");
+    const start = cursor;
+    const sectionOffset = offset;
+    consume(`===== BEGIN FILE: ${file.path} =====\n`);
+    const source = data.subarray(cursor, cursor + file.bytes);
+    assert.equal(source.length, file.bytes, "Guide source length mismatch");
+    assert.equal(digest(source), file.sha256, "Guide source digest mismatch");
+    const sourceText = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(source);
+    const chars = Array.from(sourceText).length;
+    cursor += file.bytes;
+    offset += chars;
+    consume(`\n===== END FILE: ${file.path} =====\n`);
+    const sectionText = data.subarray(start, cursor).toString("utf8");
+    const description = {
+      ...file,
+      purpose: PURPOSES[file.path] ?? sourceText.match(/^# +([^\r\n]+)$/m)?.[1] ?? "Additional canonical authoring source",
+      chars,
+      section: { offset: sectionOffset, chars: offset - sectionOffset, bytes: cursor - start },
+    };
+    if (index < metadata.files.length - 1) consume("\n");
+    return { ...description, text: sectionText };
+  });
+  assert.equal(cursor, data.length, "Unexpected trailing guide content");
+  return sections;
 }
 
 /** Source checkout: read current canonical files. Packaged runtime: read verified build output only. */

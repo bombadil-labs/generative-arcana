@@ -95,6 +95,8 @@ async function main(): Promise<void> {
       await toolSuccess(await post(call("list_decks"), token));
       await toolSuccess(await post(call("get_deck_authoring_spec"), token));
       await toolSuccess(await post(call("get_deck_authoring_guide"), token));
+      await toolSuccess(await post(call("get_deck_authoring_guide", { toc: true }), token));
+      await toolSuccess(await post(call("get_deck_authoring_guide", { files: ["skill/generative-arcana/SKILL.md"] }), token));
       await toolSuccess(await post(call("validate_deck_manifest", { manifest: neutralManifest() }), token));
       await toolSuccess(await post(call("list_public_decks"), token));
       await toolSuccess(await post(call("get_shared_deck", { deckId: publicDeck.id }), token));

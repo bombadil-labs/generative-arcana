@@ -43,8 +43,10 @@ by browser and MCP. Production accounts are enabled; the remaining end-to-end
 2. Connect `https://generative-arcana.vercel.app/mcp` in a supported Claude or ChatGPT custom MCP
    surface and complete its OAuth login/consent flow. See [host-specific setup](docs/authoring-hosts.md)
    for account/workspace prerequisites.
-3. Ask the host to read `get_deck_authoring_guide` for the complete method, then call
-   `get_deck_authoring_spec`, author a canonical schema-v2 `DeckManifest`, and
+3. Ask the host to call `get_deck_authoring_guide({})` for the complete method before planning.
+   Output-limited hosts can use `{ toc: true }` and then `{ files: [exactPaths] }` to read whole
+   files in batches; see [guide retrieval](docs/authoring-hosts.md#reading-the-authoring-guide).
+   Then call `get_deck_authoring_spec`, author a canonical schema-v2 `DeckManifest`, and
    repair it with `validate_deck_manifest` until `valid: true` and `canonical: true`.
 4. Explicitly ask it to save the validated manifest with `import_deck`. New catalog imports are
    **private**. Confirm the returned stable resource ID with `list_my_decks`; validation alone does
@@ -126,8 +128,12 @@ The portable skill teaches a host model to author a complete deck as a single ca
 **[`skill/generative-arcana/SKILL.md`](./skill/generative-arcana/SKILL.md)** for the formalism; the
 `references/` define the schema and integration rules, and `strategies/` are the per-stage generators.
 
-Use the current **`skill/generative-arcana/`** bundle in a supported skills host, or follow the
-live authoring spec exposed by MCP. The historical `generative-arcana-v2.0.zip` is also included;
+Use the current **`skill/generative-arcana/`** bundle in a supported skills host, or read the
+complete method through MCP with `get_deck_authoring_guide({})`: all 23 canonical source files,
+verbatim with filename headers, including the reviewed supporting contracts. Broad reading is
+the default because planning needs the method before strategy selection. The same tool offers
+a compact TOC and whole-file batches when needed; read `SKILL.md` and `strategies/index.md`
+before choosing strategies. The historical `generative-arcana-v2.0.zip` is also included;
 the runtime spec and validator are authoritative for new canonical manifests. Ask, for example,
 *"Design a deep-sea mythology tarot deck; validate the manifest, then ask me before saving it to my
 private library."* See [host setup](docs/authoring-hosts.md). Adding a bundled fixture under

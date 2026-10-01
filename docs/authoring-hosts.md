@@ -75,12 +75,46 @@ rollout can affect which setup UI is available; record the actual supported prod
 verify ChatGPT end-user login or tool approvals.
 
 The portable `skill/generative-arcana/` directory is the host-neutral authoring bundle. Use it in a
-host that supports skills, or have the model read `get_deck_authoring_guide` through MCP. The
-read-only tool returns the entire canonical method with filename headers; the same full text is
-available at the listed resource `arcana://authoring/guide`. `get_deck_authoring_spec` remains the
-compact machine-readable contract and links to that full guide. A custom
-skill package alone does not create an OAuth connection or save to an account. No OpenAI-specific
-field belongs in `DeckManifest`.
+host that supports skills, or have the model read `get_deck_authoring_guide` through MCP.
+`get_deck_authoring_spec` remains the compact machine-readable contract and links to that guide.
+A custom skill package alone does not create an OAuth connection or save to an account.
+No OpenAI-specific field belongs in `DeckManifest`.
+
+## Reading the authoring guide
+
+Call `get_deck_authoring_guide({})` before planning. No arguments return all 23 canonical source
+files verbatim, with filename headers: the full skill, references, strategies, and reviewed
+supporting contracts. Broad reading is the default because planning needs the method before
+strategy selection. This public, read-only tool needs no login; the same full text is available
+at the listed resource `arcana://authoring/guide`.
+
+For a host with output limits, use the same tool in two steps:
+
+1. Call `get_deck_authoring_guide({ toc: true })` for a compact inventory with bundle format,
+   hashes, total size, and every file's exact path, size, and purpose.
+2. Call it with `{ files: ["skill/generative-arcana/SKILL.md", "skill/generative-arcana/strategies/index.md"] }`
+   before selecting strategies. Continue reading whole files in sensible batches, using exact
+   repository-relative filenames from the TOC. Returned files are verbatim, retain their filename
+   headers, and appear in canonical order even if requested in another order. A TOC or purpose
+   label is navigation, not a replacement for the source instructions.
+
+All modes return the complete structured inventory. Its source `bytes`/`chars` exclude headers;
+`section.bytes`/`section.chars` include the file's framing. Allow one extra newline between
+selected sections when sizing a batch. Empty selections, duplicate or unknown paths, and mixed
+modes are rejected, including `files` or `toc` combined with `offset: 0`.
+
+Use legacy `offset`/`maxChars` only for an existing chunking client or an oversized file. Offsets
+are Unicode code points into the full guide. For a single file, start at its `section.offset`,
+cap each chunk to the remaining `section.chars`, and concatenate without separators until that
+section is complete. The returned `range.nextOffset` is full-guide-relative, so do not use its
+nullness to detect the end of one file. See the [complete retrieval contract](../mcp/README.md#response-metadata-and-version-checks).
+
+For an installed copy, compare the TOC's source hashes against **all** inventory files, including
+`docs/contracts-and-readings.md`, `docs/deck-manifest.md`, `docs/schema-v2.md`, and
+`docs/visual-grammar.md`. Comparing only the installed skill directory misses those supporting
+contracts. Global `sha256` and `sourceDigest` always identify the complete bundle and canonical
+inventory, respectively; compare them across retrieval calls. Purpose labels are not hashed.
+`formatVersion: 1` is the unchanged bundle-framing version, not a tool API version.
 
 ## Author → validate → explicitly import
 
@@ -93,8 +127,8 @@ A prompt that makes the intended save explicit:
 The complete tool flow is:
 
 1. Call `get_deck_authoring_guide({})` for the complete portable method, then `get_deck_authoring_spec`
-   for the current executable contract. If the host limits output, retrieve the same guide in
-   lossless chunks using `offset`/`maxChars` and the returned `range.nextOffset`.
+   for the current executable contract. If the host limits output, use the
+   [TOC and whole-file batches](#reading-the-authoring-guide) above.
 2. Produce a canonical `DeckManifest` with `schemaVersion: 2`, `data`, `tagline`, and optional `spreads`.
    Ownership, visibility, revision, and provider IDs do not belong inside the manifest.
 3. Call `validate_deck_manifest({ manifest })`; repair until `valid: true` and `canonical: true`.
