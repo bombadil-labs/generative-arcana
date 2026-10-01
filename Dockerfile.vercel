@@ -1,3 +1,10 @@
+FROM node:24-alpine AS authoring-build
+WORKDIR /srv
+COPY tools/build-authoring-guide.mjs ./tools/build-authoring-guide.mjs
+COPY skill/generative-arcana ./skill/generative-arcana
+COPY docs/contracts-and-readings.md docs/deck-manifest.md docs/schema-v2.md docs/visual-grammar.md ./docs/
+RUN node tools/build-authoring-guide.mjs && node tools/build-authoring-guide.mjs --check
+
 FROM node:24-alpine AS web-build
 
 WORKDIR /srv
@@ -16,6 +23,11 @@ RUN cd mcp && npm ci --omit=dev
 COPY app/src ./app/src
 COPY mcp/src ./mcp/src
 COPY mcp/tsconfig.json ./mcp/tsconfig.json
+COPY --from=authoring-build /srv/mcp/generated ./mcp/generated
+COPY tools/build-authoring-guide.mjs ./tools/build-authoring-guide.mjs
+RUN node --input-type=module -e 'import { readBuiltAuthoringGuide } from "./tools/build-authoring-guide.mjs"; readBuiltAuthoringGuide();'
+COPY tools/check-packaged-authoring-guide.mjs ./tools/check-packaged-authoring-guide.mjs
+RUN node tools/check-packaged-authoring-guide.mjs
 COPY --from=web-build /srv/app/dist ./app/dist
 COPY tools/check-public-distribution.mjs ./tools/check-public-distribution.mjs
 RUN node tools/check-public-distribution.mjs --runtime /srv && test -f ./app/dist/index.html

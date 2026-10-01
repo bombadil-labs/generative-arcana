@@ -75,7 +75,10 @@ rollout can affect which setup UI is available; record the actual supported prod
 verify ChatGPT end-user login or tool approvals.
 
 The portable `skill/generative-arcana/` directory is the host-neutral authoring bundle. Use it in a
-host that supports skills, or have the model consult `get_deck_authoring_spec` through MCP. A custom
+host that supports skills, or have the model read `get_deck_authoring_guide` through MCP. The
+read-only tool returns the entire canonical method with filename headers; the same full text is
+available at the listed resource `arcana://authoring/guide`. `get_deck_authoring_spec` remains the
+compact machine-readable contract and links to that full guide. A custom
 skill package alone does not create an OAuth connection or save to an account. No OpenAI-specific
 field belongs in `DeckManifest`.
 
@@ -83,13 +86,15 @@ field belongs in `DeckManifest`.
 
 A prompt that makes the intended save explicit:
 
-> Design a deep-sea mythology tarot deck. First get the Generative Arcana authoring spec, then
+> Design a deep-sea mythology tarot deck. First read the complete Generative Arcana authoring guide and authoring spec, then
 > create a canonical schema-v2 manifest and repair it until validation succeeds. Show me the
 > summary before importing it into my private library. Do not replace or publish an existing deck.
 
 The complete tool flow is:
 
-1. Call `get_deck_authoring_spec` and follow the portable authoring guidance.
+1. Call `get_deck_authoring_guide({})` for the complete portable method, then `get_deck_authoring_spec`
+   for the current executable contract. If the host limits output, retrieve the same guide in
+   lossless chunks using `offset`/`maxChars` and the returned `range.nextOffset`.
 2. Produce a canonical `DeckManifest` with `schemaVersion: 2`, `data`, `tagline`, and optional `spreads`.
    Ownership, visibility, revision, and provider IDs do not belong inside the manifest.
 3. Call `validate_deck_manifest({ manifest })`; repair until `valid: true` and `canonical: true`.

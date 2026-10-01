@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { assertFormerDecksUnavailable, toolResult } from "./protocol-fixtures";
+import { assertAuthoringGuide } from "./authoring-guide-contract";
 
 const SPREAD_WIDGET_URI = "ui://arcana/spread/v2.html";
 
@@ -39,6 +40,7 @@ async function main(): Promise<void> {
     const transport = new StreamableHTTPClientTransport(endpoint);
     try {
       await withTimeout(client.connect(transport), 10_000, "HTTP MCP connect");
+      await assertAuthoringGuide(client);
 
       const listed = await withTimeout(client.listTools(), 5_000, "HTTP tools/list");
       const names = new Set(listed.tools.map((tool) => tool.name));

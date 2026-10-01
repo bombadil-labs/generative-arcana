@@ -7,13 +7,12 @@
 - **[Connect Claude or ChatGPT and author a deck](docs/authoring-hosts.md)**
 - **[Self-hosted Better Auth setup](docs/better-auth-deployment.md)** · **[Launch evidence checklist](docs/production-launch-checklist.md)**
 
-**Account launch status (last public audit: 2026-09-30 UTC):** the app and anonymous MCP tools are live,
-but production was still in private-alpha bearer mode, browser sign-in was disabled, and `/readyz`
-returned 503. This branch selects self-hosted Better Auth with Neon for the account path;
-implementation is separate from production activation and operating approval. The real
-Better Auth → Claude/ChatGPT → web account journey is **not yet verified**. The account instructions below describe
-the intended configured flow, not a claim that production signup is available today. Check the
-[launch checklist](docs/production-launch-checklist.md) before inviting account users.
+**Account launch status (2026-10-01 UTC):** production accounts and readiness are live at
+[`c2cf91a`](https://github.com/bombadil-labs/generative-arcana/commit/c2cf91a2e19b43d76b5db7c6c1e394a177b0740b).
+Browser login and real Claude OAuth/private-library reads have been verified. ChatGPT connection
+setup, host-driven deck creation/import, and full cross-host persistence acceptance remain pending.
+This is not a claim that all [launch acceptance and recovery checks](docs/production-launch-checklist.md)
+have passed; the dated September 30 audit remains historical evidence.
 
 Generative Arcana is three things that fit together:
 
@@ -36,15 +35,16 @@ browser; a skinless deck (or one you paste in) still browses and reads, just wit
 ## Create, save, and share your own deck
 
 The account path uses self-hosted Better Auth, with one stable internal owner identity shared
-by browser and MCP. Once the production account setup is enabled and the [acceptance checks](docs/production-launch-checklist.md)
-pass:
+by browser and MCP. Production accounts are enabled; the remaining end-to-end
+[acceptance checks](docs/production-launch-checklist.md) are tracked separately:
 
 1. Open [My Decks](https://generative-arcana.vercel.app/#/my-decks), choose **Sign in**, and create or
    sign into your Generative Arcana account and verify your email. Use that same account in every host.
 2. Connect `https://generative-arcana.vercel.app/mcp` in a supported Claude or ChatGPT custom MCP
    surface and complete its OAuth login/consent flow. See [host-specific setup](docs/authoring-hosts.md)
    for account/workspace prerequisites.
-3. Ask the host to call `get_deck_authoring_spec`, author a canonical schema-v2 `DeckManifest`, and
+3. Ask the host to read `get_deck_authoring_guide` for the complete method, then call
+   `get_deck_authoring_spec`, author a canonical schema-v2 `DeckManifest`, and
    repair it with `validate_deck_manifest` until `valid: true` and `canonical: true`.
 4. Explicitly ask it to save the validated manifest with `import_deck`. New catalog imports are
    **private**. Confirm the returned stable resource ID with `list_my_decks`; validation alone does

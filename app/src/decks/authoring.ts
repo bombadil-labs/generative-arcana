@@ -11,6 +11,11 @@ export const DECK_MANIFEST_SPEC_VERSION = "2";
 export const DECK_MANIFEST_SPEC = Object.freeze({
   kind: "generative-arcana/deck-manifest",
   version: DECK_MANIFEST_SPEC_VERSION,
+  authoringGuide: {
+    mcpTool: "get_deck_authoring_guide",
+    resourceUri: "arcana://authoring/guide",
+    description: "Read the full canonical skill, strategies, references and examples before constructing a deck. This compact spec supplements that method.",
+  },
   schema: {
     current: CURRENT_DECK_MANIFEST_SCHEMA_VERSION,
     legacyManifestV1Accepted: true,
