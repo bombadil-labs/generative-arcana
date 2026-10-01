@@ -37,7 +37,7 @@
     "test:ulysses-v2": "tsx test/ulysses-v2.ts",
     "test:ultima-octave-v2": "tsx test/ultima-octave-v2.ts",
     "test:catalog-freshness": "tsx test/catalog-freshness.ts",
-    "test:deployment-readiness": "tsx test/deployment-readiness.ts",
+    "test:deployment-readiness": "node --import tsx --test test/readiness-http-fixture.test.ts && node --import tsx test/deployment-readiness.ts",
     "test:better-auth": "tsx test/better-auth-protocol.ts",
     "test:auth-email": "tsx test/auth-email.ts",
     "db:auth:plan": "tsx scripts/auth-schema.ts plan",

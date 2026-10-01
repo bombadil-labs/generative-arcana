@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
-import { spawn, type ChildProcess } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { startReadinessHttp, stopChild } from "./readiness-http-fixture";
 import {
   accountDeploymentReadiness,
   createDeploymentDependencyMonitor,
@@ -95,20 +96,11 @@ async function main(): Promise<void> {
 async function testHttpDiagnostics(sha: string): Promise<void> {
   const dir = await mkdtemp(join(tmpdir(), "arcana-readiness-"));
   await writeFile(join(dir, "index.html"), "<!doctype html><title>Arcana SPA fixture</title>");
-  const port = 47000 + (process.pid % 1000);
-  const base = `http://127.0.0.1:${port}`;
-  const env = { ...process.env };
-  for (const name of Object.keys(env)) {
-    if (name.startsWith("MCP_") || name.startsWith("BETTER_AUTH_") || name.startsWith("SMTP_") || name.startsWith("RESEND_") || name.startsWith("ARCANA_") || name.startsWith("VERCEL") || name === "DATABASE_URL") delete env[name];
-  }
-  const child = spawn(process.execPath, ["--import", "tsx", "src/http.ts"], {
-    env: { ...env, HOST: "127.0.0.1", PORT: String(port), ARCANA_WEB_DIST_DIR: dir, ARCANA_BUILD_SHA: sha, ARCANA_BUILD_ID: "test-build" },
-    stdio: ["ignore", "ignore", "pipe"],
-  });
-  let stderr = "";
-  child.stderr?.on("data", (chunk) => { stderr += String(chunk); });
+  let child: ChildProcess | undefined;
   try {
-    await waitForHealth(child, `${base}/healthz`, () => stderr);
+    const fixture = await startReadinessHttp({ ARCANA_WEB_DIST_DIR: dir, ARCANA_BUILD_SHA: sha, ARCANA_BUILD_ID: "test-build" });
+    child = fixture.child;
+    const { base } = fixture;
     const health = await fetch(`${base}/healthz`);
     assert.equal(health.status, 200);
     assert.equal(health.headers.get("cache-control"), "no-store");
@@ -151,7 +143,7 @@ async function testHttpDiagnostics(sha: string): Promise<void> {
     assert.equal(spa.status, 200);
     assert.match(await spa.text(), /Arcana SPA fixture/);
   } finally {
-    await stopChild(child);
+    if (child) await stopChild(child);
     await rm(dir, { recursive: true, force: true });
   }
 }
@@ -179,25 +171,14 @@ async function testConfiguredHttpDiagnostics(): Promise<void> {
   `);
   try {
     for (const mode of ["healthy", "database_error", "issuer_mismatch"]) {
-      const env = { ...process.env };
-      for (const name of Object.keys(env)) {
-        if (name.startsWith("MCP_") || name.startsWith("BETTER_AUTH_") || name.startsWith("SMTP_") || name.startsWith("RESEND_") || name.startsWith("ARCANA_") || name.startsWith("VERCEL") || name === "DATABASE_URL") delete env[name];
-      }
-      const port = 48000 + (process.pid % 1000);
-      const base = `http://127.0.0.1:${port}`;
-      const child = spawn(process.execPath, ["--import", preload, "--import", "tsx", "src/http.ts"], {
-        env: {
-          ...env, HOST: "127.0.0.1", PORT: String(port), ARCANA_WEB_DIST_DIR: dir,
-          TEST_DEPENDENCY_MODE: mode,
-          DATABASE_URL: "postgresql://test:fake@db.example.test/test",
-          MCP_OAUTH_ISSUER: "https://issuer.example.test/", MCP_OAUTH_RESOURCE: `${base}/mcp`,
-        },
-        stdio: ["ignore", "ignore", "pipe"],
-      });
-      let stderr = "";
-      child.stderr?.on("data", (chunk) => { stderr += String(chunk); });
+      const resource = "https://resource.example.test/mcp";
+      const { child, base } = await startReadinessHttp({
+        ARCANA_WEB_DIST_DIR: dir,
+        TEST_DEPENDENCY_MODE: mode,
+        DATABASE_URL: "postgresql://test:fake@db.example.test/test",
+        MCP_OAUTH_ISSUER: "https://issuer.example.test/", MCP_OAUTH_RESOURCE: resource,
+      }, [preload]);
       try {
-        await waitForHealth(child, `${base}/healthz`, () => stderr);
         const initialHealth = await (await fetch(`${base}/healthz`)).json() as { readiness: ReturnType<typeof accountDeploymentReadiness> };
         assert.equal(initialHealth.readiness.configurationReady, false, "external OAuth alone does not configure browser accounts");
         assert.equal(initialHealth.readiness.productionAccounts, false);
@@ -219,7 +200,7 @@ async function testConfiguredHttpDiagnostics(): Promise<void> {
         assert.equal(discovery.status, 200, "configured metadata routes must remain enabled");
         assert.match(discovery.headers.get("content-type") ?? "", /^application\/json/);
         const metadata = await discovery.json() as { resource: string };
-        assert.equal(metadata.resource, `${base}/mcp`);
+        assert.equal(metadata.resource, resource);
       } finally {
         await stopChild(child);
       }
@@ -227,24 +208,6 @@ async function testConfiguredHttpDiagnostics(): Promise<void> {
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
-}
-
-async function waitForHealth(child: ChildProcess, url: string, stderr: () => string): Promise<void> {
-  const deadline = Date.now() + 10_000;
-  while (Date.now() < deadline) {
-    if (child.exitCode !== null) throw new Error(`HTTP server exited before health check.\n${stderr()}`);
-    try { if ((await fetch(url)).ok) return; } catch { /* still starting */ }
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  }
-  throw new Error(`Timed out waiting for HTTP health.\n${stderr()}`);
-}
-
-async function stopChild(child: ChildProcess): Promise<void> {
-  if (child.exitCode !== null) return;
-  const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
-  child.kill("SIGTERM");
-  await Promise.race([exited, new Promise<void>((resolve) => setTimeout(resolve, 1_000))]);
-  if (child.exitCode === null) child.kill("SIGKILL");
 }
 
 main().catch((error) => { console.error(error); process.exitCode = 1; });
