@@ -82,6 +82,8 @@ jobs:
             command: npm run test:domain-migrations --prefix mcp
           - check: auth migration review guards
             command: npm run test:auth-schema --prefix mcp
+          - check: staging read-only preflight
+            command: npm run test:staging-preflight --prefix mcp
           - check: catalog tools
             command: npm run test:catalog-tools --prefix mcp
           - check: web catalog API

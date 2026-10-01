@@ -44,6 +44,8 @@
     "db:auth:check": "tsx scripts/auth-schema.ts check",
     "db:auth:apply": "tsx scripts/auth-schema.ts apply",
     "test:auth-schema": "tsx scripts/auth-schema.test.ts",
+    "test:staging-preflight": "tsx scripts/staging-preflight.test.ts",
+    "db:staging:preflight": "tsx scripts/staging-preflight.ts",
     "db:migrate:domain": "tsx scripts/migrate-domain.ts",
     "auth:link-identity": "tsx scripts/link-identity.ts",
     "db:prune-rate-limits": "tsx scripts/prune-rate-limits.ts",

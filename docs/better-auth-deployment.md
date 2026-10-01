@@ -125,6 +125,26 @@ as Arcana configuration, or infer identity ownership from matching email address
 
 ## Schema review and application
 
+For a new isolated staging target, the WSL/Linux helper bundles installation, hidden local secret
+entry, read-only target inspection and auth-plan generation. Use Node.js 24 and the current branch:
+
+```bash
+bash tools/prepare-staging-auth.sh https://YOUR-STABLE-PREVIEW-HOST
+```
+
+Paste the **unpooled/direct connection for the exact feature-branch Preview database** only into its hidden terminal prompt,
+never chat. With automatic Neon preview branching, inspect/apply against the actual preview branch;
+an existing child branch does not inherit later schema changes from its parent. The helper requires
+TLS, refuses pooled endpoints and ambiguous driver overrides, forces PostgreSQL connections and
+inspection transactions read-only, verifies the server's read-only default, and requires `public` as
+the application schema. It saves a new mode-0600 plan in a private directory under your home directory.
+It reports only host/database/schema/role and table-presence metadata; Better Auth's planner may
+also probe existing tables for row existence, without returning account contents. It cannot prove which Neon
+project/branch owns an endpoint: compare the reported target with Vercel's effective branch-specific
+connection and the intended Neon branch before approval. Inspect the generated auth SQL and the
+domain migration separately. **The helper never applies either migration, returns account contents, sends
+email, or changes Vercel. Stop for target and migration approval after it completes.**
+
 Run with the committed lockfile and installed package scripts. The commands below are procedures;
 **do not run apply against production without approval and a verified restore point**. Server
 startup, builds, health checks, and login requests do not run these migrations.
