@@ -7,13 +7,18 @@ export function artworkStorageConfiguration(env: NodeJS.ProcessEnv = process.env
   if (env.ARCANA_ARTWORK_ENABLED !== "true") return undefined;
   const required = (name: string) => { const value = env[name]?.trim(); if (!value) throw new Error(`Artwork requires ${name}.`); return value; };
   const expectedDatabaseHost = required("ARCANA_ARTWORK_DATABASE_HOST");
-  if (!env.DATABASE_URL || new URL(env.DATABASE_URL).hostname !== expectedDatabaseHost) throw new Error("Artwork database host does not match the explicitly configured branch.");
+  if (!env.DATABASE_URL || normalizeNeonDatabaseHost(new URL(env.DATABASE_URL).hostname) !== normalizeNeonDatabaseHost(expectedDatabaseHost)) throw new Error("Artwork database host does not match the explicitly configured branch.");
   const endpoint = required("ARCANA_ARTWORK_S3_ENDPOINT");
   const url = new URL(endpoint);
   if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash || url.pathname !== "/") throw new Error("Artwork storage endpoint must be an HTTPS origin.");
   const bucket = required("ARCANA_ARTWORK_S3_BUCKET");
   if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(bucket)) throw new Error("Invalid artwork bucket name.");
   return { endpoint, bucket, region: required("ARCANA_ARTWORK_S3_REGION"), accessKeyId: required("ARCANA_ARTWORK_S3_ACCESS_KEY_ID"), secretAccessKey: required("ARCANA_ARTWORK_S3_SECRET_ACCESS_KEY") };
+}
+/** Neon exposes direct and pooled names for one endpoint. No other host equivalence is accepted. */
+function normalizeNeonDatabaseHost(host: string): string {
+  return /^ep-[a-z0-9-]+-pooler\.c-\d+\.[a-z0-9-]+\.aws\.neon\.tech$/.test(host)
+    ? host.replace(/-pooler(?=\.)/, "") : host;
 }
 export class S3PrivateArtworkStorage implements PrivateArtworkStorage {
   private readonly client: S3Client;

@@ -26,13 +26,13 @@ The checked-in feature is disabled by default and creates no bucket, credentials
 2. Provision an explicitly approved private bucket on that preview's Neon branch. A separate scoped storage credential is required; current Neon storage credentials are branch+descendant scoped. Creating/configuring that credential requires operator approval and secure secret handling.
 3. Configure only that preview branch's server environment:
    - `ARCANA_ARTWORK_ENABLED=true`
-   - `ARCANA_ARTWORK_DATABASE_HOST` = exact hostname from its `DATABASE_URL`
+   - `ARCANA_ARTWORK_DATABASE_HOST` = the approved database endpoint hostname. Only the exact direct/`-pooler` pair of the same Neon AWS endpoint is treated as equivalent; endpoint ID, cluster, region and domain must all match
    - `ARCANA_ARTWORK_S3_ENDPOINT` = the reviewed HTTPS origin for the **same branch**
    - `ARCANA_ARTWORK_S3_REGION` = its region
    - `ARCANA_ARTWORK_S3_BUCKET` = approved private bucket name
    - `ARCANA_ARTWORK_S3_ACCESS_KEY_ID`
    - `ARCANA_ARTWORK_S3_SECRET_ACCESS_KEY`
-4. The explicit database-host pin fails closed if an automatic preview is assigned another DB host. These variables are not assumed to be injected by the Vercel Neon integration. Never place secret values in NEXT_PUBLIC/VITE variables, commit them, print them, or paste them into chat.
+4. The explicit database-host pin (with only that narrow direct/pooled equivalence) fails closed if an automatic preview is assigned another DB host. These variables are not assumed to be injected by the Vercel Neon integration. Never place secret values in NEXT_PUBLIC/VITE variables, commit them, print them, or paste them into chat.
 5. Verify a neutral one-card upload/read through both website and MCP in that isolated preview, plus unauthorized access and visibility revocation. The first live probe must also confirm Neon accepts conditional `PutObject` (`If-None-Match: *`) and the pinned AWS SDK checksum behavior; the general S3 compatibility docs do not explicitly guarantee those details. The adapter does not silently downgrade those protections. Production activation and whole-deck expansion are separate decisions.
 
 The S3 adapter uses path-style addressing and explicit credentials, so no ambient AWS credential fallback can silently point at a different provider. Endpoint configuration is operator-controlled, not accepted from an upload. Require a private bucket; a public-read bucket would bypass application authorization at the storage origin.

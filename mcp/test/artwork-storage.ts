@@ -6,6 +6,14 @@ const configuration = artworkStorageConfiguration(env)!;
 assert.equal(configuration.bucket, "private-fixture");
 assert.equal(artworkStorageConfiguration({ ...env, ARCANA_ARTWORK_ENABLED: "false" }), undefined);
 for (const endpoint of ["http://storage.invalid", "https://name:password@storage.invalid", "https://storage.invalid/path", "https://storage.invalid/?query=1"]) assert.throws(() => artworkStorageConfiguration({ ...env, ARCANA_ARTWORK_S3_ENDPOINT: endpoint }));
+const direct = "ep-summer-sunset-b74erymn.c-13.us-east-1.aws.neon.tech";
+const pooled = "ep-summer-sunset-b74erymn-pooler.c-13.us-east-1.aws.neon.tech";
+assert.ok(artworkStorageConfiguration({ ...env, ARCANA_ARTWORK_DATABASE_HOST: direct, DATABASE_URL: `postgres://fixture@${pooled}/db` }));
+assert.ok(artworkStorageConfiguration({ ...env, ARCANA_ARTWORK_DATABASE_HOST: pooled, DATABASE_URL: `postgres://fixture@${direct}/db` }));
+for (const host of ["ep-other-pooler.c-13.us-east-1.aws.neon.tech", "ep-summer-sunset-b74erymn-pooler.c-14.us-east-1.aws.neon.tech", "ep-summer-sunset-b74erymn-pooler.c-13.us-east-2.aws.neon.tech", "ep-summer-sunset-b74erymn-pooler.c-13.us-east-1.aws.neon.tech.evil.invalid"]) {
+  assert.throws(() => artworkStorageConfiguration({ ...env, ARCANA_ARTWORK_DATABASE_HOST: direct, DATABASE_URL: `postgres://fixture@${host}/db` }), /does not match/);
+}
+assert.throws(() => artworkStorageConfiguration({ ...env, ARCANA_ARTWORK_DATABASE_HOST: "db.preview.invalid", DATABASE_URL: "postgres://fixture@db-pooler.preview.invalid/db" }), /does not match/, "pooler equivalence is restricted to verified Neon AWS host shape");
 const storage = new S3PrivateArtworkStorage(configuration);
 // Replace only the SDK transport inside this test; no endpoint is contacted and no credentials leave the process.
 let sent: unknown; let signal: AbortSignal | undefined;
