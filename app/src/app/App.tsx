@@ -11,6 +11,7 @@ import { DeckHome } from "./DeckHome";
 import { CardBrowser } from "./CardBrowser";
 import { Reading } from "./Reading";
 import { RemoteDeckBoundary } from "./RemoteDeckBoundary";
+import { ArtworkEditor } from "./ArtworkEditor";
 
 /**
  * App shell + hash router. Deck routes use the canonical runtime/resource id. If an id is not
@@ -34,6 +35,7 @@ export function App() {
   if (accountRoute) content = <Account key={route} route={accountRoute} />;
   else if (route.match(/^\/community\/?$/)) content = <Community />;
   else if (route.match(/^\/my-decks\/?$/)) content = <MyDecks key={session.status === "authenticated" ? session.user.email : session.status} />;
+  else if ((m = route.match(/^\/deck\/([^/]+)\/artwork\/?$/))) { deckId = m[1]; content = <RemoteDeckBoundary deckId={deckId} routeKey={route}><ArtworkEditor deckId={deckId} /></RemoteDeckBoundary>; }
   else if ((m = route.match(/^\/deck\/([^/]+)\/browse\/?$/))) { deckId = m[1]; tab = "browse"; content = <RemoteDeckBoundary deckId={deckId} routeKey={route}><CardBrowser deckId={deckId} /></RemoteDeckBoundary>; }
   else if ((m = route.match(/^\/deck\/([^/]+)\/read\/?$/))) { deckId = m[1]; tab = "read"; content = <RemoteDeckBoundary deckId={deckId} routeKey={route}><Reading deckId={deckId} /></RemoteDeckBoundary>; }
   else if ((m = route.match(/^\/deck\/([^/]+)\/r\/(.+)$/))) { deckId = m[1]; tab = "read"; content = <RemoteDeckBoundary deckId={deckId} routeKey={route}><Reading deckId={deckId} token={m[2]} /></RemoteDeckBoundary>; }

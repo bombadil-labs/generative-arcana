@@ -115,7 +115,7 @@ export function createArcanaWebCatalogRequestHandler(options: ArcanaWebCatalogHa
   };
 }
 
-async function resolveWebAccess(
+export async function resolveWebAccess(
   req: IncomingMessage,
   res: ServerResponse,
   options: ArcanaWebCatalogHandlerOptions,

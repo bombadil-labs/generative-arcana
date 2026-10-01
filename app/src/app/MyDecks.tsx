@@ -326,6 +326,7 @@ function DeckRow({
             <option value="public">Public</option>
           </select>
         </label>
+        <button disabled={busy} onClick={() => navigate(`/deck/${deck.id}/artwork`)} style={quietButton}>Artwork</button>
         {deck.visibility !== "private" && <button disabled={busy} onClick={onCopy} style={quietButton}>Copy link</button>}
         <button disabled={busy} onClick={onDelete} style={dangerButton}>Delete</button>
       </div>

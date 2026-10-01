@@ -7,7 +7,9 @@
 import { TarotCard } from "./TarotCard";
 import { RawP5Card } from "./RawP5Card";
 import { CardPlaceholder } from "./CardPlaceholder";
-import { resolveVisual } from "@/runtime/defineCard";
+import { resolveVisual } from "../runtime/defineCard";
+import { useCardArtwork } from "../artwork/context";
+import { useEffect, useRef, useState } from "react";
 import type { CardData } from "@/runtime/types";
 import type { DeckDataFile } from "@/decks/types";
 
@@ -27,6 +29,12 @@ export interface CardArtProps {
 }
 
 export function CardArt({ card, deckId, deck, prefer, mode = "live", paused, onSignal }: CardArtProps) {
+  const { state: artwork, pending, fail } = useCardArtwork(deckId, card.slug);
+  // The semantic face means "no saved art", not "we have not checked yet".
+  if (pending) return <LoadingArtwork name={card.name} />;
+  if (artwork.status === "ready") {
+    return <SavedArtwork key={`${deckId}/${card.slug}/${artwork.url}`} url={artwork.url} name={card.name} onError={fail} />;
+  }
   const visual = deckId ? resolveVisual(deckId, card.slug, prefer) : null;
 
   if (visual?.kind === "kit") {
@@ -40,4 +48,25 @@ export function CardArt({ card, deckId, deck, prefer, mode = "live", paused, onS
       style={{ ...FILL, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />;
   }
   return <CardPlaceholder card={card} deck={deck} />;
+}
+
+/** Static, per-card loading state: no animated shimmer and no guessed/stale artwork. */
+function LoadingArtwork({ name }: { name: string }) {
+  return <div role="img" aria-label={`Loading artwork for ${name}`} aria-busy="true"
+    style={{ ...FILL, display: "grid", placeItems: "center", padding: 16, textAlign: "center", background: "var(--paper-2)", color: "var(--ink-3)", font: "400 12px/1.5 var(--font-body)" }}>
+    <span aria-hidden="true">Loading artwork…</span>
+  </div>;
+}
+
+function SavedArtwork({ url, name, onError }: { url: string; name: string; onError: () => void }) {
+  const [loaded, setLoaded] = useState(false);
+  const image = useRef<HTMLImageElement>(null);
+  // A shared blob may already be decoded when another card view mounts.
+  useEffect(() => { if (image.current?.complete && image.current.naturalWidth > 0) setLoaded(true); }, [url]);
+  return <>
+    {!loaded && <LoadingArtwork name={name} />}
+    <img ref={image} src={url} alt={`${name} artwork`} onLoad={() => setLoaded(true)} onError={onError}
+      aria-hidden={!loaded} loading="lazy" draggable={false}
+      style={{ ...FILL, width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: loaded ? 1 : 0 }} />
+  </>;
 }

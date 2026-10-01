@@ -1,3 +1,5 @@
+import { registerArtworkTools } from "./artworkTools";
+import type { CardArtworkService } from "./cardArtwork";
 import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { ArcanaToolAdapter, type ArcanaToolName } from "../../app/src/mcp/ArcanaToolAdapter";
@@ -91,6 +93,7 @@ export interface ArcanaOAuthToolContext {
 }
 
 export interface ArcanaMcpServerOptions {
+  artwork?: CardArtworkService;
   /** Reuse an adapter when the transport provides an appropriate state lifetime. */
   adapter?: ArcanaToolAdapter;
   /** Stateless transports must disable tools whose semantics require persistence across calls. */
@@ -120,6 +123,7 @@ export function createArcanaMcpServer(options: ArcanaMcpServerOptions = {}): Mcp
   const visuals = options.visuals ?? createStaticVisualStore();
   const server = new McpServer({ name: "generative-arcana", version: ARCANA_MCP_VERSION });
   registerAuthoringGuide(server, options.onToolCall);
+  registerArtworkTools(server, { artwork: options.artwork, principal, oauth: options.oauth });
   const readSchemes = options.oauth ? optionalOAuthSecuritySchemes(options.oauth.readScopes) : undefined;
 
   for (const definition of adapter.definitions()) {
@@ -179,6 +183,8 @@ export function createArcanaMcpServer(options: ArcanaMcpServerOptions = {}): Mcp
   registerArcanaVisualTools(server, {
     adapter,
     visuals,
+    artwork: options.artwork,
+    viewerId: canReadPrivate ? principal?.id ?? null : null,
     onToolCall: options.onToolCall,
     securitySchemes: readSchemes as readonly ToolSecurityScheme[] | undefined,
   });

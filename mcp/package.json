@@ -55,9 +55,11 @@
     "test:retired-assets": "tsx test/retired-assets.ts",
     "test:http-tool-auth": "tsx test/http-tool-auth.ts",
     "build": "node ../tools/build-authoring-guide.mjs",
-    "test:authoring-guide": "node --test ../tools/test/authoring-guide.test.mjs && npm run build && node ../tools/build-authoring-guide.mjs --check && node --import tsx test/authoring-guide.ts"
+    "test:authoring-guide": "node --test ../tools/test/authoring-guide.test.mjs && npm run build && node ../tools/build-authoring-guide.mjs --check && node --import tsx test/authoring-guide.ts",
+    "test:card-artwork": "node --import tsx test/card-artwork.ts && node --import tsx test/artwork-database.ts && node --import tsx test/artwork-storage.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1145.0",
     "@better-auth/cimd": "1.7.7",
     "@better-auth/core": "1.7.7",
     "@better-auth/mcp": "1.7.7",
@@ -69,6 +71,7 @@
     "jose": "^6.1.0",
     "nodemailer": "10.0.13",
     "pg": "8.23.1",
+    "sharp": "0.35.5",
     "tsx": "^4.20.0",
     "zod": "^4.0.0"
   },

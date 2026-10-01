@@ -35,6 +35,13 @@ export class CatalogDeckRuntime {
     this.loaded.clear();
   }
 
+  /** Revoke only this exact catalog snapshot; never evict a newer request or local replacement. */
+  invalidate(deck: DeckModule): void {
+    if (!this.source(deck) || this.registry.getDeck(deck.id) !== deck) return;
+    this.requests.delete(deck.id);
+    this.evict(deck);
+  }
+
   /** Always revalidate catalog content. A failed/aborted refresh must not expose the old snapshot. */
   async resolve(id: string, signal: AbortSignal): Promise<DeckModule> {
     const previous = this.registry.getDeck(id);

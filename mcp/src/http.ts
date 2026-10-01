@@ -1,3 +1,8 @@
+import { Pool } from "pg";
+import { CardArtworkService } from "./cardArtwork";
+import { artworkStorageConfiguration, S3PrivateArtworkStorage } from "./artworkStorage";
+import { NeonArtworkRepository } from "./neonArtworkRepository";
+import { createWebArtworkHandler, isArtworkPath } from "./webArtworkApi";
 import { neon } from "@neondatabase/serverless";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createMcpHandler } from "@modelcontextprotocol/server";
@@ -99,6 +104,11 @@ const browserPrincipalResolver = browserAuth && identities
   : undefined;
 const browserAuthHandler = browserAuth?.nodeHandler;
 const { hosts, catalog, stateMode } = createHostStore({ databaseUrl, stateDir });
+const artworkConfig = artworkStorageConfiguration();
+if (artworkConfig && (!databaseUrl || !catalog)) throw new Error("Artwork requires a durable database catalog.");
+const artworkPool = artworkConfig ? new Pool({ connectionString: databaseUrl, max: 3, connectionTimeoutMillis: 10_000 }) : undefined;
+const artworkLimiter = artworkConfig ? new DurableRateLimiter(databaseUrl!, 12) : undefined;
+const artwork = artworkConfig ? new CardArtworkService(catalog!, new NeonArtworkRepository(artworkPool!), new S3PrivateArtworkStorage(artworkConfig), async ownerId => (await artworkLimiter!.check(`artwork:${ownerId}`)).allowed) : undefined;
 const deploymentFeatures = {
   durableCatalog: stateMode === "neon" && !!catalog,
   mcpOAuth: !!oauth,
@@ -116,6 +126,7 @@ const dependencies = createDeploymentDependencyMonitor({
     await sql.query("SELECT scope_id, state FROM arcana_host_state LIMIT 0", [], { fetchOptions: { signal } });
     await sql.query("SELECT key, bucket, count FROM arcana_rate_limits LIMIT 0", [], { fetchOptions: { signal } });
     if (browserAuth) await browserAuth.checkSchema();
+    if (artwork) await sql.query("SELECT deck_id, card_slug, asset FROM arcana_card_artwork LIMIT 0", [], { fetchOptions: { signal } });
   } } : {}),
   ...(oauth ? { issuerDiscovery: async (signal: AbortSignal) => {
     await loadAuthorizationServerMetadata(oauth.issuer, (input, init) => browserAuth
@@ -129,6 +140,7 @@ if (alphaToken && stateMode === "memory") {
 }
 
 const requestHandler = createArcanaHttpRequestHandler({
+  artwork,
   maxRequestBytes,
   principalResolver,
   hosts,
@@ -150,6 +162,8 @@ const webCatalogHandler = catalog ? createArcanaWebCatalogRequestHandler({
   ...(oauth ? { oauth: { resourceMetadataUrl: oauth.resourceMetadataUrl, readScopes: oauth.readScopes, writeScopes: oauth.writeScopes } } : {}),
   maxRequestBytes,
 }) : undefined;
+const webArtworkHandler = catalog ? createWebArtworkHandler({ catalog, hosts, artwork, principalResolver, browserPrincipalResolver,
+  ...(oauth ? { oauth: { resourceMetadataUrl: oauth.resourceMetadataUrl, readScopes: oauth.readScopes, writeScopes: oauth.writeScopes } } : {}) }) : undefined;
 const validateHost = hostHeaderValidation(allowedHosts);
 const validateOrigin = originValidation(allowedOrigins);
 
@@ -271,6 +285,10 @@ async function handleHttpRequest(req: IncomingMessage, res: ServerResponse): Pro
     return;
   }
 
+  if (isArtworkPath(url.pathname) && webArtworkHandler) {
+    await webArtworkHandler(req, res);
+    return;
+  }
   if (isWebCatalogRequest) {
     if (!webCatalogHandler) {
       res.writeHead(503, { "content-type": "application/json" });
@@ -309,6 +327,7 @@ async function proxyAuthorizationServerMetadata(issuer: string, res: ServerRespo
 
 async function shutdown(signal: string) {
   console.error(`[generative-arcana-mcp] ${signal}; shutting down`);
+  void artworkPool?.end();
   http.close(() => { void browserAuth?.close().finally(() => process.exit(0)); if (!browserAuth) process.exit(0); });
 }
 
@@ -318,6 +337,7 @@ process.once("SIGTERM", () => void shutdown("SIGTERM"));
 export type { ArcanaHttpOAuthOptions } from "./httpToolAuthorization";
 
 export interface ArcanaHttpRequestHandlerOptions {
+  artwork?: CardArtworkService;
   principalResolver?: PrincipalResolver;
   hosts?: ArcanaHostStore;
   catalog?: UserDeckCatalogRepository;
@@ -340,6 +360,7 @@ export function createArcanaHttpRequestHandler(options: ArcanaHttpRequestHandler
         options.principalResolver,
       );
       const handler = createMcpHandler(() => createArcanaMcpServer({
+        artwork: options.artwork,
         adapter: access.adapter,
         includeStatefulTools: access.includeStatefulTools,
         principal: access.principal,

@@ -87,7 +87,7 @@ async function main(): Promise<void> {
     assert.equal(initialized.protocolVersion, "2025-11-25");
     const listed = await rpcResult(await post({ jsonrpc: "2.0", id: nextId++, method: "tools/list", params: {} }));
     const tools = listed.tools as Array<{ name: string }>;
-    for (const name of ["import_deck", "list_my_decks", "set_deck_visibility", "delete_my_deck"]) {
+    for (const name of ["import_deck", "list_my_decks", "set_deck_visibility", "delete_my_deck", "set_card_artwork"]) {
       assert.ok(tools.some((tool) => tool.name === name), `${name} remains discoverable before sign-in`);
     }
 
@@ -106,6 +106,7 @@ async function main(): Promise<void> {
 
     const protectedCalls = [
       call("list_my_decks"),
+      call("set_card_artwork", { deckId: privateDeck.id, cardSlug: "major-0", mediaType: "image/png", base64: "YWJj", expectedDeckRevision: 1, expectedArtworkId: null }),
       call("import_deck", { manifest: neutralManifest("unauthorized-shapes") }),
       call("set_deck_visibility", { deckId: privateDeck.id, visibility: "public" }),
       call("delete_my_deck", { deckId: privateDeck.id }),
