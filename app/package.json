@@ -28,7 +28,7 @@
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "typescript": "^5.4.0",
-    "vite": "^5.4.0"
+    "vite": "^8.3.1"
   },
   "notes": {
     "p5": "Used in INSTANCE mode only (never the global build). The deck browser loads the npm package once; every card shares it. Do not add the p5 <script> CDN tag — that creates a global p5 and breaks instance isolation.",
