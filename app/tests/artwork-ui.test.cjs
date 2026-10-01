@@ -9,9 +9,12 @@ const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost/" });
 const originalFetch = global.fetch;
 const originalWindow = global.window;
 const originalDocument = global.document;
+const originalNavigatorDescriptor = Object.getOwnPropertyDescriptor(global, "navigator");
 const originalCreate = URL.createObjectURL;
 const originalRevoke = URL.revokeObjectURL;
 global.window = dom.window; global.document = dom.window.document; global.IS_REACT_ACT_ENVIRONMENT = true;
+// Node 20 has no global navigator; newer Node versions expose a getter-only property.
+Object.defineProperty(global, "navigator", { configurable: true, value: dom.window.navigator });
 const { createRoot } = require("react-dom/client");
 let vite, root, Editor, Provider, useSession, ArtworkProvider, CardArt, Boundary, catalogRuntime, domain, controls, card, deck;
 let handler, images, revoked, anonymous = false;
@@ -70,6 +73,8 @@ test.afterEach(async () => {
 test.after(async () => {
   await vite?.close(); dom.window.close(); global.fetch = originalFetch; global.window = originalWindow; global.document = originalDocument;
   URL.createObjectURL = originalCreate; URL.revokeObjectURL = originalRevoke; delete global.IS_REACT_ACT_ENVIRONMENT;
+  if (originalNavigatorDescriptor) Object.defineProperty(global, "navigator", originalNavigatorDescriptor);
+  else delete global.navigator;
 });
 
 test("upload UI labels inputs, blocks invalid files and retries a recoverable error without duplicate submissions", async () => {
