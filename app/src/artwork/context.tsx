@@ -17,6 +17,12 @@ export function useCardArtwork(deckId: string | undefined, cardSlug: string) {
   const store = useArtworkStore();
   useArtworkVersion();
   const matching = store && store.deckId === deckId ? store : null;
+  const state = matching?.get(cardSlug) ?? EMPTY_ARTWORK;
   useEffect(() => { void matching?.load(cardSlug); }, [matching, cardSlug]);
-  return { state: matching?.get(cardSlug) ?? EMPTY_ARTWORK, fail: () => matching?.fail(cardSlug) };
+  return {
+    state,
+    pending: !!matching && (state.status === "idle" || state.status === "loading"),
+    // A late error from a discarded <img> must not evict its newer replacement.
+    fail: () => { if (matching?.get(cardSlug) === state) matching.fail(cardSlug); },
+  };
 }

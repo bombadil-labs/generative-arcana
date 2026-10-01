@@ -16,7 +16,7 @@ global.window = dom.window; global.document = dom.window.document; global.IS_REA
 // Node 20 has no global navigator; newer Node versions expose a getter-only property.
 Object.defineProperty(global, "navigator", { configurable: true, value: dom.window.navigator });
 const { createRoot } = require("react-dom/client");
-let vite, root, Editor, Provider, useSession, ArtworkProvider, CardArt, Boundary, catalogRuntime, domain, controls, card, deck;
+let vite, root, Editor, Provider, useSession, ArtworkProvider, useArtworkStore, useCardArtwork, CardArt, Boundary, catalogRuntime, domain, controls, card, deck;
 let handler, images, revoked, anonymous = false;
 let accountId = "account-one";
 function json(body, status = 200) { return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } }); }
@@ -39,10 +39,10 @@ function submit() { document.querySelector("form").dispatchEvent(new dom.window.
 
 test.before(async () => {
   const { createServer } = await import("vite");
-  vite = await createServer({ root: resolve(__dirname, ".."), server: { middlewareMode: true }, appType: "custom" });
+  vite = await createServer({ root: resolve(__dirname, ".."), server: { middlewareMode: true }, appType: "custom", optimizeDeps: { noDiscovery: true, include: [] } });
   ({ ArtworkEditor: Editor } = await vite.ssrLoadModule("/src/app/ArtworkEditor.tsx"));
   ({ BrowserSessionProvider: Provider, useBrowserSession: useSession } = await vite.ssrLoadModule("/src/auth/session.tsx"));
-  ({ CatalogArtworkProvider: ArtworkProvider } = await vite.ssrLoadModule("/src/artwork/context.tsx"));
+  ({ CatalogArtworkProvider: ArtworkProvider, useArtworkStore, useCardArtwork } = await vite.ssrLoadModule("/src/artwork/context.tsx"));
   ({ CardArt } = await vite.ssrLoadModule("/src/components/CardArt.tsx"));
   ({ RemoteDeckBoundary: Boundary } = await vite.ssrLoadModule("/src/app/RemoteDeckBoundary.tsx"));
   ({ catalogDeckRuntime: catalogRuntime } = await vite.ssrLoadModule("/src/catalog/runtime.ts"));
@@ -146,6 +146,119 @@ test("raster artwork wins over the semantic face; failed image decoding restores
   assert.doesNotMatch(document.body.innerHTML, /evil\.test/);
   await act(async () => img.dispatchEvent(new dom.window.Event("error")));
   assert.equal(document.querySelector("img"), null); assert.match(document.body.textContent, new RegExp(card.name)); assert.equal(revoked.length, 1);
+});
+
+test("slow saved artwork stays neutral through metadata, bytes and image decoding, without flashing the semantic face", async () => {
+  const meta = deferred(), bytes = deferred();
+  handler = async (path) => path.includes("/image?version=") ? bytes.promise : meta.promise;
+  await mount(React.createElement(CardArt, { card, deckId: "deck", deck: deck.data }));
+  assert.ok(document.querySelector('[aria-busy="true"]'));
+  assert.equal(document.querySelector('[aria-busy="true"]').getAttribute("aria-label"), `Loading artwork for ${card.name}`);
+  assert.doesNotMatch(document.body.textContent, new RegExp(card.name));
+  await act(async () => meta.resolve(json(catalog(metadata()))));
+  assert.ok(document.querySelector('[aria-busy="true"]')); assert.equal(document.querySelector("img"), null);
+  await act(async () => bytes.resolve(new Response("test", { headers: { "content-type": "image/webp" } })));
+  const img = document.querySelector("img"); assert.ok(img);
+  assert.equal(img.style.opacity, "0"); assert.equal(img.getAttribute("aria-hidden"), "true");
+  assert.ok(document.querySelector('[aria-busy="true"]'));
+  await act(async () => img.dispatchEvent(new dom.window.Event("load")));
+  assert.equal(document.querySelector('[aria-busy="true"]'), null);
+  assert.equal(img.style.opacity, "1"); assert.equal(img.getAttribute("aria-hidden"), "false");
+  assert.doesNotMatch(document.body.textContent, new RegExp(card.name));
+});
+
+for (const outcome of ["missing", "disabled", "error"]) test(`pending artwork resolves to the semantic face when ${outcome}`, async () => {
+  const pending = deferred(); handler = () => pending.promise;
+  await mount(React.createElement(CardArt, { card, deckId: "deck", deck: deck.data }));
+  assert.ok(document.querySelector('[aria-busy="true"]'));
+  await act(async () => pending.resolve(outcome === "missing" ? json(catalog()) : json({ message: outcome }, outcome === "disabled" ? 503 : 500)));
+  assert.equal(document.querySelector('[aria-busy="true"]'), null);
+  assert.equal(document.querySelector("img"), null); assert.match(document.body.textContent, new RegExp(card.name));
+});
+
+test("cards without saved art render independently while another card image is still loading", async () => {
+  const second = deck.cards[1], bytes = deferred();
+  handler = async (path) => path.includes("/image?version=") ? bytes.promise : json({ enabled: true, deckRevision: 1, cards: [{ slug: card.slug, name: card.name, artwork: metadata() }, { slug: second.slug, name: second.name, artwork: null }] });
+  await mount(React.createElement("div", null, React.createElement(CardArt, { card, deckId: "deck", deck: deck.data }), React.createElement(CardArt, { card: second, deckId: "deck", deck: deck.data })));
+  assert.equal(document.querySelectorAll('[aria-busy="true"]').length, 1);
+  assert.match(document.body.textContent, new RegExp(second.name));
+  assert.doesNotMatch(document.body.textContent, new RegExp(card.name));
+});
+
+test("refresh removes previous art immediately and ignores late decode events until the new image loads", async () => {
+  let store;
+  function CaptureArtwork() { store = useArtworkStore(); return React.createElement(CardArt, { card, deckId: "deck", deck: deck.data }); }
+  handler = async (path) => path.includes("/image?version=") ? new Response("test", { headers: { "content-type": "image/webp" } }) : json(catalog(metadata()));
+  await mount(React.createElement(CaptureArtwork));
+  const oldImage = document.querySelector("img");
+  await act(async () => oldImage.dispatchEvent(new dom.window.Event("load")));
+  const meta = deferred(), bytes = deferred();
+  handler = async (path) => path.includes("/image?version=") ? bytes.promise : meta.promise;
+  let refresh;
+  await act(async () => { refresh = store.load(card.slug, true); });
+  assert.equal(document.querySelector("img"), null); assert.deepEqual(revoked, [images[0]]);
+  assert.ok(document.querySelector('[aria-busy="true"]')); assert.doesNotMatch(document.body.textContent, new RegExp(card.name));
+  await act(async () => { oldImage.dispatchEvent(new dom.window.Event("load")); oldImage.dispatchEvent(new dom.window.Event("error")); });
+  await act(async () => meta.resolve(json(catalog(metadata({ id: "asset-2" })))));
+  await act(async () => { bytes.resolve(new Response("test", { headers: { "content-type": "image/webp" } })); await refresh; });
+  const latest = document.querySelector("img"); assert.notEqual(latest, oldImage);
+  assert.equal(latest.style.opacity, "0"); assert.ok(document.querySelector('[aria-busy="true"]'));
+  await act(async () => oldImage.dispatchEvent(new dom.window.Event("error")));
+  assert.equal(document.querySelector("img"), latest);
+  await act(async () => latest.dispatchEvent(new dom.window.Event("load")));
+  assert.equal(latest.style.opacity, "1"); assert.equal(document.querySelector('[aria-busy="true"]'), null);
+});
+
+test("local cards without a catalog artwork context keep their immediate semantic face", async () => {
+  await act(async () => root.render(React.createElement(CardArt, { card, deckId: "deck", deck: deck.data })));
+  assert.equal(document.querySelector('[aria-busy="true"]'), null);
+  assert.match(document.body.textContent, new RegExp(card.name));
+});
+
+test("a late error callback from a superseded artwork resource cannot discard the latest image", async () => {
+  let store, artwork;
+  function CaptureArtwork() { store = useArtworkStore(); artwork = useCardArtwork("deck", card.slug); return React.createElement(CardArt, { card, deckId: "deck", deck: deck.data }); }
+  handler = async (path) => path.includes("/image?version=") ? new Response("test", { headers: { "content-type": "image/webp" } }) : json(catalog(metadata()));
+  await mount(React.createElement(CaptureArtwork));
+  const oldFailure = artwork.fail;
+  await act(async () => store.load(card.slug, true));
+  const latest = document.querySelector("img"); const currentState = store.get(card.slug);
+  await act(async () => oldFailure());
+  assert.equal(store.get(card.slug), currentState); assert.equal(document.querySelector("img"), latest);
+  await act(async () => artwork.fail());
+  assert.equal(document.querySelector("img"), null); assert.match(document.body.textContent, new RegExp(card.name));
+});
+
+test("image fetch failure ends the loading state and restores the semantic face", async () => {
+  const bytes = deferred();
+  handler = async (path) => path.includes("/image?version=") ? bytes.promise : json(catalog(metadata()));
+  await mount(React.createElement(CardArt, { card, deckId: "deck", deck: deck.data }));
+  assert.ok(document.querySelector('[aria-busy="true"]'));
+  await act(async () => bytes.resolve(json({ message: "Image unavailable" }, 500)));
+  assert.equal(document.querySelector('[aria-busy="true"]'), null);
+  assert.match(document.body.textContent, new RegExp(card.name));
+});
+
+test("deck switching removes the former decoded image while the next deck loads", async () => {
+  handler = async (path) => path.includes("/image?version=") ? new Response("test", { headers: { "content-type": "image/webp" } }) : json(catalog(metadata()));
+  await mount(React.createElement(CardArt, { card, deckId: "deck", deck: deck.data }));
+  const oldImage = document.querySelector("img");
+  await act(async () => oldImage.dispatchEvent(new dom.window.Event("load")));
+  const pending = deferred(); handler = () => pending.promise;
+  await act(async () => root.render(React.createElement(ArtworkProvider, { deckId: "other-deck", deckRevision: 1 }, React.createElement(CardArt, { card, deckId: "other-deck", deck: deck.data }))));
+  assert.equal(document.querySelector("img"), null); assert.ok(document.querySelector('[aria-busy="true"]'));
+  assert.deepEqual(revoked, [images[0]]);
+  await act(async () => oldImage.dispatchEvent(new dom.window.Event("load")));
+  assert.equal(document.querySelector("img"), null);
+  await act(async () => pending.resolve(json(catalog())));
+  assert.equal(document.querySelector('[aria-busy="true"]'), null);
+  assert.match(document.body.textContent, new RegExp(card.name));
+});
+
+test("a mismatched catalog provider cannot hide an unrelated card behind its loading state", async () => {
+  await mount(React.createElement(CardArt, { card, deckId: "local-other-deck", deck: deck.data }));
+  assert.equal(document.querySelector('[aria-busy="true"]'), null);
+  assert.match(document.body.textContent, new RegExp(card.name));
 });
 
 test("raster bytes from a superseded card never display after card navigation", async () => {
