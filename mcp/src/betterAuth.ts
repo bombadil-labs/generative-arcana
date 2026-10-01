@@ -292,7 +292,7 @@ function createBrowserHandler(auth: Auth, baseURL: string, resource: string) {
       }
       const session = await auth.api.getSession({ headers: request.headers });
       if (url.pathname === "/auth/session" && request.method === "GET") return json(200, session?.user.emailVerified ? {
-        authenticated: true, user: { email: session.user.email, displayName: session.user.name, emailVerified: session.user.emailVerified, ...(session.user.image ? { avatarUrl: session.user.image } : {}) },
+        authenticated: true, mcpUrl: resource, user: { email: session.user.email, displayName: session.user.name, emailVerified: session.user.emailVerified, ...(session.user.image ? { avatarUrl: session.user.image } : {}) },
       } : { authenticated: false });
       if (url.pathname === "/auth/oauth/context" && request.method === "GET") {
         const oauthQuery = url.searchParams.get("oauth_query") ?? "";

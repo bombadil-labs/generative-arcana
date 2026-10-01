@@ -1,0 +1,28 @@
+.mcp-setup { margin: 0 0 24px; padding: clamp(18px, 3vw, 28px); border: 1px solid var(--line-2); border-radius: var(--r-3); background: var(--card); color: var(--ink); min-width: 0; }
+.account-card .mcp-setup { margin-top: 24px; padding: 18px; }
+.mcp-setup h2 { margin: 0 0 12px; font: 400 clamp(26px, 4vw, 34px)/1.15 var(--font-display); }
+.mcp-setup h3 { margin: 0 0 8px; font: 600 16px/1.4 var(--font-body); }
+.mcp-setup p, .mcp-setup li { color: var(--ink-2); font-size: 14px; line-height: 1.65; }
+.mcp-setup p { margin: 10px 0; }
+.mcp-setup .account-eyebrow { margin-bottom: 10px; }
+.mcp-setup a { overflow-wrap: anywhere; }
+.mcp-setup-guides { display: grid; gap: 10px; margin: 8px 0 22px; }
+.mcp-setup details { border: 1px solid var(--line); border-radius: var(--r-2); background: var(--paper); }
+.mcp-setup summary { padding: 15px 16px; cursor: pointer; font-weight: 600; font-size: 15px; }
+.mcp-setup summary:hover { color: var(--accent); }
+.mcp-setup summary:focus-visible, .mcp-setup button:focus-visible, .mcp-setup a:focus-visible, .mcp-setup input:focus-visible, .mcp-setup textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.mcp-setup-steps { padding: 0 16px 18px; font-size: 13px; }
+.mcp-setup-steps ol { margin: 0; padding-left: 22px; }
+.mcp-setup-steps li { margin-bottom: 12px; padding-left: 3px; }
+.mcp-setup strong { color: var(--ink); font-weight: 600; }
+.mcp-setup-check { border-top: 1px solid var(--line); padding-top: 20px; }
+.mcp-copy { margin-top: 18px; }
+.mcp-copy > label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 8px; }
+.mcp-copy-row { display: flex; align-items: stretch; gap: 8px; }
+.mcp-copy input, .mcp-copy textarea { display: block; flex: 1; min-width: 0; width: 100%; border: 1px solid var(--line-2); border-radius: var(--r-2); padding: 11px 12px; background: var(--paper); color: var(--ink); font: 400 13px/1.6 var(--font-mono); }
+.mcp-copy textarea { resize: vertical; min-height: 116px; font-family: var(--font-body); }
+.mcp-copy-prompt { align-items: flex-start; }
+.mcp-copy-row button { flex-shrink: 0; min-height: 44px; }
+.mcp-copy-status { min-height: 22px; padding-top: 3px; color: var(--ink-2); font-size: 12px; }
+.mcp-copy .mcp-copy-error { margin: 0 0 8px; color: var(--ink); font-size: 12px; border-left: 3px solid var(--error); padding-left: 8px; }
+@media (max-width: 560px) { .mcp-copy-row { flex-direction: column; } .mcp-copy-row button { align-self: flex-start; } .mcp-copy input, .mcp-copy textarea { font-size: 16px; } .mcp-copy textarea { min-height: 160px; } }

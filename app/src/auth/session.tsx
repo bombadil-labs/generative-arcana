@@ -11,7 +11,7 @@ export interface BrowserAccount {
 export type BrowserSessionState =
   | { status: "loading" }
   | { status: "anonymous" }
-  | { status: "authenticated"; user: BrowserAccount }
+  | { status: "authenticated"; user: BrowserAccount; mcpUrl?: string }
   | { status: "unavailable"; message: string }
   | { status: "error"; message: string };
 
@@ -40,14 +40,14 @@ export function BrowserSessionProvider({ children }: { children: React.ReactNode
         setSession({ status: "unavailable", message: "Accounts are not available on this deployment. You can still load your own deck JSON from the home page." });
         return;
       }
-      const body = await response.json() as { authenticated?: unknown; user?: BrowserAccount; message?: unknown };
+      const body = await response.json() as { authenticated?: unknown; user?: BrowserAccount; mcpUrl?: unknown; message?: unknown };
       if (id !== requestId.current) return;
       if (!response.ok) {
         setSession({ status: "error", message: typeof body.message === "string" ? body.message : `Session request failed (${response.status}).` });
         return;
       }
       setSession(body.authenticated === true
-        ? { status: "authenticated", user: body.user ?? {} }
+        ? { status: "authenticated", user: body.user ?? {}, mcpUrl: validatedMcpUrl(body.mcpUrl) }
         : { status: "anonymous" });
     } catch {
       if (id === requestId.current) setSession({ status: "error", message: "Unable to check your account. Check your connection and try again." });
@@ -88,4 +88,16 @@ export function useBrowserSession(): BrowserSessionContextValue {
   const value = useContext(BrowserSessionContext);
   if (!value) throw new Error("useBrowserSession must be used inside BrowserSessionProvider.");
   return value;
+}
+
+/** The server supplies its canonical OAuth resource, which may differ from a browser alias. */
+export function validatedMcpUrl(value: unknown): string | undefined {
+  if (typeof value !== "string" || /[\u0000-\u0020\u007f\\]/.test(value)) return undefined;
+  try {
+    const url = new URL(value);
+    const local = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+    if ((url.protocol !== "https:" && !(url.protocol === "http:" && local))
+      || url.username || url.password || url.pathname !== "/mcp" || url.search || url.hash) return undefined;
+    return url.href;
+  } catch { return undefined; }
 }
