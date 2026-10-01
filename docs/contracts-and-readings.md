@@ -34,9 +34,19 @@ with slug as a deterministic tie-breaker. JSON key order is not card identity.
 
 This is a runtime structural check, not a full authoring-quality or security audit. It does not enforce
 complete lattice coverage, the default station walk, mathematical correctness of a gloss, or an exact
-prime-factor decomposition. It is **not an SVG sanitizer**; deck-supplied glyphs still use the existing
-SVG rendering path. Import authored deck files from trusted sources. Broadening the trust boundary
-for arbitrary third-party SVG is separate work.
+prime-factor decomposition. It is **not an SVG sanitizer**: `symbol.svg` remains a string in the
+portable manifest. The app treats that string as untrusted at rendering, including browser-local
+imports and existing private, unlisted, and public account revisions. All inline glyphs go through
+`components/safeSvg.ts`: DOMPurify plus a narrow static-SVG allowlist, same-glyph-only references,
+per-instance ID remapping, and a final sanitization pass before insertion. Basic shapes, text,
+gradients, masks, clips, and local `use` references are supported; scripts, event handlers,
+HTML/foreignObject, CSS, image/external references, and animation are excluded. Invalid/oversized
+or unsupported glyphs, and environments without a working browser DOM, render a trusted fallback.
+
+This render-time protection does not rewrite stored JSON or change deck fingerprints. It does not
+turn structural validation into an authoring-quality audit or grant trust to arbitrary programs,
+rendering code, uploads, or additional asset formats. Keep the sanitized result at the HTML sink;
+new rendering paths must use the same boundary rather than insert raw manifest strings.
 
 ## Reading token v2
 
@@ -105,7 +115,8 @@ for sharing a reading without installing its deck; review it for private content
 ## Checks
 
 From `app/`, run `npm ci`, `npm test`, `npm run typecheck`, and `npm run build`. The test command uses
-the existing TypeScript dependency and Node's built-in test runner: it strictly compiles the pure
-contract/import/reading modules, tests the entire bundled corpus, and cleans its temporary output.
-There are no new package dependencies or lockfile changes. The PR workflow runs all three checks;
-the Pages build repeats the checks before publishing.
+TypeScript and Node's built-in test runner: it strictly compiles the contract/import/reading and
+render-boundary modules, tests the archived corpus and inert SVG fixtures, and cleans its temporary
+output. DOMPurify is a production browser dependency; jsdom is test-only, with script execution and
+external resource loading disabled. The PR workflow runs all three checks; the Pages build repeats
+the checks before publishing.

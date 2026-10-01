@@ -1,9 +1,10 @@
 /** Presentation helpers for card metadata: glyph rendering plus compatibility re-exports of the
  * renderer-independent label/factorization helpers from the deck domain. */
-import { useId } from "react";
+import { useId, useMemo } from "react";
+import { glyphSize, sanitizeGlyphSvg } from "./safeSvg";
 import type { DeckDataFile } from "@/decks/types";
 import type { CardData } from "@/decks/card";
-import { majorGlyphSvg, suitGlyphSvg } from "@/decks/cardMeta";
+import { majorGlyphSvg, suitGlyphSvg } from "../decks/cardMeta";
 
 export {
   RANK_ROMAN,
@@ -16,7 +17,7 @@ export {
   facVar,
   facWord,
   stationName,
-} from "@/decks/cardMeta";
+} from "../decks/cardMeta";
 
 /** The Ultima glyphs, inlined and currentColor-recolorable (fallback when a deck supplies no SVG). */
 export const GLYPHS: Record<string, string> = {
@@ -29,43 +30,29 @@ export const GLYPHS: Record<string, string> = {
 
 /** Render a set of inline SVG inner-paths inside a 0 0 100 100 viewBox (Ultima glyph fallback). */
 export function Glyph({ which, size = 16 }: { which: string; size?: number }) {
-  const inner = GLYPHS[which] ?? GLYPHS.major;
+  const inner = Object.prototype.hasOwnProperty.call(GLYPHS, which) ? GLYPHS[which] : GLYPHS.major;
+  size = glyphSize(size);
   return (
     <span
       aria-hidden
       style={{ display: "inline-flex", width: size, height: size, color: "currentColor", verticalAlign: "-0.15em" }}
-      dangerouslySetInnerHTML={{ __html: `<svg viewBox="0 0 100 100" width="${size}" height="${size}">${inner}</svg>` }}
-    />
+    >
+      <svg viewBox="0 0 100 100" width={size} height={size} dangerouslySetInnerHTML={{ __html: inner }} />
+    </span>
   );
 }
 
-const reEsc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-/** Per-instance-namespace any internal ids (mask/gradient/clip) so multiple copies of a deck SVG on
- * one page don't collide on `url(#id)`. */
-function namespaceIds(svg: string, uid: string): string {
-  const ids = Array.from(svg.matchAll(/id="([^"]+)"/g), (m) => m[1]);
-  let out = svg;
-  for (const id of ids) {
-    const u = `${id}-${uid}`;
-    out = out
-      .replace(new RegExp(`id="${reEsc(id)}"`, "g"), `id="${u}"`)
-      .replace(new RegExp(`url\\(#${reEsc(id)}\\)`, "g"), `url(#${u})`)
-      .replace(new RegExp(`(xlink:href|href)="#${reEsc(id)}"`, "g"), `$1="#${u}"`);
-  }
-  return out;
-}
-
-/** Render a deck-supplied FULL <svg> string, sized and recolored via currentColor (ids namespaced). */
+/** Render a deck-supplied full SVG only through the shared untrusted-data boundary. */
 export function Svg({ svg, size = 16 }: { svg: string; size?: number }) {
-  const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
-  const sized = svg.replace(/<svg([^>]*)>/, (_m, attrs: string) =>
-    `<svg${attrs.replace(/\s(width|height)="[^"]*"/g, "")} width="${size}" height="${size}">`);
+  const uid = useId();
+  size = glyphSize(size);
+  const safeSvg = useMemo(() => sanitizeGlyphSvg(svg, uid, size), [svg, uid, size]);
+  if (!safeSvg) return <Glyph which="major" size={size} />;
   return (
     <span
       aria-hidden
       style={{ display: "inline-flex", width: size, height: size, color: "currentColor", verticalAlign: "-0.15em" }}
-      dangerouslySetInnerHTML={{ __html: namespaceIds(sized, uid) }}
+      dangerouslySetInnerHTML={{ __html: safeSvg }}
     />
   );
 }

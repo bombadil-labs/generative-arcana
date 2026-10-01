@@ -14,6 +14,23 @@ A `deck.json` holds renderer-independent data: meanings, the four axes, structur
 brief** (motifs, scene descriptions, glyphs). It holds **no executable rendering implementation**. It lives
 in the top-level `decks/<id>/` corpus and any renderer can read it. *This* app is one renderer.
 
+## Untrusted deck glyphs
+
+Suit and major `symbol.svg` fields remain portable JSON data. Every inline glyph render, including
+previously stored account/shared decks and browser-local imports, passes through the same DOMPurify
+boundary in `components/safeSvg.ts`. A narrow static SVG allowlist preserves basic shapes, text,
+gradients, masks, clips, and local `use` references. IDs and their references are isolated per glyph.
+Scripts, event handlers, HTML, stylesheets/inline CSS, images, external references, and animation are
+not supported. Empty/oversized/unsupported glyphs and environments without a working browser DOM
+use a trusted generic icon; raw SVG is never a fallback. The stored manifest is not rewritten, so deck
+fingerprints and reading revisions stay stable. Future SVG features must extend this boundary and
+its inert regression tests; do not add another raw HTML sink or modify its sanitized output.
+
+`npm test` includes inert sanitizer fixtures (no script execution or external resource loading),
+component/SSR regressions, and geometry checks for the archived glyph corpus. These tests use jsdom
+only as a development dependency (Node 20.19+, 22.13+, or 24+); production uses the browser DOM.
+Keep DOMPurify patched as security updates are released.
+
 ## Visual skins
 
 A **skin is just a name.** Each card's renderer is resolved *per card* from whatever content is

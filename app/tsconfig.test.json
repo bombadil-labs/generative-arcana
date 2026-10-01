@@ -35,6 +35,9 @@
     "src/catalog/runtime.ts",
     "src/authoring/api.ts",
     "src/auth/api.ts",
-    "src/auth/Account.tsx"
+    "src/auth/Account.tsx",
+    "src/components/cardMeta.tsx",
+    "src/components/safeSvg.ts",
+    "src/components/CardPlaceholder.tsx"
   ]
 }
