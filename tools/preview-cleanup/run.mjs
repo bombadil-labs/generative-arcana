@@ -93,9 +93,25 @@ async function summary(report) {
 function jsonInput(value, name) {
   try { return JSON.parse(value); } catch { throw new Error(`Invalid JSON in ${name}`); }
 }
+// This path can only read providers and emit a manifest or held reason. It never
+// enters the gate/apply path, even when a plan could be generated automatically.
+export async function closedPrReport(number, policy, c, env = process.env) {
+  const report = { mode: 'automatic read-only preview manifest', providerCleanup: 'NOT EXECUTED', held: [] };
+  try {
+    const git = await c.git(number); // verifies merge, same repo, exact head and holds first
+    report.candidate = git;
+    ensure(policy.mappingVerified === true, 'Provider mapping still requires review');
+    ensure(env.VERCEL_READ_TOKEN && env.NEON_READ_TOKEN, 'Read-only provider credentials unavailable; use a manual dry-run after secure setup');
+    const plan = makePlan([await c.target(number)], policy);
+    return { ...report, plan, digest: digest(plan), requiredApprovalComment: `${LOSS_NOTICE} ${digest(plan)}` };
+  } catch (error) {
+    report.held.push({ pr: number, reason: error.message });
+    return report;
+  }
+}
 export async function main(mode, env = process.env) {
   const policy = JSON.parse(await readFile(new URL('./policy.json', import.meta.url), 'utf8'));
-  ensure(['audit','plan','gate','apply'].includes(mode), 'Use audit, plan, gate or apply');
+  ensure(['audit','report','plan','gate','apply'].includes(mode), 'Use audit, report, plan, gate or apply');
   ensure(env.GITHUB_REPOSITORY === policy.repository, 'Run only in the configured repository');
   const c = client(policy, env);
   await c.repository();
@@ -109,6 +125,13 @@ export async function main(mode, env = process.env) {
       catch (e) { report.held.push({ pr:p.number, reason:e.message }); }
     }
     return summary(report);
+  }
+  if (mode === 'report') {
+    ensure(env.GITHUB_EVENT_NAME === 'pull_request' && env.GITHUB_BASE_REF === policy.defaultBranch, 'Automatic provider reports require a PR close targeting the default branch');
+    ensure(/^[1-9][0-9]*$/.test(env.CLOSED_PR_NUMBER || ''), 'Missing exact closed PR number');
+    const number = Number(env.CLOSED_PR_NUMBER);
+    ensure(Number.isSafeInteger(number), 'Invalid closed PR number');
+    return summary(await closedPrReport(number, policy, c, env));
   }
   ensure(env.GITHUB_EVENT_NAME === 'workflow_dispatch' && env.GITHUB_REF === `refs/heads/${policy.defaultBranch}`, 'Manual stages must run from default branch');
   const manifest = env.TARGET_MANIFEST ? jsonInput(env.TARGET_MANIFEST, 'target manifest') : null;

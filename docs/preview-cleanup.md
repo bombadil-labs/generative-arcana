@@ -6,11 +6,16 @@ This change does **not** delete anything when a PR merges. It does not supply cr
 
 - Every merged PR triggers a Git-only, read-only reconciliation report from trusted default-branch code. Dependabot events need no provider credentials.
 - A manual provider dry-run can produce an exact target manifest after provider setup is verified.
+- An optional PR-close provider report can produce the same read-only manifest for a merged, same-repository, non-Dependabot PR. It requires approved read access and `PREVIEW_PROVIDER_REPORTS_ENABLED=true`; it never deletes. Fork/Dependabot events retain the credential-free Git audit and can use a separately initiated manual provider dry-run.
 - A separate manual deletion workflow is **disabled by checked-in policy**. It cannot proceed merely because an environment with the right name exists.
 - GitHub's automatically-delete-head-branches setting is separate Git housekeeping. It is managed outside this PR. It does not immediately delete native Vercel-managed Neon previews.
 - Dependabot budgets are app 2, MCP 2, Actions 1. React/runtime/types and Vite/plugin updates are grouped together, with major upgrades in separately named review groups. Better Auth keeps coordinated groups too. There is no auto-merge and no workflow that closes existing PRs. These budgets govern new version-update PRs; they do not immediately remove the existing backlog or cap security-update PRs.
 
 Preview data does **not** merge into production when code merges. Deleting a preview database loses its unique test accounts, decks, readings and other writes. Before approving cleanup, export or retain anything still needed.
+
+Future preview copying is a separate concern. See [preview data isolation](preview-isolation.md)
+before freeing capacity for more production-derived branches. That preparation does not enable
+deletion; this executor now validates ancestry within the isolated preview project only.
 
 ## Why remove Vercel deployments
 
@@ -24,7 +29,24 @@ Neon Free's published 10-branch limit includes the main branch. Eleven open bot 
 
 `tools/preview-cleanup/policy.json` protects `main`, common long-lived names, release/staging/production prefixes, and both acceptance branches (`feat/self-hosted-better-auth`, `fix/sanitize-deck-svg`). Their inclusion is a conservative hold, not a claim that either still has a provider branch. Keep the currently tested preview held until the owner explicitly releases it. Additional exact deployment and Neon branch IDs can be held.
 
-No provider IDs are invented. The Neon project ID is the owner-identified project; Vercel team/project IDs and the exact default/root Neon branch ID remain unset. `mappingVerified` and `destructiveEnabled` start false. Configure these in a reviewed follow-up change only after matching the actual Vercel resource connection to the Neon project/root.
+The configured cleanup resource is the isolated preview project `blue-pond-70470746`
+(`neon-indigo-kettle`), default/root `main` / `br-solitary-shape-b7f1tpxs`. Production project
+`dark-poetry-32860113` is explicitly excluded. Both roots and all nine known legacy Neon branch
+IDs are protected. All nine legacy Git refs remain held, even if a later deployment with the
+same ref creates a branch in the new resource. The new acceptance ref
+`chore/preview-isolation-test` is held too.
+
+The Vercel project/team IDs are recorded, but `mappingVerified` and `destructiveEnabled` remain
+**false**. Successful application readiness and new-project ancestry do not establish deletion
+provenance for every deployment or alias. Do not flip those flags just because the IDs are filled.
+The active root field now means the new preview project's default root, not the production root.
+The validator checks both root and candidate `project_id` before accepting them.
+
+`previewDeploymentNotBefore=2026-10-01T19:40:00Z` is a conservative lower bound after the
+initial isolation check, not a claim that a timestamp alone proves resource ownership. Missing,
+invalid or earlier deployment timestamps block the entire plan. A reused Git ref can include
+old-resource deployments: never omit those from inventory just to make the new-project plan pass.
+Legacy cleanup is a separate exact-target review; this executor does not switch to the old project.
 
 All aliases are held by default. Successful previews commonly have generated aliases, so this default may intentionally produce **no eligible plan**. To permit generated aliases after inspecting real metadata, explicitly enable `allowVerifiedAutomaticAliases`. Each alias must then appear in Vercel's `automaticAliases`, all `userAliases` must be absent/empty as specified by the API response, and current alias inventory must agree. A `.vercel.app` suffix alone is never sufficient. Custom/unknown aliases stay held. The plan lists all affected automatic aliases for approval.
 
@@ -36,21 +58,22 @@ A plan must cover **every** deployment returned for the exact branch, including 
 
 Read and verify:
 
-- Vercel team ID, exact Arcana project ID, and its attached `neon-cyclamen-bucket` resource
-- That resource's Neon project `dark-poetry-32860113`, default root `main` branch ID, and all preview branch IDs/names/parents
+- Vercel team `team_o9WQj6YpCF9JSk9wpVGfAmyb`, Arcana project `prj_PqzZBpZubFnrl3nmW12SmtDX3MfM`, and its Preview-only `neon-indigo-kettle` resource connection
+- That resource's Neon project `blue-pond-70470746`, default root `main` / `br-solitary-shape-b7f1tpxs`, and all preview branch IDs/names/parents
+- Preserved Production resource `neon-cyclamen-bucket` / `dark-poetry-32860113` and its root `br-steep-heart-b7gdc818`; no active cleanup target may select it
 - Current acceptance preview(s), custom aliases and long-lived environments
 - A merged PR's exact head branch/SHA, all associated deployments and Neon `preview/<git-branch>` mapping
 
 Update policy through review; leave deletion disabled during inventory validation. Never infer a database branch ID from a Git branch name. A missing, renamed, duplicate or parent-mismatched provider branch blocks the plan.
 
-### 2. Read credentials for manual dry-runs only
+### 2. Read credentials for dry-runs and opt-in reports
 
 Store credentials through secure provider/GitHub settings, never chat, source code, command-line arguments, dispatch input or artifacts:
 
 - `PREVIEW_VERCEL_READ_TOKEN`: Vercel bearer token with access to deployment/alias reads for the exact team/project. Prefer a read-capable identity restricted to this project where the account supports it. Standard personal Vercel tokens are team-scoped, not inherently endpoint-level read-only: the secret name does **not** enforce read-only permission. Verify the actual principal's rights before storing it.
 - `PREVIEW_NEON_READ_TOKEN`: Neon bearer credential able to list/read branches of this one project. Prefer a Viewer-scoped identity where supported. Neon project-scoped organization API keys have Editor access, not read-only, so do not mislabel one as restricted. If the Vercel-managed account cannot provide suitably bounded read access, stop and review the available setup instead of granting an organization-wide admin key.
 
-These secrets are only used by a manually dispatched provider-plan job on the default branch. Automatic merge audits do not receive them. No Neon write credential is needed: this implementation never calls Neon DELETE/PATCH/POST.
+These read credentials are used by the manual provider-plan job and, only after explicit opt-in, the trusted same-repository non-Dependabot PR-close report job. The Git-only audit never receives provider credentials. No Neon write credential is needed: this implementation never calls Neon DELETE/PATCH/POST.
 
 The built-in `GITHUB_TOKEN` needs contents/pull-requests read; manual approval verification also needs Actions read. No GitHub PAT is required.
 
@@ -107,3 +130,13 @@ The HTTP adapter follows no redirects and prints only sanitized status errors, n
 - [GitHub workflow approval history](https://docs.github.com/en/rest/actions/workflow-runs#get-the-review-history-for-a-workflow-run)
 - [GitHub Dependabot secret restrictions](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-on-actions)
 - [GitHub automatically deleting merged heads](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-the-automatic-deletion-of-branches)
+
+## Optional automatic read-only manifests
+
+After secure read-access setup and mapping review, opt in with repository variable
+`PREVIEW_PROVIDER_REPORTS_ENABLED=true`. The merged same-repository non-Dependabot PR-close job
+checks out trusted default-branch code and runs `report`, never `gate` or `apply`. Missing
+mapping, credentials or other evidence produces a held report. Forks/Dependabot retain the
+credential-free Git audit; a separately initiated manual dry-run is the fallback. Reports
+cover the triggering PR and expire after 60 minutes; regenerate before later approval. No
+delete token is exposed to this job. Opt-in does not grant standing deletion authority.

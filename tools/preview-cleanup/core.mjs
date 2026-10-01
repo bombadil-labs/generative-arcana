@@ -21,20 +21,27 @@ export function validateGit(pr, openPrs, currentHead, policy) {
   ensure(/^[0-9a-f]{40}$/.test(pr.head.sha), 'Invalid head SHA');
   return { pr: pr.number, branch, headSha: pr.head.sha };
 }
+export function validateCleanupScope(policy) {
+  ensure(Array.isArray(policy.excludedNeonProjectIds) && policy.excludedNeonProjectIds.length > 0 && policy.excludedNeonProjectIds.every(id => typeof id === 'string' && id.length > 0), 'Explicit excluded production/legacy projects are required');
+  ensure(typeof policy.neonProjectId === 'string' && !policy.excludedNeonProjectIds.includes(policy.neonProjectId), 'Production/legacy Neon project is excluded from cleanup');
+  ensure(Number.isFinite(Date.parse(policy.previewDeploymentNotBefore)), 'Verified preview deployment cutoff is required');
+}
 export function validateProviders(git, deployments, neonBranches, policy) {
+  validateCleanupScope(policy);
   ensure(policy.mappingVerified === true && /^prj_/.test(policy.vercelProjectId || '') && /^team_/.test(policy.vercelTeamId || '') && /^br-/.test(policy.neonRootBranchId || ''), 'Provider mapping has not been verified/configured');
   const root = neonBranches.find(b => b.id === policy.neonRootBranchId);
-  ensure(root && root.default === true && !root.parent_id && root.name === policy.defaultBranch, 'Configured Neon root/default mismatch');
+  ensure(root && root.project_id === policy.neonProjectId && root.default === true && !root.parent_id && root.name === policy.defaultBranch, 'Configured Neon root/default mismatch');
   const matching = neonBranches.filter(b => b.name === `preview/${git.branch}`);
   ensure(matching.length === 1, 'Missing or ambiguous Neon preview mapping');
   const b = matching[0];
-  ensure(b.id !== root.id && b.parent_id === root.id && b.default === false && b.protected === false && !policy.protectedNeonBranchIds.includes(b.id), 'Protected/unknown Neon branch or parent');
+  ensure(b.project_id === policy.neonProjectId && b.id !== root.id && b.parent_id === root.id && b.default === false && b.protected === false && !policy.protectedNeonBranchIds.includes(b.id), 'Protected/unknown Neon branch or parent');
   ensure(!neonBranches.some(child => child.parent_id === b.id), 'Neon preview has children');
   ensure(typeof b.created_at === 'string', 'Missing Neon branch identity timestamp');
   ensure(deployments.length > 0, 'No Vercel deployments: reconcile orphan manually');
   const ids = new Set();
   const clean = deployments.map(d => {
     ensure(/^dpl_/.test(d.id || '') && !ids.has(d.id), 'Invalid/duplicate deployment ID'); ids.add(d.id);
+    ensure(Number.isSafeInteger(d.createdAt) && d.createdAt >= Date.parse(policy.previewDeploymentNotBefore), 'Deployment predates verified isolated-preview cutover or timestamp is missing');
     ensure(d.projectId === policy.vercelProjectId && d.ownerId === policy.vercelTeamId, 'Unknown Vercel project/team ownership');
     ensure(d.target === null && !d.customEnvironment && !['PROMOTED', 'ROLLING'].includes(d.readySubstate), 'Production/custom/promoted deployment');
     ensure(['READY', 'ERROR', 'CANCELED'].includes(d.readyState), 'Deployment is not terminal');
@@ -52,12 +59,14 @@ export function validateProviders(git, deployments, neonBranches, policy) {
       ensure(policy.allowVerifiedAutomaticAliases === true && Array.isArray(d.automaticAliases) && Array.isArray(d.userAliases) && d.userAliases.length === 0, 'Aliased deployment is protected');
       ensure(aliases.every(a => typeof a === 'string' && a.endsWith('.vercel.app') && d.automaticAliases.includes(a)), 'Custom/unknown alias is protected');
     }
-    return { id: d.id, url: d.url, sha: m.githubCommitSha, aliases };
+    return { id: d.id, createdAt: d.createdAt, url: d.url, sha: m.githubCommitSha, aliases };
   }).sort((a,b) => a.id.localeCompare(b.id));
-  return { ...git, neonBranchId: b.id, neonBranchName: b.name, neonParentId: b.parent_id, neonCreatedAt: b.created_at, deployments: clean };
+  return { ...git, neonProjectId: policy.neonProjectId, neonBranchId: b.id, neonBranchName: b.name, neonParentId: b.parent_id, neonCreatedAt: b.created_at, deployments: clean };
 }
 export function makePlan(targets, policy, now = Date.now()) {
+  validateCleanupScope(policy);
   ensure(targets.length > 0 && targets.length <= policy.maxBranchesPerRun, 'Invalid branch count');
+  ensure(targets.every(t => t.neonProjectId === policy.neonProjectId), 'Plan target Neon project mismatch');
   ensure(new Set(targets.map(t => t.branch)).size === targets.length, 'Shared/duplicate target branch');
   const ids = targets.flatMap(t => t.deployments.map(d => d.id));
   ensure(ids.length <= policy.maxDeploymentsPerRun && new Set(ids).size === ids.length, 'Invalid deployment count');
