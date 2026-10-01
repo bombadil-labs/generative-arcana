@@ -241,3 +241,38 @@ Schedule the operator-owned cleanup of expired domain counters and auth counters
 Review auth/session/token cleanup and retention separately; do not delete unexpired grants or
 identity mappings by age. See [maintenance, rotation, backup and incident procedures](better-auth-operations.md)
 and the [hosted-auth migration strategy](hosted-auth-migration.md).
+
+## Explicit disposable staging exception
+
+For an operator-approved, disposable **empty Vercel branch Preview** only, an auth apply may omit
+its backup attestation using `--disposable-staging --staging-origin HTTPS_PREVIEW_ORIGIN` instead
+of `--backup-ref`. `BETTER_AUTH_URL` must match that origin and `VERCEL_ENV` must be `preview`.
+This is a conscious no-backup choice, not a claimed restore point. Production and populated
+staging retain the backup-backed workflow. The flags do not establish Neon branch ownership;
+confirm the endpoint is the isolated Preview target first.
+
+The exception still checks the reviewed plan's checksum, exact database/schema/role/host/port,
+package version and generated SQL. It requires direct Neon with certificate-verified TLS and
+`public`, permits only additive `arcana_auth_*` table/index creation, and rejects alterations or
+managed-auth SQL. Under the auth apply transaction it locks existing public `arcana_*` tables
+and checks every one is empty, including auth, catalog and domain tables. Empty domain tables
+from the separate domain migration are allowed. Non-table relations and unverifiable/RLS-hidden
+contents fail closed. Managed `neon_auth` data is neither queried nor modified by this guard.
+Keep runtime replicas stopped during staging initialization; locks cannot prevent unrelated
+operators creating entirely new domain relations concurrently.
+
+After reviewing both the committed domain migration and the auth plan, the helper below takes the
+exact reviewed plan digest and target, prompts for the direct connection locally, verifies target
+identity and empty Arcana data, applies domain then auth in separate transactions, then checks auth
+using PostgreSQL startup read-only settings. It clears inherited connection/auth/email overrides
+and drops the prompted secret when it exits. Install the pinned dependencies before running it.
+
+```bash
+bash tools/apply-disposable-staging-auth.sh \
+  https://YOUR-STABLE-BRANCH-PREVIEW.vercel.app \
+  /private/path/auth-plan.json REVIEWED_DIRECT_HOST REVIEWED_PLAN_SHA256
+```
+
+It does not install packages, deploy, restart replicas, or send email.
+A committed domain/auth step followed by a failed later step is not a rollback; stop and investigate. Keep the
+plan private, retain the honest no-backup output, and complete the remaining acceptance tests.

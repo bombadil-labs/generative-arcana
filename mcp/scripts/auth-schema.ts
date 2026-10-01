@@ -5,23 +5,32 @@ import { pathToFileURL } from 'node:url';
 import { Pool, type PoolClient } from 'pg';
 import { getMigrations } from 'better-auth/db/migration';
 import { createArcanaBetterAuthOptions, createBetterAuthConfigurationFromEnv } from '../src/betterAuth.js';
+import { assertDisposableStagingPlan, assertEmptyDisposableStaging, disposableStagingConnection } from './disposable-staging.js';
 import { assertReviewedAuthSchemaPlan, assertSafeAuthSchemaPlan, authSchemaHasChanges, buildAuthSchemaPlan } from './auth-schema-plan.js';
 
-class OperatorInputError extends Error {}
-interface Arguments { mode: 'plan' | 'check' | 'apply'; out?: string; plan?: string; expectedHost?: string; backupRef?: string }
+export class OperatorInputError extends Error {}
+interface Arguments { mode: 'plan' | 'check' | 'apply'; out?: string; plan?: string; expectedHost?: string; backupRef?: string; disposableStaging?: boolean; stagingOrigin?: string }
 export function parseAuthSchemaArguments(args: string[]): Arguments {
   const [mode, ...flags] = args;
   if (mode !== 'plan' && mode !== 'check' && mode !== 'apply') throw new OperatorInputError('Choose plan, check, or apply. See docs/better-auth-deployment.md.');
   const options: Arguments = { mode };
-  const keys = new Map([['--out', 'out'], ['--plan', 'plan'], ['--expected-host', 'expectedHost'], ['--backup-ref', 'backupRef']] as const);
+  const keys = new Map([['--out', 'out'], ['--plan', 'plan'], ['--expected-host', 'expectedHost'], ['--backup-ref', 'backupRef'], ['--staging-origin', 'stagingOrigin']] as const);
   for (let i = 0; i < flags.length; i += 2) {
+    if (flags[i] === '--disposable-staging') {
+      if (options.disposableStaging) throw new OperatorInputError('Duplicated disposable staging argument.');
+      options.disposableStaging = true;
+      i -= 1;
+      continue;
+    }
     const key = keys.get(flags[i] as '--out');
     const value = flags[i + 1];
     if (!key || !value || value.startsWith('--') || /[\r\n\0]/.test(value) || options[key]) throw new OperatorInputError('Unknown, duplicated, or incomplete schema argument.');
     options[key] = value;
   }
-  if (mode === 'apply' && (!options.plan || !options.expectedHost || !options.backupRef)) throw new OperatorInputError('Apply requires --plan, --expected-host, and --backup-ref after review and restore verification.');
-  if (mode === 'apply' && options.out || mode !== 'apply' && (options.plan || options.expectedHost || options.backupRef) || mode === 'check' && options.out) throw new OperatorInputError('Argument does not apply to this schema operation.');
+  if (Boolean(options.disposableStaging) !== Boolean(options.stagingOrigin)) throw new OperatorInputError('--disposable-staging requires --staging-origin, and that origin is only valid with this mode.');
+  if (options.backupRef && options.disposableStaging) throw new OperatorInputError('Choose a backup reference or explicitly disposable staging, never both.');
+  if (mode === 'apply' && (!options.plan || !options.expectedHost || (!options.backupRef && !options.disposableStaging))) throw new OperatorInputError('Apply requires --plan, --expected-host, and --backup-ref; only explicitly disposable empty staging may use --disposable-staging --staging-origin instead.');
+  if (mode === 'apply' && options.out || mode !== 'apply' && (options.plan || options.expectedHost || options.backupRef || options.disposableStaging || options.stagingOrigin) || mode === 'check' && options.out) throw new OperatorInputError('Argument does not apply to this schema operation.');
   if (options.backupRef && options.backupRef.length > 256) throw new OperatorInputError('Use a short backup reference, never credentials or backup content.');
   return options;
 }
@@ -29,8 +38,12 @@ export function parseAuthSchemaArguments(args: string[]): Arguments {
 export async function runAuthSchema(args: string[], env: NodeJS.ProcessEnv = process.env): Promise<number> {
   // Validate mutation intent before touching the database or loading a plan.
   const options = parseAuthSchemaArguments(args);
-  const databaseUrl = env.BETTER_AUTH_DATABASE_URL || env.DATABASE_URL;
+  let databaseUrl = env.BETTER_AUTH_DATABASE_URL || env.DATABASE_URL;
   if (!databaseUrl) throw new OperatorInputError('BETTER_AUTH_DATABASE_URL or DATABASE_URL is required.');
+  if (options.disposableStaging) {
+    try { databaseUrl = disposableStagingConnection(databaseUrl, env, options.stagingOrigin!); }
+    catch (error) { throw new OperatorInputError((error as Error).message); }
+  }
   const targetURL = new URL(databaseUrl);
   if (!['postgres:', 'postgresql:'].includes(targetURL.protocol)) throw new OperatorInputError('Auth schema tooling requires PostgreSQL.');
   if (options.mode === 'apply' && targetURL.hostname !== options.expectedHost) throw new OperatorInputError('--expected-host does not match the selected database hostname.');
@@ -56,6 +69,8 @@ export async function runAuthSchema(args: string[], env: NodeJS.ProcessEnv = pro
       await client.query('BEGIN'); transaction = true;
       await client.query("SET LOCAL lock_timeout = '5s'");
       await client.query("SET LOCAL statement_timeout = '30s'");
+      // Serialize with the domain migrator too; keep the lock ordering consistent.
+      if (options.disposableStaging) await client.query('SELECT pg_advisory_xact_lock(184734901)');
       await client.query('SELECT pg_advisory_xact_lock(184734902)');
     }
     const identity = await (client ?? pool).query<{ database: string; schema: string; role: string }>('SELECT current_database() AS database, current_schema() AS schema, session_user AS role');
@@ -86,12 +101,18 @@ export async function runAuthSchema(args: string[], env: NodeJS.ProcessEnv = pro
       console.log('Auth schema matches the installed configuration. Read-only check; no changes applied.');
       return 0;
     }
-    try { assertReviewedAuthSchemaPlan(reviewed, live); }
+    try {
+      assertReviewedAuthSchemaPlan(reviewed, live);
+      if (options.disposableStaging) {
+        assertDisposableStagingPlan(live);
+        await assertEmptyDisposableStaging(client!);
+      }
+    }
     catch (error) { throw new OperatorInputError((error as Error).message); }
     if (authSchemaHasChanges(live)) await client!.query(live.sql);
     await client!.query('COMMIT'); transaction = false;
     // Deliberately omit credentials, SQL/user values, and the private backup reference from output.
-    console.log(`Auth schema applied transactionally. Reviewed SHA-256 ${live.sha256}; backup attestation supplied. Restart service replicas and run read-only check plus acceptance tests.`);
+    console.log(`Auth schema applied transactionally. Reviewed SHA-256 ${live.sha256}; ${options.disposableStaging ? 'disposable staging explicitly approved, empty Arcana tables verified, no backup attested' : 'backup attestation supplied'}. Restart service replicas and run read-only check plus acceptance tests.`);
     return 0;
   } catch (error) {
     if (transaction) await client?.query('ROLLBACK');
