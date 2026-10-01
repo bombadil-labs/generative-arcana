@@ -9,6 +9,17 @@ permissions:
   contents: read
 
 jobs:
+  preview-cleanup:
+    name: Preview cleanup safety tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node --test tools/test/preview-cleanup.test.mjs
+
   authoring-hosts:
     name: Authoring host wrappers
     runs-on: ubuntu-latest
