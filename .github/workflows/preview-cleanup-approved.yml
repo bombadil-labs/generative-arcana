@@ -1,0 +1,70 @@
+name: Manually approved preview data deletion
+on:
+  workflow_dispatch:
+    inputs:
+      target_manifest:
+        description: 'Exact plan JSON from a fresh provider dry-run (not the outer report)'
+        required: true
+      target_digest:
+        description: 'SHA-256 digest from that dry-run'
+        required: true
+      loss_confirmation:
+        description: 'PERMANENTLY DELETE PREVIEW DATA followed by a space and the digest'
+        required: true
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+concurrency:
+  group: preview-cleanup-manual
+  cancel-in-progress: false
+jobs:
+  validate-existing-gate:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node tools/preview-cleanup/run.mjs gate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TARGET_MANIFEST: ${{ inputs.target_manifest }}
+          TARGET_DIGEST: ${{ inputs.target_digest }}
+          LOSS_CONFIRMATION: ${{ inputs.loss_confirmation }}
+  delete-exact-approved-targets:
+    needs: validate-existing-gate
+    environment: preview-cleanup-approved
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node tools/preview-cleanup/run.mjs apply
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TARGET_MANIFEST: ${{ inputs.target_manifest }}
+          TARGET_DIGEST: ${{ inputs.target_digest }}
+          LOSS_CONFIRMATION: ${{ inputs.loss_confirmation }}
+          VERCEL_READ_TOKEN: ${{ secrets.PREVIEW_VERCEL_READ_TOKEN }}
+          NEON_READ_TOKEN: ${{ secrets.PREVIEW_NEON_READ_TOKEN }}
+          VERCEL_DELETE_TOKEN: ${{ secrets.PREVIEW_VERCEL_DELETE_TOKEN }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: preview-cleanup-approved-result
+          path: |
+            preview-cleanup-report.json
+            preview-cleanup-deletion-journal.jsonl
+          if-no-files-found: ignore
+          retention-days: 30

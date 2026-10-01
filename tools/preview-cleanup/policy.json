@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "repository": "bombadil-labs/generative-arcana",
+  "repositoryId": 1291398116,
+  "defaultBranch": "main",
+  "vercelTeamId": null,
+  "vercelProjectId": null,
+  "neonProjectId": "dark-poetry-32860113",
+  "neonRootBranchId": null,
+  "mappingVerified": false,
+  "protectedBranches": ["main", "master", "production", "staging", "develop", "development", "feat/self-hosted-better-auth", "fix/sanitize-deck-svg"],
+  "protectedPrefixes": ["release/", "production/", "staging/"],
+  "protectedDeploymentIds": [],
+  "protectedNeonBranchIds": [],
+  "allowVerifiedAutomaticAliases": false,
+  "destructiveEnabled": false,
+  "approvalEnvironment": "preview-cleanup-approved",
+  "approvalEnvironmentId": null,
+  "approverLogins": [],
+  "maxBranchesPerRun": 3,
+  "maxDeploymentsPerRun": 100,
+  "planLifetimeMinutes": 60
+}
