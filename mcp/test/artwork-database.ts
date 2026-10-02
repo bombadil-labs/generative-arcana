@@ -12,6 +12,15 @@ try {
   await db.exec(await readFile(new URL("../migrations/001-domain.sql", import.meta.url), "utf8"));
   const migration = await readFile(new URL("../migrations/002-card-artwork.sql", import.meta.url), "utf8");
   await db.exec(migration); await db.exec(migration);
+  await db.query("INSERT INTO arcana_user_decks(id,owner_id,slug,manifest) VALUES($1,$2,$3,$4::jsonb)", ["legacy-deck", "alice", "legacy", JSON.stringify(neutralManifest("legacy"))]);
+  const legacy = { id: randomUUID(), deckId: "legacy-deck", cardSlug: "major-0", objectKey: "private-original.webp", mediaType: "image/webp", width: 16, height: 24, byteLength: 100, integrity: "sha256-old", createdAt: new Date().toISOString() };
+  await db.query("INSERT INTO arcana_card_artwork(deck_id,card_slug,asset) VALUES($1,$2,$3::jsonb)", ["legacy-deck","major-0",JSON.stringify(legacy)]);
+  const setsMigration = await readFile(new URL("../migrations/004-named-artwork-sets.sql", import.meta.url), "utf8");
+  await db.exec(setsMigration); await db.exec(setsMigration);
+  const retained = (await db.query<{asset:unknown}>("SELECT asset FROM arcana_card_artwork WHERE deck_id='legacy-deck'")).rows[0]?.asset;
+  assert.deepEqual(retained,legacy,"additive migration leaves existing JSON, ids and object keys unchanged");
+  await db.query("INSERT INTO arcana_card_artwork(deck_id,card_slug,asset) VALUES($1,$2,$3::jsonb) ON CONFLICT(deck_id,card_slug) DO UPDATE SET asset=EXCLUDED.asset", ["legacy-deck","major-0",JSON.stringify(legacy)]);
+  await db.query("DELETE FROM arcana_user_decks WHERE id='legacy-deck'");
   await db.query("INSERT INTO arcana_user_decks(id,owner_id,slug,manifest) VALUES($1,$2,$3,$4::jsonb)", ["deck", "alice", "test", JSON.stringify(neutralManifest())]);
   // PGlite has one connection. Queue connection leases to model a one-slot pg pool faithfully.
   let tail: Promise<void> = Promise.resolve();
@@ -19,7 +28,7 @@ try {
   const query = async (sql: string, values?: unknown[]) => { statements.push(sql); return db.query(sql, values); };
   const pool = { query, async connect() { const before = tail; let release!: () => void; tail = new Promise<void>(resolve => { release = resolve; }); await before; return { query, release }; } };
   const repository = new NeonArtworkRepository(pool as unknown as Pick<Pool, "query" | "connect">);
-  const record = (): ArtworkRecord => ({ id: randomUUID(), deckId: "deck", cardSlug: "major-0", objectKey: `card-artwork/${randomUUID()}.webp`, mediaType: "image/webp", width: 32, height: 48, byteLength: 100, integrity: "sha256-test", createdAt: new Date().toISOString() });
+  const record = (): ArtworkRecord => ({ id: randomUUID(), deckId: "deck", packId: "saved-artwork", cardSlug: "major-0", objectKey: `card-artwork/${randomUUID()}.webp`, mediaType: "image/webp", width: 32, height: 48, byteLength: 100, integrity: "sha256-test", createdAt: new Date().toISOString() });
   const first = record();
   const fails = (expected: number) => (error: unknown) => error instanceof ArtworkError && error.status === expected;
   await assert.rejects(repository.attach("bob", 1, null, first), fails(404));
@@ -31,6 +40,16 @@ try {
   const changes = await Promise.allSettled([repository.attach("alice", 1, first.id, record()), repository.attach("alice", 1, first.id, record())]);
   assert.equal(changes.filter(result => result.status === "fulfilled").length, 1);
   assert.ok(statements.some(sql => /arcana_user_decks.*FOR UPDATE/.test(sql)), "attachment locks deck against deletion/revision races");
+  const pack = {id:"claude",label:"Claude",createdAt:new Date().toISOString()};
+  await assert.rejects(repository.createPack("bob","deck",1,pack),fails(404));
+  assert.deepEqual(await repository.createPack("alice","deck",1,pack),pack);
+  assert.deepEqual(await repository.createPack("alice","deck",1,pack),pack);
+  await assert.rejects(repository.createPack("alice","deck",1,{...pack,label:"Overwrite"}),fails(409));
+  const independent = {...record(),packId:"claude"};
+  assert.equal(await repository.attach("alice",1,null,independent),null);
+  assert.deepEqual(await repository.get("deck","major-0","claude"),independent);
+  assert.equal((await repository.list("deck")).length,2);
+  await assert.rejects(repository.attach("alice",1,null,{...record(),packId:"missing"}),fails(404));
   const current = await repository.get("deck", "major-0");
   await db.query("UPDATE arcana_user_decks SET revision=2 WHERE id='deck'");
   await assert.rejects(repository.attach("alice", 1, current!.id, record()), fails(409));
@@ -38,6 +57,8 @@ try {
   await assert.rejects(repository.attach("alice", 2, current!.id, record()), fails(404));
   await db.query("DELETE FROM arcana_user_decks WHERE id='deck'");
   assert.equal(await repository.get("deck", "major-0"), null, "FK cascades metadata deletion");
+  assert.equal((await repository.listPacks("deck")).length,0,"deck deletion cascades named set metadata");
+  assert.equal(await repository.get("deck","major-0","claude"),null);
   await assert.rejects(repository.attach("alice", 2, null, record()), fails(404));
   console.log("Artwork additive migration and atomic attachment tests passed (PostgreSQL/PGlite).");
 } finally { await db.close(); }

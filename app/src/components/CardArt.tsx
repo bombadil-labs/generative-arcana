@@ -1,7 +1,7 @@
 /**
  * <CardArt> — resolves and renders a card's visual for a given deck and selected pack.
- * `prefer` is the selected pack's id; resolveVisual() honors it but falls back per-card to any other
- * pack that has this card (so a partial pack degrades gracefully), or a placeholder if none does.
+ * Catalog artwork resolves only within the selected saved set; missing slots use a semantic face.
+ * Without a catalog provider, `prefer` selects from the trusted runtime visual registry.
  *   kit -> <TarotCard>  ·  p5 -> <RawP5Card>  ·  image -> <img>  ·  none -> <CardPlaceholder>
  */
 import { TarotCard } from "./TarotCard";
@@ -29,12 +29,13 @@ export interface CardArtProps {
 }
 
 export function CardArt({ card, deckId, deck, prefer, mode = "live", paused, onSignal }: CardArtProps) {
-  const { state: artwork, pending, fail } = useCardArtwork(deckId, card.slug);
+  const { state: artwork, pending, selected, fail } = useCardArtwork(deckId, card.slug);
   // The semantic face means "no saved art", not "we have not checked yet".
   if (pending) return <LoadingArtwork name={card.name} />;
   if (artwork.status === "ready") {
     return <SavedArtwork key={`${deckId}/${card.slug}/${artwork.url}`} url={artwork.url} name={card.name} onError={fail} />;
   }
+  if (selected) return <CardPlaceholder card={card} deck={deck} />;
   const visual = deckId ? resolveVisual(deckId, card.slug, prefer) : null;
 
   if (visual?.kind === "kit") {

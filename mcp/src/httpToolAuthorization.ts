@@ -8,7 +8,7 @@ export interface ArcanaHttpOAuthOptions {
   writeScopes: readonly string[];
 }
 
-const WRITE_TOOLS = new Set(["import_deck", "set_deck_visibility", "delete_my_deck", "set_card_artwork"]);
+const WRITE_TOOLS = new Set(["import_deck", "set_deck_visibility", "delete_my_deck", "set_card_artwork", "edit_deck", "create_manifest_upload", "stage_deck_manifest", "create_visual_pack"]);
 
 /**
  * Mount inside toNodeHandler, after its bounded Node-to-Request conversion. A cloned
@@ -66,10 +66,11 @@ function protectedToolScopes(body: unknown, oauth: ArcanaHttpOAuthOptions): stri
       || (typeof message.id !== "string" && typeof message.id !== "number")
       || !isRecord(message.params) || typeof message.params.name !== "string") continue;
     const name = message.params.name;
-    if (name !== "list_my_decks" && !WRITE_TOOLS.has(name)) continue;
+    const privateValidation = name === "validate_deck_manifest" && isRecord(message.params.arguments) && (message.params.arguments.uploadId !== undefined || message.params.arguments.file !== undefined);
+    if (name !== "list_my_decks" && !WRITE_TOOLS.has(name) && !privateValidation) continue;
     protectedCall = true;
     for (const scope of oauth.readScopes) required.add(scope);
-    if (WRITE_TOOLS.has(name)) for (const scope of oauth.writeScopes) required.add(scope);
+    if (WRITE_TOOLS.has(name) || privateValidation) for (const scope of oauth.writeScopes) required.add(scope);
   }
   return protectedCall ? [...required] : undefined;
 }

@@ -1,4 +1,4 @@
-import { ArtworkError, type CardArtworkService } from "./cardArtwork";
+import { ArtworkError, DEFAULT_ARTWORK_PACK_ID, type CardArtworkService } from "./cardArtwork";
 import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import type { CardData } from "../../app/src/decks/card";
@@ -46,28 +46,33 @@ const readOnlyAnnotations = {
 /** Register Node-host visual capabilities without coupling presentation to ArcanaEngine internals. */
 export function registerArcanaVisualTools(server: McpServer, options: RegisterArcanaVisualToolsOptions): void {
   const { adapter, visuals, onToolCall } = options;
-  const listPacks = async (deckId: string) => {
-    const existing = visuals.listPacks(deckId);
-    if (!options.artwork) return existing;
-    try {
-      const cards = await options.artwork.readableCards(options.viewerId ?? null, deckId);
-      const count = cards.cards.filter(card => card.artwork).length;
-      return count ? [...existing, { deckId, id: "saved-artwork", label: "Saved card artwork", renderer: "static-image" as const, mimeType: "image/webp", complete: count === cards.cards.length, cardCount: count }] : existing;
-    } catch (error) {
-      if (error instanceof ArtworkError && error.status === 404) return existing;
+  const savedPacks = async (deckId: string) => {
+    if (!options.artwork) return [];
+    try { return await options.artwork.listPacks(options.viewerId ?? null, deckId); }
+    catch (error) {
+      if (error instanceof ArtworkError && error.status === 404) return [];
       throw new Error("Saved artwork is temporarily unavailable.");
     }
   };
+  const listPacks = async (deckId: string, includeEmptyDefault = false) => {
+    const saved = (await savedPacks(deckId)).filter(pack => includeEmptyDefault || pack.id !== DEFAULT_ARTWORK_PACK_ID || pack.cardCount > 0);
+    return [...visuals.listPacks(deckId), ...saved.map(pack => ({ deckId, id: pack.id, label: pack.label, ...(pack.description ? { description: pack.description } : {}), renderer: "static-image" as const, mimeType: "image/webp", complete: pack.complete, cardCount: pack.cardCount }))];
+  };
   const loadCardArt = async (deckId: string, cardSlug: string, packId?: string) => {
-    if (options.artwork && (!packId || packId === "saved-artwork")) {
+    const saved = options.artwork ? await savedPacks(deckId) : [];
+    const selected = saved.find(pack => pack.id === (packId ?? DEFAULT_ARTWORK_PACK_ID));
+    if (options.artwork && selected) {
       try {
-        const { metadata, bytes } = await options.artwork.image(options.viewerId ?? null, deckId, cardSlug);
-        return { deckId, cardSlug, packId: "saved-artwork", packLabel: "Saved card artwork", mimeType: metadata.mediaType, data: Buffer.from(bytes) };
+        const { metadata, bytes } = await options.artwork.image(options.viewerId ?? null, deckId, cardSlug, undefined, selected.id);
+        return { deckId, cardSlug, packId: selected.id, packLabel: selected.label, mimeType: metadata.mediaType, data: Buffer.from(bytes) };
       } catch (error) {
         if (!(error instanceof ArtworkError && error.status === 404)) throw new Error("Saved artwork is temporarily unavailable.");
+        // A selected set is a boundary, never a preference that leaks another set's image.
+        if (packId) return null;
       }
     }
-    return visuals.loadCardArt(deckId, cardSlug, packId);
+    const art = await visuals.loadCardArt(deckId, cardSlug, packId);
+    return packId && art?.packId !== packId ? null : art;
   };
   const authMeta = options.securitySchemes ? { securitySchemes: options.securitySchemes } : undefined;
   registerArcanaSpreadWidget(server);
@@ -75,7 +80,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
   server.registerTool(
     "list_visual_packs",
     {
-      description: "List server-renderable card-art and Living Spread visual packs available for one deck.",
+      description: "List named saved-artwork sets and server-renderable visual packs for one deck, including empty named sets and their coverage. Omitted packId on image tools uses the legacy saved-artwork set.",
       inputSchema: z.object({ deckId: z.string().min(1) }),
       annotations: readOnlyAnnotations,
       ...(authMeta ? { _meta: authMeta } : {}),
@@ -94,7 +99,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
   server.registerTool(
     "get_card_art",
     {
-      description: "Return actual card artwork as MCP image content when this host has server-renderable card art for the deck.",
+      description: "Return actual card artwork as MCP image content. With packId, resolve strictly within that visual set; missing art never falls back to another set.",
       inputSchema: z.object({
         deckId: z.string().min(1),
         cardSlug: z.string().min(1),
@@ -108,7 +113,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
       const card = await adapter.call("get_card", { deckId, cardSlug }) as CardData;
 
       const art = await loadCardArt(deckId, cardSlug, packId);
-      if (!art) throw visualLookupError(deckId, visuals);
+      if (!art) throw packId ? new Error(`Visual set “${packId}” has no artwork for card “${cardSlug}”.`) : visualLookupError(deckId, visuals);
 
       const result = {
         deckId,
@@ -132,7 +137,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
     "render_reading",
     {
       title: "Render Arcana spread",
-      description: "Render an existing Arcana reading token. A matching Living Spread is preferred when available; otherwise server card art is laid out responsively. This never recasts the reading.",
+      description: "Render an existing Arcana reading token. An explicit packId is strict: the selected set supplies every image, with no cross-set fallback. Otherwise a matching Living Spread is preferred before static art. This never recasts the reading.",
       inputSchema: z.object({
         token: z.string().min(1),
         deckId: z.string().min(1).optional(),
@@ -154,7 +159,12 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
         ...(deckId ? { deckId } : {}),
       }) as ResolvedReadingView;
 
-      const spreadScene = visuals.resolveSpreadScene(reading.deckId, reading.spread.id, packId);
+      const available = await listPacks(reading.deckId, packId === DEFAULT_ARTWORK_PACK_ID);
+      const selectedPack = packId ? available.find(pack => pack.id === packId) : undefined;
+      if (packId && !selectedPack) throw new Error(`Unknown visual set “${packId}” for this deck.`);
+      const selectedSaved = !!packId && (await savedPacks(reading.deckId)).some(pack => pack.id === packId);
+      const resolvedScene = selectedSaved ? null : visuals.resolveSpreadScene(reading.deckId, reading.spread.id, packId);
+      const spreadScene = packId && resolvedScene?.packId !== packId ? null : resolvedScene;
       if (spreadScene) {
         const result = buildLivingSpreadResult(reading, spreadScene);
         return {
@@ -166,7 +176,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
         };
       }
 
-      const staticPacks = (await listPacks(reading.deckId)).filter((pack) => pack.renderer === "static-image");
+      const staticPacks = available.filter((pack) => pack.renderer === "static-image");
       if (!staticPacks.length) throw noVisualError(reading.deckId, reading.spread.id);
 
       const content: Array<
@@ -217,7 +227,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
             spreadId: reading.spread.id,
             spreadName: reading.spread.name,
             question: reading.question,
-            layout: { kind: "flow" },
+            layout: { kind: "flow", ...(selectedPack ? { packId: selectedPack.id, packLabel: selectedPack.label } : {}) },
             placements,
           },
         },

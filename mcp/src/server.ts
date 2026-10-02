@@ -1,8 +1,13 @@
+import { registerDeckEditTools } from "./deckEditTools";
+import { toolResult, summarizeToolResult, ARCANA_RESPONSE_FORMATS } from "./toolResult";
+import { registerManifestUploadTools, stageManifest, manifestPermission, nativeManifestFileSchema, type ManifestToolOptions } from "./manifestUploadTools";
+import type { NativeManifestFile } from "./nativeManifestFile";
+import { ManifestUploadError, stagedManifestReport } from "./manifestUploads";
 import { registerArtworkTools } from "./artworkTools";
 import type { CardArtworkService } from "./cardArtwork";
 import { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
-import { ArcanaToolAdapter, type ArcanaToolName } from "../../app/src/mcp/ArcanaToolAdapter";
+import { ArcanaToolAdapter, ARCANA_DECK_VIEWS, type ArcanaToolName } from "../../app/src/mcp/ArcanaToolAdapter";
 import { MAX_QUESTION_LENGTH } from "../../app/src/reading/encode";
 import { CatalogResolvingArcanaToolAdapter } from "./catalogResolvingAdapter";
 import { createArcanaAdapter } from "./hostStore";
@@ -48,7 +53,7 @@ const cardQuery = z.object({
 
 const schemas: Record<ArcanaToolName, z.ZodTypeAny> = {
   list_decks: z.object({}),
-  get_deck: z.object({ deckId: z.string().min(1) }),
+  get_deck: z.object({ deckId: z.string().min(1), view: z.enum(ARCANA_DECK_VIEWS).optional(), responseFormat: z.enum(ARCANA_RESPONSE_FORMATS).optional() }),
   get_card: z.object({ deckId: z.string().min(1), cardSlug: z.string().min(1) }),
   analyze_card: z.object({ deckId: z.string().min(1), cardSlug: z.string().min(1) }),
   query_cards: z.object({ deckId: z.string().min(1), query: cardQuery }),
@@ -66,8 +71,10 @@ const schemas: Record<ArcanaToolName, z.ZodTypeAny> = {
     manifest: z.unknown().optional(),
     json: z.string().max(MAX_IMPORT_JSON_CHARS).optional(),
     includeNormalizedManifest: z.boolean().optional(),
-  }).refine((value) => (value.manifest !== undefined) !== (value.json !== undefined), {
-    message: "Provide exactly one of manifest or json.",
+    uploadId: z.string().uuid().optional(),
+    file: nativeManifestFileSchema.optional(),
+  }).refine((value) => [value.manifest, value.json, value.uploadId, value.file].filter(v => v !== undefined).length === 1, {
+    message: "Provide exactly one of manifest, json, uploadId or file.",
   }),
   import_deck: z.object({
     manifest: z.unknown().optional(),
@@ -76,9 +83,12 @@ const schemas: Record<ArcanaToolName, z.ZodTypeAny> = {
     tagline: z.string().min(1).optional(),
     spreads: z.array(spread).max(MAX_SPREADS).optional(),
     replaceExisting: z.boolean().optional(),
+    uploadId: z.string().uuid().optional(),
+    deckId: z.string().min(1).optional(),
+    expectedRevision: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER).optional(),
   }).refine(
-    (value) => [value.manifest, value.data, value.json].filter((payload) => payload !== undefined).length === 1,
-    { message: "Provide exactly one of manifest, data, or json." },
+    (value) => [value.manifest, value.data, value.json, value.uploadId].filter((payload) => payload !== undefined).length === 1,
+    { message: "Provide exactly one of manifest, data, json, or uploadId." },
   ).refine(
     (value) => value.manifest === undefined || (value.tagline === undefined && value.spreads === undefined),
     { message: "When manifest is provided, tagline and spreads must be authored inside the manifest." },
@@ -93,6 +103,7 @@ export interface ArcanaOAuthToolContext {
 }
 
 export interface ArcanaMcpServerOptions {
+  manifestUploads?: Omit<ManifestToolOptions, "principal" | "oauth">;
   artwork?: CardArtworkService;
   /** Reuse an adapter when the transport provides an appropriate state lifetime. */
   adapter?: ArcanaToolAdapter;
@@ -123,6 +134,8 @@ export function createArcanaMcpServer(options: ArcanaMcpServerOptions = {}): Mcp
   const visuals = options.visuals ?? createStaticVisualStore();
   const server = new McpServer({ name: "generative-arcana", version: ARCANA_MCP_VERSION });
   registerAuthoringGuide(server, options.onToolCall);
+  const manifestOptions: ManifestToolOptions = { ...options.manifestUploads, principal, oauth: options.oauth };
+  registerManifestUploadTools(server, manifestOptions);
   registerArtworkTools(server, { artwork: options.artwork, principal, oauth: options.oauth });
   const readSchemes = options.oauth ? optionalOAuthSecuritySchemes(options.oauth.readScopes) : undefined;
 
@@ -140,15 +153,17 @@ export function createArcanaMcpServer(options: ArcanaMcpServerOptions = {}): Mcp
     server.registerTool(
       definition.name,
       {
-        description: definition.description,
-        inputSchema: schemas[definition.name],
+        description: definition.description + (definition.name === "validate_deck_manifest" ? " Prefer uploadId for staged bytes or native file input when available; file input stages privately and returns an immutable uploadId. Inline manifest/json remains available." : isImport ? " Prefer uploadId after file validation. File replacement requires stable deckId and expectedRevision; retries return the same receipt for 24 hours." : ""),
+        inputSchema: schemas[definition.name] instanceof z.ZodObject
+          ? (schemas[definition.name] as z.ZodObject).safeExtend({ responseFormat: z.enum(ARCANA_RESPONSE_FORMATS).optional() })
+          : schemas[definition.name],
         annotations: {
-          readOnlyHint: definition.name === "cast_reading" ? true : definition.readOnly,
-          destructiveHint: false,
-          idempotentHint: definition.name !== "cast_reading",
+          readOnlyHint: definition.name === "validate_deck_manifest" ? false : definition.name === "cast_reading" ? true : definition.readOnly,
+          destructiveHint: isImport,
+          idempotentHint: definition.name !== "cast_reading" && definition.name !== "validate_deck_manifest",
           openWorldHint: false,
         },
-        ...(securitySchemes ? { _meta: { securitySchemes } } : {}),
+        ...((securitySchemes || definition.name === "validate_deck_manifest") ? { _meta: { ...(securitySchemes ? { securitySchemes } : {}), ...(definition.name === "validate_deck_manifest" ? { "openai/fileParams": ["file"] } : {}) } } : {}),
       },
       async (input: unknown) => {
         if (isImport && options.oauth && !principalHasScopes(options.oauth.principal, requiredImportScopes)) {
@@ -164,14 +179,32 @@ export function createArcanaMcpServer(options: ArcanaMcpServerOptions = {}): Mcp
         const startedAt = Date.now();
         let ok = false;
         try {
-          const result = await adapter.call(definition.name, input);
+          const args = input as { uploadId?: string; file?: NativeManifestFile; deckId?: string; expectedRevision?: number; replaceExisting?: boolean; tagline?: string; spreads?: unknown; includeNormalizedManifest?: boolean; responseFormat?: "json" | "structured" };
+          let result: unknown;
+          if ((definition.name === "validate_deck_manifest" || isImport) && (args.uploadId || args.file)) {
+            const denied = manifestPermission(manifestOptions); if (denied) return denied;
+            if (!manifestOptions.uploads) throw new ManifestUploadError(503, "Private manifest staging is unavailable on this server.");
+            if (args.tagline !== undefined || args.spreads !== undefined) throw new ManifestUploadError(400, "File imports use the complete authored manifest; tagline and spreads belong inside it.");
+            const staged = args.file ? await stageManifest(manifestOptions, { file: args.file }) : undefined;
+            const uploadId = staged?.uploadId ?? args.uploadId!;
+            if (isImport) {
+              if (args.deckId !== undefined && args.replaceExisting === false) throw new ManifestUploadError(400, "deckId replacement conflicts with replaceExisting:false.");
+              if (args.replaceExisting && !args.deckId) throw new ManifestUploadError(400, "File replacement requires stable deckId and expectedRevision.");
+              result = await manifestOptions.uploads.import(principal!.id, uploadId, { deckId: args.deckId, expectedRevision: args.expectedRevision });
+            } else {
+              const artifact = await manifestOptions.uploads.read(principal!.id, uploadId);
+              result = { ...stagedManifestReport(artifact.json, args.includeNormalizedManifest), uploadId, sha256: artifact.sha256, byteLength: artifact.byteLength, ...(staged ? { expiresAt: staged.expiresAt } : {}) };
+            }
+          } else {
+            if (isImport && args.expectedRevision !== undefined && !options.catalog) throw new ManifestUploadError(400, "Revision-checked import requires a durable account catalog.");
+            if (isImport && args.deckId !== undefined) throw new ManifestUploadError(400, "Stable deckId import targeting requires uploadId. Use edit_deck for small edits.");
+            result = await adapter.call(definition.name, input);
+          }
           ok = true;
-          return {
-            content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-            structuredContent: { result },
-          };
+          return toolResult(result, { responseFormat: args.responseFormat, summary: summarizeToolResult(definition.name, result) });
         } catch (error) {
-          const message = error instanceof Error ? error.message : "Arcana tool call failed.";
+          const fileRequest = input && typeof input === "object" && ("uploadId" in input || "file" in input);
+          const message = fileRequest && !(error instanceof ManifestUploadError) ? "Manifest operation failed. Retry later." : error instanceof Error ? error.message : "Arcana tool call failed.";
           return { content: [{ type: "text" as const, text: message }], isError: true };
         } finally {
           options.onToolCall?.({ tool: definition.name, ok, durationMs: Date.now() - startedAt });
@@ -190,6 +223,7 @@ export function createArcanaMcpServer(options: ArcanaMcpServerOptions = {}): Mcp
   });
 
   if (options.catalog) {
+    registerDeckEditTools(server, { catalog: options.catalog, principal, oauth: options.oauth, onToolCall: options.onToolCall });
     registerArcanaCatalogTools(server, {
       adapter: localAdapter,
       catalog: options.catalog,

@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { getCardArtwork, getReadableArtwork, getOwnedArtwork, getArtworkImage, uploadCardArtwork, validateArtworkFile, MAX_ARTWORK_INPUT_BYTES } = require("../.test-build/artwork/api.js");
+const { getCardArtwork, getReadableArtwork, getOwnedArtwork, getArtworkImage, uploadCardArtwork, createArtworkSet, validateArtworkFile, MAX_ARTWORK_INPUT_BYTES } = require("../.test-build/artwork/api.js");
 const { ArtworkStore } = require("../.test-build/artwork/store.js");
 const metadata = (overrides = {}) => ({ id: "asset-1", deckId: "deck", cardSlug: "major-0", mediaType: "image/webp", width: 100, height: 150, byteLength: 4, integrity: "sha256-test", deckRevision: 1, ...overrides });
 const catalog = (artwork = metadata()) => ({ enabled: true, deckRevision: 1, cards: [{ slug: "major-0", name: "The Fool", artwork }] });
@@ -22,7 +22,7 @@ test("artwork API uses fixed same-origin routes, no-store credentials and ignore
     assert.equal(calls[0][1].credentials, "same-origin"); assert.equal(calls[0][1].redirect, "error"); assert.equal(calls[0][1].cache, "no-store");
     global.fetch = async (path, init) => { calls.push([path, init]); return new Response("test", { headers: { "content-type": "image/webp" } }); };
     await getArtworkImage(result);
-    assert.equal(calls[1][0], "/api/decks/deck/cards/major-0/artwork/image?version=asset-1");
+    assert.equal(calls[1][0], "/api/decks/deck/cards/major-0/artwork/image?version=asset-1&packId=saved-artwork");
   } finally { global.fetch = original; }
 });
 
@@ -93,7 +93,7 @@ test("refresh removes stale image immediately; failure leaves semantic fallback 
 test("logout/navigation clears blobs and ignored-abort responses cannot recreate private images", async () => {
   const pending = deferred(); let created = 0;
   const { store } = fixture({ image: () => pending.promise, createUrl: () => { ++created; return "blob:private"; } });
-  const load = store.load("major-0"); await Promise.resolve(); await Promise.resolve();
+  const load = store.load("major-0"); await new Promise(setImmediate);
   store.clear(); pending.resolve(new Blob(["test"])); await load;
   assert.equal(created, 0); assert.equal(store.get("major-0").status, "idle");
   const normal = fixture(); await normal.store.load("major-0"); normal.store.clear();
@@ -103,7 +103,7 @@ test("logout/navigation clears blobs and ignored-abort responses cannot recreate
 test("an older upload refresh cannot overwrite a newer artwork response", async () => {
   const first = deferred(); let count = 0;
   const { store } = fixture({ image: async () => ++count === 1 ? first.promise : new Blob(["test"]) });
-  const old = store.load("major-0"); await Promise.resolve(); await Promise.resolve();
+  const old = store.load("major-0"); await new Promise(setImmediate);
   await store.load("major-0", true); const latest = store.get("major-0");
   first.resolve(new Blob(["old!"])); await old;
   assert.equal(store.get("major-0"), latest);
@@ -112,4 +112,106 @@ test("an older upload refresh cannot overwrite a newer artwork response", async 
 test("deck revision mismatch never requests image bytes or acquires an object URL", async () => {
   const { store } = fixture({ catalog: async () => catalog(metadata({ deckRevision: 2 })), image: async () => assert.fail("stale revision must not fetch image") });
   await store.load("major-0"); assert.equal(store.get("major-0").status, "error");
+});
+
+function namedCatalog(packId, art = metadata({ packId })) {
+  return { ...catalog(art), packId, packs: [
+    { id: "saved-artwork", label: "Saved artwork", cardCount: 1, complete: true },
+    { id: "watercolor", label: "Watercolor", description: "Soft washes", cardCount: art ? 1 : 0, complete: !!art },
+    { id: "ink", label: "Ink", cardCount: 0, complete: false },
+  ] };
+}
+
+test("legacy catalogs and metadata normalize into Saved artwork", async () => {
+  const original = global.fetch;
+  global.fetch = async () => response(catalog());
+  try {
+    const result = await getReadableArtwork("deck");
+    assert.equal(result.packId, "saved-artwork"); assert.equal(result.cards[0].artwork.packId, "saved-artwork");
+    assert.deepEqual(result.packs, [{ id: "saved-artwork", label: "Saved artwork", cardCount: 1, complete: true }]);
+  } finally { global.fetch = original; }
+});
+
+test("named artwork API scopes catalogs, individual cards, image bytes and uploads to one set", async () => {
+  const original = global.fetch, calls = []; const signal = new AbortController().signal;
+  global.fetch = async (path, init) => {
+    calls.push([path, init]);
+    if (path.includes("/image?")) return new Response("test", { headers: { "content-type": "image/webp" } });
+    return response(path.includes("/cards/") ? metadata({ packId: "watercolor" }) : namedCatalog("watercolor"));
+  };
+  try {
+    await getOwnedArtwork("deck", signal, "watercolor"); await getReadableArtwork("deck", signal, "watercolor");
+    const result = await getCardArtwork("deck", "major-0", signal, "watercolor");
+    await getArtworkImage(result, signal);
+    await uploadCardArtwork("deck", "major-0", new File(["png"], "card.png", { type: "image/png" }), 1, null, signal, "watercolor");
+    assert.deepEqual(calls.map(([path]) => path), [
+      "/api/me/decks/deck/artwork?packId=watercolor", "/api/decks/deck/artwork?packId=watercolor",
+      "/api/decks/deck/cards/major-0/artwork?packId=watercolor", "/api/decks/deck/cards/major-0/artwork/image?version=asset-1&packId=watercolor",
+      "/api/me/decks/deck/cards/major-0/artwork?packId=watercolor",
+    ]);
+    assert.ok(calls.every(([, init]) => init.signal === signal));
+  } finally { global.fetch = original; }
+});
+
+test("another or omitted set identity never silently satisfies a named artwork request", async () => {
+  const original = global.fetch;
+  try {
+    for (const invalid of [catalog(), namedCatalog("ink"), namedCatalog("watercolor", metadata())]) {
+      global.fetch = async () => response(invalid);
+      await assert.rejects(getReadableArtwork("deck", undefined, "watercolor"), /invalid artwork/);
+    }
+    global.fetch = async () => response(metadata());
+    await assert.rejects(getCardArtwork("deck", "major-0", undefined, "watercolor"), /invalid artwork metadata/);
+    const duplicate = namedCatalog("watercolor"); duplicate.packs.push(duplicate.packs[1]);
+    global.fetch = async () => response(duplicate);
+    await assert.rejects(getOwnedArtwork("deck", undefined, "watercolor"), /invalid artwork set catalog/);
+  } finally { global.fetch = original; }
+});
+
+test("creating a named set sends bounded metadata and its deck revision, never executable visual content", async () => {
+  const original = global.fetch; let calls = 0;
+  global.fetch = async (path, init) => {
+    ++calls; assert.equal(path, "/api/me/decks/deck/artwork/sets"); assert.equal(init.method, "POST");
+    assert.deepEqual(JSON.parse(init.body), { id: "water.color_v2", label: "Watercolor", description: "Soft washes", expectedDeckRevision: 1 });
+    return response({ id: "water.color_v2", label: "Watercolor", description: "Soft washes", cardCount: 0, complete: false, imageUrl: "https://bad.test" });
+  };
+  try {
+    const result = await createArtworkSet("deck", { id: "water.color_v2", label: " Watercolor ", description: " Soft washes ", expectedDeckRevision: 1 });
+    assert.equal(result.imageUrl, undefined); assert.equal(result.complete, false);
+    for (const invalid of [{ id: "saved-artwork" }, { id: "../water" }, { label: " " }, { label: "x".repeat(81) }, { description: "x".repeat(501) }, { expectedDeckRevision: 0 }]) {
+      await assert.rejects(createArtworkSet("deck", { id: "watercolor", label: "Watercolor", expectedDeckRevision: 1, ...invalid }));
+    }
+    assert.equal(calls, 1);
+  } finally { global.fetch = original; }
+});
+
+test("switching sets revokes the old image immediately and isolates the same card and asset IDs", async () => {
+  const seen = [];
+  const { store, revoked } = fixture({ catalog: async (deckId, signal, packId = "saved-artwork") => { seen.push(packId); return namedCatalog(packId); } });
+  await store.load("major-0"); assert.equal(store.has("major-0"), true);
+  store.selectPack("watercolor"); assert.equal(store.get("major-0").status, "idle"); assert.equal(revoked.length, 1);
+  await store.load("major-0"); assert.equal(store.get("major-0").artwork.packId, "watercolor");
+  assert.deepEqual(seen, ["saved-artwork", "watercolor"]);
+});
+
+test("rapid set switching ignores late catalog and image responses even when abort is ignored", async () => {
+  const oldBytes = deferred(), oldCatalog = deferred(); let created = 0;
+  const { store } = fixture({
+    catalog: async (deckId, signal, packId = "saved-artwork") => packId === "watercolor" ? oldCatalog.promise : namedCatalog(packId),
+    image: async (art) => art.packId === "saved-artwork" ? oldBytes.promise : new Blob(["test"]),
+    createUrl: () => `blob:${++created}`,
+  });
+  const first = store.load("major-0"); await new Promise(setImmediate);
+  store.selectPack("watercolor"); const second = store.load("major-0");
+  store.selectPack("ink"); await store.load("major-0"); const current = store.get("major-0");
+  oldCatalog.resolve(namedCatalog("watercolor")); oldBytes.resolve(new Blob(["test"])); await Promise.all([first, second]);
+  assert.equal(store.get("major-0"), current); assert.equal(current.artwork.packId, "ink"); assert.equal(created, 1);
+  assert.equal(store.packId, "ink"); assert.equal(store.catalogStatus, "ready");
+});
+
+test("set mismatches and missing slots never fetch another set's images", async () => {
+  const { store } = fixture({ catalog: async () => namedCatalog("watercolor", null), image: async () => assert.fail("must not fetch image bytes") });
+  store.selectPack("watercolor"); await store.load("major-0"); assert.equal(store.get("major-0").status, "missing");
+  const mismatch = fixture({ catalog: async () => namedCatalog("watercolor", metadata({ packId: "ink" })), image: async () => assert.fail("must not fetch mismatched bytes") });
+  mismatch.store.selectPack("watercolor"); await mismatch.store.load("major-0"); assert.equal(mismatch.store.get("major-0").status, "error");
 });

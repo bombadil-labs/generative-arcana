@@ -106,6 +106,12 @@ async function main(): Promise<void> {
 
     const protectedCalls = [
       call("list_my_decks"),
+      call("create_manifest_upload", { byteLength: 2 }),
+      call("stage_deck_manifest", { json: "{}" }),
+      call("validate_deck_manifest", { uploadId: "00000000-0000-4000-8000-000000000001" }),
+      call("validate_deck_manifest", { file: { download_url: "https://files.oaiusercontent.com/test", file_id: "file-test" } }),
+      call("edit_deck", { deckId: privateDeck.id, expectedRevision: 1, metadata: { tagline: "Changed" } }),
+      call("create_visual_pack", { deckId: privateDeck.id, packId: "gpt", label: "GPT", expectedDeckRevision: 1 }),
       call("set_card_artwork", { deckId: privateDeck.id, cardSlug: "major-0", mediaType: "image/png", base64: "YWJj", expectedDeckRevision: 1, expectedArtworkId: null }),
       call("import_deck", { manifest: neutralManifest("unauthorized-shapes") }),
       call("set_deck_visibility", { deckId: privateDeck.id, visibility: "public" }),

@@ -3,7 +3,7 @@ import { neon } from "@neondatabase/serverless";
 import type { DeckVisibility, UserDeckManifest, UserDeckRecord } from "../../app/src/decks/catalog.js";
 import { validateDeckManifest } from "../../app/src/decks/manifest.js";
 import { immutableJsonSnapshot } from "../../app/src/decks/jsonSnapshot.js";
-import type { UserDeckCatalogRepository } from "./userDeckCatalog.js";
+import { requireExpectedRevision, UserDeckRevisionConflictError, type UserDeckCatalogRepository } from "./userDeckCatalog.js";
 
 type NeonSql = (strings: TemplateStringsArray, ...params: unknown[]) => Promise<Array<Record<string, unknown>>>;
 
@@ -105,6 +105,38 @@ export class NeonUserDeckCatalogRepository implements UserDeckCatalogRepository 
     `;
     if (!rows.length) throw new Error("User deck upsert returned no row.");
     return parseRow(rows[0]!);
+  }
+
+  async replaceOwned(ownerId: string, deckId: string, expectedRevision: number, manifest: UserDeckManifest): Promise<UserDeckRecord> {
+    const owner = requireText(ownerId, "ownerId");
+    const id = requireText(deckId, "deckId");
+    const expected = requireExpectedRevision(expectedRevision);
+    const clean = snapshotManifest(manifest);
+    let rows: Array<Record<string, unknown>>;
+    try {
+      // Ownership and revision are predicates of the write itself, not just an earlier read.
+      // PostgreSQL rechecks them after waiting for a concurrent row writer; exactly one wins.
+      rows = await this.sql`
+        UPDATE arcana_user_decks
+        SET slug = ${clean.data.slug}, manifest = ${JSON.stringify(clean)}::jsonb,
+            revision = revision + 1, updated_at = now()
+        WHERE id = ${id} AND owner_id = ${owner} AND revision = ${expected}
+        RETURNING id, owner_id, slug, manifest, visibility, revision, created_at, updated_at, published_at
+      `;
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "23505") {
+        throw new Error(`A deck with slug “${clean.data.slug}” is already owned by this account.`);
+      }
+      throw error;
+    }
+    if (rows.length) return parseRow(rows[0]!);
+    // This read only improves the error. It never participates in accepting a write, and remains
+    // owner-scoped so neither existence nor revision is revealed for another account's deck.
+    const existing = await this.sql`
+      SELECT revision FROM arcana_user_decks WHERE id = ${id} AND owner_id = ${owner} LIMIT 1
+    `;
+    if (!existing.length) throw new Error("Unknown owned user deck.");
+    throw new UserDeckRevisionConflictError(expected, requireExpectedRevision(Number(existing[0]!.revision)));
   }
 
   async setVisibility(ownerId: string, deckId: string, visibility: DeckVisibility): Promise<UserDeckRecord> {

@@ -253,6 +253,7 @@ const SPREAD_WIDGET_HTML = String.raw`<!doctype html>
         var header = element("header", "spread-header");
         header.appendChild(element("h2", "spread-title", result.deckName + " · " + result.spreadName));
         if (result.question) header.appendChild(element("p", "spread-question", result.question));
+        if (result.layout && result.layout.packLabel) header.appendChild(element("p", "spread-question", "Visual set · " + result.layout.packLabel));
         shell.appendChild(header);
         var meta = element("div", "living-meta");
         meta.appendChild(element("span", "living-pill", "Living Spread"));
@@ -282,6 +283,7 @@ const SPREAD_WIDGET_HTML = String.raw`<!doctype html>
         var header = element("header", "spread-header");
         header.appendChild(element("h2", "spread-title", result.deckName + " · " + result.spreadName));
         if (result.question) header.appendChild(element("p", "spread-question", result.question));
+        if (result.layout && result.layout.packLabel) header.appendChild(element("p", "spread-question", "Visual set · " + result.layout.packLabel));
         shell.appendChild(header);
 
         var grid = element("div", "spread-grid");

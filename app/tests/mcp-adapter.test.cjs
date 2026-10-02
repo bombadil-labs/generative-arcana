@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const { ArcanaEngine } = require("../.test-build/engine/ArcanaEngine.js");
 const { DeckRegistry } = require("../.test-build/decks/registry.js");
 const { ArcanaToolAdapter, ARCANA_TOOL_NAMES } = require("../.test-build/mcp/ArcanaToolAdapter.js");
+const { snapshotDeckManifest, validateDeckManifest } = require("../.test-build/decks/manifest.js");
 const { rawDeck } = require("./fixtures.cjs");
 
 function adapter() {
@@ -14,6 +15,82 @@ function adapter() {
 test("tool contract exposes the intended initial MCP surface", () => {
   const { tools } = adapter();
   assert.deepEqual(tools.definitions().map((tool) => tool.name), [...ARCANA_TOOL_NAMES]);
+});
+
+test("get_deck keeps the historical runtime projection by default and explicitly", async () => {
+  const { deck, tools } = adapter();
+  assert.strictEqual(await tools.call("get_deck", { deckId: deck.id }), deck);
+  assert.strictEqual(await tools.call("get_deck", { deckId: deck.id, view: "full" }), deck);
+  assert.ok(Array.isArray(deck.cards));
+  assert.deepEqual(deck.data.cards[deck.cards[0].slug], deck.cards[0]);
+});
+
+test("get_deck manifest view returns the canonical artifact with card bodies only once", async () => {
+  const { deck, tools } = adapter();
+  const manifest = await tools.call("get_deck", { deckId: deck.id, view: "manifest" });
+  assert.deepEqual(manifest, snapshotDeckManifest(deck));
+  assert.equal(manifest.schemaVersion, 2);
+  assert.equal(manifest.cards, undefined);
+  assert.equal(manifest.id, undefined, "runtime resource identity is not authored into the manifest");
+  assert.deepEqual(manifest.data.cards, deck.data.cards);
+  assert.equal(validateDeckManifest(manifest).ok, true);
+  assert.ok(JSON.stringify(manifest).length < JSON.stringify(deck).length * 0.7,
+    "the lean manifest must materially reduce the duplicated runtime payload");
+});
+
+test("get_deck summary and structure omit card bodies without changing source data", async () => {
+  const { deck, tools } = adapter();
+  const before = JSON.stringify(deck);
+  const summary = await tools.call("get_deck", { deckId: deck.id, view: "summary" });
+  assert.equal(summary.id, deck.id);
+  assert.equal(summary.slug, deck.data.slug);
+  assert.equal(summary.name, deck.name);
+  assert.equal(summary.cardCount, deck.cards.length);
+  assert.equal(summary.suitCount, Object.keys(deck.data.suits).length);
+  assert.equal(summary.rankCount, Object.keys(deck.data.ranks).length);
+  assert.equal(summary.stationCount, Object.keys(deck.data.transversal.stations).length);
+  assert.equal(summary.spreadCount, (await tools.call("list_spreads", { deckId: deck.id })).length);
+  assert.equal(summary.nativeSpreadCount, 0);
+  assert.equal(summary.data, undefined);
+  assert.equal(summary.cards, undefined);
+
+  const structure = await tools.call("get_deck", { deckId: deck.id, view: "structure" });
+  assert.deepEqual(structure.summary, summary);
+  assert.deepEqual(structure.cardOrder, deck.cards.map((card) => card.slug));
+  const { cards, ...dataWithoutCards } = deck.data;
+  assert.deepEqual(structure.data, dataWithoutCards);
+  assert.equal(structure.data.cards, undefined);
+  assert.equal(structure.cards, undefined);
+  assert.equal(structure.schemaVersion, undefined, "structure is not advertised as an importable manifest");
+  assert.equal(structure.spreads, undefined);
+  assert.equal(JSON.stringify(deck), before);
+});
+
+test("lean deck views preserve runtime identity, authored extensions and native spreads", async () => {
+  const registry = new DeckRegistry();
+  const data = rawDeck();
+  data.authoring_profile = { name: "Extension survives projection" };
+  const nativeSpread = { id: "native", name: "Native", description: "One card", positions: [{ name: "Here", prompt: "What is here?" }] };
+  const deck = registry.registerDeck({ data, tagline: "Fixture", runtimeId: "resource-123", custom: true, spreads: [nativeSpread] });
+  const tools = new ArcanaToolAdapter(new ArcanaEngine(registry));
+  const summary = await tools.call("get_deck", { deckId: data.slug, view: "summary" });
+  assert.equal(summary.id, "resource-123");
+  assert.equal(summary.slug, data.slug);
+  assert.equal(summary.custom, true);
+  assert.equal(summary.nativeSpreadCount, 1);
+  const structure = await tools.call("get_deck", { deckId: deck.id, view: "structure" });
+  assert.deepEqual(structure.data.authoring_profile, data.authoring_profile);
+  assert.deepEqual(structure.spreads, deck.spreads);
+  const manifest = await tools.call("get_deck", { deckId: deck.id, view: "manifest" });
+  assert.deepEqual(manifest, snapshotDeckManifest(deck));
+});
+
+test("get_deck rejects invalid views instead of silently sending a full deck", async () => {
+  const { deck, tools } = adapter();
+  for (const view of ["compact", "", null, false, [], {}]) {
+    await assert.rejects(tools.call("get_deck", { deckId: deck.id, view }), /view must be one of/);
+  }
+  await assert.rejects(tools.call("get_deck", { deckId: "missing", view: "summary" }), /Unknown deck/);
 });
 
 test("get_card preserves card fields and adds a complete render projection", async () => {

@@ -15,3 +15,10 @@
 .artwork-preview figcaption { margin-top: 10px; color: var(--ink-3); font-size: 12px; }
 .artwork-error, .artwork-success { padding: 12px 16px; background: var(--paper-2); border-left: 3px solid var(--accent); overflow-wrap: anywhere; }
 @media (max-width: 600px) { .artwork-layout { grid-template-columns: minmax(0, 1fr); } .artwork-preview { width: min(220px, 100%); } }
+.artwork-set-controls { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; margin-top: 24px; }
+.artwork-set-controls > div { flex: 1 1 280px; }
+.artwork-set-controls label { margin-top: 0; }
+.artwork-set-controls > button { margin-bottom: 2px; }
+.artwork-create-set { padding: 20px; margin-top: 24px; max-width: 620px; border: 1px solid var(--line-2); border-radius: var(--r-2); background: var(--paper-2); }
+.artwork-create-set h2 { margin: 0; font: 400 24px/1.2 var(--font-display); }
+.artwork-create-actions { display: flex; gap: 12px; margin-top: 20px; }

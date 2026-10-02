@@ -4,7 +4,7 @@ import { isIllustrated, listPacks } from "@/runtime/defineCard";
 import { DeckGrid } from "@/components/DeckGrid";
 import { navigate } from "./router";
 import { getPackId, setPackId } from "./packPref";
-import { useArtworkStore, useArtworkVersion } from "../artwork/context";
+import { useArtworkStore, useArtworkVersion, useArtworkSelection } from "../artwork/context";
 import type { CardData } from "@/runtime/types";
 
 type Named = { slug?: string; name: string; index?: number };
@@ -31,6 +31,7 @@ export function CardBrowser({ deckId }: { deckId: string }) {
   const deck = getDeck(deckId);
   const artwork = useArtworkStore();
   const artworkVersion = useArtworkVersion();
+  const artworkSelection = useArtworkSelection();
   const [q, setQ] = useState("");
   const [arcana, setArcana] = useState("");
   const [suit, setSuit] = useState("");
@@ -41,7 +42,7 @@ export function CardBrowser({ deckId }: { deckId: string }) {
 
   const packs = listPacks(deckId);
   const [pack, setPack] = useState(() => getPackId(deckId, packs[0]?.id ?? ""));
-  const prefer = (packs.find((p) => p.id === pack) ?? packs[0])?.id;
+  const prefer = artworkSelection?.packId ?? (packs.find((p) => p.id === pack) ?? packs[0])?.id;
 
   const opts = useMemo(() => {
     if (!deck) return { suits: [], ranks: [], virtues: [] as Named[] };
@@ -63,7 +64,7 @@ export function CardBrowser({ deckId }: { deckId: string }) {
       if (rank && c.rank_slug !== rank) return false;
       if (virtue && c.station_slug !== virtue) return false;
       if (comp && numericKind(c.number) !== comp) return false;
-      if (illustratedOnly && !artwork?.has(c.slug) && !isIllustrated(deckId, c.slug)) return false;
+      if (illustratedOnly && !(artwork ? artwork.hasArtwork(c.slug) : isIllustrated(deckId, c.slug))) return false;
       return true;
     });
   }, [deck, q, arcana, suit, rank, virtue, comp, illustratedOnly, artwork, artworkVersion]);
@@ -121,7 +122,17 @@ export function CardBrowser({ deckId }: { deckId: string }) {
           <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--ink-3)" }}>
             {filtered.length} of {deck.cards.length} cards
           </span>
-          {packs.length > 1 && (() => {
+          {artworkSelection && <div style={{ display: "flex", alignItems: "center", gap: "var(--s-2)", flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <label htmlFor="browser-artwork-set" style={skinLabel}>Artwork set</label>
+            <select id="browser-artwork-set" value={artworkSelection.packId} onChange={(event) => artworkSelection.selectPack(event.target.value)} style={selectStyle}>
+              {!artworkSelection.packs.some((item) => item.id === artworkSelection.packId) && <option value={artworkSelection.packId}>{artworkSelection.packId} · unavailable</option>}
+              {artworkSelection.packs.map((item) => <option key={item.id} value={item.id}>{item.label} · {item.cardCount}/{deck.cards.length}{item.complete ? " · complete" : ""}</option>)}
+            </select>
+            {artworkSelection.status === "loading" && <span role="status" style={skinCaption}>Loading this artwork set…</span>}
+            {artworkSelection.packs.find((item) => item.id === artworkSelection.packId)?.description && <span style={skinCaption}>{artworkSelection.packs.find((item) => item.id === artworkSelection.packId)?.description}</span>}
+            {artworkSelection.error && <span role="alert" style={skinCaption}>{artworkSelection.error} <button type="button" onClick={artworkSelection.refresh} style={linkBtn}>Retry artwork</button></span>}
+          </div>}
+          {!artworkSelection && packs.length > 1 && (() => {
             const active = packs.find((p) => p.id === pack) ?? packs[0];
             const caption = active.description ?? "";
             return (
