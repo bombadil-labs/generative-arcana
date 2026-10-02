@@ -20,10 +20,13 @@ file/reference transfer when the server exposes it. Keep the canonical authored 
    length and optional local SHA-256. Make one plain PUT of the file with Content-Type application/json
    and the returned upload-only Authorization header. Do not extract or pass account OAuth tokens
    into a sandbox. Compare the server's received SHA-256, then validate using `{ uploadId }`.
-3. If neither transport is available, `stage_deck_manifest({ json })` sends the artifact inline
-   once; validate and import by `uploadId` afterward. Do not regenerate the entire deck merely
-   because a host cannot upload. An MCP connection does not imply sandbox egress.
-4. For older servers or offline-compatible inline validation, call:
+3. If neither file transport is available, prefer incremental MCP drafts when exposed. A sandbox
+   `host_not_allowed` error on PUT, including in Claude, is a reason to use the connector's draft
+   tools rather than repeatedly attempting sandbox egress. An MCP connection does not imply
+   that its sandbox can reach the upload host. Do not extract account OAuth tokens into a sandbox.
+4. If draft tools are unavailable, `stage_deck_manifest({ json })` sends the artifact inline once;
+   validate and import by `uploadId` afterward. Do not regenerate the entire deck merely because
+   a host cannot upload. For older servers or offline-compatible inline validation, call:
 
 ```text
 validate_deck_manifest({ manifest: <the complete manifest> })
@@ -40,6 +43,41 @@ Treat results this way:
 
 Inline validation is stateless. File validation stages private transient bytes for 15 minutes; validation by uploadId reads those same immutable bytes. Neither creates or publishes a deck. Repairs require a new upload, so a validated upload cannot be overwritten before import.
 
+## Incremental MCP assembly
+
+For a host without usable native-file or raw HTTP transfer, assemble the authored manifest over
+MCP in bounded batches. This preserves the same deck schema and authoring grammar:
+
+1. `start_deck_draft({startKey})` returns a private `draftId`, `version:1` and fixed two-hour
+   expiry. Pick a unique key of 1–80 ASCII letters, digits, underscores or hyphens; reuse it only
+   when recovering the same start after a lost response.
+2. `update_deck_draft({draftId,expectedVersion,mutationId,...})` adds metadata and typed entity
+   batches. `metadata` supports `schemaVersion`, `tagline`, and `data` fields excluding cards,
+   suits, ranks and transversal. `transversal` supplies its fields except stations. Cards and
+   spreads use `{upsert:[<complete entities>],remove:[<slugs or IDs>]}`. Suits, ranks and stations
+   use `{upsert:[{key:<dictionary key>,value:<complete entity>}],remove:[<keys>]}`. Preserve
+   extension fields when replacing an entity. `metadata.remove` and `transversalRemove` remove
+   fields in their respective sections; arbitrary JSON patches are not supported.
+3. Each batch must fit both 20 combined operations and 64 KiB of UTF-8 JSON. Each metadata
+   field, entity upsert and removal counts. Follow the returned version for the next batch.
+   After a lost response, retry identical arguments with the same mutationId. Changing content
+   or expectedVersion requires a fresh mutationId; never blindly replay against a newer version.
+   Replays include the original applied version and currentVersion; read current state before
+   continuing when they differ.
+4. Recover with `get_deck_draft({draftId})` for summary/version/expiry only. Select a named
+   section (`metadata`, `transversal`, `cards`, `suits`, `ranks`, `stations`, `spreads`) plus
+   optional `keys`, `offset` and `limit` for bounded pages. Follow `nextOffset`; do not fetch
+   all content when a summary or one affected card is enough.
+5. `validate_deck_draft({draftId,expectedVersion})` runs full canonical validation and returns
+   bounded repair diagnostics. Incomplete intermediate drafts are allowed during assembly,
+   but finish only after `valid:true, canonical:true`. Repair with more bounded updates.
+
+All draft tools require account read/write permissions. Drafts are private staging and create
+no catalog deck until explicit commit. They allow at most 512 successful mutations and
+2,000,000 assembled UTF-8 bytes; the two-hour expiry does not slide on activity. Authored text
+still passes through model tool arguments. Batching reduces per-call size and retry costs; it
+does not make this zero-copy transfer or guarantee a particular host's acceptance.
+
 ## Import is separate
 
 Only import when the user actually wants the deck added to the connected Generative Arcana account/host and the relevant stateful tool is available. Validation success alone is not permission to mutate account state.
@@ -48,6 +86,12 @@ For a staged file, call `import_deck({ uploadId })`; do not send the full file a
 retry with the same uploadId and options returns its original result for 24 hours. Replacement
 requires the existing stable `deckId` and current `expectedRevision` together. On a revision
 conflict, read current state and reconcile rather than blindly overwriting another host's changes.
+
+For a validated draft, explicitly call `commit_deck_draft({draftId,expectedVersion})` after the
+user authorizes saving. It revalidates the whole canonical manifest and writes the catalog and
+receipt atomically. Replacement additionally requires stable `deckId` and current
+`expectedRevision` together. Retry identical commit arguments to recover the original result
+for 24 hours. Use the draft commit tool, not `import_deck({uploadId:draftId})`.
 
 For older servers, pass the exact validated authored artifact:
 

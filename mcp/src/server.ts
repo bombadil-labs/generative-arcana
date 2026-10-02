@@ -1,4 +1,5 @@
 import { registerDeckEditTools } from "./deckEditTools";
+import { registerManifestDraftTools } from "./manifestDraftTools";
 import { toolResult, summarizeToolResult, ARCANA_RESPONSE_FORMATS } from "./toolResult";
 import { registerManifestUploadTools, stageManifest, manifestPermission, nativeManifestFileSchema, type ManifestToolOptions } from "./manifestUploadTools";
 import type { NativeManifestFile } from "./nativeManifestFile";
@@ -136,6 +137,7 @@ export function createArcanaMcpServer(options: ArcanaMcpServerOptions = {}): Mcp
   registerAuthoringGuide(server, options.onToolCall);
   const manifestOptions: ManifestToolOptions = { ...options.manifestUploads, principal, oauth: options.oauth };
   registerManifestUploadTools(server, manifestOptions);
+  registerManifestDraftTools(server, manifestOptions);
   registerArtworkTools(server, { artwork: options.artwork, principal, oauth: options.oauth });
   const readSchemes = options.oauth ? optionalOAuthSecuritySchemes(options.oauth.readScopes) : undefined;
 

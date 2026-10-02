@@ -5,14 +5,17 @@ import { principalHasScopes, type ArcanaPrincipal } from "./principal";
 import type { CatalogOAuthContext } from "./catalogTools";
 import { MAX_MANIFEST_UPLOAD_BYTES, ManifestUploadError, hashBytes, type ManifestUploadRepository } from "./manifestUploads";
 import { fetchNativeManifest, type NativeManifestFile } from "./nativeManifestFile";
+import type { ManifestDraftRepository } from "./manifestDrafts";
 
 export const nativeManifestFileSchema = z.object({ download_url: z.string().max(8192), file_id: z.string().min(1).max(256), mime_type: z.string().max(128).optional(), file_name: z.string().max(256).optional() }).strict();
 export interface ManifestToolOptions {
   uploads?: ManifestUploadRepository;
+  drafts?: ManifestDraftRepository;
   uploadOrigin?: string;
   principal?: ArcanaPrincipal | null;
   oauth?: CatalogOAuthContext;
   allowCreate?: (ownerId: string) => Promise<boolean>;
+  allowDraftOperation?: (ownerId: string) => Promise<boolean>;
 }
 export function manifestPermission(options: ManifestToolOptions) {
   const scopes = options.oauth ? [...new Set([...options.oauth.readScopes, ...options.oauth.writeScopes])] : [];
@@ -33,7 +36,7 @@ export function registerManifestUploadTools(server: McpServer, options: Manifest
   const scopes = options.oauth ? [...new Set([...options.oauth.readScopes, ...options.oauth.writeScopes])] : [];
   const metadata = options.oauth ? { securitySchemes: requiredOAuthSecuritySchemes(scopes) } : {};
   server.registerTool("create_manifest_upload", {
-    description: "Create a private, one-object, 15-minute JSON upload ticket. Upload exact file bytes with PUT using returned URL and upload-only Authorization header; never use your account OAuth token in a sandbox. Then validate_deck_manifest/import_deck using uploadId. Requires host network egress; otherwise use stage_deck_manifest inline once.",
+    description: "Create a private, one-object, 15-minute JSON upload ticket. Upload exact file bytes with PUT using returned URL and upload-only Authorization header; never use your account OAuth token in a sandbox. Then validate_deck_manifest/import_deck using uploadId. Requires host network egress; if blocked (host_not_allowed), prefer start_deck_draft and bounded update_deck_draft batches over MCP. stage_deck_manifest inline remains a compatibility fallback.",
     inputSchema: z.object({ byteLength: z.number().int().min(1).max(MAX_MANIFEST_UPLOAD_BYTES), sha256: z.string().regex(/^[0-9a-f]{64}$/).optional() }).strict(),
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     _meta: metadata,
