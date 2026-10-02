@@ -2,7 +2,7 @@ import * as z from "zod/v4";
 import { randomBytes, randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import {
-  hashBytes, MAX_ACTIVE_MANIFEST_UPLOADS, ManifestUploadError, ManifestDraftVersionConflict,
+  DRAFT_SHA256_BASIS, hashBytes, MAX_ACTIVE_MANIFEST_UPLOADS, ManifestUploadError, ManifestDraftVersionConflict,
   PostgresManifestUploads, stagedManifestReport, type ManifestImportOptions,
 } from "./manifestUploads";
 import {
@@ -106,8 +106,8 @@ export class PostgresManifestDrafts implements ManifestDraftRepository {
   private status(row: DraftRow): Record<string, unknown> {
     return {
       draftId: String(row.id), version: Number(row.draft_version), state: row.import_result ? "committed" : "editing",
-      expiresAt: new Date(row.expires_at).toISOString(), sha256: row.sha256, byteLength: Number(row.byte_length),
-      ...(row.import_result ? { receipt: row.import_result } : { summary: draftSummary(String(row.draft_json)) }),
+      expiresAt: new Date(row.expires_at).toISOString(), sha256: row.sha256, sha256Basis: DRAFT_SHA256_BASIS, byteLength: Number(row.byte_length),
+      ...(row.import_result ? { receipt: { ...row.import_result, sha256Basis: DRAFT_SHA256_BASIS } } : { summary: draftSummary(String(row.draft_json)) }),
     };
   }
   private expectVersion(row: DraftRow, expectedVersion: number) {

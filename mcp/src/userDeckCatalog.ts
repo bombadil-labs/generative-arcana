@@ -111,7 +111,16 @@ export class CatalogPersistingArcanaToolAdapter extends ArcanaToolAdapter {
     // Serialize refresh/read/import together so a slow snapshot cannot clobber a newer local write.
     const operation = this.operationTail.then(async () => {
       await this.refreshOwnedDecks();
-      return name === "import_deck" ? this.importCatalogDeck(input) : super.call(name, input);
+      if (name === "import_deck") return this.importCatalogDeck(input);
+      const result = await super.call(name, input);
+      if (name !== "get_deck") return result;
+      const view = input && typeof input === "object" ? (input as Record<string, unknown>).view : undefined;
+      const record = result as Record<string, unknown>;
+      const summary = view === "structure" ? record.summary as Record<string, unknown> : record;
+      // This map and the engine data came from the same refreshed snapshot above. Do not read
+      // the catalog again here: a later row could pair a newer revision with older content.
+      const revision = typeof summary?.id === "string" ? this.revisions.get(summary.id) : undefined;
+      return withDeckSummaryRevision(result, view, revision);
     });
     this.operationTail = operation.then(() => undefined, () => undefined);
     return operation;
@@ -187,6 +196,17 @@ export class CatalogPersistingArcanaToolAdapter extends ArcanaToolAdapter {
       revision: record.revision,
     };
   }
+}
+
+/** Transport metadata only: never put a catalog revision into the canonical authored manifest. */
+export function withDeckSummaryRevision(result: unknown, view: unknown, revision: number | undefined): unknown {
+  if (revision === undefined || !result || typeof result !== "object" || Array.isArray(result)) return result;
+  const projection = result as Record<string, unknown>;
+  if (view === "summary") return { ...projection, revision };
+  if (view === "structure" && projection.summary && typeof projection.summary === "object") {
+    return { ...projection, summary: { ...projection.summary, revision } };
+  }
+  return result;
 }
 
 /** Small contract-faithful implementation for tests and non-durable development callers. */

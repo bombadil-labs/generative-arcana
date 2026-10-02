@@ -43,6 +43,7 @@ try {
   };
   const started = await drafts.start("alice","resume-key");
   assert.equal(started.version,1);
+  assert.equal(started.sha256Basis,"assembled-json-sorted-keys-compact-utf8-v1");
   assert.equal(started.state,"editing");
   assert.deepEqual(await replica.start("alice","resume-key"),started);
   assert.equal((await row(started.draftId)).draft_key,"resume-key");
@@ -58,6 +59,7 @@ try {
   const update = {draftId:started.draftId,expectedVersion:1,mutationId:"first",metadata:{tagline:"A first line."}};
   const changed = await drafts.update("alice",update);
   assert.equal(changed.version,2);
+  assert.equal(changed.sha256Basis,started.sha256Basis);
   assert.equal(changed.expiresAt,started.expiresAt,"writes cannot extend expiry indefinitely");
   const replay = await replica.update("alice",update);
   assert.equal(replay.replayed,true); assert.equal(replay.version,2);
@@ -74,6 +76,7 @@ try {
   await assert.rejects(oldDeployment.import("alice",String(ready.draftId)),/Upload bytes before importing/);
   const validated = await replica.validate("alice",String(ready.draftId),Number(ready.version));
   assert.equal((validated.validation as {valid:boolean}).valid,true);
+  assert.equal(validated.sha256Basis,started.sha256Basis);
   assert.equal(await count(),0,"validating does not insert a catalog deck");
   const partial = await replica.read("alice",{draftId:ready.draftId,section:"cards",limit:2});
   assert.equal(((partial.part as {entries:unknown[]}).entries).length,2);
@@ -86,6 +89,9 @@ try {
   assert.equal((await row(ready.draftId)).raw_json,null,"old deployment imports see no finalized source bytes");
   const receipts = await Promise.all(Array.from({length:4},()=>drafts.commit("alice",String(ready.draftId),Number(ready.version))));
   for (const receipt of receipts) assert.deepEqual(receipt,receipts[0]);
+  assert.equal(receipts[0].sha256Basis,started.sha256Basis);
+  await db.query("UPDATE arcana_manifest_uploads SET import_result=import_result-'sha256Basis' WHERE id=$1",[ready.draftId]);
+  assert.equal((await drafts.commit("alice",String(ready.draftId),Number(ready.version))).sha256Basis,started.sha256Basis,"old receipts gain response metadata without rewriting stored data");
   assert.equal(await count(),1);
   assert.equal((await row(ready.draftId)).raw_json,null);
   assert.equal((await row(ready.draftId)).draft_json,null);

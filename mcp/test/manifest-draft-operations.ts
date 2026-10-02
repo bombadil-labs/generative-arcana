@@ -5,6 +5,7 @@ import {
   INITIAL_DRAFT_JSON, MAX_DRAFT_READ_BYTES, MAX_DRAFT_UPDATE_BYTES,
   applyDraftUpdate, canonicalDraftJson, draftReadSchema, draftSummary, draftUpdateSchema, readDraftPart,
 } from "../src/manifestDraftOperations.js";
+import { hashBytes } from "../src/manifestUploads.js";
 import { neutralManifest } from "./protocol-fixtures.js";
 
 const draftId = "82f5a10a-2fbb-4b95-bd80-2f33c76c42a3";
@@ -154,3 +155,12 @@ assert.ok("entries" in remainder);
 assert.equal(remainder.entries[0].key, "data.extension-1");
 assert.equal(remainder.nextOffset, null);
 console.log("Incremental semantic draft assembly, typed local checks, preserved extensions, deterministic order and bounded reads passed.");
+
+// Equal byte counts do not establish either byte identity or user-file semantic parity.
+const orderA = '{"z":1,"a":2}', orderB = '{"a":2,"z":1}';
+assert.equal(Buffer.byteLength(orderA),Buffer.byteLength(orderB));
+assert.notEqual(hashBytes(orderA),hashBytes(orderB));
+assert.equal(hashBytes(canonicalDraftJson(JSON.parse(orderA))),hashBytes(canonicalDraftJson(JSON.parse(orderB))));
+assert.equal(hashBytes(canonicalDraftJson(JSON.parse(' { "a": 2, "z": 1 } '))),hashBytes(orderB));
+assert.notEqual(hashBytes(canonicalDraftJson({a:[1,2]})),hashBytes(canonicalDraftJson({a:[2,1]})),"array order is part of the assembled byte hash");
+assert.notEqual(hashBytes(canonicalDraftJson({a:"x y"})),hashBytes(canonicalDraftJson({a:"xy"})),"authored string whitespace is preserved");

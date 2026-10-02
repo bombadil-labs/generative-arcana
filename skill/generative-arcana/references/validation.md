@@ -71,6 +71,13 @@ MCP in bounded batches. This preserves the same deck schema and authoring gramma
 5. `validate_deck_draft({draftId,expectedVersion})` runs full canonical validation and returns
    bounded repair diagnostics. Incomplete intermediate drafts are allowed during assembly,
    but finish only after `valid:true, canonical:true`. Repair with more bounded updates.
+   Draft responses label the hash as `sha256Basis:"assembled-json-sorted-keys-compact-utf8-v1"`:
+   SHA-256 and byteLength refer to assembled JSON before import normalization, with recursively
+   sorted object keys (JavaScript UTF-16 lexical order), preserved array order, compact
+   JSON.stringify scalar/string encoding, UTF-8, and no BOM or trailing newline. This is not an
+   original-file byte hash or an assertion of equality with a local file. Equal byte counts do
+   not prove byte/content parity. Compare actual parsed values or use the same serialization
+   algorithm before explaining a hash mismatch. File staging instead labels `original-upload-bytes`.
 
 All draft tools require account read/write permissions. Drafts are private staging and create
 no catalog deck until explicit commit. They allow at most 512 successful mutations and
@@ -115,7 +122,11 @@ For a small change to an existing owned deck, use `edit_deck` with its stable `d
 `expectedRevision`, and typed card/spread upserts or removals (at most 20 combined operations,
 64 KiB per request). Metadata supports name, version, tagline and theme fields. Full-card upserts
 replace that card; preserve the other fields deliberately. The server validates the resulting
-whole manifest before its atomic write. Deck meaning stays separate from visual image sets.
+whole manifest before its atomic write. For an owned catalog deck, obtain the current revision
+from `get_deck({deckId,view:"summary"}).revision`, the structure view's `summary.revision`, or
+`list_my_decks`; do not deliberately submit a stale write to discover it. Summary content and
+revision come from the same snapshot. Built-in/non-catalog and shared non-owned summaries omit
+this editing metadata. Deck meaning stays separate from visual image sets.
 
 Use `get_deck({deckId,view:"summary"})` for counts, `view:"structure"` for axes and card slugs,
 and `get_card` for a chosen card. `view:"manifest"` exports the canonical artifact with each card

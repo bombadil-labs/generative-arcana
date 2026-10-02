@@ -47,7 +47,7 @@ export function registerManifestDraftTools(server: McpServer, options: ManifestT
     },
     {
       name: "get_deck_draft",
-      description: "Recover a private draft's current version, expiry and counts without returning the whole manifest. Omit section for summary only. Select metadata, transversal, cards, suits, ranks, stations or spreads for a bounded page (up to 20 entries and 64 KiB), optionally filtering keys or using offset/limit. Follow nextOffset. Requires the same deck read/write scopes as draft creation.",
+      description: "Recover a private draft's current version, expiry and counts without returning the whole manifest. Omit section for summary only. Select metadata, transversal, cards, suits, ranks, stations or spreads for a bounded page (up to 20 entries and 64 KiB), optionally filtering keys or using offset/limit. Follow nextOffset. sha256Basis identifies sorted-key compact UTF-8 assembled JSON, not the original local file bytes or proof of semantic equality. Requires the same deck read/write scopes as draft creation.",
       schema: draftReadSchema,
       readOnly: true,
       destructive: false,
@@ -59,7 +59,7 @@ export function registerManifestDraftTools(server: McpServer, options: ManifestT
     },
     {
       name: "validate_deck_draft",
-      description: "Run the complete canonical DeckManifest validator on a private draft at expectedVersion. Returns bounded diagnostics and a compact summary without importing, publishing or echoing the whole deck. Incomplete intermediate drafts may fail validation; repair with update_deck_draft and validate the new version. Commit revalidates independently.",
+      description: "Run the complete canonical DeckManifest validator on a private draft at expectedVersion. Returns bounded diagnostics and a compact summary without importing, publishing or echoing the whole deck. Incomplete intermediate drafts may fail validation; repair with update_deck_draft and validate the new version. Commit revalidates independently. sha256 hashes the assembled sorted-key compact UTF-8 JSON before import normalization; compare original-file bytes only on the file-upload route.",
       schema: draftValidateSchema,
       readOnly: true,
       destructive: false,
