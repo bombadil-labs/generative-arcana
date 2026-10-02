@@ -8,6 +8,7 @@ import { InMemoryUserDeckCatalogRepository, restoreUserDeckRecords } from "../sr
 
 const RESOURCE_METADATA = "https://arcana.example/.well-known/oauth-protected-resource/mcp";
 const OAUTH = {
+  requestOfflineAccess: true,
   resourceMetadataUrl: RESOURCE_METADATA,
   readScopes: ["decks:read"],
   writeScopes: ["decks:write"],
@@ -33,12 +34,12 @@ async function main(): Promise<void> {
     assert.ok(publicTool);
     assert.deepEqual((publicTool._meta as { securitySchemes?: unknown[] })?.securitySchemes, [
       { type: "noauth" },
-      { type: "oauth2", scopes: ["decks:read"] },
+      { type: "oauth2", scopes: ["decks:read", "offline_access"] },
     ]);
     const writeTool = tools.tools.find((tool) => tool.name === "set_deck_visibility");
     assert.ok(writeTool, "OAuth personal tools remain discoverable before login");
     assert.deepEqual((writeTool._meta as { securitySchemes?: unknown[] })?.securitySchemes, [
-      { type: "oauth2", scopes: ["decks:read", "decks:write"] },
+      { type: "oauth2", scopes: ["decks:read", "decks:write", "offline_access"] },
     ]);
 
     const publicList = await anonymous.client.callTool({ name: "list_public_decks", arguments: {} });

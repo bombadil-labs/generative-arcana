@@ -11,6 +11,7 @@ import { CatalogPersistingArcanaToolAdapter, InMemoryUserDeckCatalogRepository }
 import { neutralManifest } from "./protocol-fixtures";
 
 const oauth = {
+  requestOfflineAccess: true,
   resourceMetadataUrl: "https://arcana.example/.well-known/oauth-protected-resource/mcp",
   readScopes: ["decks:read"],
   writeScopes: ["decks:write"],
@@ -31,7 +32,7 @@ async function main(): Promise<void> {
   let sdkRequests = 0;
   let inspectedBodies = 0;
   const failures: unknown[] = [];
-  // Authentication is an upstream boundary. These fixtures represent its verified principals.
+  // These verified principals deliberately omit offline_access: it is not a resource permission.
   const principals: Record<string, ArcanaPrincipal> = {
     "Bearer writer": { id: "alice", scopes: ["decks:read", "decks:write"] },
     "Bearer reader": { id: "alice", scopes: ["decks:read"] },
@@ -207,6 +208,7 @@ async function challenge(response: Response, status: number, error: string, scop
   assert.ok(header.includes(`resource_metadata="${oauth.resourceMetadataUrl}"`));
   assert.ok(header.includes(`error="${error}"`));
   assert.ok(header.includes(`scope="${scope}"`));
+  assert.equal(header.includes("offline_access"), false, "resource challenges never demand renewable authorization");
   assert.equal(response.headers.get("cache-control"), "no-store");
   assert.equal((await response.json() as { error: string }).error, error);
 }

@@ -3,6 +3,8 @@ import { bearerChallenge } from "./oauthResource";
 import { principalHasScopes, type ArcanaPrincipal } from "./principal";
 
 export interface ArcanaHttpOAuthOptions {
+  /** Tool metadata only; enable when the authorization server supports offline_access. */
+  requestOfflineAccess?: boolean;
   resourceMetadataUrl: string;
   readScopes: readonly string[];
   writeScopes: readonly string[];

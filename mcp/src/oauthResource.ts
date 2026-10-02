@@ -67,15 +67,20 @@ export async function loadAuthorizationServerMetadata(
   return metadata;
 }
 
-export function optionalOAuthSecuritySchemes(readScopes: readonly string[]): ToolSecurityScheme[] {
+/**
+ * Request renewable authorization in host-facing tool metadata. offline_access is
+ * an authorization-server scope, not a deck permission: never add it to resource
+ * metadata, bearer challenges, or the scopes enforced by tool handlers.
+ */
+export function optionalOAuthSecuritySchemes(readScopes: readonly string[], requestOfflineAccess = false): ToolSecurityScheme[] {
   return [
     { type: "noauth" },
-    { type: "oauth2", scopes: uniqueScopes(readScopes) },
+    { type: "oauth2", scopes: uniqueScopes([...readScopes, ...(requestOfflineAccess ? ["offline_access"] : [])]) },
   ];
 }
 
-export function requiredOAuthSecuritySchemes(scopes: readonly string[]): ToolSecurityScheme[] {
-  return [{ type: "oauth2", scopes: uniqueScopes(scopes) }];
+export function requiredOAuthSecuritySchemes(scopes: readonly string[], requestOfflineAccess = false): ToolSecurityScheme[] {
+  return [{ type: "oauth2", scopes: uniqueScopes([...scopes, ...(requestOfflineAccess ? ["offline_access"] : [])]) }];
 }
 
 export function bearerChallenge(input: {

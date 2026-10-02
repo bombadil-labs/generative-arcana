@@ -20,7 +20,7 @@ import { NeonUserDeckCatalogRepository } from "../src/neonUserDeckCatalog";
 import { createArcanaAdapter } from "../src/hostStore";
 import { neutralManifest, textContent, toolResult } from "./protocol-fixtures";
 
-const oauth = { resourceMetadataUrl: "https://arcana.example/.well-known/oauth-protected-resource/mcp", readScopes: ["decks:read"], writeScopes: ["decks:write"] };
+const oauth = { requestOfflineAccess: true, resourceMetadataUrl: "https://arcana.example/.well-known/oauth-protected-resource/mcp", readScopes: ["decks:read"], writeScopes: ["decks:write"] };
 
 await repositoryContract(new InMemoryUserDeckCatalogRepository());
 const db = new PGlite();
@@ -201,7 +201,7 @@ async function toolContract(): Promise<void> {
       const listing = await denied.client.listTools();
       const edit = listing.tools.find((tool) => tool.name === "edit_deck");
       assert.ok(edit, "OAuth tools remain discoverable before sign-in");
-      assert.deepEqual(edit._meta?.securitySchemes, [{ type: "oauth2", scopes: ["decks:read", "decks:write"] }]);
+      assert.deepEqual(edit._meta?.securitySchemes, [{ type: "oauth2", scopes: ["decks:read", "decks:write", "offline_access"] }]);
       const result = await denied.client.callTool({ name: "edit_deck", arguments: { deckId: deck.id, expectedRevision: 1, metadata: { name: "Denied" } } });
       assert.equal(result.isError, true);
       assert.ok(JSON.stringify(result._meta).includes("mcp/www_authenticate"));

@@ -109,7 +109,7 @@ export function registerDeckEditTools(server: McpServer, options: RegisterDeckEd
     description: "Apply small typed edits to an owned deck by stable id and expectedRevision. Patch name/version/tagline/theme or replace/remove complete cards and native spreads. Upsert replaces the entire card/spread; omitted optional fields are removed. Each identity may occur once; removals must exist. At most 20 combined card/spread operations and 64 KiB of JSON. The complete result is validated and saved atomically; stale revisions fail without changing the deck. Read current revision before editing. Use manifest file import for large changes or other fields.",
     inputSchema: deckEditInputSchema,
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
-    ...(options.oauth ? { _meta: { securitySchemes: requiredOAuthSecuritySchemes(scopes) } } : {}),
+    ...(options.oauth ? { _meta: { securitySchemes: requiredOAuthSecuritySchemes(scopes, options.oauth?.requestOfflineAccess) } } : {}),
   }, async (input) => {
     const startedAt = Date.now();
     let ok = false;

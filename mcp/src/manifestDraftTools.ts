@@ -19,7 +19,7 @@ export const draftCommitSchema = draftValidateSchema.extend({
 export function registerManifestDraftTools(server: McpServer, options: ManifestToolOptions): void {
   if (!options.drafts || (!options.principal && !options.oauth)) return;
   const scopes = options.oauth ? [...new Set([...options.oauth.readScopes, ...options.oauth.writeScopes])] : [];
-  const metadata = options.oauth ? { securitySchemes: requiredOAuthSecuritySchemes(scopes) } : {};
+  const metadata = options.oauth ? { securitySchemes: requiredOAuthSecuritySchemes(scopes, options.oauth?.requestOfflineAccess) } : {};
   const definitions = [
     {
       name: "start_deck_draft",

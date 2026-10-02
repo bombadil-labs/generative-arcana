@@ -8,7 +8,7 @@ import { textContent, toolResult } from "./protocol-fixtures";
 
 const draftId = "00000000-0000-4000-8000-000000000001";
 const names = ["start_deck_draft", "update_deck_draft", "get_deck_draft", "validate_deck_draft", "commit_deck_draft"];
-const oauth = { resourceMetadataUrl: "https://arcana.example/.well-known/oauth-protected-resource/mcp", readScopes: ["decks:read"], writeScopes: ["decks:write"] };
+const oauth = { requestOfflineAccess: true, resourceMetadataUrl: "https://arcana.example/.well-known/oauth-protected-resource/mcp", readScopes: ["decks:read"], writeScopes: ["decks:write"] };
 const calls: Array<{ method: string; owner: string; input: unknown }> = [];
 let createChecks = 0, operationChecks = 0, allowCreate = true, allowOperation = true;
 let failure: Error | undefined;
@@ -45,7 +45,7 @@ try {
     const descriptor = tools.find(tool => tool.name === name)!;
     assert.ok(descriptor, `${name} is registered`);
     assert.ok(publicTools.some(tool => tool.name === name), `${name} remains discoverable for OAuth sign-in`);
-    assert.deepEqual(descriptor._meta?.securitySchemes, [{ type: "oauth2", scopes: ["decks:read", "decks:write"] }]);
+    assert.deepEqual(descriptor._meta?.securitySchemes, [{ type: "oauth2", scopes: ["decks:read", "decks:write", "offline_access"] }]);
     assert.equal(descriptor.annotations?.idempotentHint, true);
     const shape = (descriptor.inputSchema.allOf as Array<Record<string, unknown>> | undefined)?.find(schema => schema.properties) ?? descriptor.inputSchema;
     assert.equal(shape.additionalProperties, false);

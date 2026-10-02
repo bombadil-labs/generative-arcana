@@ -183,6 +183,14 @@ the original manifest when archiving a reading. See [reading contracts](contract
 - **Protected tools missing:** first check account readiness. Non-OAuth anonymous deployments
   intentionally omit them. In OAuth mode they should be advertised before login; refresh/reconnect
   the host after a deployment or tool change.
+- **ChatGPT reconnects after a few minutes:** refresh the connection's tool definitions and
+  reconnect/consent again. The Better Auth deployment requests `offline_access` in OAuth tool
+  metadata; check that Arcana's
+  consent page includes **Stay connected until you disconnect the client or end this sign-in**.
+  This asks the authorization server for a refresh token without adding deck permissions.
+  Existing grants do not gain it automatically. This is a host interoperability experiment:
+  verify `list_my_decks` immediately after consent and again more than five minutes later before
+  treating renewal as confirmed. Do not share tokens, credentials, or full authorization URLs.
 - **Login works but import is denied:** verify actual `decks:read` and `decks:write` grants and the
   exact MCP audience. Verify the selected client-identification/registration path and consent;
   do not substitute OIDC identity scopes for deck permissions.

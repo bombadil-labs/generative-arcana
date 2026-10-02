@@ -83,7 +83,7 @@ const uncertain = new CardArtworkService(catalog, { get: records.get.bind(record
 await assert.rejects(uncertain.upload({ ...input, deckId: uncertainDeck.id }), /Connection lost/);
 assert.equal(uncertainStorage.objects.size, 1, "ambiguous outcomes must never delete potentially committed artwork");
 
-const oauth = { resourceMetadataUrl: "https://arcana.test/.well-known/oauth-protected-resource/mcp", readScopes: ["decks:read"], writeScopes: ["decks:write"] };
+const oauth = { requestOfflineAccess: true, resourceMetadataUrl: "https://arcana.test/.well-known/oauth-protected-resource/mcp", readScopes: ["decks:read"], writeScopes: ["decks:write"] };
 const principal = { id: "alice", scopes: ["decks:read", "decks:write"] };
 const handlerOptions = { catalog, hosts: new InMemoryArcanaHostStore(), artwork: service, oauth,
   principalResolver: { async resolve(req: { headers: Headers }) { const token = req.headers.get("authorization"); if (token === "Bearer alice") return principal; if (token === "Bearer read") return { id: "alice", scopes: ["decks:read"] }; if (token === "Bearer bob") return { id: "bob", scopes: ["decks:read", "decks:write"] }; return null; } },
@@ -121,7 +121,7 @@ const anonymous = await connect(null);
 try {
   const tools = await anonymous.client.listTools(); const write = tools.tools.find(tool => tool.name === "set_card_artwork"); assert.ok(write);
   assert.equal(write.annotations?.destructiveHint, true);
-  assert.deepEqual(write._meta?.securitySchemes, [{ type: "oauth2", scopes: ["decks:read", "decks:write"] }]);
+  assert.deepEqual(write._meta?.securitySchemes, [{ type: "oauth2", scopes: ["decks:read", "decks:write", "offline_access"] }]);
   const denied = await anonymous.client.callTool({ name: "set_card_artwork", arguments: { deckId: deck.id, cardSlug: "major-0", expectedDeckRevision: 5, expectedArtworkId: current.id, mediaType: "image/png", base64: png.toString("base64") } });
   assert.equal(denied.isError, true); assert.ok(denied._meta?.["mcp/www_authenticate"]);
 } finally { await anonymous.close(); }

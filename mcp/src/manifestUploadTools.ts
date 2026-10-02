@@ -34,7 +34,7 @@ export async function stageManifest(options: ManifestToolOptions, input: { file?
 export function registerManifestUploadTools(server: McpServer, options: ManifestToolOptions) {
   if (!options.uploads || (!options.principal && !options.oauth)) return;
   const scopes = options.oauth ? [...new Set([...options.oauth.readScopes, ...options.oauth.writeScopes])] : [];
-  const metadata = options.oauth ? { securitySchemes: requiredOAuthSecuritySchemes(scopes) } : {};
+  const metadata = options.oauth ? { securitySchemes: requiredOAuthSecuritySchemes(scopes, options.oauth?.requestOfflineAccess) } : {};
   server.registerTool("create_manifest_upload", {
     description: "Create a private, one-object, 15-minute JSON upload ticket. Upload exact file bytes with PUT using returned URL and upload-only Authorization header; never use your account OAuth token in a sandbox. Then validate_deck_manifest/import_deck using uploadId. Requires host network egress; if blocked (host_not_allowed), prefer start_deck_draft and bounded update_deck_draft batches over MCP. stage_deck_manifest inline remains a compatibility fallback.",
     inputSchema: z.object({ byteLength: z.number().int().min(1).max(MAX_MANIFEST_UPLOAD_BYTES), sha256: z.string().regex(/^[0-9a-f]{64}$/).optional() }).strict(),
