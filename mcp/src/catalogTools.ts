@@ -11,6 +11,8 @@ import { principalHasScopes, type ArcanaPrincipal } from "./principal.js";
 import type { UserDeckCatalogRepository } from "./userDeckCatalog.js";
 
 export interface CatalogOAuthContext {
+  /** Tool metadata only; enable when the authorization server supports offline_access. */
+  requestOfflineAccess?: boolean;
   resourceMetadataUrl: string;
   readScopes: readonly string[];
   writeScopes: readonly string[];
@@ -32,11 +34,11 @@ export function registerArcanaCatalogTools(
   options: RegisterArcanaCatalogToolsOptions,
 ): void {
   const principal = options.principal ?? null;
-  const readSchemes = options.oauth ? optionalOAuthSecuritySchemes(options.oauth.readScopes) : undefined;
+  const readSchemes = options.oauth ? optionalOAuthSecuritySchemes(options.oauth.readScopes, options.oauth?.requestOfflineAccess) : undefined;
   const writeScopes = options.oauth
     ? [...new Set([...options.oauth.readScopes, ...options.oauth.writeScopes])]
     : [];
-  const writeSchemes = options.oauth ? requiredOAuthSecuritySchemes(writeScopes) : undefined;
+  const writeSchemes = options.oauth ? requiredOAuthSecuritySchemes(writeScopes, options.oauth?.requestOfflineAccess) : undefined;
 
   server.registerTool(
     "list_public_decks",
@@ -110,7 +112,7 @@ export function registerArcanaCatalogTools(
         idempotentHint: true,
         openWorldHint: false,
       },
-      ...(options.oauth ? { _meta: { securitySchemes: requiredOAuthSecuritySchemes(options.oauth.readScopes) } } : {}),
+      ...(options.oauth ? { _meta: { securitySchemes: requiredOAuthSecuritySchemes(options.oauth.readScopes, options.oauth?.requestOfflineAccess) } } : {}),
     },
     async () => {
       const denied = requirePrincipal(principal, options.oauth, options.oauth?.readScopes ?? [], "Sign in to view your decks.");

@@ -97,6 +97,8 @@ const schemas: Record<ArcanaToolName, z.ZodTypeAny> = {
 };
 
 export interface ArcanaOAuthToolContext {
+  /** Tool metadata only; enable when the authorization server supports offline_access. */
+  requestOfflineAccess?: boolean;
   principal: ArcanaPrincipal | null;
   resourceMetadataUrl: string;
   readScopes: readonly string[];
@@ -139,7 +141,7 @@ export function createArcanaMcpServer(options: ArcanaMcpServerOptions = {}): Mcp
   registerManifestUploadTools(server, manifestOptions);
   registerManifestDraftTools(server, manifestOptions);
   registerArtworkTools(server, { artwork: options.artwork, principal, oauth: options.oauth });
-  const readSchemes = options.oauth ? optionalOAuthSecuritySchemes(options.oauth.readScopes) : undefined;
+  const readSchemes = options.oauth ? optionalOAuthSecuritySchemes(options.oauth.readScopes, options.oauth?.requestOfflineAccess) : undefined;
 
   for (const definition of adapter.definitions()) {
     const isImport = definition.name === "import_deck";
@@ -149,7 +151,7 @@ export function createArcanaMcpServer(options: ArcanaMcpServerOptions = {}): Mcp
       ? [...new Set([...options.oauth.readScopes, ...options.oauth.writeScopes])]
       : [];
     const securitySchemes = options.oauth
-      ? (isImport ? requiredOAuthSecuritySchemes(requiredImportScopes) : readSchemes)
+      ? (isImport ? requiredOAuthSecuritySchemes(requiredImportScopes, options.oauth?.requestOfflineAccess) : readSchemes)
       : undefined;
 
     server.registerTool(
@@ -236,6 +238,7 @@ export function createArcanaMcpServer(options: ArcanaMcpServerOptions = {}): Mcp
               resourceMetadataUrl: options.oauth.resourceMetadataUrl,
               readScopes: options.oauth.readScopes,
               writeScopes: options.oauth.writeScopes,
+              requestOfflineAccess: options.oauth.requestOfflineAccess,
             },
           }
         : {}),

@@ -179,6 +179,8 @@ const requestHandler = createArcanaHttpRequestHandler({
         resourceMetadataUrl: oauth.resourceMetadataUrl,
         readScopes: oauth.readScopes,
         writeScopes: oauth.writeScopes,
+        // External providers retain their existing scope requests.
+        requestOfflineAccess: !!browserAuth,
       }
     : undefined,
 });
@@ -410,6 +412,7 @@ export function createArcanaHttpRequestHandler(options: ArcanaHttpRequestHandler
               resourceMetadataUrl: options.oauth.resourceMetadataUrl,
               readScopes: options.oauth.readScopes,
               writeScopes: options.oauth.writeScopes,
+              requestOfflineAccess: options.oauth.requestOfflineAccess,
             }
           : undefined,
         onToolCall: jsonToolCallObserver({ transport: "http", principalId: access.principal?.id }),

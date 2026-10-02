@@ -60,7 +60,7 @@ assert.deepEqual(listing.packs.map(pack => [pack.id, pack.cardCount]), [["saved-
 assert.deepEqual((await catalog.get(deck.id))?.manifest, manifest, "set creation/uploads never change semantic content");
 assert.equal((await catalog.get(deck.id))?.revision, 1);
 
-const oauth = { resourceMetadataUrl: "https://arcana.test/.well-known/oauth-protected-resource/mcp", readScopes: ["decks:read"], writeScopes: ["decks:write"] };
+const oauth = { requestOfflineAccess: true, resourceMetadataUrl: "https://arcana.test/.well-known/oauth-protected-resource/mcp", readScopes: ["decks:read"], writeScopes: ["decks:write"] };
 const principal = { id: "alice", scopes: ["decks:read", "decks:write"] };
 const handler = createWebArtworkHandler({ catalog, hosts: new InMemoryArcanaHostStore(), artwork: service, oauth,
   principalResolver: { async resolve(req: { headers: Headers }) { return req.headers.get("authorization") === "Bearer alice" ? principal : req.headers.get("authorization") === "Bearer read" ? { id: "alice", scopes: ["decks:read"] } : null; } },
@@ -91,7 +91,7 @@ await Promise.all([server.connect(left),client.connect(right)]);
 try {
   const tools = await client.listTools();
   assert.deepEqual(tools.tools.find(tool => tool.name === "set_card_artwork")?._meta?.["openai/fileParams"],["file"]);
-  assert.deepEqual(tools.tools.find(tool => tool.name === "create_visual_pack")?._meta?.securitySchemes,[{type:"oauth2",scopes:["decks:read","decks:write"]}]);
+  assert.deepEqual(tools.tools.find(tool => tool.name === "create_visual_pack")?._meta?.securitySchemes,[{type:"oauth2",scopes:["decks:read","decks:write","offline_access"]}]);
   const empty = toolResult<ArtworkPackSummary>(await client.callTool({name:"create_visual_pack",arguments:{deckId:deck.id,packId:"empty",label:"Empty",expectedDeckRevision:1}}));
   assert.equal(empty.cardCount,0);
   const packs = toolResult<ArtworkPackSummary[]>(await client.callTool({name:"list_visual_packs",arguments:{deckId:deck.id}}));

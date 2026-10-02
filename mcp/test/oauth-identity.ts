@@ -11,12 +11,16 @@ import {
   authorizationServerMetadataUrl,
   bearerChallenge,
   loadAuthorizationServerMetadata,
+  optionalOAuthSecuritySchemes,
+  requiredOAuthSecuritySchemes,
+  type ToolSecurityScheme,
   protectedResourceMetadata,
   protectedResourceMetadataPaths,
   protectedResourceMetadataUrl,
 } from "../src/oauthResource";
 import { createArcanaMcpServer } from "../src/server";
 import type { PrincipalRequest } from "../src/principal";
+import { InMemoryUserDeckCatalogRepository } from "../src/userDeckCatalog";
 
 const RESOURCE = "https://arcana.example/mcp";
 const METADATA_URL = "https://arcana.example/.well-known/oauth-protected-resource/mcp";
@@ -25,6 +29,7 @@ async function main(): Promise<void> {
   await identityResolution();
   await metadataContract();
   await toolAuthContract();
+  await renewableToolMetadataContract();
 }
 
 async function identityResolution(): Promise<void> {
@@ -127,6 +132,17 @@ async function metadataContract(): Promise<void> {
   assert.match(challenge, /resource_metadata="https:\/\/arcana\.example\/\.well-known\/oauth-protected-resource\/mcp"/);
   assert.match(challenge, /scope="decks:read decks:write"/);
   assert.match(challenge, /error="insufficient_scope"/);
+  assert.equal(challenge.includes("offline_access"), false);
+
+  const readScopes = Object.freeze(["decks:read", "decks:read"]);
+  assert.deepEqual(optionalOAuthSecuritySchemes(readScopes), [
+    { type: "noauth" }, { type: "oauth2", scopes: ["decks:read"] },
+  ], "external providers do not request offline_access without opting in");
+  assert.deepEqual(requiredOAuthSecuritySchemes(["decks:read", "offline_access"], true), [
+    { type: "oauth2", scopes: ["decks:read", "offline_access"] },
+  ], "renewal scopes are deduplicated");
+  optionalOAuthSecuritySchemes(readScopes, true);
+  assert.deepEqual(readScopes, ["decks:read", "decks:read"], "metadata never mutates enforced scopes");
 }
 
 async function toolAuthContract(): Promise<void> {
@@ -135,6 +151,7 @@ async function toolAuthContract(): Promise<void> {
     includeStatefulTools: false,
     oauth: {
       principal: null,
+      requestOfflineAccess: true,
       resourceMetadataUrl: METADATA_URL,
       readScopes: ["decks:read"],
       writeScopes: ["decks:write"],
@@ -151,14 +168,14 @@ async function toolAuthContract(): Promise<void> {
     const publicSchemes = (publicTool?._meta as { securitySchemes?: Array<{ type: string; scopes?: string[] }> } | undefined)?.securitySchemes;
     assert.deepEqual(publicSchemes, [
       { type: "noauth" },
-      { type: "oauth2", scopes: ["decks:read"] },
+      { type: "oauth2", scopes: ["decks:read", "offline_access"] },
     ]);
 
     const importTool = listed.tools.find((tool) => tool.name === "import_deck");
     assert.ok(importTool, "OAuth-capable HTTP servers must advertise protected stateful tools before login");
     const importSchemes = (importTool._meta as { securitySchemes?: Array<{ type: string; scopes?: string[] }> } | undefined)?.securitySchemes;
     assert.deepEqual(importSchemes, [
-      { type: "oauth2", scopes: ["decks:read", "decks:write"] },
+      { type: "oauth2", scopes: ["decks:read", "decks:write", "offline_access"] },
     ]);
 
     const denied = await client.callTool({
@@ -168,9 +185,70 @@ async function toolAuthContract(): Promise<void> {
     assert.equal(denied.isError, true);
     const meta = denied._meta as { "mcp/www_authenticate"?: string[] } | undefined;
     assert.ok(meta?.["mcp/www_authenticate"]?.[0]?.includes("resource_metadata="));
+    assert.ok(meta?.["mcp/www_authenticate"]?.[0]?.includes('scope="decks:read decks:write"'));
+    assert.equal(JSON.stringify(meta).includes("offline_access"), false, "tool challenges use only resource scopes");
   } finally {
     await client.close().catch(() => undefined);
     await server.close().catch(() => undefined);
+  }
+}
+
+
+async function renewableToolMetadataContract(): Promise<void> {
+  const unused = async (): Promise<never> => { throw new Error("Discovery must not touch private state."); };
+  const collectTools = async (requestOfflineAccess?: boolean, withOAuth = true) => {
+    const server = createArcanaMcpServer({
+      catalog: new InMemoryUserDeckCatalogRepository(),
+      includeStatefulTools: false,
+      manifestUploads: {
+        uploads: { create: unused, finalize: unused, read: unused, import: unused },
+        drafts: { start: unused, update: unused, read: unused, validate: unused, commit: unused },
+      },
+      ...(withOAuth ? { oauth: {
+        principal: null, resourceMetadataUrl: METADATA_URL,
+        readScopes: ["decks:read"], writeScopes: ["decks:write"], requestOfflineAccess,
+      } } : {}),
+    });
+    const client = new Client({ name: "renewable-metadata-test", version: "1" });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    try {
+      await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+      return (await client.listTools()).tools;
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  };
+  const legacy = await collectTools();
+  const renewable = await collectTools(true);
+  assert.deepEqual(await collectTools(false), legacy, "external-provider default stays unchanged");
+  assert.deepEqual(renewable.map(tool => tool.name), legacy.map(tool => tool.name));
+  let oauthCount = 0;
+  for (let i = 0; i < legacy.length; i++) {
+    const tool = legacy[i];
+    const schemes = tool._meta?.securitySchemes as ToolSecurityScheme[] | undefined;
+    const expected = structuredClone(tool);
+    if (schemes?.some(scheme => scheme.type === "oauth2")) {
+      oauthCount++;
+      expected._meta!.securitySchemes = schemes.map(scheme => scheme.type === "oauth2"
+        ? { type: "oauth2", scopes: [...scheme.scopes, "offline_access"] }
+        : scheme);
+    }
+    assert.deepEqual(renewable[i], expected, `${tool.name}: only OAuth request scopes may change`);
+  }
+  assert.ok(oauthCount > 25, "cover the complete catalog, draft, upload, artwork, and reading surface");
+  for (const name of ["list_my_decks", "get_card_artwork", "get_deck", "get_deck_draft", "validate_deck_draft"]) {
+    const tool = renewable.find(tool => tool.name === name);
+    assert.ok(tool, `${name} is covered`);
+    const schemes = tool._meta?.securitySchemes as ToolSecurityScheme[];
+    assert.ok(schemes.some(scheme => scheme.type === "oauth2" && scheme.scopes.includes("offline_access")),
+      `${name} requests renewable authorization even when read-only`);
+  }
+  assert.deepEqual(renewable.find(tool => tool.name === "get_deck_authoring_guide")?._meta?.securitySchemes,
+    [{ type: "noauth" }], "the public guide stays noauth-only");
+  for (const tool of await collectTools(true, false)) {
+    const schemes = tool._meta?.securitySchemes as ToolSecurityScheme[] | undefined;
+    assert.ok(!schemes?.some(scheme => scheme.type === "oauth2"), `${tool.name}: non-OAuth metadata stays unchanged`);
   }
 }
 

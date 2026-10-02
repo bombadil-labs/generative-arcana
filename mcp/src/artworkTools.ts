@@ -20,7 +20,7 @@ export function registerArtworkTools(server: McpServer, options: { artwork?: Car
     description: "Retrieve saved card artwork from one named visual set. Omitted packId uses saved-artwork for compatibility. Set includeImage:false for compact metadata and the prior artwork id before upload. Never falls back across sets; current deck visibility applies.",
     inputSchema: z.object({ ...ids, includeImage: z.boolean().optional() }),
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    ...(oauth ? { _meta: { securitySchemes: optionalOAuthSecuritySchemes(readScopes) } } : {}),
+    ...(oauth ? { _meta: { securitySchemes: optionalOAuthSecuritySchemes(readScopes, oauth?.requestOfflineAccess) } } : {}),
   }, async ({ deckId, cardSlug, packId, includeImage }) => {
     try {
       if (!artwork) return unavailable();
@@ -35,7 +35,7 @@ export function registerArtworkTools(server: McpServer, options: { artwork?: Car
     description: "Create an independent named static-artwork set on one owned deck, for example Claude or GPT. Stable packId selects the set for subsequent card uploads and reads. Leaves existing images and all deck meanings unchanged. Repeating the same id/name/description is safe; changing an existing set is not supported here.",
     inputSchema: z.object({ deckId: ids.deckId, packId, label: z.string().trim().min(1).max(80), description: z.string().trim().max(500).optional(), expectedDeckRevision: z.number().int().positive() }),
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    ...(oauth ? { _meta: { securitySchemes: requiredOAuthSecuritySchemes(writeScopes) } } : {}),
+    ...(oauth ? { _meta: { securitySchemes: requiredOAuthSecuritySchemes(writeScopes, oauth?.requestOfflineAccess) } } : {}),
   }, async input => {
     if (!principal || !principalHasScopes(principal, writeScopes)) return denied();
     try {
@@ -47,7 +47,7 @@ export function registerArtworkTools(server: McpServer, options: { artwork?: Car
     description: "Save static PNG/JPEG/WebP artwork in one owned deck's named visual set. Supply exactly one host-native file (up to 5 MB) or canonical base64 (up to 1 MB), mediaType, current deck revision and prior artwork id (null for first image in this set). Omitted packId uses saved-artwork. Only this deck/set/card slot is replaced; other sets and meanings stay intact. Native file availability depends on the host; otherwise use base64 or the website (up to 3 MB). No arbitrary URLs, SVG, animation or program execution.",
     inputSchema: z.object({ ...ids, mediaType: z.enum(["image/png", "image/jpeg", "image/webp"]), base64: z.string().min(4).max(4 * Math.ceil(MAX_MCP_ARTWORK_BYTES / 3)).optional(), file: nativeManifestFileSchema.optional(), expectedDeckRevision: z.number().int().positive(), expectedArtworkId: z.string().uuid().nullable() }).refine(input => Number(input.base64 !== undefined) + Number(input.file !== undefined) === 1, { message: "Supply exactly one of file or base64." }),
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
-    _meta: { ...(oauth ? { securitySchemes: requiredOAuthSecuritySchemes(writeScopes) } : {}), "openai/fileParams": ["file"] },
+    _meta: { ...(oauth ? { securitySchemes: requiredOAuthSecuritySchemes(writeScopes, oauth?.requestOfflineAccess) } : {}), "openai/fileParams": ["file"] },
   }, async ({ base64, file, ...input }) => {
     if (!principal || !principalHasScopes(principal, writeScopes)) return denied();
     try {
