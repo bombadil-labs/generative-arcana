@@ -141,6 +141,17 @@ The complete tool flow is:
 6. Open My Decks while signed into the same account, select the deck, and deal in the browser.
    Reconnect/refresh the other host and verify it sees the same ID and latest contents.
 
+For larger decks, prefer native-file validation or upload-ticket PUT when the host supports it,
+then validate/import by immutable `uploadId`. If Claude's sandbox PUT fails with
+`host_not_allowed`, use `start_deck_draft` → bounded `update_deck_draft` batches →
+`validate_deck_draft` → explicitly authorized `commit_deck_draft`, all through the MCP connector.
+Keep the returned draft version and retry keys; recover only necessary sections with
+`get_deck_draft`. This avoids a single giant inline call and repeated transmission of accepted
+batches. The text still passes through model tool arguments, so this is not zero-copy transport.
+Native files, raw PUT, inline staging and legacy inline tools remain available. See the
+[limits and resumable workflow](mcp-efficiency.md#incremental-resumable-mcp-drafts). Host acceptance
+must be tested separately; local protocol tests do not prove a real Claude conversation succeeded.
+
 For a revision, retain the authored slug, validate the changed manifest, then explicitly request
 `import_deck({ manifest, replaceExisting: true })`. Replacement preserves the resource ID and
 publication state and advances the catalog revision. A duplicate import without that flag fails;

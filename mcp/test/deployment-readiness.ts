@@ -159,7 +159,7 @@ async function testConfiguredHttpDiagnostics(): Promise<void> {
       if (!init?.signal) throw new Error("Probe requests must carry an abort signal");
       if (url.pathname === "/sql" && url.hostname.endsWith(".example.test")) {
         const query = JSON.parse(init.body);
-        if (!/^SELECT (principal_id FROM arcana_external_identities|id, owner_id, manifest FROM arcana_user_decks|scope_id, state FROM arcana_host_state|key, bucket, count FROM arcana_rate_limits|id,owner_id,raw_json,import_result FROM arcana_manifest_uploads) LIMIT 0$/.test(query.query) || query.params.length !== 0) throw new Error("Unexpected database query");
+        if (!/^SELECT (principal_id FROM arcana_external_identities|id, owner_id, manifest FROM arcana_user_decks|scope_id, state FROM arcana_host_state|key, bucket, count FROM arcana_rate_limits|id,owner_id,raw_json,import_result,draft_version,draft_key,draft_history,draft_json FROM arcana_manifest_uploads) LIMIT 0$/.test(query.query) || query.params.length !== 0) throw new Error("Unexpected database query");
         if (process.env.TEST_DEPENDENCY_MODE === "database_error") throw new Error("DO_NOT_EXPOSE_DATABASE_SECRET");
         return Response.json({ command: "SELECT", rowCount: 1, fields: [{ name: "ready", dataTypeID: 23 }], rows: [["1"]] });
       }

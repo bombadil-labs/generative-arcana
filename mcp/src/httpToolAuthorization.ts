@@ -8,7 +8,7 @@ export interface ArcanaHttpOAuthOptions {
   writeScopes: readonly string[];
 }
 
-const WRITE_TOOLS = new Set(["import_deck", "set_deck_visibility", "delete_my_deck", "set_card_artwork", "edit_deck", "create_manifest_upload", "stage_deck_manifest", "create_visual_pack"]);
+const WRITE_TOOLS = new Set(["import_deck", "set_deck_visibility", "delete_my_deck", "set_card_artwork", "edit_deck", "create_manifest_upload", "stage_deck_manifest", "start_deck_draft", "update_deck_draft", "get_deck_draft", "validate_deck_draft", "commit_deck_draft", "create_visual_pack"]);
 
 /**
  * Mount inside toNodeHandler, after its bounded Node-to-Request conversion. A cloned

@@ -1,4 +1,5 @@
 import { PostgresManifestUploads } from "./manifestUploads";
+import { PostgresManifestDrafts } from "./manifestDrafts";
 import type { ManifestToolOptions } from "./manifestUploadTools";
 import { createManifestUploadHandler, isManifestUploadPath } from "./webManifestUploads";
 import { Pool } from "pg";
@@ -114,9 +115,17 @@ const artworkLimiter = artworkConfig ? new DurableRateLimiter(databaseUrl!, 12) 
 const artwork = artworkConfig ? new CardArtworkService(catalog!, new NeonArtworkRepository(artworkPool!), new S3PrivateArtworkStorage(artworkConfig), async ownerId => (await artworkLimiter!.check(`artwork:${ownerId}`)).allowed) : undefined;
 const manifestPool = databaseUrl && catalog ? new Pool({ connectionString: databaseUrl, max: 3, connectionTimeoutMillis: 10_000 }) : undefined;
 const manifestUploads = manifestPool ? new PostgresManifestUploads(manifestPool) : undefined;
+const manifestDrafts = manifestUploads ? new PostgresManifestDrafts(manifestPool!, manifestUploads) : undefined;
 const manifestLimiter = manifestUploads ? new DurableRateLimiter(databaseUrl!, 12) : undefined;
+const draftOperationLimiter = manifestUploads ? new DurableRateLimiter(databaseUrl!, 60) : undefined;
 const uploadOrigin = oauth ? new URL(oauth.resource).origin : undefined;
-const manifestTools = manifestUploads ? { uploads: manifestUploads, uploadOrigin, allowCreate: async (ownerId: string) => (await manifestLimiter!.check(`manifest:${ownerId}`)).allowed } : undefined;
+const manifestTools: Omit<ManifestToolOptions, "principal" | "oauth"> | undefined = manifestUploads ? {
+  uploads: manifestUploads,
+  drafts: manifestDrafts,
+  uploadOrigin,
+  allowCreate: async (ownerId: string) => (await manifestLimiter!.check(`manifest:${ownerId}`)).allowed,
+  allowDraftOperation: async (ownerId: string) => (await draftOperationLimiter!.check(`manifest-draft:${ownerId}`)).allowed,
+} : undefined;
 const manifestUploadHandler = manifestUploads ? createManifestUploadHandler(manifestUploads) : undefined;
 // Bounded global cleanup, including abandoned uploads from accounts that never return.
 const sweepManifestUploads = () => { void manifestUploads?.pruneExpired().catch(() => console.error("[generative-arcana-mcp] manifest cleanup unavailable")); };
@@ -139,7 +148,7 @@ const dependencies = createDeploymentDependencyMonitor({
     await sql.query("SELECT id, owner_id, manifest FROM arcana_user_decks LIMIT 0", [], { fetchOptions: { signal } });
     await sql.query("SELECT scope_id, state FROM arcana_host_state LIMIT 0", [], { fetchOptions: { signal } });
     await sql.query("SELECT key, bucket, count FROM arcana_rate_limits LIMIT 0", [], { fetchOptions: { signal } });
-    if (manifestUploads) await sql.query("SELECT id,owner_id,raw_json,import_result FROM arcana_manifest_uploads LIMIT 0", [], { fetchOptions: { signal } });
+    if (manifestUploads) await sql.query("SELECT id,owner_id,raw_json,import_result,draft_version,draft_key,draft_history,draft_json FROM arcana_manifest_uploads LIMIT 0", [], { fetchOptions: { signal } });
     if (browserAuth) await browserAuth.checkSchema();
     if (artwork) {
       await sql.query("SELECT deck_id, card_slug, asset FROM arcana_card_artwork LIMIT 0", [], { fetchOptions: { signal } });
