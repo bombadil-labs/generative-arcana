@@ -3,7 +3,7 @@ import { DeckRegistry } from "../../app/src/decks/registry.js";
 import { ArcanaEngine } from "../../app/src/engine/ArcanaEngine.js";
 import { ArcanaToolAdapter, type ArcanaToolName } from "../../app/src/mcp/ArcanaToolAdapter.js";
 import { decodeReading } from "../../app/src/reading/encode.js";
-import type { UserDeckCatalogRepository } from "./userDeckCatalog.js";
+import { withDeckSummaryRevision, type UserDeckCatalogRepository } from "./userDeckCatalog.js";
 
 /**
  * Read-through adapter for shared catalog decks.
@@ -36,7 +36,11 @@ export class CatalogResolvingArcanaToolAdapter extends ArcanaToolAdapter {
       return this.local.call(name, input);
     }
 
-    return adapterForRecord(record).call(name, input);
+    const result = await adapterForRecord(record).call(name, input);
+    // The scratch adapter and revision are derived from this one authorized catalog record.
+    return name === "get_deck" && record.ownerId === this.viewerId
+      ? withDeckSummaryRevision(result, objectInput(input)?.view, record.revision)
+      : result;
   }
 }
 

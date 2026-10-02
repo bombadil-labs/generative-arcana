@@ -35,9 +35,11 @@ try {
     for(const key of ["download_url","file_id","mime_type","file_name"]) assert.ok(fileSchema.properties[key]);
     assert.deepEqual(fileSchema.required,["download_url","file_id"]);
     for(const session of [anon,reader]) assert.equal((await session.client.callTool({name:"stage_deck_manifest",arguments:{manifest:neutralManifest()}})).isError,true);
-    const staged=toolResult<{uploadId:string;sha256:string}>(await alice.client.callTool({name:"stage_deck_manifest",arguments:{manifest:neutralManifest()}}));
+    const staged=toolResult<{uploadId:string;sha256:string;sha256Basis:string}>(await alice.client.callTool({name:"stage_deck_manifest",arguments:{manifest:neutralManifest()}}));
+    assert.equal(staged.sha256Basis,"original-upload-bytes");
     assert.match(staged.sha256,/^[0-9a-f]{64}$/);
-    const validated=toolResult<{valid:boolean;uploadId:string;sha256:string}>(await alice.client.callTool({name:"validate_deck_manifest",arguments:{uploadId:staged.uploadId}}));
+    const validated=toolResult<{valid:boolean;uploadId:string;sha256:string;sha256Basis:string}>(await alice.client.callTool({name:"validate_deck_manifest",arguments:{uploadId:staged.uploadId}}));
+    assert.equal(validated.sha256Basis,"original-upload-bytes");
     assert.equal(validated.valid,true); assert.equal(validated.sha256,staged.sha256);
     for(const session of [bob,anon,reader]) assert.equal((await session.client.callTool({name:"validate_deck_manifest",arguments:{uploadId:staged.uploadId}})).isError,true);
     const imported=toolResult<{id:string;revision:number}>(await alice.client.callTool({name:"import_deck",arguments:{uploadId:staged.uploadId}}));
@@ -47,6 +49,7 @@ try {
     const manifest=toolResult<{schemaVersion:number;data:{cards:unknown}}>(await alice.client.callTool({name:"get_deck",arguments:{deckId:imported.id,view:"manifest"}}));
     assert.equal(manifest.schemaVersion,2); assert.ok(manifest.data.cards); assert.equal("cards" in manifest,false);
     const lean=await alice.client.callTool({name:"get_deck",arguments:{deckId:imported.id,view:"summary",responseFormat:"structured"}});
+    assert.equal((lean.structuredContent as {result:{revision:number}}).result.revision,1);
     assert.equal(lean.isError,undefined); assert.match((lean.content[0] as {text:string}).text,/Deck:/);
     const ticket=toolResult<{uploadUrl:string;headers:{Authorization:string}}>(await alice.client.callTool({name:"create_manifest_upload",arguments:{byteLength:2}}));
     assert.match(ticket.uploadUrl,/^https:\/\/arcana.example\/api\/manifest-uploads\//); assert.match(ticket.headers.Authorization,/^Bearer [A-Za-z0-9_-]{43}$/);

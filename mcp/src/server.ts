@@ -3,7 +3,7 @@ import { registerManifestDraftTools } from "./manifestDraftTools";
 import { toolResult, summarizeToolResult, ARCANA_RESPONSE_FORMATS } from "./toolResult";
 import { registerManifestUploadTools, stageManifest, manifestPermission, nativeManifestFileSchema, type ManifestToolOptions } from "./manifestUploadTools";
 import type { NativeManifestFile } from "./nativeManifestFile";
-import { ManifestUploadError, stagedManifestReport } from "./manifestUploads";
+import { ManifestUploadError, stagedManifestReport, UPLOAD_SHA256_BASIS } from "./manifestUploads";
 import { registerArtworkTools } from "./artworkTools";
 import type { CardArtworkService } from "./cardArtwork";
 import { McpServer } from "@modelcontextprotocol/server";
@@ -155,7 +155,7 @@ export function createArcanaMcpServer(options: ArcanaMcpServerOptions = {}): Mcp
     server.registerTool(
       definition.name,
       {
-        description: definition.description + (definition.name === "validate_deck_manifest" ? " Prefer uploadId for staged bytes or native file input when available; file input stages privately and returns an immutable uploadId. Inline manifest/json remains available." : isImport ? " Prefer uploadId after file validation. File replacement requires stable deckId and expectedRevision; retries return the same receipt for 24 hours." : ""),
+        description: definition.description + (definition.name === "get_deck" ? " For an owned catalog deck, view=summary returns revision and view=structure returns summary.revision from the same data snapshot, for use as expectedRevision. Built-in/non-catalog and shared non-owned summaries omit it." : "") + (definition.name === "validate_deck_manifest" ? " Prefer uploadId for staged bytes or native file input when available; file input stages privately and returns an immutable uploadId. Inline manifest/json remains available." : isImport ? " Prefer uploadId after file validation. File replacement requires stable deckId and expectedRevision; retries return the same receipt for 24 hours." : ""),
         inputSchema: schemas[definition.name] instanceof z.ZodObject
           ? (schemas[definition.name] as z.ZodObject).safeExtend({ responseFormat: z.enum(ARCANA_RESPONSE_FORMATS).optional() })
           : schemas[definition.name],
@@ -195,7 +195,7 @@ export function createArcanaMcpServer(options: ArcanaMcpServerOptions = {}): Mcp
               result = await manifestOptions.uploads.import(principal!.id, uploadId, { deckId: args.deckId, expectedRevision: args.expectedRevision });
             } else {
               const artifact = await manifestOptions.uploads.read(principal!.id, uploadId);
-              result = { ...stagedManifestReport(artifact.json, args.includeNormalizedManifest), uploadId, sha256: artifact.sha256, byteLength: artifact.byteLength, ...(staged ? { expiresAt: staged.expiresAt } : {}) };
+              result = { ...stagedManifestReport(artifact.json, args.includeNormalizedManifest), uploadId, sha256: artifact.sha256, sha256Basis: UPLOAD_SHA256_BASIS, byteLength: artifact.byteLength, ...(staged ? { expiresAt: staged.expiresAt } : {}) };
             }
           } else {
             if (isImport && args.expectedRevision !== undefined && !options.catalog) throw new ManifestUploadError(400, "Revision-checked import requires a durable account catalog.");

@@ -14,10 +14,14 @@ an optional `view`:
 - `summary`: resource ID, authored slug, name/version/tagline, custom status, current schema
   version, and card/suit/rank/station/spread counts. `spreadCount` includes all available spreads;
   `nativeSpreadCount` counts only deck-authored spreads. No card or axis bodies are returned.
+  For an owned catalog deck, `revision` is the revision of the same snapshot as the summary.
+  Use it as `expectedRevision` for an edit or replacement. Shared non-owned decks and built-in/
+  non-catalog decks omit this owner editing metadata; no revision is fabricated.
 - `structure`: `{ summary, data, cardOrder, spreads? }`. `data` retains all authored metadata,
   axes, visual language, and extension fields except its `cards` member; `cardOrder` lists the
   canonical runtime card slugs. This is a read projection, not an importable partial manifest.
   Use `get_card` or `analyze_card` for individual bodies/interpretation after selecting a slug.
+  Owned catalog structure views include the same editing revision at `summary.revision`.
 
 For example, `get_deck` with `{ "deckId": "...", "view": "structure" }` lets an agent inspect
 the deck's axes and choose a card without retrieving every card's meanings and visual prose.
@@ -161,6 +165,30 @@ through model tool arguments. Batching bounds individual calls and retry costs, 
 assembly avoids re-sending already accepted parts. It does not eliminate the model-token cost
 of authoring/transmitting the deck. Native files, upload-ticket PUT, immutable inline staging,
 and legacy inline validation/import remain supported when appropriate.
+
+## SHA-256 and byte counts
+
+Responses with a staging digest now include `sha256Basis`:
+
+- `assembled-json-sorted-keys-compact-utf8-v1`: incremental draft status, validation and commit.
+  SHA-256 and `byteLength` refer to the assembled draft JSON before import normalization: object
+  keys recursively sorted with JavaScript UTF-16 lexical ordering, arrays kept in authored order,
+  JSON string/scalar encoding from `JSON.stringify`, compact separators, UTF-8, no BOM or trailing
+  newline. The hash covers the manifest only, not mutation IDs or other transport fields. This is
+  this service's versioned serialization format, not a claim to implement RFC 8785.
+- `original-upload-bytes`: immutable native-file, raw PUT or inline staging. The digest covers
+  the exact bytes received by staging (inline object input is first serialized by the server).
+
+A draft digest is not an original-file byte digest. Different object key order, insignificant
+JSON whitespace or equivalent JSON escaping can change the original-file hash; equal byte
+counts do not prove identical bytes or preserved authored values. Do not diagnose a particular
+mismatch as harmless without comparing the actual inputs. To verify content preservation,
+compare parsed authored values or serialize both complete documents with the same stated
+algorithm. Array order and text inside strings remain significant. Full canonical validation
+establishes schema and relationships, not equality with an unseen local file.
+
+These labels also accompany retries of receipts created before the labels were introduced;
+that response-only metadata does not rewrite the saved deck, draft or receipt.
 
 ## Typed revision-safe edits
 

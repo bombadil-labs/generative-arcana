@@ -3,6 +3,8 @@ import type { Pool, PoolClient } from "pg";
 import { inspectDeckAuthoringArtifact } from "../../app/src/decks/authoring";
 import { inspectStagedManifest } from "./manifestDiagnostics";
 
+export const DRAFT_SHA256_BASIS = "assembled-json-sorted-keys-compact-utf8-v1" as const;
+export const UPLOAD_SHA256_BASIS = "original-upload-bytes" as const;
 export const MAX_MANIFEST_UPLOAD_BYTES = 2_000_000;
 export const MANIFEST_UPLOAD_TTL_SECONDS = 15 * 60;
 export const MANIFEST_RECEIPT_TTL_SECONDS = 24 * 60 * 60;
@@ -59,7 +61,7 @@ export class PostgresManifestUploads implements ManifestUploadRepository {
       if (Number(row.expected_bytes) !== bytes.byteLength || (row.expected_sha256 && row.expected_sha256 !== sha256)) throw new ManifestUploadError(400, "Uploaded byte count or SHA-256 does not match the upload ticket.");
       if (row.sha256 && row.sha256 !== sha256) throw new ManifestUploadError(409, "Manifest upload is immutable. Create a new upload for changed content.");
       if (!row.sha256) await client.query("UPDATE arcana_manifest_uploads SET raw_json=$2,sha256=$3,byte_length=$4 WHERE id=$1", [uploadId, json, sha256, bytes.byteLength]);
-      return { uploadId, sha256, byteLength: bytes.byteLength, validation: stagedManifestReport(json) };
+      return { uploadId, sha256, sha256Basis: UPLOAD_SHA256_BASIS, byteLength: bytes.byteLength, validation: stagedManifestReport(json) };
     });
   }
   async read(ownerId: string, uploadId: string) {
@@ -67,7 +69,7 @@ export class PostgresManifestUploads implements ManifestUploadRepository {
     if (!row) throw missing();
     if (row.draft_version != null) throw new ManifestUploadError(409, "Use get_deck_draft or validate_deck_draft for an incremental draft.");
     if (row.raw_json === null) throw new ManifestUploadError(409, "Upload is not finalized, or was already imported. Import retries return the original receipt.");
-    return { uploadId, json: String(row.raw_json), sha256: String(row.sha256), byteLength: Number(row.byte_length) };
+    return { uploadId, json: String(row.raw_json), sha256: String(row.sha256), sha256Basis: UPLOAD_SHA256_BASIS, byteLength: Number(row.byte_length) };
   }
   async import(ownerId: string, uploadId: string, options: ManifestImportOptions = {}) {
     return this.importManifest(ownerId, uploadId, options);
@@ -91,7 +93,7 @@ export class PostgresManifestUploads implements ManifestUploadRepository {
       }
       if (row.import_result) {
         if (JSON.stringify(row.import_request) !== JSON.stringify(request) && (row.import_request.deckId !== request.deckId || row.import_request.expectedRevision !== request.expectedRevision || row.import_request.expectedDraftVersion !== expectedDraftVersion)) throw new ManifestUploadError(409, "This upload was already imported with different options.");
-        return row.import_result as Record<string, unknown>;
+        return { ...row.import_result, sha256Basis: expectedDraftVersion === undefined ? UPLOAD_SHA256_BASIS : DRAFT_SHA256_BASIS } as Record<string, unknown>;
       }
       const sourceJson = expectedDraftVersion === undefined ? row.raw_json : row.draft_json;
       if (sourceJson == null) throw new ManifestUploadError(409, "Upload bytes before importing this manifest.");
@@ -110,7 +112,7 @@ export class PostgresManifestUploads implements ManifestUploadRepository {
           ON CONFLICT(owner_id,slug) DO NOTHING RETURNING id,slug,revision`, [randomUUID(), ownerId, manifest.data.slug, JSON.stringify(manifest)])).rows[0];
         if (!deck) throw new ManifestUploadError(409, "A deck with this slug already exists. Replace it using its stable deckId and expectedRevision.");
       }
-      const result = { id: deck!.id, slug: deck!.slug, revision: Number(deck!.revision), name: expectedDraftVersion === undefined ? manifest.data.name : manifest.data.name.slice(0, 256), cardCount: Object.keys(manifest.data.cards).length, custom: true, uploadId, sha256: row.sha256, ...(expectedDraftVersion === undefined ? {} : { draftId: uploadId, version: expectedDraftVersion }) };
+      const result = { id: deck!.id, slug: deck!.slug, revision: Number(deck!.revision), name: expectedDraftVersion === undefined ? manifest.data.name : manifest.data.name.slice(0, 256), cardCount: Object.keys(manifest.data.cards).length, custom: true, uploadId, sha256: row.sha256, sha256Basis: expectedDraftVersion === undefined ? UPLOAD_SHA256_BASIS : DRAFT_SHA256_BASIS, ...(expectedDraftVersion === undefined ? {} : { draftId: uploadId, version: expectedDraftVersion }) };
       // Commit the deck and receipt together. Discard only the transient source bytes, retain receipt 24h.
       await client.query(`UPDATE arcana_manifest_uploads SET raw_json=NULL,${expectedDraftVersion === undefined ? "" : "draft_json=NULL,"}import_request=$2::jsonb,import_result=$3::jsonb,expires_at=now()+interval '24 hours' WHERE id=$1`, [uploadId, JSON.stringify(request), JSON.stringify(result)]);
       return result;
