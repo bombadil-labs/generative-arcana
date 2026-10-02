@@ -79,7 +79,7 @@ await assert.rejects(raced.upload({ ...input, deckId: raceDeck.id }), status(404
 assert.equal(raceStorage.objects.size, 0);
 const uncertainDeck = await catalog.createImported("alice", neutralManifest("uncertain"));
 const uncertainStorage = new InMemoryArtworkStorage();
-const uncertain = new CardArtworkService(catalog, { get: records.get.bind(records), list: records.list.bind(records), attach: async () => { throw new Error("Connection lost during commit"); } }, uncertainStorage);
+const uncertain = new CardArtworkService(catalog, { get: records.get.bind(records), list: records.list.bind(records), listPacks: records.listPacks.bind(records), createPack: records.createPack.bind(records), attach: async () => { throw new Error("Connection lost during commit"); } }, uncertainStorage);
 await assert.rejects(uncertain.upload({ ...input, deckId: uncertainDeck.id }), /Connection lost/);
 assert.equal(uncertainStorage.objects.size, 1, "ambiguous outcomes must never delete potentially committed artwork");
 

@@ -1,4 +1,4 @@
-import { getReadableArtwork, getArtworkImage, ArtworkApiError, type CardArtwork, type OwnedArtworkCatalog } from "./api";
+import { getReadableArtwork, getArtworkImage, ArtworkApiError, DEFAULT_ARTWORK_PACK_ID, type ArtworkPack, type CardArtwork, type OwnedArtworkCatalog } from "./api";
 
 export type ArtworkState = { status: "idle" | "loading" | "missing" | "error" } | { status: "ready"; artwork: CardArtwork; url: string };
 export const EMPTY_ARTWORK: ArtworkState = Object.freeze({ status: "idle" });
@@ -12,20 +12,26 @@ const browserTransport: ArtworkTransport = {
   catalog: getReadableArtwork, image: getArtworkImage,
   createUrl: (blob) => URL.createObjectURL(blob), revokeUrl: (url) => URL.revokeObjectURL(url),
 };
-/** One disposable catalog route's artwork. Nothing enters deck JSON or the trusted skin registry. */
+/** One disposable catalog route's selected artwork set. Nothing enters deck JSON or the trusted skin registry. */
 export class ArtworkStore {
   private states = new Map<string, ArtworkState>();
   private requests = new Map<string, AbortController>();
   private listeners = new Set<() => void>();
   private catalogPromise: Promise<OwnedArtworkCatalog> | null = null;
   private catalogController: AbortController | null = null;
+  private catalog: OwnedArtworkCatalog | null = null;
   private version = 0;
   private generation = 0;
-  constructor(readonly deckId: string, readonly deckRevision: number, private transport: ArtworkTransport = browserTransport) {}
+  packId: string;
+  packs: ArtworkPack[] = [{ id: DEFAULT_ARTWORK_PACK_ID, label: "Saved artwork", cardCount: 0, complete: false }];
+  catalogStatus: "idle" | "loading" | "ready" | "error" = "idle";
+  catalogError: string | null = null;
+  constructor(readonly deckId: string, readonly deckRevision: number, private transport: ArtworkTransport = browserTransport, packId = DEFAULT_ARTWORK_PACK_ID) { this.packId = packId; }
   subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => this.listeners.delete(listener); };
   getVersion = (): number => this.version;
   get(slug: string): ArtworkState { return this.states.get(slug) ?? EMPTY_ARTWORK; }
   has(slug: string): boolean { return this.get(slug).status === "ready"; }
+  hasArtwork(slug: string): boolean { return !!this.catalog?.cards.find((card) => card.slug === slug)?.artwork; }
   private emit(): void { ++this.version; this.listeners.forEach((listener) => listener()); }
   private evict(slug: string): void {
     this.requests.get(slug)?.abort(); this.requests.delete(slug);
@@ -36,29 +42,58 @@ export class ArtworkStore {
   clear(): void {
     ++this.generation;
     this.catalogController?.abort(); this.catalogController = null; this.catalogPromise = null;
+    this.catalog = null; this.catalogStatus = "idle"; this.catalogError = null;
     for (const slug of new Set([...this.states.keys(), ...this.requests.keys()])) this.evict(slug);
     this.emit();
   }
+  selectPack(packId: string): void {
+    if (packId === this.packId) return;
+    // Synchronous eviction means a render can never use the preceding set's decoded image.
+    this.packId = packId;
+    this.clear();
+  }
+  addPack(pack: ArtworkPack): void {
+    this.packs = [...this.packs.filter((item) => item.id !== pack.id), pack];
+    this.emit();
+  }
   fail(slug: string): void { this.evict(slug); this.states.set(slug, { status: "error" }); this.emit(); }
+  loadCatalog(refresh = false): Promise<OwnedArtworkCatalog> {
+    if (refresh) { this.catalogController?.abort(); this.catalogPromise = null; this.catalog = null; }
+    if (!this.catalogPromise) {
+      const controller = new AbortController(); this.catalogController = controller;
+      const generation = this.generation, packId = this.packId;
+      const current = () => !controller.signal.aborted && this.catalogController === controller && this.generation === generation && this.packId === packId;
+      this.catalogStatus = "loading"; this.catalogError = null;
+      this.catalogPromise = this.transport.catalog(this.deckId, controller.signal, packId === DEFAULT_ARTWORK_PACK_ID ? undefined : packId).then((catalog) => {
+        if ((catalog.packId ?? DEFAULT_ARTWORK_PACK_ID) !== packId || catalog.deckRevision !== this.deckRevision) throw new Error("Artwork set or revision mismatch. Reopen the deck to refresh it.");
+        if (current()) {
+          this.catalog = catalog;
+          this.packs = catalog.packs ?? [{ id: DEFAULT_ARTWORK_PACK_ID, label: "Saved artwork", cardCount: catalog.cards.filter((card) => card.artwork).length, complete: catalog.cards.every((card) => !!card.artwork) }];
+          this.catalogStatus = "ready"; this.emit();
+        }
+        return catalog;
+      }).catch((error: unknown) => {
+        if (current()) { this.catalogStatus = "error"; this.catalogError = error instanceof Error ? error.message : "Unable to load this artwork set."; this.emit(); }
+        throw error;
+      });
+      this.emit();
+    }
+    return this.catalogPromise;
+  }
   async load(slug: string, refresh = false): Promise<void> {
     if (!refresh && this.get(slug).status !== "idle") return;
     this.evict(slug);
-    if (refresh) { this.catalogController?.abort(); this.catalogPromise = null; }
     const controller = new AbortController();
-    const generation = this.generation;
+    const generation = this.generation, packId = this.packId;
     this.requests.set(slug, controller);
     this.states.set(slug, { status: "loading" }); this.emit();
-    const current = () => !controller.signal.aborted && generation === this.generation && this.requests.get(slug) === controller;
+    const current = () => !controller.signal.aborted && generation === this.generation && this.packId === packId && this.requests.get(slug) === controller;
     try {
-      if (!this.catalogPromise) {
-        this.catalogController = new AbortController();
-        this.catalogPromise = this.transport.catalog(this.deckId, this.catalogController.signal);
-      }
-      const catalog = await this.catalogPromise;
-      const artwork = catalog.cards.find((card) => card.slug === slug)?.artwork;
-      if (!artwork) throw new ArtworkApiError(404, "No artwork.");
+      const catalog = await this.loadCatalog(refresh);
       if (!current()) return;
-      if (artwork.deckId !== this.deckId || artwork.cardSlug !== slug || artwork.deckRevision !== this.deckRevision) throw new Error("Artwork revision mismatch.");
+      const artwork = catalog.cards.find((card) => card.slug === slug)?.artwork;
+      if (!artwork) throw new ArtworkApiError(404, "No artwork in this set.");
+      if (artwork.deckId !== this.deckId || artwork.cardSlug !== slug || artwork.deckRevision !== this.deckRevision || (artwork.packId ?? DEFAULT_ARTWORK_PACK_ID) !== packId) throw new Error("Artwork identity or revision mismatch.");
       const blob = await this.transport.image(artwork, controller.signal);
       if (!current()) return;
       const url = this.transport.createUrl(blob);

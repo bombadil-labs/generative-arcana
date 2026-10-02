@@ -89,7 +89,7 @@ async function hostMigrationAndPersistence(): Promise<void> {
   const importResult = await alice.call("import_deck", {
     data: importedData,
     tagline: "catalog backed",
-  }) as { id: string; slug: string; name: string; cardCount: number; custom: boolean };
+  }) as { id: string; slug: string; name: string; cardCount: number; custom: boolean; revision: number };
 
   const owned = await catalog.listOwned("alice");
   assert.equal(owned.length, 2);
@@ -97,6 +97,7 @@ async function hostMigrationAndPersistence(): Promise<void> {
   if (!persisted) throw new Error("Imported catalog deck was not persisted.");
   assert.equal(importResult.id, persisted.id, "tool result exposes the stable catalog resource id");
   assert.equal(importResult.slug, importedData.slug, "authored slug remains separate presentation metadata");
+  assert.equal(importResult.revision, persisted.revision, "catalog imports return the revision needed for safe small edits");
   assert.notEqual(importResult.id, importResult.slug);
   assert.equal(persisted.visibility, "private", "new imports start private");
   assert.equal((await alice.call("get_deck", { deckId: persisted.id }) as { id: string }).id, persisted.id);
@@ -115,13 +116,14 @@ async function hostMigrationAndPersistence(): Promise<void> {
     data: importedData,
     tagline: "replacement",
     replaceExisting: true,
-  }) as { id: string; slug: string };
+  }) as { id: string; slug: string; revision: number };
   const replacedRecord = await catalog.get(persisted.id);
   assert.equal(replacedResult.id, persisted.id, "explicit replacement preserves runtime resource identity");
   assert.equal(replacedRecord?.id, persisted.id);
   assert.equal(replacedRecord?.visibility, "public", "replacement preserves publication state");
   assert.equal(replacedRecord?.publishedAt, published.publishedAt);
   assert.equal(replacedRecord?.revision, published.revision + 1);
+  assert.equal(replacedResult.revision, replacedRecord?.revision);
   assert.equal(replacedRecord?.manifest.tagline, "replacement");
 
   // Simulate a new process: runtime state is reconstructed only from first-class catalog rows.

@@ -56,7 +56,8 @@
     "test:http-tool-auth": "tsx test/http-tool-auth.ts",
     "build": "node ../tools/build-authoring-guide.mjs",
     "test:authoring-guide": "node --test ../tools/test/authoring-guide.test.mjs && npm run build && node ../tools/build-authoring-guide.mjs --check && node --import tsx test/authoring-guide.ts",
-    "test:card-artwork": "node --import tsx test/card-artwork.ts && node --import tsx test/artwork-database.ts && node --import tsx test/artwork-storage.ts"
+    "test:card-artwork": "node --import tsx test/card-artwork.ts && node --import tsx test/artwork-database.ts && node --import tsx test/artwork-storage.ts && node --import tsx test/named-artwork-sets.ts",
+    "test:mcp-efficiency": "node --import tsx test/manifest-uploads.ts && node --import tsx test/manifest-upload-tools.ts && node --import tsx test/deck-edits.ts && node --import tsx test/tool-result.ts && node --import tsx test/manifest-diagnostics.ts && node --import tsx test/native-file-transport.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1145.0",

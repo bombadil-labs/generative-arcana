@@ -16,7 +16,7 @@ global.window = dom.window; global.document = dom.window.document; global.IS_REA
 // Node 20 has no global navigator; newer Node versions expose a getter-only property.
 Object.defineProperty(global, "navigator", { configurable: true, value: dom.window.navigator });
 const { createRoot } = require("react-dom/client");
-let vite, root, Editor, Provider, useSession, ArtworkProvider, useArtworkStore, useCardArtwork, CardArt, Boundary, catalogRuntime, domain, controls, card, deck;
+let vite, root, Editor, Provider, useSession, ArtworkProvider, useArtworkStore, useArtworkSelection, useCardArtwork, CardArt, CardBrowser, Reading, visuals, Boundary, catalogRuntime, domain, controls, card, deck;
 let handler, images, revoked, anonymous = false;
 let accountId = "account-one";
 function json(body, status = 200) { return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } }); }
@@ -35,21 +35,25 @@ function inputFile(type = "image/png") {
   Object.defineProperty(input, "files", { configurable: true, value: [new File(["data"], "card.png", { type })] });
   input.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
 }
-function submit() { document.querySelector("form").dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true })); }
+function submit() { document.getElementById("artwork-upload-form").dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true })); }
 
 test.before(async () => {
   const { createServer } = await import("vite");
   vite = await createServer({ root: resolve(__dirname, ".."), server: { middlewareMode: true }, appType: "custom", optimizeDeps: { noDiscovery: true, include: [] } });
   ({ ArtworkEditor: Editor } = await vite.ssrLoadModule("/src/app/ArtworkEditor.tsx"));
   ({ BrowserSessionProvider: Provider, useBrowserSession: useSession } = await vite.ssrLoadModule("/src/auth/session.tsx"));
-  ({ CatalogArtworkProvider: ArtworkProvider, useArtworkStore, useCardArtwork } = await vite.ssrLoadModule("/src/artwork/context.tsx"));
+  ({ CatalogArtworkProvider: ArtworkProvider, useArtworkStore, useArtworkSelection, useCardArtwork } = await vite.ssrLoadModule("/src/artwork/context.tsx"));
   ({ CardArt } = await vite.ssrLoadModule("/src/components/CardArt.tsx"));
+  ({ CardBrowser } = await vite.ssrLoadModule("/src/app/CardBrowser.tsx"));
+  ({ Reading } = await vite.ssrLoadModule("/src/app/Reading.tsx"));
+  visuals = await vite.ssrLoadModule("/src/runtime/defineCard.ts");
   ({ RemoteDeckBoundary: Boundary } = await vite.ssrLoadModule("/src/app/RemoteDeckBoundary.tsx"));
   ({ catalogDeckRuntime: catalogRuntime } = await vite.ssrLoadModule("/src/catalog/runtime.ts"));
   domain = await vite.ssrLoadModule("/src/decks/registry.ts");
   deck = domain.registerDeck({ data: rawDeck(), runtimeId: "deck", custom: true }); card = deck.cards[0];
 });
 test.beforeEach(() => {
+  window.localStorage.clear();
   anonymous = false; accountId = "account-one"; images = []; revoked = [];
   URL.createObjectURL = () => { const url = `blob:trusted-${images.length}`; images.push(url); return url; };
   URL.revokeObjectURL = (url) => revoked.push(url);
@@ -67,7 +71,7 @@ test.beforeEach(() => {
 });
 test.afterEach(async () => {
   await act(async () => root.unmount()); document.getElementById("root").replaceChildren();
-  catalogRuntime.clear();
+  catalogRuntime.clear(); visuals.visualRegistry.clearDeck("deck");
   if (!domain.getDeck("deck")) domain.registerDeck({ data: deck.data, runtimeId: "deck", custom: true });
 });
 test.after(async () => {
@@ -419,3 +423,175 @@ for (const recovery of ["focus", "retry button"]) {
     assert.doesNotMatch(document.body.textContent, /Temporary catalog outage/);
   });
 }
+
+const packInfo = (id, overrides = {}) => ({ id, label: id === "saved-artwork" ? "Saved artwork" : id === "watercolor" ? "Watercolor" : "Ink", cardCount: 0, complete: false, ...overrides });
+function setCatalog(packId, art = null, packs = [packInfo("saved-artwork"), packInfo("watercolor"), packInfo("ink")]) {
+  return { ...catalog(art), packId, packs };
+}
+function requestedPack(path) { return new URL(path, "http://localhost").searchParams.get("packId") || "saved-artwork"; }
+function changeSelect(id, value) {
+  const input = document.getElementById(id); assert.ok(input); input.value = value;
+  input.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+}
+function enterText(id, value) {
+  const input = document.getElementById(id); assert.ok(input);
+  Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, "value").set.call(input, value);
+  input.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+}
+function clickButton(text) {
+  const button = Array.from(document.querySelectorAll("button")).find((item) => item.textContent === text);
+  assert.ok(button, `Expected button: ${text}`); button.click();
+}
+
+for (const outcome of ["missing", "failed"]) test(`a selected saved set never falls back to runtime imagery when ${outcome}`, async () => {
+  visuals.registerPack("deck", { id: "runtime", label: "Runtime" });
+  visuals.registerImagePack("deck", "runtime", { [card.slug]: "https://example.test/unrelated.png" });
+  window.localStorage.setItem("arcana:artwork-set:deck", "watercolor");
+  handler = async (path) => {
+    assert.equal(requestedPack(path), "watercolor");
+    return outcome === "missing" ? json(setCatalog("watercolor")) : json({ message: "offline" }, 500);
+  };
+  await mount(React.createElement(CardArt, { card, deckId: "deck", deck: deck.data, prefer: "runtime" }));
+  assert.equal(document.querySelector("img"), null); assert.match(document.body.textContent, new RegExp(card.name));
+  assert.doesNotMatch(document.body.innerHTML, /unrelated\.png/);
+});
+
+test("editor creates a set once, selects it, and uploads only into the new set", async () => {
+  const pending = deferred(); const calls = []; let created = false, uploaded = false;
+  handler = async (path, init) => {
+    const packId = requestedPack(path); calls.push([path, init]);
+    if (init.method === "POST") return pending.promise;
+    if (init.method === "PUT") { uploaded = true; return json(metadata({ packId })); }
+    if (path.includes("/image?")) return new Response("test", { headers: { "content-type": "image/webp" } });
+    const packs = [packInfo("saved-artwork", { cardCount: 1, complete: true }), ...(created ? [packInfo("watercolor")] : [])];
+    const art = packId === "saved-artwork" || uploaded ? metadata({ packId }) : null;
+    return json(setCatalog(packId, art, packs));
+  };
+  await mount();
+  await act(async () => clickButton("New artwork set"));
+  await act(async () => enterText("artwork-set-name", "Watercolor"));
+  assert.equal(document.getElementById("artwork-set-id").value, "watercolor");
+  await act(async () => enterText("artwork-set-description", "Soft washes"));
+  await act(async () => {
+    const form = document.querySelector(".artwork-create-set");
+    form.dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true }));
+    form.dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true }));
+  });
+  const posts = calls.filter(([, init]) => init.method === "POST"); assert.equal(posts.length, 1);
+  assert.deepEqual(JSON.parse(posts[0][1].body), { id: "watercolor", label: "Watercolor", description: "Soft washes", expectedDeckRevision: 1 });
+  created = true;
+  await act(async () => pending.resolve(json(packInfo("watercolor", { description: "Soft washes" }), 201))); await flush();
+  assert.equal(document.getElementById("artwork-set").value, "watercolor");
+  assert.equal(window.localStorage.getItem("arcana:artwork-set:deck"), "watercolor");
+  assert.equal(document.querySelector(".artwork-create-set"), null); assert.equal(document.querySelector("img"), null);
+  await act(async () => inputFile()); await act(async () => submit()); await flush();
+  const put = calls.find(([, init]) => init.method === "PUT");
+  assert.equal(put[0], `/api/me/decks/deck/cards/${card.slug}/artwork?packId=watercolor`);
+  assert.equal(put[1].headers["x-arcana-artwork-version"], "none");
+  assert.match(document.body.textContent, /saved in Watercolor/); assert.ok(document.querySelector("img"));
+  assert.match(document.querySelector("#artwork-set option:checked").textContent, /Watercolor · 1 illustrated · complete/);
+});
+
+test("switching sets cancels an upload and never applies its late response to the new set", async () => {
+  const pending = deferred(); let signal;
+  handler = async (path, init) => {
+    if (init.method === "PUT") { signal = init.signal; return pending.promise; }
+    return json(setCatalog(requestedPack(path)));
+  };
+  await mount(); await act(async () => inputFile()); await act(async () => submit());
+  await act(async () => changeSelect("artwork-set", "watercolor")); await flush();
+  assert.equal(signal.aborted, true); assert.equal(document.querySelector("#artwork-upload-form button[type=submit]").disabled, true);
+  assert.doesNotMatch(document.body.textContent, /Ready: card.png/);
+  await act(async () => pending.resolve(json(metadata({ packId: "saved-artwork" }), 201)));
+  assert.equal(document.getElementById("artwork-set").value, "watercolor"); assert.equal(document.querySelector("img"), null);
+  assert.doesNotMatch(document.body.textContent, /Artwork saved/);
+});
+
+test("a late set creation after selection changes cannot switch the editor back", async () => {
+  const pending = deferred(); let signal;
+  handler = async (path, init) => {
+    if (init.method === "POST") { signal = init.signal; return pending.promise; }
+    return json(setCatalog(requestedPack(path)));
+  };
+  await mount(); await act(async () => clickButton("New artwork set"));
+  await act(async () => enterText("artwork-set-name", "Pastel"));
+  await act(async () => document.querySelector(".artwork-create-set").dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true })));
+  await act(async () => changeSelect("artwork-set", "ink")); await flush();
+  assert.equal(signal.aborted, true);
+  await act(async () => pending.resolve(json(packInfo("pastel", { label: "Pastel" }), 201)));
+  assert.equal(document.getElementById("artwork-set").value, "ink"); assert.equal(document.querySelector(".artwork-create-set"), null);
+});
+
+test("idempotent create of the current set refreshes without leaving the editor busy", async () => {
+  window.localStorage.setItem("arcana:artwork-set:deck", "watercolor");
+  handler = async (path, init) => init.method === "POST" ? json(packInfo("watercolor")) : json(setCatalog(requestedPack(path)));
+  await mount(); await act(async () => clickButton("New artwork set"));
+  await act(async () => enterText("artwork-set-name", "Watercolor"));
+  await act(async () => document.querySelector(".artwork-create-set").dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true })));
+  await flush();
+  assert.equal(document.getElementById("artwork-set").value, "watercolor"); assert.equal(document.querySelector(".artwork-create-set"), null);
+  assert.equal(document.getElementById("artwork-file").disabled, false);
+});
+
+test("rapid set switching removes decoded images and ignores old metadata, bytes, and decode events", async () => {
+  let selection; const watercolor = deferred(), ink = deferred();
+  function CaptureSelection() { selection = useArtworkSelection(); return React.createElement(CardArt, { card, deckId: "deck", deck: deck.data }); }
+  handler = async (path) => {
+    const packId = requestedPack(path);
+    if (path.includes("/image?")) return packId === "ink" ? ink.promise : new Response("test", { headers: { "content-type": "image/webp" } });
+    return packId === "watercolor" ? watercolor.promise : json(setCatalog(packId, metadata({ packId })));
+  };
+  await mount(React.createElement(CaptureSelection));
+  const oldImage = document.querySelector("img"); await act(async () => oldImage.dispatchEvent(new dom.window.Event("load")));
+  await act(async () => selection.selectPack("watercolor"));
+  assert.equal(document.querySelector("img"), null); assert.ok(revoked.includes(oldImage.getAttribute("src")));
+  await act(async () => selection.selectPack("ink"));
+  await act(async () => watercolor.resolve(json(setCatalog("watercolor", metadata({ packId: "watercolor" })))));
+  assert.equal(document.querySelector("img"), null);
+  await act(async () => ink.resolve(new Response("test", { headers: { "content-type": "image/webp" } })));
+  const latest = document.querySelector("img"); assert.ok(latest); assert.notEqual(latest, oldImage); assert.equal(latest.style.opacity, "0");
+  await act(async () => { oldImage.dispatchEvent(new dom.window.Event("error")); oldImage.dispatchEvent(new dom.window.Event("load")); });
+  assert.equal(document.querySelector("img"), latest); assert.equal(latest.style.opacity, "0");
+  await act(async () => latest.dispatchEvent(new dom.window.Event("load"))); assert.equal(latest.style.opacity, "1");
+});
+
+test("browser and reading restore the per-deck selection, filter only the selected set, and preserve semantic identity", async () => {
+  const before = JSON.stringify(deck.data); let catalogReads = 0;
+  handler = async (path) => {
+    if (path.includes("/image?")) return new Response("test", { headers: { "content-type": "image/webp" } });
+    ++catalogReads;
+    const packId = requestedPack(path), art = packId === "saved-artwork" ? metadata({ packId }) : null;
+    return json({ ...setCatalog(packId), cards: deck.cards.map((item) => ({ slug: item.slug, name: item.name, artwork: item.slug === card.slug ? art : null })) });
+  };
+  await mount(React.createElement(CardBrowser, { deckId: "deck" }));
+  assert.equal(document.getElementById("browser-artwork-set").value, "saved-artwork"); assert.equal(catalogReads, 1);
+  await act(async () => changeSelect("browser-artwork-set", "watercolor"));
+  await act(async () => clickButton("Illustrated"));
+  assert.match(document.body.textContent, /No cards match/); assert.equal(document.querySelector("img"), null);
+  await act(async () => root.render(React.createElement("p", null, "Another page")));
+  await mount(React.createElement(Reading, { deckId: "deck" }));
+  assert.equal(document.getElementById("reading-artwork-set").value, "watercolor");
+  assert.equal(JSON.stringify(deck.data), before);
+});
+
+test("reading cards use the saved set without substituting a runtime spread or changing the dealt reading", async () => {
+  visuals.registerPack("deck", { id: "runtime", label: "Runtime" });
+  visuals.registerImagePack("deck", "runtime", { [card.slug]: "https://example.test/unrelated-reading.png" });
+  visuals.registerSpreadKitPack("deck", "runtime", [{ spreadId: "single", draw: () => {} }]);
+  window.localStorage.setItem("arcana:artwork-set:deck", "watercolor");
+  const imagePacks = [];
+  handler = async (path) => {
+    const packId = requestedPack(path);
+    if (path.includes("/image?")) { imagePacks.push(packId); return new Response("test", { headers: { "content-type": "image/webp" } }); }
+    return json(setCatalog(packId, packId === "watercolor" ? metadata({ packId }) : null));
+  };
+  const { encodeReading } = await vite.ssrLoadModule("/src/reading/encode.ts");
+  const token = await encodeReading(domain.getDeck("deck"), "single", "What matters?", [{ slug: card.slug, reversed: false }]);
+  await mount(React.createElement(Reading, { deckId: "deck", token })); await flush();
+  assert.ok(document.querySelector("img"), document.body.textContent); assert.deepEqual(imagePacks, ["watercolor"]);
+  assert.doesNotMatch(document.body.textContent, /Living Spread/);
+  const prompt = document.querySelector("pre").textContent;
+  await act(async () => changeSelect("reading-artwork-set", "saved-artwork")); await flush();
+  assert.equal(document.querySelector("img"), null); assert.doesNotMatch(document.body.innerHTML, /unrelated-reading\.png/);
+  assert.equal(document.querySelector("pre").textContent, prompt);
+});

@@ -10,10 +10,12 @@ import { navigate } from "./router";
 import { getPackId } from "./packPref";
 import { listPacks, resolveSpreadVisual } from "@/runtime/defineCard";
 import { buildSpreadSceneData } from "@/runtime/spreadSceneData";
+import { useArtworkSelection, useArtworkStore } from "../artwork/context";
 import { catalogDeckRuntime } from "@/catalog/runtime";
 
 export function Reading({ deckId, token }: { deckId: string; token?: string }) {
   const deck = arcanaEngine.getDeck(deckId);
+  const artworkSelection = useArtworkSelection();
   if (!deck) {
     return (
       <div style={{ padding: "var(--s-5)" }}>
@@ -24,6 +26,14 @@ export function Reading({ deckId, token }: { deckId: string; token?: string }) {
   }
   return (
     <div style={{ maxWidth: 980, margin: "0 auto", padding: "var(--s-4) var(--s-4) var(--s-6)" }}>
+      {artworkSelection && <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: "var(--s-4)" }}>
+        <label htmlFor="reading-artwork-set" style={{ ...fieldLabel, margin: 0 }}>Artwork set</label>
+        <select id="reading-artwork-set" value={artworkSelection.packId} onChange={(event) => artworkSelection.selectPack(event.target.value)} style={{ ...secondaryBtn, appearance: "auto", maxWidth: "100%" }}>
+          {!artworkSelection.packs.some((item) => item.id === artworkSelection.packId) && <option value={artworkSelection.packId}>{artworkSelection.packId} · unavailable</option>}
+          {artworkSelection.packs.map((item) => <option key={item.id} value={item.id}>{item.label} · {item.cardCount}/{deck.cards.length}</option>)}
+        </select>
+        {artworkSelection.error && <span role="alert" style={errorText}>{artworkSelection.error} <button type="button" onClick={artworkSelection.refresh} style={secondaryBtn}>Retry artwork</button></span>}
+      </div>}
       {token ? <ReadingResult deck={deck} token={token} /> : <ReadingComposer deck={deck} />}
     </div>
   );
@@ -113,6 +123,7 @@ function ReadingComposer({ deck }: { deck: DeckModule }) {
 }
 
 function ReadingResult({ deck, token }: { deck: DeckModule; token: string }) {
+  const artwork = useArtworkStore();
   const [copied, setCopied] = useState<string | null>(null);
   const [resolution, setResolution] = useState<{ token: string; deck: DeckModule; reading?: ArcanaReading; error?: string } | null>(null);
   const [visualMode, setVisualMode] = useState<"scene" | "cards">("scene");
@@ -148,8 +159,9 @@ function ReadingResult({ deck, token }: { deck: DeckModule; token: string }) {
   const seqCards = placements.map((placement) => placement.card);
   const prompt = arcanaEngine.buildInterpretationContext(reading);
   const packs = listPacks(deck.id);
-  const prefer = (packs.find((p) => p.id === getPackId(deck.id, packs[0]?.id ?? "")) ?? packs[0])?.id;
-  const spreadVisual = resolveSpreadVisual(deck.id, spread.id, prefer);
+  const prefer = artwork?.packId ?? (packs.find((p) => p.id === getPackId(deck.id, packs[0]?.id ?? "")) ?? packs[0])?.id;
+  // Saved image sets must never silently switch to an unrelated trusted scene.
+  const spreadVisual = artwork ? null : resolveSpreadVisual(deck.id, spread.id, prefer);
   const sceneData = spreadVisual ? buildSpreadSceneData(reading) : null;
   const showingScene = visualMode === "scene" && !!spreadVisual && !!sceneData;
 

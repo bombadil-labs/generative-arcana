@@ -1,3 +1,6 @@
+import { PostgresManifestUploads } from "./manifestUploads";
+import type { ManifestToolOptions } from "./manifestUploadTools";
+import { createManifestUploadHandler, isManifestUploadPath } from "./webManifestUploads";
 import { Pool } from "pg";
 import { CardArtworkService } from "./cardArtwork";
 import { artworkStorageConfiguration, S3PrivateArtworkStorage } from "./artworkStorage";
@@ -109,6 +112,17 @@ if (artworkConfig && (!databaseUrl || !catalog)) throw new Error("Artwork requir
 const artworkPool = artworkConfig ? new Pool({ connectionString: databaseUrl, max: 3, connectionTimeoutMillis: 10_000 }) : undefined;
 const artworkLimiter = artworkConfig ? new DurableRateLimiter(databaseUrl!, 12) : undefined;
 const artwork = artworkConfig ? new CardArtworkService(catalog!, new NeonArtworkRepository(artworkPool!), new S3PrivateArtworkStorage(artworkConfig), async ownerId => (await artworkLimiter!.check(`artwork:${ownerId}`)).allowed) : undefined;
+const manifestPool = databaseUrl && catalog ? new Pool({ connectionString: databaseUrl, max: 3, connectionTimeoutMillis: 10_000 }) : undefined;
+const manifestUploads = manifestPool ? new PostgresManifestUploads(manifestPool) : undefined;
+const manifestLimiter = manifestUploads ? new DurableRateLimiter(databaseUrl!, 12) : undefined;
+const uploadOrigin = oauth ? new URL(oauth.resource).origin : undefined;
+const manifestTools = manifestUploads ? { uploads: manifestUploads, uploadOrigin, allowCreate: async (ownerId: string) => (await manifestLimiter!.check(`manifest:${ownerId}`)).allowed } : undefined;
+const manifestUploadHandler = manifestUploads ? createManifestUploadHandler(manifestUploads) : undefined;
+// Bounded global cleanup, including abandoned uploads from accounts that never return.
+const sweepManifestUploads = () => { void manifestUploads?.pruneExpired().catch(() => console.error("[generative-arcana-mcp] manifest cleanup unavailable")); };
+const manifestCleanupTimer = manifestUploads ? setInterval(sweepManifestUploads, 60_000) : undefined;
+manifestCleanupTimer?.unref();
+if (manifestUploads) sweepManifestUploads();
 const deploymentFeatures = {
   durableCatalog: stateMode === "neon" && !!catalog,
   mcpOAuth: !!oauth,
@@ -125,8 +139,13 @@ const dependencies = createDeploymentDependencyMonitor({
     await sql.query("SELECT id, owner_id, manifest FROM arcana_user_decks LIMIT 0", [], { fetchOptions: { signal } });
     await sql.query("SELECT scope_id, state FROM arcana_host_state LIMIT 0", [], { fetchOptions: { signal } });
     await sql.query("SELECT key, bucket, count FROM arcana_rate_limits LIMIT 0", [], { fetchOptions: { signal } });
+    if (manifestUploads) await sql.query("SELECT id,owner_id,raw_json,import_result FROM arcana_manifest_uploads LIMIT 0", [], { fetchOptions: { signal } });
     if (browserAuth) await browserAuth.checkSchema();
-    if (artwork) await sql.query("SELECT deck_id, card_slug, asset FROM arcana_card_artwork LIMIT 0", [], { fetchOptions: { signal } });
+    if (artwork) {
+      await sql.query("SELECT deck_id, card_slug, asset FROM arcana_card_artwork LIMIT 0", [], { fetchOptions: { signal } });
+      await sql.query("SELECT deck_id,pack_id,label FROM arcana_visual_packs LIMIT 0", [], { fetchOptions: { signal } });
+      await sql.query("SELECT deck_id,pack_id,card_slug,asset FROM arcana_visual_pack_artwork LIMIT 0", [], { fetchOptions: { signal } });
+    }
   } } : {}),
   ...(oauth ? { issuerDiscovery: async (signal: AbortSignal) => {
     await loadAuthorizationServerMetadata(oauth.issuer, (input, init) => browserAuth
@@ -140,6 +159,7 @@ if (alphaToken && stateMode === "memory") {
 }
 
 const requestHandler = createArcanaHttpRequestHandler({
+  manifestUploads: manifestTools,
   artwork,
   maxRequestBytes,
   principalResolver,
@@ -234,11 +254,12 @@ async function handleHttpRequest(req: IncomingMessage, res: ServerResponse): Pro
     return;
   }
 
+  const isManifestUploadRequest = isManifestUploadPath(url.pathname);
   const isAuthoringRequest = isArcanaAuthoringPath(url.pathname);
   const isWebCatalogRequest = isArcanaWebCatalogPath(url.pathname);
   const isBrowserAuthRequest = browserAuth ? isBetterAuthRequestPath(url.pathname)
     : ["/auth/login", "/auth/session", "/auth/logout"].includes(url.pathname);
-  if (url.pathname !== "/mcp" && !isAuthoringRequest && !isWebCatalogRequest && !isBrowserAuthRequest) {
+  if (url.pathname !== "/mcp" && !isAuthoringRequest && !isWebCatalogRequest && !isBrowserAuthRequest && !isManifestUploadRequest) {
     if (webAppDistDir && validateHost(req, res) && serveArcanaWebApp(req, res, webAppDistDir)) return;
     if (res.headersSent) return;
     res.writeHead(404, { "content-type": "application/json" });
@@ -247,7 +268,7 @@ async function handleHttpRequest(req: IncomingMessage, res: ServerResponse): Pro
   }
 
   if (!validateHost(req, res)) return;
-  const requiresOrigin = url.pathname === "/mcp"
+  const requiresOrigin = isManifestUploadRequest || url.pathname === "/mcp"
     || isWebCatalogRequest
     || (isAuthoringRequest && req.method === "POST")
     || (isBrowserAuthRequest && url.pathname.startsWith("/auth/") && req.method === "POST");
@@ -268,6 +289,11 @@ async function handleHttpRequest(req: IncomingMessage, res: ServerResponse): Pro
     });
     res.end(JSON.stringify({ error: "rate_limited" }));
     return;
+  }
+
+  if (isManifestUploadRequest) {
+    if (!manifestUploadHandler) { res.writeHead(503, { "content-type": "application/json", "cache-control": "no-store" }); res.end(JSON.stringify({ error: "manifest_staging_unavailable" })); return; }
+    await manifestUploadHandler(req, res); return;
   }
 
   if (isAuthoringRequest) {
@@ -328,6 +354,8 @@ async function proxyAuthorizationServerMetadata(issuer: string, res: ServerRespo
 async function shutdown(signal: string) {
   console.error(`[generative-arcana-mcp] ${signal}; shutting down`);
   void artworkPool?.end();
+  if (manifestCleanupTimer) clearInterval(manifestCleanupTimer);
+  void manifestPool?.end();
   http.close(() => { void browserAuth?.close().finally(() => process.exit(0)); if (!browserAuth) process.exit(0); });
 }
 
@@ -337,6 +365,7 @@ process.once("SIGTERM", () => void shutdown("SIGTERM"));
 export type { ArcanaHttpOAuthOptions } from "./httpToolAuthorization";
 
 export interface ArcanaHttpRequestHandlerOptions {
+  manifestUploads?: Omit<ManifestToolOptions, "principal" | "oauth">;
   artwork?: CardArtworkService;
   principalResolver?: PrincipalResolver;
   hosts?: ArcanaHostStore;
@@ -360,6 +389,7 @@ export function createArcanaHttpRequestHandler(options: ArcanaHttpRequestHandler
         options.principalResolver,
       );
       const handler = createMcpHandler(() => createArcanaMcpServer({
+        manifestUploads: options.manifestUploads,
         artwork: options.artwork,
         adapter: access.adapter,
         includeStatefulTools: access.includeStatefulTools,

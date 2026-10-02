@@ -2,8 +2,13 @@ import type { ArcanaEngine } from "../engine/ArcanaEngine";
 import type { ArcanaReading, CardQuery, ImportDeckOptions } from "../engine/types";
 import type { Spread } from "../decks/spreads";
 import { DECK_MANIFEST_SPEC, inspectDeckAuthoringArtifact, invalidDeckAuthoringArtifact } from "../decks/authoring";
-import { validateDeckManifest } from "../decks/manifest";
+import { CURRENT_DECK_MANIFEST_SCHEMA_VERSION, snapshotDeckManifest, validateDeckManifest } from "../decks/manifest";
 import { renderableCard } from "../decks/renderSpec";
+import type { DeckModule } from "../decks/types";
+
+/** Full is the historical runtime projection; all lean projections are opt-in. */
+export const ARCANA_DECK_VIEWS = ["full", "manifest", "summary", "structure"] as const;
+export type ArcanaDeckView = typeof ARCANA_DECK_VIEWS[number];
 
 export const ARCANA_TOOL_NAMES = [
   "list_decks",
@@ -30,7 +35,7 @@ export interface ArcanaToolDefinition {
 
 export const ARCANA_TOOL_DEFINITIONS: readonly ArcanaToolDefinition[] = Object.freeze([
   { name: "list_decks", description: "List decks available in this Arcana host.", readOnly: true },
-  { name: "get_deck", description: "Get one validated deck and its authored symbolic structure.", readOnly: true },
+  { name: "get_deck", description: "Get one validated deck. Prefer view=summary for counts, structure for authored axes and ordered card slugs without card bodies, or manifest for the canonical artifact with cards once. The default full view preserves the legacy runtime projection.", readOnly: true },
   { name: "get_card", description: "Get one authored card plus a fully resolved render specification derived from its deck/family/rank/station/number context.", readOnly: true },
   { name: "analyze_card", description: "Resolve a card as a point in the deck's factorized symbolic space.", readOnly: true },
   { name: "query_cards", description: "Query exact intersections of authored card axes and numeric structure.", readOnly: true },
@@ -65,7 +70,20 @@ export class ArcanaToolAdapter {
         }));
       case "get_deck": {
         const deck = requireDeck(this.engine, stringArg(args, "deckId"));
-        return deck;
+        const view = deckView(args.view);
+        if (view === "full") return deck;
+        if (view === "manifest") return snapshotDeckManifest(deck);
+        const summary = deckSummary(deck, this.engine.listSpreads(deck.id).length);
+        if (view === "summary") return summary;
+        // This is a read projection, deliberately not a partial DeckManifest. Preserve authored
+        // extension metadata while excluding both copies of the potentially large card bodies.
+        const { cards: _cards, ...data } = deck.data;
+        return {
+          summary,
+          data,
+          cardOrder: deck.cards.map((card) => card.slug),
+          ...(deck.spreads === undefined ? {} : { spreads: deck.spreads }),
+        };
       }
       case "get_card": {
         const deckId = stringArg(args, "deckId");
@@ -117,6 +135,9 @@ export class ArcanaToolAdapter {
         return inspectDeckAuthoringArtifact(args.manifest, { includeNormalizedManifest });
       }
       case "import_deck": {
+        if (args.expectedRevision !== undefined) {
+          throw new Error("expectedRevision requires a catalog-backed account. This host cannot safely compare deck revisions.");
+        }
         const request = parseImportDeckInput(args);
         const deck = this.engine.importDeck(request.data, request.options);
         return { id: deck.id, slug: deck.data.slug, name: deck.name, cardCount: deck.cards.length, custom: true };
@@ -244,4 +265,28 @@ function requireDeck(engine: ArcanaEngine, deckId: string) {
   const deck = engine.getDeck(deckId);
   if (!deck) throw new Error(`Unknown deck: ${deckId}.`);
   return deck;
+}
+
+function deckView(value: unknown): ArcanaDeckView {
+  if (value === undefined) return "full";
+  if (typeof value === "string" && ARCANA_DECK_VIEWS.includes(value as ArcanaDeckView)) return value as ArcanaDeckView;
+  throw new Error(`view must be one of: ${ARCANA_DECK_VIEWS.join(", ")}.`);
+}
+
+function deckSummary(deck: DeckModule, spreadCount: number) {
+  return {
+    id: deck.id,
+    slug: deck.data.slug,
+    name: deck.name,
+    version: deck.data.version,
+    schemaVersion: CURRENT_DECK_MANIFEST_SCHEMA_VERSION,
+    tagline: deck.tagline,
+    custom: !!deck.custom,
+    cardCount: deck.cards.length,
+    suitCount: Object.keys(deck.data.suits).length,
+    rankCount: Object.keys(deck.data.ranks).length,
+    stationCount: Object.keys(deck.data.transversal.stations).length,
+    spreadCount,
+    nativeSpreadCount: deck.spreads?.length ?? 0,
+  };
 }

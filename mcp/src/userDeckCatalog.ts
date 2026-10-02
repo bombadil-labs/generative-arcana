@@ -19,9 +19,28 @@ export interface UserDeckCatalogRepository {
   createImported(ownerId: string, manifest: UserDeckManifest): Promise<UserDeckRecord>;
   /** User-facing replace/create: preserves an existing stable resource id and publication state. */
   upsertImported(ownerId: string, manifest: UserDeckManifest): Promise<UserDeckRecord>;
+  /** Atomic owner-scoped compare-and-swap; never creates a row or changes its resource id. */
+  replaceOwned(ownerId: string, deckId: string, expectedRevision: number, manifest: UserDeckManifest): Promise<UserDeckRecord>;
   setVisibility(ownerId: string, deckId: string, visibility: DeckVisibility): Promise<UserDeckRecord>;
   deleteOwned(ownerId: string, deckId: string): Promise<boolean>;
   deleteAllOwned(ownerId: string): Promise<number>;
+}
+
+/** A rejected stale write. Only expose the current revision after verifying ownership. */
+export class UserDeckRevisionConflictError extends Error {
+  readonly code = "revision_conflict";
+
+  constructor(readonly expectedRevision: number, readonly currentRevision: number) {
+    super(`Deck revision conflict: expected ${expectedRevision}, current ${currentRevision}. Read the latest deck and retry your edit against its revision.`);
+    this.name = "UserDeckRevisionConflictError";
+  }
+}
+
+export function requireExpectedRevision(value: unknown): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1) {
+    throw new Error("expectedRevision must be a positive safe integer.");
+  }
+  return value;
 }
 
 /** Compatibility facade for older catalog callers; canonical implementation lives in the deck domain. */
@@ -133,10 +152,23 @@ export class CatalogPersistingArcanaToolAdapter extends ArcanaToolAdapter {
 
   private async importCatalogDeck(input: unknown): Promise<unknown> {
     const request = parseImportDeckInput(input);
+    const operation = input as Record<string, unknown>;
+    if (operation.deckId !== undefined) throw new Error("deckId is only supported for staged manifest imports; inline replacements resolve the owned manifest slug.");
+    const expectedRevision = operation.expectedRevision === undefined ? undefined : requireExpectedRevision(operation.expectedRevision);
+    if (expectedRevision !== undefined && !request.options.replaceExisting) {
+      throw new Error("expectedRevision requires replaceExisting: true for an inline catalog import.");
+    }
     const manifest = validateUserDeckManifest(request.data, request.options);
-    const record = request.options.replaceExisting
-      ? await this.catalog.upsertImported(this.ownerId, manifest)
-      : await this.catalog.createImported(this.ownerId, manifest);
+    let record: UserDeckRecord;
+    if (expectedRevision !== undefined) {
+      const existing = (await this.catalog.listOwned(this.ownerId)).find((deck) => deck.slug === manifest.data.slug);
+      if (!existing || existing.ownerId !== this.ownerId) throw new Error("Unknown owned user deck.");
+      record = await this.catalog.replaceOwned(this.ownerId, existing.id, expectedRevision, manifest);
+    } else {
+      record = request.options.replaceExisting
+        ? await this.catalog.upsertImported(this.ownerId, manifest)
+        : await this.catalog.createImported(this.ownerId, manifest);
+    }
 
     const deck = this.engine.importDeck(record.manifest.data, {
       tagline: record.manifest.tagline,
@@ -152,6 +184,7 @@ export class CatalogPersistingArcanaToolAdapter extends ArcanaToolAdapter {
       name: deck.name,
       cardCount: deck.cards.length,
       custom: true,
+      revision: record.revision,
     };
   }
 }
@@ -221,6 +254,29 @@ export class InMemoryUserDeckCatalogRepository implements UserDeckCatalogReposit
       updatedAt: new Date().toISOString(),
     };
     this.records.set(updated.id, updated);
+    return snapshot(updated);
+  }
+
+  async replaceOwned(ownerId: string, deckId: string, expectedRevision: number, manifest: UserDeckManifest): Promise<UserDeckRecord> {
+    const owner = requireId(ownerId, "ownerId");
+    const id = requireId(deckId, "deckId");
+    const expected = requireExpectedRevision(expectedRevision);
+    const clean = snapshotManifest(manifest);
+    // There are deliberately no awaits between comparison and mutation. Competing callers cannot
+    // both replace the same revision, matching the SQL repository's conditional UPDATE.
+    const existing = this.records.get(id);
+    if (!existing || existing.ownerId !== owner) throw new Error("Unknown owned user deck.");
+    if (existing.revision !== expected) throw new UserDeckRevisionConflictError(expected, existing.revision);
+    const sameSlug = this.findOwnedBySlug(owner, clean.data.slug);
+    if (sameSlug && sameSlug.id !== id) throw new Error(`A deck with slug “${clean.data.slug}” is already owned by this account.`);
+    const updated: UserDeckRecord = {
+      ...existing,
+      slug: clean.data.slug,
+      manifest: clean,
+      revision: existing.revision + 1,
+      updatedAt: new Date().toISOString(),
+    };
+    this.records.set(id, updated);
     return snapshot(updated);
   }
 
