@@ -5,6 +5,7 @@ import { canResolveUserDeck } from "../../app/src/decks/catalog";
 import type { UserDeckCatalogRepository } from "./userDeckCatalog";
 
 export const MAX_ARTWORK_INPUT_BYTES = 3_000_000;
+export const MAX_NATIVE_ARTWORK_INPUT_BYTES = 5_000_000;
 export const MAX_ARTWORK_OUTPUT_BYTES = 2_000_000;
 export const MAX_ARTWORK_PIXELS = 16_000_000;
 export const MAX_ARTWORK_EDGE = 4096;
@@ -156,7 +157,10 @@ export class CardArtworkService {
     if (this.activeDecodes >= 2) throw new ArtworkError(429, "artwork_busy", "Artwork processing is busy. Try again shortly.");
     this.activeDecodes++;
     let image: Awaited<ReturnType<typeof normalizeArtwork>>;
-    try { image = await normalizeArtwork(input.loadBytes ? await input.loadBytes() : input.bytes, input.mediaType); }
+    // Only the internal lazy native-file path gets the larger fetch budget. Browser/raw bytes stay at 3 MB.
+    try { image = input.loadBytes
+      ? await normalizeArtworkWithinLimit(await input.loadBytes(), input.mediaType, MAX_NATIVE_ARTWORK_INPUT_BYTES)
+      : await normalizeArtwork(input.bytes, input.mediaType); }
     finally { this.activeDecodes--; }
     const id = randomUUID();
     const record: ArtworkRecord = {
@@ -178,7 +182,10 @@ export class CardArtworkService {
 }
 
 export async function normalizeArtwork(bytes: Uint8Array, mediaType: string) {
-  if (!bytes.byteLength || bytes.byteLength > MAX_ARTWORK_INPUT_BYTES) throw new ArtworkError(413, "artwork_size", "Choose an image up to 3 MB.");
+  return normalizeArtworkWithinLimit(bytes, mediaType, MAX_ARTWORK_INPUT_BYTES);
+}
+async function normalizeArtworkWithinLimit(bytes: Uint8Array, mediaType: string, maxInputBytes: number) {
+  if (!bytes.byteLength || bytes.byteLength > maxInputBytes) throw new ArtworkError(413, "artwork_size", `Choose an image up to ${maxInputBytes / 1_000_000} MB.`);
   const format = ({ "image/png": "png", "image/jpeg": "jpeg", "image/webp": "webp" } as Record<string, string>)[mediaType];
   if (!format) throw new ArtworkError(415, "artwork_format", "Choose a static PNG, JPEG, or WebP image. SVG and animations are not supported.");
   try {

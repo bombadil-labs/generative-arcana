@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
-import { ArtworkError, MAX_ARTWORK_INPUT_BYTES, type CardArtworkService } from "./cardArtwork";
+import { ArtworkError, MAX_NATIVE_ARTWORK_INPUT_BYTES, type CardArtworkService } from "./cardArtwork";
 import { principalHasScopes, type ArcanaPrincipal } from "./principal";
 import { oauthToolError, optionalOAuthSecuritySchemes, requiredOAuthSecuritySchemes } from "./oauthResource";
 import type { CatalogOAuthContext } from "./catalogTools";
@@ -44,7 +44,7 @@ export function registerArtworkTools(server: McpServer, options: { artwork?: Car
     } catch (error) { return failed(error); }
   });
   server.registerTool("set_card_artwork", {
-    description: "Save static PNG/JPEG/WebP artwork in one owned deck's named visual set. Supply exactly one host-native file (up to 3 MB) or canonical base64 (up to 1 MB), mediaType, current deck revision and prior artwork id (null for first image in this set). Omitted packId uses saved-artwork. Only this deck/set/card slot is replaced; other sets and meanings stay intact. Native file availability depends on the host; otherwise use base64 or the website. No arbitrary URLs, SVG, animation or program execution.",
+    description: "Save static PNG/JPEG/WebP artwork in one owned deck's named visual set. Supply exactly one host-native file (up to 5 MB) or canonical base64 (up to 1 MB), mediaType, current deck revision and prior artwork id (null for first image in this set). Omitted packId uses saved-artwork. Only this deck/set/card slot is replaced; other sets and meanings stay intact. Native file availability depends on the host; otherwise use base64 or the website (up to 3 MB). No arbitrary URLs, SVG, animation or program execution.",
     inputSchema: z.object({ ...ids, mediaType: z.enum(["image/png", "image/jpeg", "image/webp"]), base64: z.string().min(4).max(4 * Math.ceil(MAX_MCP_ARTWORK_BYTES / 3)).optional(), file: nativeManifestFileSchema.optional(), expectedDeckRevision: z.number().int().positive(), expectedArtworkId: z.string().uuid().nullable() }).refine(input => Number(input.base64 !== undefined) + Number(input.file !== undefined) === 1, { message: "Supply exactly one of file or base64." }),
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     _meta: { ...(oauth ? { securitySchemes: requiredOAuthSecuritySchemes(writeScopes) } : {}), "openai/fileParams": ["file"] },
@@ -55,13 +55,13 @@ export function registerArtworkTools(server: McpServer, options: { artwork?: Car
       // Reject wrong owners, stale slots and nonexistent packs before downloading or decoding any file.
       await artwork.assertUpload(principal.id, input.deckId, input.cardSlug, input.expectedDeckRevision, input.expectedArtworkId, input.packId);
       if (file) return result(await artwork.upload({ ...input, ownerId: principal.id,
-        loadBytes: () => fetchNativeFile(file, { maxBytes: MAX_ARTWORK_INPUT_BYTES, mediaTypes: ["image/png", "image/jpeg", "image/webp", "application/octet-stream"] }),
+        loadBytes: () => fetchNativeFile(file, { maxBytes: MAX_NATIVE_ARTWORK_INPUT_BYTES, mediaTypes: ["image/png", "image/jpeg", "image/webp", "application/octet-stream"] }),
       }));
       let bytes: Uint8Array;
       {
         if (!base64 || base64.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(base64)) throw new ArtworkError(400, "artwork_base64", "Supply canonical base64 file bytes, without a data URL prefix.");
         const decoded = Buffer.from(base64, "base64");
-        if (decoded.length > MAX_MCP_ARTWORK_BYTES || decoded.toString("base64") !== base64) throw new ArtworkError(413, "artwork_size", "Inline artwork uploads must be at most 1 MB. Use a native file or the website for files up to 3 MB.");
+        if (decoded.length > MAX_MCP_ARTWORK_BYTES || decoded.toString("base64") !== base64) throw new ArtworkError(413, "artwork_size", "Inline artwork uploads must be at most 1 MB. Use a native file for files up to 5 MB or the website for files up to 3 MB.");
         bytes = decoded;
       }
       return result(await artwork.upload({ ...input, ownerId: principal.id, bytes }));

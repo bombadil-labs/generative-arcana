@@ -41,7 +41,7 @@ const nativeFileTransport: NativeFileTransport = {
 export async function fetchNativeFile(file: NativeManifestFile, options: { maxBytes: number; mediaTypes: readonly string[] }, transport: NativeFileTransport = nativeFileTransport): Promise<Uint8Array> {
   const accepts = (value?: string) => options.mediaTypes.includes((value ?? "application/octet-stream").split(";", 1)[0].trim().toLowerCase());
   if (!file.file_id || (file.mime_type !== undefined && !accepts(file.mime_type))) throw new ManifestUploadError(400, "Native file has an unsupported content type.");
-  if (!Number.isSafeInteger(options.maxBytes) || options.maxBytes < 1 || options.maxBytes > 3_000_000) throw new ManifestUploadError(400, "Invalid native file byte limit.");
+  if (!Number.isSafeInteger(options.maxBytes) || options.maxBytes < 1 || options.maxBytes > 5_000_000) throw new ManifestUploadError(400, "Invalid native file byte limit.");
   const url = nativeFileUrl(file.download_url);
   const signal = transport.signal();
   let addresses;
