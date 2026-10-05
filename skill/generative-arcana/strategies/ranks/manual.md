@@ -16,4 +16,4 @@ The **fourth axis stays latent** (`references/numeric_axis.md`): even a theme-na
 
 Build as in `ranks/questions.md`: four roles, distinct initials, no collisions with suit or major names, an encoded progression. If the theme supplies four native roles, use them — confirm distinct initials and adjust collisions.
 
-Present the ten numbered ranks, then the four face ranks, for feedback.
+Discuss the ten numbered ranks and their formal grammar with the user; wait for explicit agreement before proposing the four face ranks. Discuss and agree those roles and their visual progression before minor projection.

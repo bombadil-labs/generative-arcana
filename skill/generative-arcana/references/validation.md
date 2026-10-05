@@ -4,6 +4,8 @@ The authoring grammar is portable, but Generative Arcana owns the executable val
 
 ## Before authoring
 
+First finish the full-skill reading and follow the design-decision agreement loop in `SKILL.md`. Validation and transfer implement the agreed design; they do not replace the dialogue or authorize new creative choices.
+
 If `get_deck_authoring_spec` is available, call it once before generation. Treat the returned spec as the current machine-readable statement of the `DeckManifest` boundary and identity rules. It supplements this bundle; it does not replace the richer authoring strategies here.
 
 If the tool is unavailable, continue normally from `references/schema.md`. The authoring workflow must still be usable offline or in hosts without MCP.
@@ -38,7 +40,7 @@ Treat results this way:
 
 - `valid: true, canonical: true` — the authored artifact may be delivered or imported.
 - `valid: true, canonical: false` — the input is supported legacy content (a v1 manifest without `schemaVersion`, or bare raw deck data). Use the normalized v2 shape or explicitly add `schemaVersion: 2`, then validate again. New authoring must not finish on this path.
-- `valid: false` — use `error` as repair feedback, edit the artifact, and validate again. Do not paper over the failure or merely warn the user.
+- `valid: false` — use `error` as repair feedback, edit the artifact, and validate again. Fix mechanical encoding/structure directly; if a repair changes an agreed design decision, discuss it and obtain agreement before applying it. Do not paper over the failure or merely warn the user.
 - tool/transport failure — do not reinterpret that as a validation failure. If the platform validator is unavailable, perform the local quality checks in this bundle and clearly deliver the manifest without claiming server validation.
 
 Inline validation is stateless. File validation stages private transient bytes for 15 minutes; validation by uploadId reads those same immutable bytes. Neither creates or publishes a deck. Repairs require a new upload, so a validated upload cannot be overwritten before import.
@@ -46,7 +48,11 @@ Inline validation is stateless. File validation stages private transient bytes f
 ## Incremental MCP assembly
 
 For a host without usable native-file or raw HTTP transfer, assemble the authored manifest over
-MCP in bounded batches. This preserves the same deck schema and authoring grammar:
+MCP in bounded batches. Batch only content whose design decisions have already been agreed;
+upload batches are technical transfer units, not creative approval checkpoints. Starting or
+updating a draft does not authorize the next design decision. Keep durable local working notes
+of agreed content and defer opening the short-lived remote draft until ready to transfer; do not
+rush the dialogue to meet a staging expiry. This preserves the same deck schema and authoring grammar:
 
 1. `start_deck_draft({startKey})` returns a private `draftId`, `version:1` and fixed two-hour
    expiry. Pick a unique key of 1–80 ASCII letters, digits, underscores or hyphens; reuse it only

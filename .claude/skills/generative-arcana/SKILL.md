@@ -13,7 +13,7 @@ The canonical portable authoring bundle for this repository is:
 ../../../skill/generative-arcana/SKILL.md
 ```
 
-Read that file and follow it as the source of truth. Resolve every `references/...` and `strategies/...` path relative to the canonical bundle directory (`skill/generative-arcana/`), not relative to this wrapper.
+Read the full canonical skill and its references, strategies and supporting contracts before design, then follow its user-agreement dialogue as the source of truth. Resolve every `references/...` and `strategies/...` path relative to the canonical bundle directory (`skill/generative-arcana/`), not relative to this wrapper. A single canonical manifest is the eventual artifact, not a one-turn authoring instruction.
 
 When the Generative Arcana MCP is connected, use the canonical workflow's platform loop: call `get_deck_authoring_spec`, construct a `DeckManifest`, and use `validate_deck_manifest` as repair feedback until the result is `valid: true, canonical: true`. Only perform `import_deck` when the user explicitly wants an account/host mutation.
 

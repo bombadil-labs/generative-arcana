@@ -1,6 +1,8 @@
 # Strategy Registry
 
-The orchestrator reads this in Stage 0 to build the per-stage generation plan. Each row: the stage, the method, when it's right, the file. Strategies generate an axis's *inputs*; they defer to `references/schema.md` for output shape and `references/integration.md` for the card pass.
+Read this registry and all strategy files as part of the full-skill reading before Stage 0. Use the registry in the design dialogue to agree the per-stage generation plan with the user. Each row: the stage, the method, when it's right, the file. Strategies generate an axis's *inputs*; they defer to `references/schema.md` for output shape and `references/integration.md` for the card pass.
+
+Every strategy follows the **discuss, agree, then advance** loop in `SKILL.md`. Its procedure is a sequence of design decisions to discuss with the user, not permission to execute the entire method in one turn. Presenting material for feedback means waiting for explicit agreement before dependent work; the absence of an extra checkpoint sentence in a strategy does not remove that requirement. Propose and agree any strategy switch or revision to an earlier choice before applying it.
 
 The **transversal is always on** (the choice is which one). The **prime/composite axis is always on too** — its factorization is derived from the number, but its **gloss is authored on every major** (and optionally on each rank); a gloss that won't cohere is signal the slot is miscast. The prime-leaning strategies below merely make it *load-bearing* rather than a quiet undertone.
 

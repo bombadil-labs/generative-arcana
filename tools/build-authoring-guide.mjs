@@ -24,7 +24,7 @@ const digest = (value) => createHash("sha256").update(value).digest("hex");
 
 // Discovery labels only. They never replace source text or enter the source/bundle hashes.
 const PURPOSES = {
-  [`${SOURCE_ROOT}/SKILL.md`]: "Host-neutral workflow, four-axis model, staged planning, and canonical manifest delivery",
+  [`${SOURCE_ROOT}/SKILL.md`]: "Full-read-first, user-agreement dialogue, four-axis model, and canonical manifest delivery",
   [`${SOURCE_ROOT}/references/integration.md`]: "Integrate declared axes, sublimated stations, numeric character, meanings, and scenes",
   [`${SOURCE_ROOT}/references/numeric_axis.md`]: "Prime/composite interpretation, number ownership, gloss quality, and visual ancestry",
   [`${SOURCE_ROOT}/references/schema.md`]: "Canonical manifest interfaces, normalized fields, default profile, and station walks",

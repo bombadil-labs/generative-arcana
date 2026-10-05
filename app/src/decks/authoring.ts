@@ -14,7 +14,7 @@ export const DECK_MANIFEST_SPEC = Object.freeze({
   authoringGuide: {
     mcpTool: "get_deck_authoring_guide",
     resourceUri: "arcana://authoring/guide",
-    description: "Read the full canonical skill, strategies, references and examples before constructing a deck. This compact spec supplements that method.",
+    description: "Read the full canonical skill, strategies, references, examples and supporting contracts before design. Then discuss each design decision with the user and wait for explicit agreement before proceeding to the next. This compact spec supplements that method.",
   },
   schema: {
     current: CURRENT_DECK_MANIFEST_SCHEMA_VERSION,

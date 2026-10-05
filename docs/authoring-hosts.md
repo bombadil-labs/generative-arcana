@@ -84,8 +84,9 @@ No OpenAI-specific field belongs in `DeckManifest`.
 
 Call `get_deck_authoring_guide({})` before planning. No arguments return all 23 canonical source
 files verbatim, with filename headers: the full skill, references, strategies, and reviewed
-supporting contracts. Broad reading is the default because planning needs the method before
-strategy selection. This public, read-only tool needs no login; the same full text is available
+supporting contracts. Finish the full reading before design or strategy selection, then follow
+the skill's dialogue: discuss each design decision with the user and wait for explicit agreement
+before proceeding to the next. This public, read-only tool needs no login; the same full text is available
 at the listed resource `arcana://authoring/guide`.
 
 For a host with output limits, use the same tool in two steps:
@@ -93,7 +94,8 @@ For a host with output limits, use the same tool in two steps:
 1. Call `get_deck_authoring_guide({ toc: true })` for a compact inventory with bundle format,
    hashes, total size, and every file's exact path, size, and purpose.
 2. Call it with `{ files: ["skill/generative-arcana/SKILL.md", "skill/generative-arcana/strategies/index.md"] }`
-   before selecting strategies. Continue reading whole files in sensible batches, using exact
+   as the first reading batch. Continue through every inventory file before selecting strategies or
+   beginning design, using sensible whole-file batches and exact
    repository-relative filenames from the TOC. Returned files are verbatim, retain their filename
    headers, and appear in canonical order even if requested in another order. A TOC or purpose
    label is navigation, not a replacement for the source instructions.
@@ -116,23 +118,28 @@ contracts. Global `sha256` and `sourceDigest` always identify the complete bundl
 inventory, respectively; compare them across retrieval calls. Purpose labels are not hashed.
 `formatVersion: 1` is the unchanged bundle-framing version, not a tool API version.
 
-## Author → validate → explicitly import
+## Read → discuss and agree → author → validate → explicitly import
 
 A prompt that makes the intended save explicit:
 
-> Design a deep-sea mythology tarot deck. First read the complete Generative Arcana authoring guide and authoring spec, then
-> create a canonical schema-v2 manifest and repair it until validation succeeds. Show me the
-> summary before importing it into my private library. Do not replace or publish an existing deck.
+> Design a deep-sea mythology tarot deck with me. First read the complete Generative Arcana authoring guide and authoring spec.
+> Then discuss each design decision with me and wait for my agreement before proceeding to the next.
+> Once we have agreed the deck, create and validate its canonical schema-v2 manifest.
+> Ask me before importing it into my private library. Do not replace or publish an existing deck.
 
 The complete tool flow is:
 
 1. Call `get_deck_authoring_guide({})` for the complete portable method, then `get_deck_authoring_spec`
    for the current executable contract. If the host limits output, use the
    [TOC and whole-file batches](#reading-the-authoring-guide) above.
-2. Produce a canonical `DeckManifest` with `schemaVersion: 2`, `data`, `tagline`, and optional `spreads`.
+2. Follow the canonical skill's staged dialogue, discussing and agreeing each design decision
+   before the next or its dependent content. Agreement on the plan does not pre-approve axes or
+   cards; review their meanings and visual direction as the skill prescribes. Once agreed, assemble
+   a canonical `DeckManifest` with `schemaVersion: 2`, `data`, `tagline`, and optional `spreads`.
    Ownership, visibility, revision, and provider IDs do not belong inside the manifest.
 3. Call `validate_deck_manifest({ manifest })`; repair until `valid: true` and `canonical: true`.
-   Validation is stateless and does not save the deck.
+   Mechanical repairs need no new creative checkpoint; changes to agreed design decisions return
+   to dialogue first. Validation is stateless and does not save the deck.
 4. After you approve saving it, explicitly call `import_deck({ manifest })`. New catalog decks start private. Save the returned
    stable resource ID and confirm it with `list_my_decks`; do not substitute the authored slug.
 5. Use that resource ID with `get_deck`, `list_spreads`, and `cast_reading`; use the resulting token
@@ -147,7 +154,9 @@ then validate/import by immutable `uploadId`. If Claude's sandbox PUT fails with
 `validate_deck_draft` → explicitly authorized `commit_deck_draft`, all through the MCP connector.
 Keep the returned draft version and retry keys; recover only necessary sections with
 `get_deck_draft`. This avoids a single giant inline call and repeated transmission of accepted
-batches. The text still passes through model tool arguments, so this is not zero-copy transport.
+batches. These are transfers of agreed content, not a substitute for the design dialogue. Defer
+opening the two-hour draft until ready to transfer rather than rushing creative decisions for its expiry.
+The text still passes through model tool arguments, so this is not zero-copy transport.
 Native files, raw PUT, inline staging and legacy inline tools remain available. See the
 [limits and resumable workflow](mcp-efficiency.md#incremental-resumable-mcp-drafts). Host acceptance
 must be tested separately; local protocol tests do not prove a real Claude conversation succeeded.
@@ -220,15 +229,27 @@ Anthropic currently documents this project-skill location and the standard `SKIL
 
 ## Standalone Claude custom skill
 
-Anthropic custom Agent Skills also use a directory with a top-level `SKILL.md` plus supporting files. Therefore the **same portable `skill/generative-arcana/` bundle** can be packaged/uploaded as a standalone custom Claude skill; the repo-only `.claude` wrapper is not part of that bundle.
+Anthropic custom Agent Skills also use a directory with a top-level `SKILL.md` plus supporting files. Use a freshly generated **`dist/generative-arcana-v2.0.zip`** for a standalone custom Claude skill: it packages the portable sources together with all supporting authoring contracts. The bare `skill/generative-arcana/` directory expects the repository's supporting `docs/` files and is not a complete offline installation by itself. The repo-only `.claude` wrapper is not part of the standalone package.
 
 This is deliberate: project discovery is host glue, while the bundle remains portable.
+
+Build `dist/generative-arcana-v2.0.zip` from current canonical sources with
+`python3 tools/build-skill-package.py`; verify parity with `--check`. Generated archives are build
+outputs, not a second checked-in source of truth. The root `generative-arcana-v2.0.zip` is a historical
+archive and must not be installed for new authoring. The generated package retains the single
+`generative-arcana/` skill root and includes the four supporting contracts under its `docs/`
+directory, so full reading works offline. Resolve `references/`, `strategies/`, and `docs/` from
+that installed root. In a repository checkout, supporting `docs/` paths refer to the repository
+root. Operational navigation and implementation-code links are not authoring dependencies.
+Replace an older installed archive to receive current instructions; an existing installation is
+not updated merely because the repository or MCP service changed.
 
 ## Other hosts
 
 A future native/web authoring adapter should implement only the host UX:
 
-1. collect or generate authored content using the portable workflow or equivalent UI;
+1. read the full portable workflow and use its decision-by-decision agreement dialogue, or an
+   equivalent UI that lets the user discuss/review and agree each design decision before advancing;
 2. assemble canonical `DeckManifest`;
 3. validate with the shared domain/API boundary;
 4. repair until canonical and valid;
