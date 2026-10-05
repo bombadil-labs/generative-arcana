@@ -171,3 +171,11 @@ for the same ID/profile preserves pending work, including native file-picker sel
 identity, account changes, logout, or failed session verification never preserve authenticated
 snapshots based only on email/display name. Artwork requests and image bytes use `no-store` and
 never follow returned external URLs or redirects.
+
+On opening an account deck, the browser checks artwork coverage before choosing a set. One set
+with saved card images is selected automatically, even when the legacy Saved artwork destination
+or other named sets are empty. Several populated sets require an explicit choice unless a valid,
+populated per-deck choice is already remembered. A stale/empty remembered choice does not override
+available artwork. Automatic choices are not saved as viewer preferences. Empty decks retain their
+semantic faces and editable upload destinations. The editor lists empty sets and honors an explicit
+empty choice so an owner can start uploading there; browsing/reading never mix images across sets.

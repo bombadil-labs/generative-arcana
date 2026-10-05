@@ -349,7 +349,25 @@ Available anonymously over HTTP and over stdio:
 - `get_card_art`
 - `render_reading`
 
-The visual tools are renderer-capability tools, not symbolic semantics. `Final Fantasy Tarot` currently ships the first complete server-renderable pack (`pixel`, 78 PNGs). `get_card_art` returns an MCP `image` content block for one card; `render_reading` resolves a reading token and returns its drawn cards as image blocks with position/orientation metadata. Browser-only kit/raw-p5 skins remain separate until a headless renderer is added.
+The visual tools are renderer-capability tools, not symbolic semantics. No visual packs are
+installed by default. `get_card_art` returns an MCP `image` content block for one card;
+`render_reading` resolves a reading token and returns its drawn cards as image blocks with
+position/orientation metadata, or a matching Living Spread. Browser-only kit/raw-p5 skins
+remain separate until a headless renderer is added.
+
+Omitting `packId` automatically selects the only usable populated visual set. Empty saved-artwork
+and named-set metadata do not compete. `get_card_art` considers card-art packs;
+`render_reading` also considers Living Spread packs supporting that reading's spread. When
+multiple sets qualify, supply `packId` from `list_visual_packs` rather than relying on pack order.
+A host-supplied static pack without a `cardCount` remains an available capability; a known zero
+count does not qualify for automatic selection. Partial packs count, but missing card art is an
+error: a reading selects one set for all placements and never fills gaps from another set.
+Explicit `packId` is always strict, including selection of an empty set. Empty named sets remain
+discoverable through `list_visual_packs`.
+
+The lower-level `get_card_artwork`, `set_card_artwork`, and HTTP artwork metadata/upload APIs
+retain their compatibility default of `saved-artwork` when `packId` is omitted. Uploads therefore
+never change their destination based on which visual set is populated.
 
 `import_deck` is available over stdio and authenticated HTTP. In OAuth HTTP mode it is also
 advertised before login, but a caller needs the configured read/write permissions to execute it.

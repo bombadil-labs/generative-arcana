@@ -8,7 +8,7 @@ import type { ArcanaToolCallObserver } from "./observability";
 import type { ToolSecurityScheme } from "./oauthResource";
 import { buildLivingSpreadResult, type ResolvedReadingForLivingSpread } from "./livingSpreadPayload";
 import { ARCANA_SPREAD_WIDGET_URI, registerArcanaSpreadWidget } from "./spreadWidget";
-import type { ServerVisualStore } from "./staticVisuals";
+import type { ServerVisualPackSummary, ServerVisualStore } from "./staticVisuals";
 
 export const ARCANA_VISUAL_TOOL_NAMES = [
   "list_visual_packs",
@@ -25,6 +25,11 @@ export interface RegisterArcanaVisualToolsOptions {
   viewerId?: string | null;
   onToolCall?: ArcanaToolCallObserver;
   securitySchemes?: readonly ToolSecurityScheme[];
+}
+
+interface VisualPackChoice {
+  pack: ServerVisualPackSummary;
+  saved: boolean;
 }
 
 interface ResolvedReadingView extends ResolvedReadingForLivingSpread {
@@ -54,25 +59,50 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
       throw new Error("Saved artwork is temporarily unavailable.");
     }
   };
-  const listPacks = async (deckId: string, includeEmptyDefault = false) => {
+  const packChoices = async (deckId: string, includeEmptyDefault = false): Promise<VisualPackChoice[]> => {
     const saved = (await savedPacks(deckId)).filter(pack => includeEmptyDefault || pack.id !== DEFAULT_ARTWORK_PACK_ID || pack.cardCount > 0);
-    return [...visuals.listPacks(deckId), ...saved.map(pack => ({ deckId, id: pack.id, label: pack.label, ...(pack.description ? { description: pack.description } : {}), renderer: "static-image" as const, mimeType: "image/webp", complete: pack.complete, cardCount: pack.cardCount }))];
+    return [
+      ...visuals.listPacks(deckId).map(pack => ({ pack, saved: false })),
+      ...saved.map(pack => ({ saved: true, pack: { deckId, id: pack.id, label: pack.label, ...(pack.description ? { description: pack.description } : {}), renderer: "static-image" as const, mimeType: "image/webp", complete: pack.complete, cardCount: pack.cardCount } })),
+    ];
   };
-  const loadCardArt = async (deckId: string, cardSlug: string, packId?: string) => {
-    const saved = options.artwork ? await savedPacks(deckId) : [];
-    const selected = saved.find(pack => pack.id === (packId ?? DEFAULT_ARTWORK_PACK_ID));
-    if (options.artwork && selected) {
+  const listPacks = async (deckId: string) => (await packChoices(deckId)).map(choice => choice.pack);
+  const selectPack = async (deckId: string, packId?: string, spreadId?: string): Promise<VisualPackChoice | undefined> => {
+    const available = await packChoices(deckId, packId === DEFAULT_ARTWORK_PACK_ID);
+    if (packId) {
+      // Explicit saved-set selection retains precedence even when an identically named host pack exists.
+      const selected = available.find(choice => choice.saved && choice.pack.id === packId)
+        ?? available.find(choice => choice.pack.id === packId);
+      if (!selected) throw new Error(`Unknown visual set “${packId}” for this deck.`);
+      return selected;
+    }
+    const candidates = available.filter(({ pack }) => pack.renderer === "static-image"
+      // Older host-supplied static packs omit coverage; their registered capability still counts.
+      ? pack.cardCount === undefined || pack.cardCount > 0
+      : spreadId !== undefined && pack.spreadIds.includes(spreadId));
+    // Host card art and a Living Spread can share one identity; saved art is a separate source.
+    const identities = new Set(candidates.map(({ pack, saved }) => `${saved ? "saved" : "host"}:${pack.id}`));
+    if (identities.size > 1) {
+      const ids = [...new Set(candidates.map(({ pack }) => pack.id))];
+      throw new Error(`Multiple visual sets are available for deck “${deckId}”. Specify packId: ${ids.join(", ")}.`);
+    }
+    // Preserve the selected source: empty saved metadata must not shadow usable host visuals.
+    return candidates[0];
+  };
+  const loadCardArt = async (deckId: string, cardSlug: string, choice: VisualPackChoice) => {
+    const { pack: selected } = choice;
+    if (options.artwork && choice.saved) {
       try {
         const { metadata, bytes } = await options.artwork.image(options.viewerId ?? null, deckId, cardSlug, undefined, selected.id);
         return { deckId, cardSlug, packId: selected.id, packLabel: selected.label, mimeType: metadata.mediaType, data: Buffer.from(bytes) };
       } catch (error) {
         if (!(error instanceof ArtworkError && error.status === 404)) throw new Error("Saved artwork is temporarily unavailable.");
         // A selected set is a boundary, never a preference that leaks another set's image.
-        if (packId) return null;
+        return null;
       }
     }
-    const art = await visuals.loadCardArt(deckId, cardSlug, packId);
-    return packId && art?.packId !== packId ? null : art;
+    const art = await visuals.loadCardArt(deckId, cardSlug, selected.id);
+    return art?.packId === selected.id ? art : null;
   };
   const authMeta = options.securitySchemes ? { securitySchemes: options.securitySchemes } : undefined;
   registerArcanaSpreadWidget(server);
@@ -80,7 +110,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
   server.registerTool(
     "list_visual_packs",
     {
-      description: "List named saved-artwork sets and server-renderable visual packs for one deck, including empty named sets and their coverage. Omitted packId on image tools uses the legacy saved-artwork set.",
+      description: "List named saved-artwork sets and server-renderable visual packs for one deck, including empty named sets and their coverage. Image tools automatically select the only usable populated pack; multiple usable packs require packId.",
       inputSchema: z.object({ deckId: z.string().min(1) }),
       annotations: readOnlyAnnotations,
       ...(authMeta ? { _meta: authMeta } : {}),
@@ -99,7 +129,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
   server.registerTool(
     "get_card_art",
     {
-      description: "Return actual card artwork as MCP image content. With packId, resolve strictly within that visual set; missing art never falls back to another set.",
+      description: "Return actual card artwork as MCP image content. Omit packId to select the only populated card-art pack; multiple packs require packId. Selection is strict, and missing art never falls back to another set.",
       inputSchema: z.object({
         deckId: z.string().min(1),
         cardSlug: z.string().min(1),
@@ -112,8 +142,11 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
       const { deckId, cardSlug, packId } = input as { deckId: string; cardSlug: string; packId?: string };
       const card = await adapter.call("get_card", { deckId, cardSlug }) as CardData;
 
-      const art = await loadCardArt(deckId, cardSlug, packId);
-      if (!art) throw packId ? new Error(`Visual set “${packId}” has no artwork for card “${cardSlug}”.`) : visualLookupError(deckId, visuals);
+      const choice = await selectPack(deckId, packId);
+      if (!choice) throw visualLookupError(deckId, visuals);
+      const selectedPack = choice.pack;
+      const art = await loadCardArt(deckId, cardSlug, choice);
+      if (!art) throw new Error(`Visual set “${selectedPack.id}” has no artwork for card “${cardSlug}”.`);
 
       const result = {
         deckId,
@@ -137,7 +170,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
     "render_reading",
     {
       title: "Render Arcana spread",
-      description: "Render an existing Arcana reading token. An explicit packId is strict: the selected set supplies every image, with no cross-set fallback. Otherwise a matching Living Spread is preferred before static art. This never recasts the reading.",
+      description: "Render an existing Arcana reading token. Omit packId to select the only populated card-art pack or matching Living Spread; multiple usable packs require packId. The selected set supplies every image, with no cross-set fallback. This never recasts the reading.",
       inputSchema: z.object({
         token: z.string().min(1),
         deckId: z.string().min(1).optional(),
@@ -159,12 +192,12 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
         ...(deckId ? { deckId } : {}),
       }) as ResolvedReadingView;
 
-      const available = await listPacks(reading.deckId, packId === DEFAULT_ARTWORK_PACK_ID);
-      const selectedPack = packId ? available.find(pack => pack.id === packId) : undefined;
-      if (packId && !selectedPack) throw new Error(`Unknown visual set “${packId}” for this deck.`);
-      const selectedSaved = !!packId && (await savedPacks(reading.deckId)).some(pack => pack.id === packId);
-      const resolvedScene = selectedSaved ? null : visuals.resolveSpreadScene(reading.deckId, reading.spread.id, packId);
-      const spreadScene = packId && resolvedScene?.packId !== packId ? null : resolvedScene;
+      // Resolve once for the whole reading so partial packs can never be mixed per card.
+      const choice = await selectPack(reading.deckId, packId, reading.spread.id);
+      if (!choice) throw noVisualError(reading.deckId, reading.spread.id);
+      const selectedPack = choice.pack;
+      const resolvedScene = choice.saved ? null : visuals.resolveSpreadScene(reading.deckId, reading.spread.id, selectedPack.id);
+      const spreadScene = resolvedScene?.packId === selectedPack.id ? resolvedScene : null;
       if (spreadScene) {
         const result = buildLivingSpreadResult(reading, spreadScene);
         return {
@@ -176,8 +209,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
         };
       }
 
-      const staticPacks = available.filter((pack) => pack.renderer === "static-image");
-      if (!staticPacks.length) throw noVisualError(reading.deckId, reading.spread.id);
+      if (selectedPack.renderer !== "static-image") throw noVisualError(reading.deckId, reading.spread.id);
 
       const content: Array<
         | { type: "text"; text: string }
@@ -197,9 +229,9 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
       }> = [];
 
       for (const [index, placement] of reading.placements.entries()) {
-        const art = await loadCardArt(reading.deckId, placement.card.slug, packId);
+        const art = await loadCardArt(reading.deckId, placement.card.slug, choice);
         if (!art) {
-          throw new Error(`Visual pack for deck “${reading.deckId}” is missing art for card “${placement.card.slug}”.`);
+          throw new Error(`Visual set “${selectedPack.id}” for deck “${reading.deckId}” is missing art for card “${placement.card.slug}”.`);
         }
         content.push({
           type: "text",
@@ -227,7 +259,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
             spreadId: reading.spread.id,
             spreadName: reading.spread.name,
             question: reading.question,
-            layout: { kind: "flow", ...(selectedPack ? { packId: selectedPack.id, packLabel: selectedPack.label } : {}) },
+            layout: { kind: "flow", packId: selectedPack.id, packLabel: selectedPack.label },
             placements,
           },
         },

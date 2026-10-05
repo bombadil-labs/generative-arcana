@@ -19,7 +19,7 @@
     "test:principal": "tsx test/principal.ts",
     "test:alpha-auth": "tsx test/alpha-auth.ts",
     "test:hardening": "tsx test/hardening.ts",
-    "test:visuals": "tsx test/visuals.ts",
+    "test:visuals": "node --import tsx test/visuals.ts && node --import tsx test/visual-pack-selection.ts",
     "eval:golden": "tsx eval/golden.ts",
     "typecheck": "tsc --noEmit",
     "test:oauth-identity": "tsx test/oauth-identity.ts",
