@@ -1,0 +1,64 @@
+name: Approved existing preview migration
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        description: 'Reviewed full commit SHA containing the migration catalog and runner'
+        required: true
+      operation:
+        type: choice
+        options: [plan, status, baseline, apply]
+        default: plan
+      expected_host:
+        description: 'Reviewed direct hostname of the EXISTING preview database'
+        required: true
+      expected_database:
+        description: 'Reviewed database name'
+        required: true
+      expected_user:
+        description: 'Reviewed dedicated migration role'
+        required: true
+      backup_reference:
+        description: 'Reviewed backup/recovery evidence; required for baseline/apply'
+      baseline_through:
+        description: 'Explicit historical version, baseline only'
+permissions:
+  contents: read
+concurrency:
+  group: arcana-preview-migration
+  cancel-in-progress: false
+jobs:
+  migrate:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    environment: arcana-preview-migrations
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Validate immutable revision
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+        run: '[[ "$REVIEWED_SHA" =~ ^[0-9a-f]{40}$ ]]'
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: npm ci --prefix mcp --ignore-scripts
+      - name: Run reviewed migration operation
+        env:
+          DATABASE_MIGRATION_URL: ${{ secrets.ARCANA_PREVIEW_MIGRATION_URL }}
+          OPERATION: ${{ inputs.operation }}
+          EXPECTED_HOST: ${{ inputs.expected_host }}
+          EXPECTED_DATABASE: ${{ inputs.expected_database }}
+          EXPECTED_USER: ${{ inputs.expected_user }}
+          BACKUP_REFERENCE: ${{ inputs.backup_reference }}
+          BASELINE_THROUGH: ${{ inputs.baseline_through }}
+        shell: bash
+        run: |
+          args=("$OPERATION" --target preview --expected-host "$EXPECTED_HOST" --expected-database "$EXPECTED_DATABASE" --expected-user "$EXPECTED_USER")
+          if [[ -n "$BACKUP_REFERENCE" ]]; then args+=(--backup-reference "$BACKUP_REFERENCE"); fi
+          if [[ -n "$BASELINE_THROUGH" ]]; then args+=(--through "$BASELINE_THROUGH"); fi
+          npm run db:migrate:domain --prefix mcp -- "${args[@]}"

@@ -185,3 +185,38 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: docker build -f Dockerfile.vercel -t generative-arcana-vercel:test .
+
+  migration-workflow:
+    name: Versioned migration safety and PostgreSQL concurrency
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: arcana_ci
+          POSTGRES_PASSWORD: disposable-ci-only
+          POSTGRES_DB: arcana_migration_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: node tools/check-migration-history.mjs
+        env:
+          MIGRATION_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+      - run: npm ci --prefix mcp
+      - run: npm run db:domain:catalog:check --prefix mcp
+      - run: npm run test:migration-runner --prefix mcp
+      - run: npm run test:migration-concurrency --prefix mcp
+        env:
+          ARCANA_DISPOSABLE_POSTGRES: '1'
