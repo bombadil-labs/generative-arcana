@@ -18,4 +18,4 @@ For each, the full `Suit` per `references/schema.md` — index, name, slug, glyp
 
 Lean on the suits' existing cultural associations for the palettes, but still chiralize inversions (Fire inverted is not "no fire" but "consuming what feeds it").
 
-Present the four ordered suits for feedback before Stage 2.
+Discuss the four ordered suits and their visual families with the user; wait for explicit agreement before Stage 2.

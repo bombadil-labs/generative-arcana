@@ -11,6 +11,9 @@ export async function assertAuthoringGuide(client: Client, chunks = false): Prom
   const tools = await client.listTools();
   const tool = tools.tools.find((item) => item.name === AUTHORING_GUIDE_TOOL);
   assert.ok(tool, "full authoring method must be discoverable as a tool");
+  assert.match(tool.description ?? "", /Read the full guide before designing/);
+  assert.match(tool.description ?? "", /finish all inventory files before design or strategy selection/);
+  assert.match(tool.description ?? "", /discuss each design decision with the user and wait for explicit agreement before proceeding to the next/);
   assert.equal(tool.annotations?.readOnlyHint, true);
   assert.equal(tool.annotations?.destructiveHint, false);
   assert.deepEqual(tool._meta?.securitySchemes, [{ type: "noauth" }]);
@@ -34,6 +37,8 @@ export async function assertAuthoringGuide(client: Client, chunks = false): Prom
   const toc = await client.callTool({ name: AUTHORING_GUIDE_TOOL, arguments: { toc: true } });
   assert.equal(toc.isError, undefined);
   const tocText = toc.content[0].type === "text" ? toc.content[0].text : "";
+  assert.match(tocText, /then finish all inventory files/);
+  assert.match(tocText, /wait for explicit agreement before proceeding to the next/);
   const tocMetadata = toc.structuredContent as Record<string, unknown>;
   assert.equal(tocMetadata.mode, "toc");
   assert.equal(tocMetadata.range, undefined);
@@ -58,9 +63,10 @@ export async function assertAuthoringGuide(client: Client, chunks = false): Prom
     for (const key of ["resourceUri", "formatVersion", "sourceRoot", "sourceDigest", "sha256", "byteLength", "files"]) assert.deepEqual(actual[key], metadata[key]);
   }
   const spec = await client.callTool({ name: "get_deck_authoring_spec", arguments: {} });
-  const specResult = (spec.structuredContent as Record<string, unknown>).result as { authoringGuide: { mcpTool: string; resourceUri: string } };
+  const specResult = (spec.structuredContent as Record<string, unknown>).result as { authoringGuide: { mcpTool: string; resourceUri: string; description: string } };
   assert.equal(specResult.authoringGuide.mcpTool, AUTHORING_GUIDE_TOOL);
   assert.equal(specResult.authoringGuide.resourceUri, AUTHORING_GUIDE_URI);
+  assert.match(specResult.authoringGuide.description, /wait for explicit agreement before proceeding to the next/);
 
   if (chunks) {
     for (const file of sections) {

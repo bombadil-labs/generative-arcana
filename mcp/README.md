@@ -31,14 +31,17 @@ account or rendering capability is required. The same full text is a
 listed resource at `arcana://authoring/guide` (`text/plain`). `get_deck_authoring_spec` links to both
 surfaces and remains the compact machine-readable validation contract, not the authoring method.
 
-Broad reading remains the default: planning needs the method before selecting strategies.
+Finish the full guide before design or strategy selection. Then follow the canonical skill's
+dialogue: discuss each design decision with the user and wait for explicit agreement before
+proceeding to the next. One complete manifest is the final artifact, not a one-turn workflow.
 Use the same tool for each of these retrieval patterns:
 
 - **Full:** omit arguments (or pass `{}`) for the complete guide, including its preamble.
 - **Discovery and whole files:** use `{ toc: true }` for a compact TOC with bundle format/hash,
   total size, and every exact source path, source size, and purpose. Then use
   `{ files: ["skill/generative-arcana/SKILL.md", "skill/generative-arcana/strategies/index.md"] }`
-  to retrieve whole files before choosing strategies. Batch further files using the TOC's exact
+  as the first batch. Read all remaining inventory files before choosing strategies or beginning
+  design, using the TOC's exact
   repository-relative paths. Results always use canonical order, regardless of request order,
   and retain the full guide's filename headers. They omit the preamble and join the framed
   sections with one newline between each pair (`N - 1` separator characters for `N` files).

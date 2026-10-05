@@ -10,7 +10,7 @@ The full prime/composite tables, power rules, and traditional mapping live in `r
 
 1. **Identities (0, 1).** Card 0 = additive identity (void/precondition/pure potential). Card 1 = multiplicative identity (the unit of agency, the transparent operator). Define "nothing yet" and "becoming one who acts" in the theme.
 
-2. **Eight primes (2, 3, 5, 7, 11, 13, 17, 19).** Each an irreducible archetypal energy that simply *is*. 2 and 3 are load-bearing (in most composites), so choose them as energies that combine and scale well under powers. 11/13/17/19 are genuinely new, unfactorable experiences later in the arc. Present identities + primes for feedback before composites.
+2. **Eight primes (2, 3, 5, 7, 11, 13, 17, 19).** Each an irreducible archetypal energy that simply *is*. 2 and 3 are load-bearing (in most composites), so choose them as energies that combine and scale well under powers. 11/13/17/19 are genuinely new, unfactorable experiences later in the arc. Discuss identities + primes with the user and wait for explicit agreement before composites.
 
 3. **Eleven composites (4, 6, 8, 9, 10, 12, 14, 15, 16, 18, 20, 21).** Derive from factorization — products combine energies, powers intensify (x² stabilizes, x³ deep mastery/excess, x⁴ collapse/breakthrough). A composite that doesn't follow from its factors means revisiting it or its primes. (In v2 this check is concrete and recorded: it is exactly a `factorization.gloss` that won't cohere — `references/numeric_axis.md` → "The gloss as signal." Don't write around it; recast the slot or fix the factor-card.)
 

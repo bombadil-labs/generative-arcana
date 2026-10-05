@@ -8,7 +8,7 @@ The structure and traditional mapping live in `references/tarot_structure.md` �
 
 1. **Ace (1) = multiplicative identity** — pure suit potential, the unit of the suit's energy.
 2. **Primes (2, 3, 5, 7) = irreducible questions** — each an atomic, unfactorable question the suit answers. 2 and 3 are load-bearing (they recur in the composites), so define them as questions that combine well.
-3. **Composites derive from factors:**
+3. Discuss the identity and prime foundations with the user and wait for explicit agreement. **Then derive composites from those factors:**
    - 4 = 2² — the 2-question stabilized into structure.
    - 6 = 2×3 — the 2-question meets the 3-question.
    - 8 = 2³ — the 2-question cubed: mastery or excess.
@@ -19,7 +19,7 @@ For each rank produce the `Rank` fields (`description` = the framework, `questio
 
 ## Don't force it
 
-Optional scaffolding. If the arithmetic strains a rank, drop it for `questions.md` or `manual.md` — coherence by any means beats forced factorization. And remember the axis is *always* present regardless (you can pick `questions` and still have the integrator notice primality); this strategy just promotes it from latent to structural.
+Optional scaffolding. If the arithmetic strains a rank, propose switching to `questions.md` or `manual.md` and agree the change with the user before applying it — coherence by any means beats forced factorization. And remember the axis is *always* present regardless (you can pick `questions` and still have the integrator notice primality); this strategy just promotes it from latent to structural.
 
 ## Visual arithmetic
 

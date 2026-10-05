@@ -17,13 +17,16 @@ See `docs/deck-manifest.md` for the ownership and identity contract.
 
 ## Validation loop
 
-A portable authoring workflow is:
+A portable validation workflow follows the full-skill reading and design-decision agreement
+dialogue in `skill/generative-arcana/SKILL.md`:
 
-1. produce a schema-v2 `DeckManifest`;
+1. assemble agreed content into a schema-v2 `DeckManifest`;
 2. validate it through Generative Arcana;
-3. use `{ valid: false, error }` as repair feedback and repeat;
+3. use `{ valid: false, error }` as repair feedback and repeat; mechanical repairs can proceed,
+   but discuss and agree any change to a design decision with the user before applying it;
 4. continue only when the result is `valid: true` and `canonical: true`;
-5. persist/import the same authored content; the catalog then assigns stable resource identity, ownership, visibility, and revision.
+5. persist/import the same authored content only when the user explicitly authorizes saving;
+   the catalog then assigns stable resource identity, ownership, visibility, and revision.
 
 Validation is stateless and account-independent.
 

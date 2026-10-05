@@ -24,6 +24,13 @@ assert(portable.includes("get_deck_authoring_spec"), "portable workflow must con
 assert(portable.includes("validate_deck_manifest"), "portable workflow must validate canonical manifests when the platform tool is available");
 assert(portable.includes("valid: true, canonical: true"), "portable workflow must require canonical validation success before connected delivery/import");
 assert(portable.includes("references/visual_language.md"), "portable workflow must reference the structured visual-language contract");
+assert(portable.includes("## Read the full skill before the design dialogue"), "read the full skill before any design dialogue");
+assert(portable.includes("finish reading **all** inventory files before beginning the design dialogue"), "batch retrieval must complete before design");
+assert(portable.includes("wait for explicit agreement before proceeding to the next decision or generating dependent content"), "every design decision needs agreement before dependent work");
+assert((portable.match(/\*\*Agreement gates:\*\*/g) ?? []).length === 5, "suits, transversal, majors, ranks and projection must retain agreement gates");
+assert(!/Don't prompt stage-by-stage|plan once, adjust once, build|let the user adjust in one pass|Creative judgment supersedes the plan/.test(portable), "one-pass or unilateral-plan instructions contradict the dialogue");
+const strategies = readFileSync(resolve(portableDir, "strategies/index.md"), "utf8");
+assert(strategies.includes("waiting for explicit agreement before dependent work"), "all strategy feedback checkpoints must be agreement gates");
 const visualLanguage = readFileSync(resolve(portableDir, "references/visual_language.md"), "utf8");
 for (const phrase of ["Rank recognizability", "Factorization composition", "Style inversion", "Subject-removal", "Station leakage", "Cross-deck distinctiveness"]) {
   assert(visualLanguage.includes(phrase), `visual-language quality contract must retain stress test: ${phrase}`);

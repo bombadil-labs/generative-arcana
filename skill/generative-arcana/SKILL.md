@@ -1,6 +1,6 @@
 ---
 name: generative-arcana
-description: Design thematically coherent custom tarot decks woven from four symbolic axes — suit, rank, a required transversal substrate (the generalization of tarot's Chaldean/decan order), and the latent prime/composite character of each card's number. Use when the user asks to create, design, or generate a custom tarot deck for a theme (e.g. "design a cyberpunk tarot deck", "make a tarot deck about ocean mythology"). This portable skill routes a per-stage generation plan and emits one canonical DeckManifest artifact.
+description: Design thematically coherent custom tarot decks woven from four symbolic axes — suit, rank, a required transversal substrate (the generalization of tarot's Chaldean/decan order), and the latent prime/composite character of each card's number. Use when the user asks to create, design, or generate a custom tarot deck for a theme (e.g. "design a cyberpunk tarot deck", "make a tarot deck about ocean mythology"). Read the full skill first, then discuss and agree each design decision with the user before proceeding to the next; the dialogue culminates in one canonical DeckManifest artifact.
 ---
 
 # Generative Arcana
@@ -11,7 +11,15 @@ A custom tarot designer built on one idea: **a tarot deck is a small semantic sp
 
 v2.0. Changes from v1: the fourth (prime/composite) axis is now **baked in where the number is originated** — each **major** stores an authored `factorization.gloss`, and a gloss that won't cohere is treated as *signal* the slot is miscast (was: derived-only, stored nothing). In the default profile, minors derive their character from their **rank**, which may carry an optional gloss; alternate profiles may explicitly originate minor numbers at suit or card. The gloss/visual logic lives once at whichever layer owns the number. Stations gain an optional concise `description` and an optional `symbol` (meta-layer by default; may surface tastefully). Numbered ranks gain a `question` with a literal `{suit}` placeholder. Per-card `description` is dropped (it was redundant with `meaning`). See `references/schema.md`.
 
-## The formalism (read this first)
+## Read the full skill before the design dialogue
+
+Before proposing a deck or choosing strategies, read this entire `SKILL.md`, every file in `references/` and `strategies/` (including `strategies/index.md`), and the supporting authoring contracts they reference. Read ahead to understand the whole method; do not design ahead of the user.
+
+When connected, `get_deck_authoring_guide({})` supplies the complete canonical guide, including those contracts. If output limits require the TOC and whole-file batches, finish reading **all** inventory files before beginning the design dialogue; a TOC or the opening files alone is not enough. An installed bundle supplies the same sources locally. Then consult `get_deck_authoring_spec` when available.
+
+The deliverable is one complete manifest, but authoring is a **step-by-step dialogue**, not a single-pass generation task. Follow the agreement loop below throughout the stages and their strategy procedures.
+
+## The formalism
 
 Four axes, two kinds, one storage rule. Internalize this before generating anything.
 
@@ -55,17 +63,20 @@ This bundle is usable without a connected Generative Arcana service. When the ho
 
 The platform validator owns runtime correctness. This skill owns generative quality and thematic coherence. Do not recreate server validation rules inside a ChatGPT-, Claude-, or other host-specific wrapper.
 
-## Workflow: plan, then execute
+## Workflow: discuss, agree, then advance
 
-Don't prompt stage-by-stage — plan once, adjust once, build.
+For **each design decision**, explain the current choice in the theme's terms, offer a concrete proposal and useful alternatives, discuss the user's feedback, and **wait for explicit agreement before proceeding to the next decision or generating dependent content**. Summarize what was agreed so later stages build on it. A clear choice already supplied by the user counts; do not ask them to approve it twice. Silence, a vague initial request to make a deck, or approval of an overall plan does not approve choices that have not been discussed.
+
+The stages below are an ordered conversation, not a questionnaire delivered all at once. A stage can contain several decisions: settle them in dependency order rather than presenting all stages or the finished deck for a single retrospective approval. A strategy's feedback checkpoint is a required agreement gate under this same loop. Propose manageable groups of closely related material for review, but do not hide unresolved choices inside a batch or advance while feedback is outstanding.
+
+Mechanical work does not need a new creative checkpoint: compute the agreed walks/factorizations, encode agreed content, assemble JSON, run checks, and repair purely structural errors. If any repair or quality check would change an agreed name, meaning, structure, scene, or visual direction, bring that change back to the user first. Tool/upload batches are transport units, not permission to make new creative decisions.
 
 ### Stage 0 — Theme, visual language, dialectics, and the plan
 
-1. Articulate the **theme** (canonical name + evocative description). See `references/schema.md` → Theme.
-2. Establish the deck's **shared visual/material language** per `references/visual_language.md`: medium, surface, mark-making, signature accent, finish, and meaningful avoid-list. Make it specific enough to distinguish this deck even with theme nouns removed. This becomes `Deck.visual_language`.
-3. Read `references/tarot_structure.md` if you need the traditional baseline.
-4. Propose a **generation plan** — one strategy per stage — consulting `strategies/index.md` (the registry). Give each a one-line rationale. The transversal is always on; the choice there is *which* transversal.
-5. Present the plan; let the user adjust in one pass (strategies can be chosen aware of each other). Lock it, then execute in order.
+1. Discuss and agree the **theme** (canonical name + evocative description), scope/profile, and creator credit. See `references/schema.md` → Theme. The stages below describe the default 78-card profile; discuss any departure rather than choosing it silently.
+2. Discuss and agree the deck's **shared visual/material language** per `references/visual_language.md`: medium, surface, mark-making, signature accent, finish, and meaningful avoid-list. Resolve its choices in dialogue; make it specific enough to distinguish this deck even with theme nouns removed. This becomes `Deck.visual_language`.
+3. Give a brief roadmap of the stages. Using the already-read `strategies/index.md`, discuss the strategy for each stage in turn, explain its rationale and relationships to the other choices, and agree it before moving on. The transversal is always on; the choice there is *which* transversal.
+4. Recap the agreed plan before Stage 1. Agreement on the plan sets direction; it does not pre-approve the axis definitions or cards. Revisit the plan together whenever later findings warrant a change.
 
 Every strategy emits values conforming to `references/schema.md` and defers to `references/integration.md` for the card pass — strategies decide *how to generate an axis's inputs*, never the card's output shape.
 
@@ -77,6 +88,8 @@ Establish four ordered suits (`index` 0–3). Strategies in `strategies/suits/`:
 
 Output: four `Suit` entities (index, name, slug, glyph SVG per `references/svg_symbols.md`, meaning palette, concise `visual_style`, and structured `visual_grammar`). The four family grammars should diverge structurally—composition, edge/value, camera/scale, detail distribution, material handling—not merely by palette or mascot. See `references/visual_language.md`.
 
+**Agreement gates:** under `dialectical`, agree the two dialectics before deriving their four suits; under `manual`, agree the native four-fold grouping first. Then discuss the suit identities and fixed order, meanings, glyph concepts, and family grammars in turn. Obtain agreement on the completed suit definitions before Stage 2.
+
 ### Stage 2 — Transversal (substrate axis) — *before the majors*
 
 Lay down the required transversal now: it is the deck's most global layer, the one structure that must stay coherent across majors, courts, and pips at once, so it is a substrate the others express rather than something derived per-class. Strategies in `strategies/transversal/`:
@@ -84,6 +97,8 @@ Lay down the required transversal now: it is the deck's most global layer, the o
 - `themed_cycle.md` — a theme-native canonically-ordered cycle (alchemical operations, OSI layers, lunar phases, modes). The general case.
 
 Output: one `Transversal` entity — N **stations** in canonical order (N ≥ 4 so each rank's four suits land on distinct stations), an optional `suit_stride` (default 1; any value coprime to N works, so N = 7 is fine), each station carrying a semantic charge, a concise `description`, an optional `symbol`, a legacy/general `visual_motif`, and a structured `visual_environment`. **Station changes the weather, not the family**: illumination/palette/atmosphere/motion/material effects may modulate a card, but must not replace suit/Major medium, composition, or mark-making. See `references/visual_language.md`. The walk is structural (above); nothing to anchor. Once N, the order, and `suit_stride` are fixed, **every card's station is determined** — including each major's, which seeds Stage 3.
+
+**Agreement gates:** agree the cycle, station count/order and their rationale before elaborating the stations. Discuss the station meanings, environmental treatment and any glyphs, then the stride's cross-suit effect. Agree the completed transversal before Stage 3; compute individual station assignments mechanically from those choices.
 
 ### Stage 3 — Major Arcana (style-suit + 22 cards)
 
@@ -94,6 +109,8 @@ The Major Arcana is a visual family contributing `visual_style` plus structured 
 
 Each slot's station (sublimated) and numeric character (gloss authored) inform what it becomes — and for `primes.md`, a composite whose gloss won't follow from its factor-cards is a flag to recast the slot. Author `major_arcana.visual_grammar` as its family-level visual system and normally give every major a `factorization.visual_logic` describing the formal consequence of its number. Composite visual logic should show ancestry from factor-majors without literal collage. Output: `MajorArcana` + 22 `MajorArcanaCard`s per `references/integration.md`.
 
+**Agreement gates:** agree the Major family's visual system and the strategy's foundations before dependent cards: identities and primes before composites, the journey and its anchors before later beats, or the borrowed source set and ordering before adaptations. Discuss the resulting archetypes, integrated meanings, glosses and scenes in reviewable groups, resolving each group's decisions before the next. Agree the complete major sequence before Stage 4. Recasting an agreed slot or factor-major returns to dialogue and review of its affected descendants.
+
 ### Stage 4 — Minor ranks (grid axis)
 
 Define 14 ranks (10 numbered + 4 face) as abstract frameworks refracting through every suit. Strategies in `strategies/ranks/`:
@@ -103,11 +120,17 @@ Define 14 ranks (10 numbered + 4 face) as abstract frameworks refracting through
 
 Face ranks: four roles, distinct initials (for glyph abbreviation), an encoded progression. Output: 14 `Rank` entities. In the default authoring profile, each rank also gets a `visual_form`—at least a `composition_law`, with spatial/rhythm/density/figure-ground fields where useful—so the rank is formally recognizable across suits before subject labels are read. Court/face ranks should express their progression visually rather than as four arbitrary portraits. A rank may optionally carry a `factorization` gloss/visual logic, load-bearing under `prime_scaffold`.
 
+**Agreement gates:** discuss and agree the numbered-rank progression, questions/meanings and formal grammar before the face ranks. Under `prime_scaffold`, agree the identity/prime foundations before deriving composites. Then discuss and agree the four court roles, their progression and visual form before Stage 5.
+
 ### Stage 5 — Minor projection
 
 Generate the 56 minor cards. Each integrates its **suit family grammar** (declared) × **rank content + formal grammar** (declared) × its **station environment** (sublimated — from the minor walk) × its **numeric character/formal ancestry** (latent — derived from the declared number-owning layer; rank in this default profile, not duplicated per-card). Follow `references/integration.md` and `references/visual_language.md` exactly. `detailed_description` stores the one concrete scene, not a copy of the inherited prompt stack; Generative Arcana resolves that stack into `get_card(...).render` at read time. Overrides only where a card genuinely refines a parent axis.
 
-### Stage 6 — Emit and validate the canonical DeckManifest
+**Agreement gates:** begin with a small cross-suit sample to discuss how the agreed axes combine into meanings and scenes. Agree the sample and a manageable review grouping (for example, one rank across suits), then propose each group, discuss it and wait for agreement before the next. Review every group's authored content; a successful sample does not authorize unreviewed creative choices for the remaining cards. Reopen any axis decision that the projection shows needs revision before continuing.
+
+### Stage 6 — Final review, emit and validate the canonical DeckManifest
+
+Review the completed deck with the user, resolve any remaining design choices, and agree the final name, tagline and any authored native spreads before assembling the deliverable. This is a coherence check over already-agreed content, not the first opportunity for feedback.
 
 Assemble the full `Deck` payload per `references/schema.md` (theme, 4 ordered suits, 14 ranks, transversal, major_arcana, 78 cards), explicitly setting `minor_number_origin: "rank"` for this default 4×14 profile. Write a concise explicit `tagline` and wrap them in the canonical host-neutral artifact:
 
@@ -122,7 +145,7 @@ Assemble the full `Deck` payload per `references/schema.md` (theme, 4 ordered su
 
 `schemaVersion: 2` is required for newly authored manifests. `spreads` is optional; omit it when the deck has no authored native spreads. Do **not** emit a catalog resource ID, owner/principal, visibility, revision/timestamps, OAuth/provider/session data, or renderer/MCP host metadata. `data.slug` remains authored metadata; the platform assigns stable resource identity when the manifest is imported.
 
-When `validate_deck_manifest` is available, validate this exact envelope before delivery. Repair any `valid: false` result and re-run; if the result says `canonical: false`, convert the artifact to the canonical manifest envelope and re-run. Finish only on `valid: true, canonical: true`. Validation does not itself import or publish anything.
+When `validate_deck_manifest` is available, validate this exact envelope before delivery. Repair any `valid: false` result and re-run; if the result says `canonical: false`, convert the artifact to the canonical manifest envelope and re-run. Structural repairs can proceed directly; a repair that changes an agreed design decision returns to dialogue before it is applied. Finish only on `valid: true, canonical: true`. Validation does not itself import or publish anything.
 
 Save the artifact:
 
@@ -136,12 +159,14 @@ Confirm the save and report the path. If the user also asked to import it into a
 
 ## Working with feedback
 
-- Iterate freely; revising an axis cascades to dependents (re-running the transversal re-derives every station; changing N re-walks the whole deck).
-- Creative judgment supersedes the plan when the theme demands it.
-- Present cards by name and meaning; mention scaffolding (primes, stations) only if asked.
+- Iterate through dialogue; explain the dependent content affected by a revision and agree the change before regenerating it (re-running the transversal re-derives every station; changing N re-walks the whole deck).
+- Use creative judgment to propose improvements to the plan, never to overrule an agreed decision silently. Review affected outputs with the user before advancing again.
+- Present cards by name, meaning and scene. Explain primes, stations or other scaffolding when they are the decision under discussion or help the user judge a choice; avoid gratuitous technical detail.
+- On resuming a conversation, recover the agreed decisions and the current open question. Continue from that checkpoint; do not treat a partial plan or staged draft as approval of the rest.
 
 ## Quality checks
 
+- **Full reading and agreement?** Was the full skill read before design, and was each design decision discussed and agreed before dependent work? Were revisions and all review groups agreed, rather than merely presented?
 - **Platform-valid when available?** If the executable validator is connected, did the final artifact reach `valid: true, canonical: true` before delivery/import?
 - **Canonical envelope?** Is the final artifact schema v2 — `schemaVersion: 2`, `data`, explicit non-empty `tagline`, and optional `spreads` — with no catalog/account/host identity metadata?
 - **Axes orthogonal?** Do suit, rank, and transversal each carve the space differently? (If the transversal aligns with the suits, N or the walk is wrong.)

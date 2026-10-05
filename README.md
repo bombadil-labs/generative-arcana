@@ -46,7 +46,9 @@ by browser and MCP. Production accounts are enabled; the remaining end-to-end
 3. Ask the host to call `get_deck_authoring_guide({})` for the complete method before planning.
    Output-limited hosts can use `{ toc: true }` and then `{ files: [exactPaths] }` to read whole
    files in batches; see [guide retrieval](docs/authoring-hosts.md#reading-the-authoring-guide).
-   Then call `get_deck_authoring_spec`, author a canonical schema-v2 `DeckManifest`, and
+   Finish all inventory files, then call `get_deck_authoring_spec`. Discuss and agree each design
+   decision with the host before proceeding to the next, following the skill's staged dialogue.
+   Assemble the agreed content into a canonical schema-v2 `DeckManifest`, and
    repair it with `validate_deck_manifest` until `valid: true` and `canonical: true`.
 4. Explicitly ask it to save the validated manifest with `import_deck`. New catalog imports are
    **private**. Confirm the returned stable resource ID with `list_my_decks`; validation alone does
@@ -110,7 +112,7 @@ Yew, *Role of Valor* is the Fighter — with the 3-bit Truth·Love·Courage valu
 
 ```
 skill/generative-arcana/      the method, as a Claude skill (SKILL.md + references/ + strategies/)
-generative-arcana-v2.0.zip    the same skill, packaged for one-click install
+generative-arcana-v2.0.zip    historical archive; use current sources or generate a fresh package
 decks/<id>/deck.json          the deck corpus — portable meanings, structure, and iconographic briefs (no renderer code)
 app/                          the web client (Vite + React + TypeScript)
 mcp/                          the Node MCP, account, authoring, and catalog APIs
@@ -124,19 +126,26 @@ tools/gen/                    deck-data generators (e.g. the Ultima Octave latti
 
 ## The skill
 
-The portable skill teaches a host model to author a complete deck as a single canonical JSON manifest. Read
+The portable skill teaches a host model to read the full method, then design a deck through dialogue
+with the user, agreeing each design decision before proceeding to the next. The final deliverable
+is a single canonical JSON manifest; that does not mean generating it all in one pass. Read
 **[`skill/generative-arcana/SKILL.md`](./skill/generative-arcana/SKILL.md)** for the formalism; the
 `references/` define the schema and integration rules, and `strategies/` are the per-stage generators.
 
-Use the current **`skill/generative-arcana/`** bundle in a supported skills host, or read the
+Use a freshly built **`dist/generative-arcana-v2.0.zip`** for a standalone skills host, the canonical
+**`skill/generative-arcana/`** sources with their supporting docs in a repository checkout, or read the
 complete method through MCP with `get_deck_authoring_guide({})`: all 23 canonical source files,
-verbatim with filename headers, including the reviewed supporting contracts. Broad reading is
-the default because planning needs the method before strategy selection. The same tool offers
-a compact TOC and whole-file batches when needed; read `SKILL.md` and `strategies/index.md`
-before choosing strategies. The historical `generative-arcana-v2.0.zip` is also included;
-the runtime spec and validator are authoritative for new canonical manifests. Ask, for example,
-*"Design a deep-sea mythology tarot deck; validate the manifest, then ask me before saving it to my
-private library."* See [host setup](docs/authoring-hosts.md). Adding a bundled fixture under
+verbatim with filename headers, including the reviewed supporting contracts. The same tool offers
+a compact TOC and whole-file batches when needed; start with `SKILL.md` and `strategies/index.md`
+and finish every inventory file before design or strategy selection. The generated
+`dist/generative-arcana-v2.0.zip` contains the current skill and supporting contracts for offline use;
+build it with `python3 tools/build-skill-package.py` and check parity with `--check`. The checked-in
+root ZIP is historical and must not be used for new authoring. Replace older
+installed copies to receive the updated workflow. The runtime spec and validator are authoritative
+for new canonical manifests. Ask, for example,
+*"Design a deep-sea mythology tarot deck with me. Read the full skill first, then discuss each
+design decision and wait for my agreement before the next. Validate the finished manifest and
+ask me before saving it to my private library."* See [host setup](docs/authoring-hosts.md). Adding a bundled fixture under
 `decks/<id>/` and registering it in source is a developer workflow, not required for an account import.
 
 This is **v2.0**: the prime/composite axis is stored as an authored `factorization` gloss on the majors

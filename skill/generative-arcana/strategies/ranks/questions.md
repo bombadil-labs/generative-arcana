@@ -23,7 +23,7 @@ For each: name the question, give the palette, describe `visual_content` general
 
 The **fourth axis is latent here too** (`references/numeric_axis.md`): a prime-numbered rank (2, 3, 5, 7) tends to pose a more *irreducible* question, a composite (4, 6, 8, 9, 10) a more *derived* one — even though you're not structuring by factorization. Let that tint the question's framing where it helps; ignore it otherwise. (Face ranks 11–14 carry numeric character too: 11, 13 prime; 12, 14 composite.)
 
-Present the ten numbered ranks for feedback before the face ranks.
+Discuss the ten numbered ranks and their formal grammar with the user; wait for explicit agreement before the face ranks.
 
 ## Face ranks (11–14)
 
@@ -32,7 +32,7 @@ Four roles — archetypes from the major arcana projected through suit space. Re
 - **No collisions** with suit names or major-arcana names.
 - **Encoded progression** 11→14: hierarchy (Student→Warrior→Nurturing Ruler→Commanding Ruler), cycle (Spring→Summer→Autumn→Winter), composition (Element→Compound→Mixture→Synthesis), development (Observation→Experimentation→Integration→Mastery). Hierarchical, cyclic, rhizomatic, or distributed — between them they should capture some aspect of the major arcana and show how it applies suit by suit.
 
-Propose a progression fitting the deck's concepts; present for feedback.
+Propose a progression fitting the deck's concepts; discuss it and its visual form with the user, and wait for explicit agreement before minor projection.
 
 ## Formal visual grammar
 

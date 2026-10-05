@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -34,6 +35,29 @@ test("canonical full source text and all strategy/schema/example sections surviv
   for (const phrase of ["## Example (a suit glyph)", "## Interfaces", "## Visual quality / stress tests", "# Majors — Primes", "raw-p5/image renderers"]) assert.ok(bundle.text.includes(phrase));
   assert.equal(bundle.metadata.byteLength, Buffer.byteLength(bundle.text));
   assert.equal(bundle.metadata.sha256, hash(bundle.text));
+});
+
+test("canonical guide consistently requires full reading and decision-by-decision agreement", () => {
+  const bundle = buildAuthoringGuide(root);
+  const skill = readFileSync(join(root, SOURCE_ROOT, "SKILL.md"), "utf8");
+  assert.ok(skill.indexOf("## Read the full skill before the design dialogue") < skill.indexOf("## Workflow:"));
+  assert.match(skill, /wait for explicit agreement before proceeding to the next decision or generating dependent content/);
+  assert.match(skill, /approval of an overall plan does not approve choices that have not been discussed/);
+  assert.match(skill, /a successful sample does not authorize unreviewed creative choices/);
+  assert.match(skill, /Mechanical work does not need a new creative checkpoint/);
+  assert.match(skill, /a repair that changes an agreed design decision returns to dialogue/);
+  assert.doesNotMatch(bundle.text, /Don't prompt stage-by-stage|plan once, adjust once, build|let the user adjust in one pass|Creative judgment supersedes the plan/);
+  const validation = readFileSync(join(root, SOURCE_ROOT, "references/validation.md"), "utf8");
+  assert.match(validation, /Batch only content whose design decisions have already been agreed/);
+  assert.match(validation, /after the\nuser authorizes saving/);
+});
+
+test("generated installable skill has the complete canonical inventory and byte-identical sources", () => {
+  for (const args of [[], ["--check"]]) {
+    const result = spawnSync("python3", ["tools/build-skill-package.py", ...args], { cwd: root, encoding: "utf8" });
+    assert.equal(result.status, 0, result.error?.message ?? result.stderr);
+    assert.match(result.stdout, /23 canonical files, one generative-arcana\/ root/);
+  }
 });
 
 test("ordering and hashes are deterministic and independent of mtimes or filesystem insertion order", () => fixture((directory) => {

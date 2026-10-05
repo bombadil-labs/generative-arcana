@@ -10,7 +10,7 @@ Criteria: each a real axis of difference; together covering different facets; pa
 
 *Cyberpunk example axes:* Individual⟷Collective, Technology⟷Human, Control⟷Chaos, Flesh⟷Digital (each with a paragraph of tension).
 
-Present candidates with their tensions; optionally flag generative pairings. Let the user pick two or propose their own. **Finalize two before proceeding.**
+Present candidates with their tensions; optionally flag generative pairings. Let the user pick two or propose their own. **Wait for explicit agreement on the two dialectics before proceeding.**
 
 ## 2. Cross-product into four ordered suits
 
@@ -38,7 +38,7 @@ Decide how alike the four styles are — small controlled variations (a shared w
 
 *Cyberpunk "Individual+Technology" → "Programs" (index 0):* glyph a radiating node; upright {individual agency, technical mastery, composable specialization, crafted solutions}; inverted {isolated expertise, over-optimization, tools become chains, solution seeking problems}; style "neon wireframes (pink/green/blue, red for errors) over dark grounds; close-up interfaces; angular precise compositions."
 
-Present the four ordered suits for feedback before Stage 2.
+Discuss the four ordered suits and their visual families with the user; wait for explicit agreement before Stage 2.
 
 ## Visual family obligation
 
