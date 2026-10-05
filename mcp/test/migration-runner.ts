@@ -7,6 +7,9 @@ const url = 'postgresql://migration:secret@localhost/arcana';
 assert.throws(() => target({DATABASE_URL:url}, flags), /Dedicated/);
 for (const key of ['expected-host','expected-database','expected-user']) assert.throws(() => target({DATABASE_MIGRATION_URL:url}, {...flags,[key]:'wrong'}), /target/);
 assert.throws(() => target({DATABASE_MIGRATION_URL:url+'?host=evil'}, flags), /parameters/);
+assert.throws(() => target({DATABASE_MIGRATION_URL:url+'?sslmode=require&channel_binding=require'}, flags), /channel_binding=require cannot be enforced/);
+assert.throws(() => target({DATABASE_MIGRATION_URL:url+'?channel_binding=prefer&channel_binding=require'}, flags), /channel_binding=require cannot be enforced/);
+assert.throws(() => target({DATABASE_MIGRATION_URL:url+'?channel_binding=disable'}, flags), /parameters/);
 assert.throws(() => target({DATABASE_MIGRATION_URL:url}, {...flags,target:''}), /Explicit/);
 assert.equal(target({DATABASE_MIGRATION_URL:url}, flags),url);
 async function fixture(test: (db: Connection) => Promise<void>) {
@@ -20,19 +23,19 @@ async function fixture(test: (db: Connection) => Promise<void>) {
 }
 await fixture(async db => {
   await db.query('CREATE TABLE arcana_auth_user (id text PRIMARY KEY); INSERT INTO arcana_auth_user VALUES (\'untouched\')');
-  assert.equal((await run(db, entries, 'plan')).pending.length,5);
+  assert.equal((await run(db, entries, 'plan')).pending.length,entries.length);
   assert.equal((await db.query("SELECT to_regclass('public.arcana_migration_history') AS ledger")).rows[0].ledger,null);
   await run(db, entries,'apply');
   assert.deepEqual(await schema(db),entries.at(-1)!.schema);
   await run(db,entries,'apply');
   assert.equal((await db.query('SELECT id FROM arcana_auth_user')).rows[0].id,'untouched');
-  assert.equal((await db.query('SELECT count(*)::int AS n FROM arcana_migration_history')).rows[0].n,5);
+  assert.equal((await db.query('SELECT count(*)::int AS n FROM arcana_migration_history')).rows[0].n,entries.length);
   await db.query("UPDATE arcana_migration_history SET checksum='bad' WHERE version=1");
   await assert.rejects(run(db, entries,'apply'), /checksum/);
 });
 await fixture(async db => {
   await run(db,entries.slice(0,2),'apply');
-  assert.equal((await run(db,entries,'plan')).pending.length,3);
+  assert.equal((await run(db,entries,'plan')).pending.length,entries.length-2);
   await run(db,entries,'apply');
 });
 await fixture(async db => {
