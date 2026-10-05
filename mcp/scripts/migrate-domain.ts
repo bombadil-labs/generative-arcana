@@ -1,40 +1,35 @@
-import { readFile } from "node:fs/promises";
-import { Pool } from "pg";
+import { Pool } from 'pg';
+import { catalog, run, target, MigrationSafetyError } from './domain-migrations';
 
-const args = process.argv.slice(2);
-let sql = await readFile(new URL("../migrations/001-domain.sql", import.meta.url), "utf8");
-if (args.includes("--include-artwork")) sql += "\n" + await readFile(new URL("../migrations/002-card-artwork.sql", import.meta.url), "utf8");
-if (args.includes("--include-manifest-uploads") || args.includes("--include-manifest-drafts")) sql += "\n" + await readFile(new URL("../migrations/003-manifest-uploads.sql", import.meta.url), "utf8");
-if (args.includes("--include-visual-packs")) {
-  if (!args.includes("--include-artwork")) sql += "\n" + await readFile(new URL("../migrations/002-card-artwork.sql", import.meta.url), "utf8");
-  sql += "\n" + await readFile(new URL("../migrations/004-named-artwork-sets.sql", import.meta.url), "utf8");
+const [command = 'plan', ...args] = process.argv.slice(2);
+if (!['plan','status','apply','baseline'].includes(command)) throw new Error('Expected plan, status, apply or baseline');
+const flags: Record<string,string> = {};
+const allowed = ['target','expected-host','expected-database','expected-user','expected-port','through','backup-reference'];
+for (let i = 0; i < args.length; i += 2) {
+  const key = args[i].slice(2);
+  if (!args[i].startsWith('--') || !allowed.includes(key) || flags[key] || !args[i+1] || args[i+1].startsWith('--')) throw new Error('Invalid, duplicate or retired migration option');
+  flags[key] = args[i+1];
 }
-if (args.includes("--include-manifest-drafts")) sql += "\n" + await readFile(new URL("../migrations/005-manifest-drafts.sql", import.meta.url), "utf8");
-if (!args.includes("--apply")) {
-  console.log(sql);
-  console.error("Preview only. Apply using DATABASE_MIGRATION_URL (or DATABASE_URL), --apply --expected-host <database hostname> after backup/review.");
-} else {
-  const connectionString = process.env.DATABASE_MIGRATION_URL ?? process.env.DATABASE_URL;
-  if (!connectionString) throw new Error("DATABASE_MIGRATION_URL or DATABASE_URL is required.");
-  const expectedHost = args[args.indexOf("--expected-host") + 1];
-  if (!args.includes("--expected-host") || new URL(connectionString).hostname !== expectedHost) {
-    throw new Error("--expected-host must exactly match the reviewed database hostname.");
-  }
-  const pool = new Pool({ connectionString, max: 1, connectionTimeoutMillis: 10_000 });
+const connectionString = target(process.env, flags);
+if (['apply','baseline'].includes(command) && !flags['backup-reference']) throw new Error('Reviewed --backup-reference required for writes');
+if (flags.through && (command !== 'baseline' || !/^[1-9][0-9]*$/.test(flags.through))) throw new Error('--through is only valid for baseline');
+if (command === 'baseline' && !flags.through) throw new Error('Baseline requires explicit --through');
+if (flags['backup-reference'] && (flags['backup-reference'].length > 256 || /[\r\n\0]/.test(flags['backup-reference']))) throw new Error('Use a short backup reference, never backup content');
+const entries = await catalog();
+const pool = new Pool({connectionString, max:1, connectionTimeoutMillis:10_000});
+try {
   const client = await pool.connect();
   try {
-    await client.query("BEGIN");
-    await client.query("SET LOCAL lock_timeout = '5s'");
-    await client.query("SET LOCAL statement_timeout = '30s'");
-    await client.query("SELECT pg_advisory_xact_lock(184734901)");
-    await client.query(sql);
-    await client.query("COMMIT");
-    console.log("Arcana domain migration applied. Existing ownership IDs were preserved.");
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-    await pool.end();
-  }
-}
+    const identity = (await client.query('SELECT current_database() AS db, current_user AS role')).rows[0];
+    if (identity.db !== flags['expected-database'] || identity.role !== flags['expected-user']) throw new Error('Connected database identity mismatch');
+    const result = await run(client, entries, command, Number(flags.through));
+    console.log(JSON.stringify({target:flags.target, host:flags['expected-host'], database:identity.db,
+      backupReference:flags['backup-reference'], ...result}, null, 2));
+    if (command === 'status' && (result.baselineRequired || result.pending.length)) process.exitCode = 2;
+  } finally { client.release(); }
+} catch (error) {
+  // Driver errors can include connection details. Never print connection strings.
+  if (error instanceof MigrationSafetyError) console.error(error.message);
+  console.error('Migration stopped. Check target, catalog/history, schema drift, lock timeout and database logs. Inspect status before retrying after an uncertain connection/commit outcome.');
+  process.exitCode = 1;
+} finally { await pool.end(); }
