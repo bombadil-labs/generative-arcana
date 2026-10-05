@@ -7,6 +7,7 @@ import { getDeck } from "../decks/registry";
 import { CardArt } from "../components/CardArt";
 import { navigate } from "./router";
 import "./artwork.css";
+import { PackAssetEditor } from "./PackAssetEditor";
 
 type CatalogState = { deckId: string; packId: string; session: BrowserSessionState; data: OwnedArtworkCatalog | null; error: string | null };
 /** Ownership is established by the owner-only API. Every mutation has a revision + asset precondition. */
@@ -108,11 +109,20 @@ function OwnedArtworkEditor({ deckId, session }: { deckId: string; session: Brow
     try {
       const artwork = await uploadCardArtwork(canonicalId, selected.slug, file, current.data.deckRevision, selected.artwork?.id ?? null, controller.signal, packId === DEFAULT_ARTWORK_PACK_ID ? undefined : packId);
       if (!stillCurrent()) return;
-      const cards = current.data.cards.map((card) => card.slug === selected.slug ? { ...card, artwork } : card);
-      const cardCount = cards.filter((card) => card.artwork).length;
-      const packs = current.data.packs.map((pack) => pack.id === packId ? { ...pack, cardCount, complete: cardCount === cards.length } : pack);
-      setCatalog({ ...current, data: { ...current.data, deckRevision: artwork.deckRevision, cards, packs } });
-      setKnownPacks({ deckId: canonicalId, session, packs });
+      // Another optional slot may have finished while this front uploaded. Merge into the
+      // latest catalog so its metadata/flags are never replaced by this request's snapshot.
+      setCatalog((previous) => {
+        if (!previous?.data || previous.deckId !== canonicalId || previous.packId !== packId || previous.session !== session) return previous;
+        const cards = previous.data.cards.map((card) => card.slug === selected.slug ? { ...card, artwork } : card);
+        const cardCount = cards.filter((card) => card.artwork).length;
+        const packs = previous.data.packs.map((pack) => pack.id === packId ? { ...pack, cardCount, complete: cardCount === cards.length } : pack);
+        return { ...previous, data: { ...previous.data, deckRevision: artwork.deckRevision, cards, packs } };
+      });
+      setKnownPacks((previous) => {
+        if (!previous || previous.deckId !== canonicalId || previous.session !== session) return previous;
+        const cardCount = current.data!.cards.filter((card) => card.slug === selected.slug || card.artwork).length;
+        return { ...previous, packs: previous.packs.map((pack) => pack.id === packId ? { ...pack, cardCount, complete: cardCount === current.data!.cards.length } : pack) };
+      });
       resetFile();
       setMessage(`Artwork saved for ${selected.name}. It is saved in ${activePack?.label ?? packId} for the card browser and readings.`);
       void artworkStore?.load(selected.slug, true);
@@ -229,6 +239,16 @@ function OwnedArtworkEditor({ deckId, session }: { deckId: string; session: Brow
       </form>
       {preview && (!artworkStore || current.data.deckRevision === artworkStore.deckRevision) && <figure className="artwork-preview"><div>{artworkStore ? <CardArt card={preview} deckId={canonicalId} deck={deck?.data} mode="poster" /> : <CatalogArtworkProvider key={packId} deckId={canonicalId} deckRevision={current.data.deckRevision} selectedPackId={packId}><CardArt card={preview} deckId={canonicalId} deck={deck?.data} mode="poster" /></CatalogArtworkProvider>}</div><figcaption>{activePack?.label ?? packId} · {preview.name}</figcaption></figure>}
     </div>}
+    {current?.data && <PackAssetEditor key={`${canonicalId}:${packId}`} deckId={canonicalId} packId={packId} session={session} catalog={current.data} disabled={busy || creating} onSaved={(asset) => {
+      const updatePacks = (items: ArtworkPack[]) => items.map((pack) => pack.id === packId ? { ...pack, [asset.slot === "cover" ? "hasCover" : "hasCardBack"]: true } : pack);
+      setCatalog((previous) => previous?.deckId === canonicalId && previous.packId === packId && previous.session === session && previous.data ? { ...previous, data: { ...previous.data, [asset.slot]: asset, packs: updatePacks(previous.data.packs) } } : previous);
+      setKnownPacks((previous) => previous?.deckId === canonicalId && previous.session === session ? { ...previous, packs: updatePacks(previous.packs) } : previous);
+      void artworkStore?.loadCatalog(true).catch(() => {});
+    }} onRefresh={(data) => {
+      setCatalog({ deckId: canonicalId, packId, session, data, error: null });
+      setKnownPacks({ deckId: canonicalId, session, packs: data.packs });
+      void artworkStore?.loadCatalog(true).catch(() => {});
+    }} />}
   </section>;
 }
 function friendlyError(error: unknown): string {

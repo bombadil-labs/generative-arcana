@@ -1,12 +1,12 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { ArtworkError, MAX_ARTWORK_INPUT_BYTES, artworkPackId, type CardArtworkService } from "./cardArtwork";
+import { ArtworkError, MAX_ARTWORK_INPUT_BYTES, artworkPackId, packAssetSlot, type CardArtworkService } from "./cardArtwork";
 import { principalHasScopes } from "./principal";
 import { OAuthPrincipalError } from "./oauthIdentity";
 import { createArcanaAdapter } from "./hostStore";
 import { resolveWebAccess, type ArcanaWebCatalogHandlerOptions } from "./webCatalogApi";
 import { bearerChallenge } from "./oauthResource";
 
-export function isArtworkPath(path: string) { return /^\/api\/(?:me\/)?decks\/[^/]+\/(?:artwork(?:\/sets)?|cards\/[^/]+\/artwork(?:\/image)?)$/.test(path); }
+export function isArtworkPath(path: string) { return /^\/api\/(?:me\/)?decks\/[^/]+\/(?:artwork(?:\/sets|\/assets\/(?:cover|cardBack)(?:\/image)?)?|cards\/[^/]+\/artwork(?:\/image)?)$/.test(path); }
 export function createWebArtworkHandler(options: ArcanaWebCatalogHandlerOptions & { artwork?: CardArtworkService }) {
   const anonymous = createArcanaAdapter();
   return async (req: IncomingMessage, res: ServerResponse) => {
@@ -22,12 +22,14 @@ export function createWebArtworkHandler(options: ArcanaWebCatalogHandlerOptions 
         return json(res, status, { error: status === 401 ? "invalid_token" : "insufficient_scope", message: "Sign in with deck permission to manage artwork." });
       }
       if (!options.artwork) return json(res, 503, { error: "artwork_unavailable", message: "Artwork storage is not configured yet." });
-      const match = url.pathname.match(/^\/api\/(?:me\/)?decks\/([^/]+)\/(?:artwork(?:\/sets)?|cards\/([^/]+)\/artwork(\/image)?)$/);
+      const match = url.pathname.match(/^\/api\/(?:me\/)?decks\/([^/]+)\/(?:artwork(?:\/sets|\/assets\/(cover|cardBack)(\/image)?)?|cards\/([^/]+)\/artwork(\/image)?)$/);
       if (!match) return json(res, 404, { error: "not_found" });
       const deckId = decodeURIComponent(match[1]);
       const packId = artworkPackId(url.searchParams.get("packId") ?? undefined);
       const setsPath = url.pathname.endsWith("/artwork/sets");
-      const cardSlug = match[2] ? decodeURIComponent(match[2]) : undefined;
+      const cardSlug = match[4] ? decodeURIComponent(match[4]) : undefined;
+      const slot = match[2] ? packAssetSlot(match[2]) : undefined;
+      const imagePath = !!(match[3] || match[5]);
       const viewer = access.principal && (!options.oauth || principalHasScopes(access.principal, options.oauth.readScopes)) ? access.principal.id : null;
       if (req.method === "POST" && setsPath && owned) {
         if ((req.headers["content-type"] ?? "").split(";")[0] !== "application/json") throw new ArtworkError(415, "artwork_pack", "Send visual set metadata as JSON.");
@@ -39,23 +41,31 @@ export function createWebArtworkHandler(options: ArcanaWebCatalogHandlerOptions 
         return json(res, 201, await options.artwork.createPack({ ownerId: access.principal!.id, deckId, packId: input.id, label: input.label, description: input.description as string | undefined, expectedDeckRevision: Number(input.expectedDeckRevision) }));
       }
       if (setsPath) return json(res, 405, { error: "method_not_allowed" });
-      if (req.method === "GET" && !cardSlug) return json(res, 200, owned ? await options.artwork.ownedCards(access.principal!.id, deckId, packId) : await options.artwork.readableCards(viewer, deckId, packId));
+      if (slot && req.method === "GET" && !owned) {
+        if (!imagePath) return json(res, 200, await options.artwork.packAssetMetadata(viewer, deckId, slot, packId));
+        const { metadata, bytes } = await options.artwork.packAssetImage(viewer, deckId, slot, url.searchParams.get("version") ?? undefined, packId);
+        res.writeHead(200, { "content-type": metadata.mediaType, "content-length": bytes.byteLength, "cache-control": "private, no-store", "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'; sandbox", "content-disposition": 'inline; filename="pack-artwork.webp"' });
+        res.end(bytes); return;
+      }
+      if (req.method === "GET" && !cardSlug && !slot) return json(res, 200, owned ? await options.artwork.ownedCards(access.principal!.id, deckId, packId) : await options.artwork.readableCards(viewer, deckId, packId));
       if (req.method === "GET" && cardSlug && !owned) {
-        if (!match[3]) return json(res, 200, await options.artwork.metadata(viewer, deckId, cardSlug, packId));
+        if (!imagePath) return json(res, 200, await options.artwork.metadata(viewer, deckId, cardSlug, packId));
         const { metadata, bytes } = await options.artwork.image(viewer, deckId, cardSlug, url.searchParams.get("version") ?? undefined, packId);
         res.writeHead(200, { "content-type": metadata.mediaType, "content-length": bytes.byteLength, "cache-control": "private, no-store", "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'; sandbox", "content-disposition": 'inline; filename="card-artwork.webp"' });
         res.end(bytes); return;
       }
-      if (req.method === "PUT" && owned && cardSlug && !match[3]) {
+      if (req.method === "PUT" && owned && (cardSlug || slot) && !imagePath) {
         const revision = Number(req.headers["x-arcana-deck-revision"]);
         const rawVersion = req.headers["x-arcana-artwork-version"];
         if (!Number.isSafeInteger(revision) || revision < 1 || typeof rawVersion !== "string" || !/^(none|[0-9a-f-]{36})$/.test(rawVersion)) {
           throw new ArtworkError(400, "artwork_version", "Supply the current deck revision and artwork version.");
         }
         const expectedArtworkId = rawVersion === "none" ? null : rawVersion;
-        await options.artwork.assertUpload(access.principal!.id, deckId, cardSlug, revision, expectedArtworkId, packId);
+        if (slot) await options.artwork.assertPackAssetUpload(access.principal!.id, deckId, slot, revision, expectedArtworkId, packId);
+        else await options.artwork.assertUpload(access.principal!.id, deckId, cardSlug!, revision, expectedArtworkId, packId);
         const bytes = await readBytes(req);
-        return json(res, 201, await options.artwork.upload({ ownerId: access.principal!.id, deckId, cardSlug, packId, expectedDeckRevision: revision, expectedArtworkId, mediaType: req.headers["content-type"] ?? "", bytes }));
+        const input = { ownerId: access.principal!.id, deckId, packId, expectedDeckRevision: revision, expectedArtworkId, mediaType: req.headers["content-type"] ?? "", bytes };
+        return json(res, 201, slot ? await options.artwork.uploadPackAsset({ ...input, slot }) : await options.artwork.upload({ ...input, cardSlug: cardSlug! }));
       }
       return json(res, 405, { error: "method_not_allowed" });
     } catch (error) {

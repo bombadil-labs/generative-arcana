@@ -118,11 +118,22 @@ test("deck attachment validates card and spread slots only at the ownership boun
   assert.match(result.error, /spreads\.unknown.*does not exist/i);
 });
 
-test("a pack must bind at least one card or spread", () => {
+test("a pack must bind at least one presentation slot", () => {
   const value = pack();
   delete value.cards;
   delete value.spreads;
   const result = validateVisualPackManifest(value);
   assert.equal(result.ok, false);
-  assert.match(result.error, /bind at least one card or spread/i);
+  assert.match(result.error, /bind at least one card, spread, cover, or cardBack/i);
+});
+
+for (const slot of ["cover", "cardBack"]) test(`${slot} is an optional image-only binding outside card coverage`, () => {
+  const value = pack(); delete value.cards; delete value.spreads;
+  value[slot] = { asset: "major-image" };
+  const result = validateVisualPackForDeck(value, createDeckManifest(rawDeck(), { tagline: "Fixture" }));
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.pack[slot], { asset: "major-image" });
+  assert.equal(result.pack.cards, undefined);
+  value[slot] = { asset: "missing" }; assert.equal(validateVisualPackManifest(value).ok, false);
+  value[slot] = { asset: "scene-program" }; assert.equal(validateVisualPackManifest(value).ok, false);
 });

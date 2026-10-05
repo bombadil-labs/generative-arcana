@@ -6,6 +6,8 @@ export interface ArtworkPack {
   description?: string;
   cardCount: number;
   complete: boolean;
+  hasCover?: boolean;
+  hasCardBack?: boolean;
 }
 export interface CardArtwork {
   id: string;
@@ -19,11 +21,15 @@ export interface CardArtwork {
   integrity: string;
   deckRevision: number;
 }
+export type PackArtworkSlot = "cover" | "cardBack";
+export interface PackArtworkAsset extends Omit<CardArtwork, "cardSlug"> { slot: PackArtworkSlot; }
 export interface OwnedArtworkCatalog {
   enabled: true;
   deckRevision: number;
   packId: string;
   packs: ArtworkPack[];
+  cover?: PackArtworkAsset | null;
+  cardBack?: PackArtworkAsset | null;
   cards: { slug: string; name: string; artwork: CardArtwork | null }[];
 }
 export const MAX_ARTWORK_INPUT_BYTES = 3_000_000;
@@ -35,6 +41,10 @@ export class ArtworkApiError extends Error {
 }
 export function artworkPath(deckId: string, cardSlug: string): string {
   return `/api/decks/${encodeURIComponent(deckId)}/cards/${encodeURIComponent(cardSlug)}/artwork`;
+}
+export function packArtworkPath(deckId: string, slot: PackArtworkSlot): string {
+  if (slot !== "cover" && slot !== "cardBack") throw new Error("Unknown artwork asset slot.");
+  return `/api/decks/${encodeURIComponent(deckId)}/artwork/assets/${slot}`;
 }
 function packQuery(packId?: string): string { return packId ? `?packId=${encodeURIComponent(packId)}` : ""; }
 export function validateArtworkFile(file: Pick<File, "type" | "size">): string | null {
@@ -55,11 +65,17 @@ function parseArtwork(value: unknown, deckId: string, cardSlug: string, packId =
   // Pick known data fields only: URLs, scripts, and renderer content are never accepted here.
   return { id: value.id, deckId, cardSlug, packId, mediaType: "image/webp", width: value.width, height: value.height, byteLength: value.byteLength, integrity: value.integrity, deckRevision: value.deckRevision };
 }
+function parsePackAsset(value: unknown, deckId: string, slot: PackArtworkSlot, packId = DEFAULT_ARTWORK_PACK_ID): PackArtworkAsset {
+  if (!record(value) || value.slot !== slot) throw new Error("The server returned invalid artwork asset metadata.");
+  const { cardSlug: _cardSlug, ...metadata } = parseArtwork({ ...value, cardSlug: "asset" }, deckId, "asset", packId);
+  return { ...metadata, slot };
+}
 function parsePack(value: unknown): ArtworkPack {
   if (!record(value) || !validPackId(value.id) || typeof value.label !== "string" || !value.label.trim() || value.label.length > 80
     || (value.description !== undefined && (typeof value.description !== "string" || value.description.length > 500))
+    || (value.hasCover !== undefined && typeof value.hasCover !== "boolean") || (value.hasCardBack !== undefined && typeof value.hasCardBack !== "boolean")
     || typeof value.cardCount !== "number" || !Number.isSafeInteger(value.cardCount) || value.cardCount < 0 || typeof value.complete !== "boolean") throw new Error("The server returned an invalid artwork set.");
-  return { id: value.id, label: value.label, ...(value.description === undefined ? {} : { description: value.description }), cardCount: value.cardCount, complete: value.complete };
+  return { id: value.id, label: value.label, ...(value.description === undefined ? {} : { description: value.description }), cardCount: value.cardCount, complete: value.complete, ...(value.hasCover === undefined ? {} : { hasCover: value.hasCover }), ...(value.hasCardBack === undefined ? {} : { hasCardBack: value.hasCardBack }) };
 }
 async function request(path: string, init: RequestInit = {}): Promise<Response> {
   const response = await fetch(path, { ...init, credentials: "same-origin", cache: "no-store", redirect: "error" });
@@ -79,7 +95,16 @@ export async function getCardArtwork(deckId: string, cardSlug: string, signal?: 
   return parseArtwork(await json(`${artworkPath(deckId, cardSlug)}${packQuery(packId)}`, { signal }), deckId, cardSlug, packId);
 }
 export async function getArtworkImage(metadata: CardArtwork, signal?: AbortSignal): Promise<Blob> {
-  const response = await request(`${artworkPath(metadata.deckId, metadata.cardSlug)}/image?version=${encodeURIComponent(metadata.id)}&packId=${encodeURIComponent(metadata.packId ?? DEFAULT_ARTWORK_PACK_ID)}`, { signal, headers: { accept: "image/webp" } });
+  return fetchArtworkImage(artworkPath(metadata.deckId, metadata.cardSlug), metadata, signal);
+}
+export async function getPackArtworkAsset(deckId: string, slot: PackArtworkSlot, signal?: AbortSignal, packId?: string): Promise<PackArtworkAsset> {
+  return parsePackAsset(await json(`${packArtworkPath(deckId, slot)}${packQuery(packId)}`, { signal }), deckId, slot, packId);
+}
+export async function getPackArtworkImage(metadata: PackArtworkAsset, signal?: AbortSignal): Promise<Blob> {
+  return fetchArtworkImage(packArtworkPath(metadata.deckId, metadata.slot), metadata, signal);
+}
+async function fetchArtworkImage(path: string, metadata: CardArtwork | PackArtworkAsset, signal?: AbortSignal): Promise<Blob> {
+  const response = await request(`${path}/image?version=${encodeURIComponent(metadata.id)}&packId=${encodeURIComponent(metadata.packId ?? DEFAULT_ARTWORK_PACK_ID)}`, { signal, headers: { accept: "image/webp" } });
   if (response.headers.get("content-type")?.split(";")[0].trim() !== "image/webp") throw new Error("Unsupported artwork image response.");
   const blob = await response.blob();
   if (blob.size !== metadata.byteLength || blob.size > MAX_OUTPUT_BYTES) throw new Error("Artwork changed while loading. Reopen the deck to refresh it.");
@@ -104,7 +129,10 @@ function parseCatalog(value: unknown, deckId: string, packId = DEFAULT_ARTWORK_P
     ? [{ id: DEFAULT_ARTWORK_PACK_ID, label: "Saved artwork", cardCount, complete: cardCount === cards.length }]
     : Array.isArray(value.packs) ? value.packs.map(parsePack) : [];
   if (!packs.some((pack) => pack.id === packId) || !packs.some((pack) => pack.id === DEFAULT_ARTWORK_PACK_ID) || new Set(packs.map((pack) => pack.id)).size !== packs.length) throw new Error("The server returned an invalid artwork set catalog.");
-  return { enabled: true, deckRevision: value.deckRevision, packId, packs, cards };
+  const cover = value.cover == null ? null : parsePackAsset(value.cover, deckId, "cover", packId);
+  const cardBack = value.cardBack == null ? null : parsePackAsset(value.cardBack, deckId, "cardBack", packId);
+  if ([cover, cardBack].some((asset) => asset && asset.deckRevision !== value.deckRevision)) throw new Error("The server returned invalid artwork asset revision metadata.");
+  return { enabled: true, deckRevision: value.deckRevision, packId, packs, cards, cover, cardBack };
 }
 export async function uploadCardArtwork(deckId: string, cardSlug: string, file: File, deckRevision: number, artworkVersion: string | null, signal?: AbortSignal, packId?: string): Promise<CardArtwork> {
   const error = validateArtworkFile(file);
@@ -128,4 +156,15 @@ export async function createArtworkSet(deckId: string, input: { id: string; labe
   }));
   if (pack.id !== id) throw new Error("The server returned a different artwork set.");
   return pack;
+}
+
+export async function uploadPackArtworkAsset(deckId: string, slot: PackArtworkSlot, file: File, deckRevision: number, artworkVersion: string | null, signal?: AbortSignal, packId?: string): Promise<PackArtworkAsset> {
+  const error = validateArtworkFile(file);
+  if (error) throw new Error(error);
+  if (!positiveInteger(deckRevision)) throw new Error("Refresh this deck before uploading.");
+  const path = packArtworkPath(deckId, slot).replace("/api/decks/", "/api/me/decks/");
+  return parsePackAsset(await json(`${path}${packQuery(packId)}`, {
+    method: "PUT", signal, body: file,
+    headers: { "content-type": file.type, "x-arcana-deck-revision": String(deckRevision), "x-arcana-artwork-version": artworkVersion ?? "none" },
+  }), deckId, slot, packId);
 }

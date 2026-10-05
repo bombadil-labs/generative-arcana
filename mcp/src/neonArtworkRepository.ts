@@ -1,11 +1,36 @@
 import { Pool } from "pg";
-import { ArtworkError, DEFAULT_ARTWORK_PACK_ID, artworkConflict, artworkMissing, type ArtworkPack, type ArtworkRecord, type ArtworkRepository } from "./cardArtwork";
+import { ArtworkError, DEFAULT_ARTWORK_PACK_ID, artworkConflict, artworkMissing, type ArtworkPack, type ArtworkRecord, type ArtworkRepository, type PackAssetSlot, type PackArtworkRecord, packAssetSlot } from "./cardArtwork";
 
 type PackRow = { pack_id: string; label: string; description: string | null; created_at: Date | string };
 const packFromRow = (row: PackRow): ArtworkPack => ({ id: row.pack_id, label: row.label, ...(row.description ? { description: row.description } : {}), createdAt: new Date(row.created_at).toISOString() });
 /** Deck locks serialize creation/attachment against deletion, revision changes and independent replicas. */
 export class NeonArtworkRepository implements ArtworkRepository {
   constructor(private readonly pool: Pick<Pool, "query" | "connect">) {}
+  async getPackAsset(deckId: string, slot: PackAssetSlot, packId: string): Promise<PackArtworkRecord | null> {
+    return (await this.pool.query("SELECT asset FROM arcana_visual_pack_assets WHERE deck_id=$1 AND pack_id=$2 AND slot=$3", [deckId, packId, slot])).rows[0]?.asset ?? null;
+  }
+  async listPackAssets(deckId: string, packId?: string): Promise<PackArtworkRecord[]> {
+    return (await this.pool.query("SELECT asset FROM arcana_visual_pack_assets WHERE deck_id=$1 AND ($2::text IS NULL OR pack_id=$2)", [deckId, packId ?? null])).rows.map(row => row.asset);
+  }
+  async attachPackAsset(ownerId: string, revision: number, expected: string | null, record: PackArtworkRecord): Promise<PackArtworkRecord | null> {
+    packAssetSlot(record.slot);
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SET LOCAL lock_timeout = '5s'"); await client.query("SET LOCAL statement_timeout = '15s'");
+      const deck = (await client.query("SELECT owner_id,revision FROM arcana_user_decks WHERE id=$1 AND owner_id=$2 FOR UPDATE", [record.deckId, ownerId])).rows[0];
+      if (!deck || deck.owner_id !== ownerId) throw artworkMissing();
+      if (Number(deck.revision) !== revision) throw artworkConflict();
+      if (record.packId !== DEFAULT_ARTWORK_PACK_ID && !(await client.query("SELECT pack_id FROM arcana_visual_packs WHERE deck_id=$1 AND pack_id=$2", [record.deckId, record.packId])).rows.length) throw artworkMissing();
+      const previous = (await client.query("SELECT asset FROM arcana_visual_pack_assets WHERE deck_id=$1 AND pack_id=$2 AND slot=$3 FOR UPDATE", [record.deckId, record.packId, record.slot])).rows[0]?.asset ?? null;
+      if ((previous?.id ?? null) !== expected) throw artworkConflict();
+      await client.query(`INSERT INTO arcana_visual_pack_assets(deck_id,pack_id,slot,asset) VALUES($1,$2,$3,$4::jsonb)
+        ON CONFLICT(deck_id,pack_id,slot) DO UPDATE SET asset=EXCLUDED.asset`, [record.deckId, record.packId, record.slot, JSON.stringify(record)]);
+      await client.query("COMMIT");
+      return previous;
+    } catch (error) { await client.query("ROLLBACK").catch(() => undefined); throw error; }
+    finally { client.release(); }
+  }
   async get(deckId: string, cardSlug: string, packId = DEFAULT_ARTWORK_PACK_ID): Promise<ArtworkRecord | null> {
     const result = packId === DEFAULT_ARTWORK_PACK_ID
       ? await this.pool.query("SELECT asset FROM arcana_card_artwork WHERE deck_id=$1 AND card_slug=$2", [deckId, cardSlug])

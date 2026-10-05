@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { listPublicDecks, type CatalogDeckSummary } from "@/catalog/api";
+import { DeckCover } from "../components/DeckCover";
 import { navigate } from "./router";
 
 export function Community() {
@@ -36,7 +37,7 @@ export function Community() {
         <div style={grid}>
           {decks.map((deck) => (
             <button key={deck.id} onClick={() => navigate(`/deck/${deck.id}`)} style={tile}>
-              <div style={preview} aria-hidden><span style={sigil}>✦</span></div>
+              <div style={preview}><DeckCover deckId={deck.id} deckRevision={deck.revision} name={deck.name} fallback={<span style={sigil} aria-hidden>✦</span>} /></div>
               <div style={body}>
                 <div style={deckName}>{deck.name}</div>
                 <div style={tagline}>{deck.tagline}</div>

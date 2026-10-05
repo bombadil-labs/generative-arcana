@@ -9,6 +9,9 @@ export interface StaticVisualPackSummary {
   mimeType: string;
   complete: boolean;
   cardCount?: number;
+  /** Optional saved-pack extras; never included in front completeness. */
+  hasCover?: boolean;
+  hasCardBack?: boolean;
 }
 
 export interface LivingSpreadPackSummary {

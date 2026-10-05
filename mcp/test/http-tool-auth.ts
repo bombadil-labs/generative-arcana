@@ -88,7 +88,7 @@ async function main(): Promise<void> {
     assert.equal(initialized.protocolVersion, "2025-11-25");
     const listed = await rpcResult(await post({ jsonrpc: "2.0", id: nextId++, method: "tools/list", params: {} }));
     const tools = listed.tools as Array<{ name: string }>;
-    for (const name of ["import_deck", "list_my_decks", "set_deck_visibility", "delete_my_deck", "set_card_artwork"]) {
+    for (const name of ["import_deck", "list_my_decks", "set_deck_visibility", "delete_my_deck", "set_card_artwork", "set_visual_pack_asset"]) {
       assert.ok(tools.some((tool) => tool.name === name), `${name} remains discoverable before sign-in`);
     }
 
@@ -118,6 +118,7 @@ async function main(): Promise<void> {
       call("validate_deck_manifest", { file: { download_url: "https://files.oaiusercontent.com/test", file_id: "file-test" } }),
       call("edit_deck", { deckId: privateDeck.id, expectedRevision: 1, metadata: { tagline: "Changed" } }),
       call("create_visual_pack", { deckId: privateDeck.id, packId: "gpt", label: "GPT", expectedDeckRevision: 1 }),
+      call("set_visual_pack_asset", { deckId: privateDeck.id, slot: "cover", mediaType: "image/png", base64: "YWJj", expectedDeckRevision: 1, expectedArtworkId: null }),
       call("set_card_artwork", { deckId: privateDeck.id, cardSlug: "major-0", mediaType: "image/png", base64: "YWJj", expectedDeckRevision: 1, expectedArtworkId: null }),
       call("import_deck", { manifest: neutralManifest("unauthorized-shapes") }),
       call("set_deck_visibility", { deckId: privateDeck.id, visibility: "public" }),
