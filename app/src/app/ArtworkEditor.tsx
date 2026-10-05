@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useBrowserSession, type BrowserSessionState } from "../auth/session";
 import { getOwnedArtwork, uploadCardArtwork, createArtworkSet, validateArtworkFile, ArtworkApiError, DEFAULT_ARTWORK_PACK_ID, type ArtworkPack, type OwnedArtworkCatalog } from "../artwork/api";
 import { useArtworkStore, useArtworkSelection, getArtworkPackId, setArtworkPackId, CatalogArtworkProvider } from "../artwork/context";
+import { resolveArtworkPack } from "../artwork/selection";
 import { getDeck } from "../decks/registry";
 import { CardArt } from "../components/CardArt";
 import { navigate } from "./router";
@@ -20,8 +21,12 @@ function OwnedArtworkEditor({ deckId, session }: { deckId: string; session: Brow
   const canonicalId = deck?.id ?? deckId;
   const artworkStore = useArtworkStore();
   const selection = useArtworkSelection();
-  const [localSelection, setLocalSelection] = useState(() => ({ deckId: canonicalId, packId: getArtworkPackId(canonicalId) }));
-  const packId = selection?.packId ?? (localSelection.deckId === canonicalId ? localSelection.packId : getArtworkPackId(canonicalId));
+  const [localSelection, setLocalSelection] = useState(() => ({ deckId: canonicalId, packId: getArtworkPackId(canonicalId) || DEFAULT_ARTWORK_PACK_ID }));
+  const localResolution = useRef<string | null>(null);
+  const packId = selection?.packId ?? (localSelection.deckId === canonicalId ? localSelection.packId : getArtworkPackId(canonicalId) || DEFAULT_ARTWORK_PACK_ID);
+  const hasSelection = !!selection;
+  const selectionPending = !!selection && !selection.resolved;
+  const selectionError = selectionPending ? selection?.error : null;
   const [knownPacks, setKnownPacks] = useState<{ deckId: string; session: BrowserSessionState; packs: ArtworkPack[] } | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [setName, setSetName] = useState("");
@@ -46,17 +51,31 @@ function OwnedArtworkEditor({ deckId, session }: { deckId: string; session: Brow
     mutation.current?.abort(); mutation.current = null;
     setCatalog(null); setFile(null); setBusy(false); setCreating(false); setMessage(null); setError(null);
     if (fileInput.current) fileInput.current.value = "";
-    void getOwnedArtwork(canonicalId, controller.signal, packId === DEFAULT_ARTWORK_PACK_ID ? undefined : packId).then((data) => {
+    if (selectionPending) {
+      if (selectionError) setCatalog({ deckId: canonicalId, packId, session, data: null, error: selectionError ?? "Unable to load artwork sets." });
+      return () => controller.abort();
+    }
+    if (!packId) return () => controller.abort();
+    const read = () => getOwnedArtwork(canonicalId, controller.signal, packId === DEFAULT_ARTWORK_PACK_ID ? undefined : packId);
+    void read().catch((cause: unknown) => {
+      if (!hasSelection && localResolution.current !== canonicalId && cause instanceof ArtworkApiError && (cause.status === 400 || cause.status === 404) && packId !== DEFAULT_ARTWORK_PACK_ID) return getOwnedArtwork(canonicalId, controller.signal);
+      throw cause;
+    }).then((data) => {
       if (controller.signal.aborted) return;
-      setCatalog({ deckId: canonicalId, packId, session, data, error: null });
       setKnownPacks({ deckId: canonicalId, session, packs: data.packs });
+      if (!hasSelection && localResolution.current !== canonicalId) {
+        localResolution.current = canonicalId;
+        const resolved = resolveArtworkPack(data.packs, getArtworkPackId(canonicalId));
+        if (resolved !== packId) { setLocalSelection({ deckId: canonicalId, packId: resolved }); return; }
+      }
+      setCatalog({ deckId: canonicalId, packId, session, data, error: null });
       setSlug((previous) => data.cards.some((card) => card.slug === previous) ? previous : data.cards[0]?.slug ?? "");
     }).catch((cause: unknown) => {
       if (controller.signal.aborted) return;
       setCatalog({ deckId: canonicalId, packId, session, data: null, error: friendlyError(cause) });
     });
     return () => { controller.abort(); mutation.current?.abort(); };
-  }, [canonicalId, session, reload, packId]);
+  }, [canonicalId, session, reload, packId, hasSelection, selectionPending, selectionError]);
 
   const rememberedPacks = knownPacks?.deckId === canonicalId && knownPacks.session === session ? knownPacks.packs : [];
   const packs = current?.data?.packs ?? (rememberedPacks.length ? rememberedPacks : selection?.packs ?? []);
@@ -65,6 +84,7 @@ function OwnedArtworkEditor({ deckId, session }: { deckId: string; session: Brow
     // Cancel immediately, even if a network response arrives before the next effect cleanup.
     request.current?.abort(); mutation.current?.abort(); mutation.current = null;
     setArtworkPackId(canonicalId, id);
+    localResolution.current = canonicalId;
     if (selection) selection.selectPack(id);
     else setLocalSelection({ deckId: canonicalId, packId: id });
     setShowCreate(false); setCreating(false); setBusy(false);
@@ -156,7 +176,8 @@ function OwnedArtworkEditor({ deckId, session }: { deckId: string; session: Brow
       <div>
         <label htmlFor="artwork-set">Artwork set</label>
         <select id="artwork-set" value={packId} onChange={(event) => changePack(event.target.value)}>
-          {!packs.some((pack) => pack.id === packId) && <option value={packId}>{packId === DEFAULT_ARTWORK_PACK_ID ? "Saved artwork" : packId}</option>}
+          {!packId && <option value="" disabled>Choose an artwork set…</option>}
+          {packId && !packs.some((pack) => pack.id === packId) && <option value={packId}>{packId === DEFAULT_ARTWORK_PACK_ID ? "Saved artwork" : packId}</option>}
           {packs.map((pack) => <option key={pack.id} value={pack.id}>{pack.label} · {pack.cardCount} illustrated{pack.complete ? " · complete" : ""}</option>)}
         </select>
         {activePack?.description && <p className="artwork-hint">{activePack.description}</p>}
@@ -182,8 +203,8 @@ function OwnedArtworkEditor({ deckId, session }: { deckId: string; session: Brow
         <button type="button" disabled={creating} onClick={() => setShowCreate(false)}>Cancel</button>
       </div>
     </form>}
-    {!current && <p role="status">Loading the latest cards and artwork…</p>}
-    {current?.error && <div role="alert"><p>{current.error}</p><button type="button" onClick={() => setReload((value) => value + 1)}>Try again</button></div>}
+    {!current && <p role="status">{packId ? "Loading the latest cards and artwork…" : "Choose an artwork set to edit."}</p>}
+    {current?.error && <div role="alert"><p>{current.error}</p><button type="button" onClick={() => { selection?.refresh(); setReload((value) => value + 1); }}>Try again</button></div>}
     {current && error && <p className="artwork-error" role="alert">{error}</p>}
     {current && message && <p className="artwork-success" role="status">{message}</p>}
     {current?.data && <div className="artwork-layout">
@@ -206,7 +227,7 @@ function OwnedArtworkEditor({ deckId, session }: { deckId: string; session: Brow
         {file && <p className="artwork-hint">Ready: {file.name}</p>}
         <button className="artwork-submit" type="submit" disabled={busy || creating || !file || !selected}>{busy ? "Uploading…" : selected?.artwork ? "Replace artwork" : "Upload artwork"}</button>
       </form>
-      {preview && (!artworkStore || current.data.deckRevision === artworkStore.deckRevision) && <figure className="artwork-preview"><div>{artworkStore ? <CardArt card={preview} deckId={canonicalId} deck={deck?.data} mode="poster" /> : <CatalogArtworkProvider key={packId} deckId={canonicalId} deckRevision={current.data.deckRevision}><CardArt card={preview} deckId={canonicalId} deck={deck?.data} mode="poster" /></CatalogArtworkProvider>}</div><figcaption>{activePack?.label ?? packId} · {preview.name}</figcaption></figure>}
+      {preview && (!artworkStore || current.data.deckRevision === artworkStore.deckRevision) && <figure className="artwork-preview"><div>{artworkStore ? <CardArt card={preview} deckId={canonicalId} deck={deck?.data} mode="poster" /> : <CatalogArtworkProvider key={packId} deckId={canonicalId} deckRevision={current.data.deckRevision} selectedPackId={packId}><CardArt card={preview} deckId={canonicalId} deck={deck?.data} mode="poster" /></CatalogArtworkProvider>}</div><figcaption>{activePack?.label ?? packId} · {preview.name}</figcaption></figure>}
     </div>}
   </section>;
 }

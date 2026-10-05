@@ -188,6 +188,7 @@ test("creating a named set sends bounded metadata and its deck revision, never e
 test("switching sets revokes the old image immediately and isolates the same card and asset IDs", async () => {
   const seen = [];
   const { store, revoked } = fixture({ catalog: async (deckId, signal, packId = "saved-artwork") => { seen.push(packId); return namedCatalog(packId); } });
+  store.selectPack("saved-artwork");
   await store.load("major-0"); assert.equal(store.has("major-0"), true);
   store.selectPack("watercolor"); assert.equal(store.get("major-0").status, "idle"); assert.equal(revoked.length, 1);
   await store.load("major-0"); assert.equal(store.get("major-0").artwork.packId, "watercolor");
@@ -214,4 +215,100 @@ test("set mismatches and missing slots never fetch another set's images", async 
   store.selectPack("watercolor"); await store.load("major-0"); assert.equal(store.get("major-0").status, "missing");
   const mismatch = fixture({ catalog: async () => namedCatalog("watercolor", metadata({ packId: "ink" })), image: async () => assert.fail("must not fetch mismatched bytes") });
   mismatch.store.selectPack("watercolor"); await mismatch.store.load("major-0"); assert.equal(mismatch.store.get("major-0").status, "error");
+});
+
+
+const summary = (id, cardCount) => ({ id, label: id, cardCount, complete: false });
+function selectionFixture(packs, preferred, overrides = {}) {
+  const requests = [], imagePacks = [];
+  const transport = {
+    catalog: async (_deckId, _signal, packId = "saved-artwork") => {
+      requests.push(packId);
+      if (!packs.some(pack => pack.id === packId)) throw Object.assign(new Error("missing"), { status: 404 });
+      const art = packs.find(pack => pack.id === packId).cardCount ? metadata({ packId }) : null;
+      return { ...catalog(art), packId, packs };
+    },
+    image: async (art) => { imagePacks.push(art.packId); return new Blob(["test"]); },
+    createUrl: () => "blob:chosen", revokeUrl: () => {}, ...overrides,
+  };
+  return { store: new ArtworkStore("deck", 1, transport, preferred), requests, imagePacks };
+}
+
+test("sole populated set becomes the default despite empty legacy/named sets and is not per-card fallback", async () => {
+  for (const preferred of [undefined, "saved-artwork", "empty", "deleted"]) {
+    const { store, imagePacks } = selectionFixture([summary("saved-artwork", 0), summary("empty", 0), summary("gpt", 1)], preferred);
+    await Promise.all([store.load("major-0"), store.load("major-6")]);
+    assert.equal(store.packId, "gpt"); assert.equal(store.get("major-0").status, "ready");
+    assert.equal(store.get("major-6").status, "missing"); assert.deepEqual(imagePacks, ["gpt"]);
+  }
+});
+
+test("multiple populated sets require a choice and never load an arbitrary image", async () => {
+  for (const preferred of [undefined, "saved-artwork", "deleted"]) {
+    const { store, imagePacks } = selectionFixture([summary("saved-artwork", 0), summary("gpt", 1), summary("claude", 1)], preferred);
+    await store.load("major-0");
+    assert.equal(store.packId, ""); assert.equal(store.catalogStatus, "ready");
+    assert.equal(store.hasArtwork("major-0"), false); assert.deepEqual(imagePacks, []);
+    store.selectPack("claude"); await store.load("major-0");
+    assert.equal(store.get("major-0").artwork.packId, "claude");
+  }
+  const populatedDefault = selectionFixture([summary("saved-artwork", 1), summary("gpt", 1)]);
+  await populatedDefault.store.load("major-0"); assert.equal(populatedDefault.store.packId, "");
+});
+
+test("valid populated preferences survive multiple packs; empty decks retain an editable fallback", async () => {
+  for (const preferred of ["saved-artwork", "gpt"]) {
+    const { store } = selectionFixture([summary("saved-artwork", 1), summary("gpt", 1)], preferred);
+    await store.load("major-0"); assert.equal(store.packId, preferred); assert.equal(store.has("major-0"), true);
+  }
+  for (const [preferred, expected] of [[undefined, "saved-artwork"], ["empty", "empty"], ["deleted", "saved-artwork"]]) {
+    const { store, imagePacks } = selectionFixture([summary("saved-artwork", 0), summary("empty", 0)], preferred);
+    await store.load("major-0"); assert.equal(store.packId, expected); assert.deepEqual(imagePacks, []);
+  }
+});
+
+test("a manual empty upload destination is not auto-switched, and late discovery cannot undo a choice", async () => {
+  const packs = [summary("saved-artwork", 0), summary("gpt", 1), summary("empty", 0)];
+  const { store } = selectionFixture(packs);
+  await store.loadCatalog(); store.selectPack("empty"); await store.load("major-0");
+  assert.equal(store.packId, "empty"); assert.equal(store.get("major-0").status, "missing");
+  const pending = deferred();
+  const late = selectionFixture(packs, undefined, { catalog: async (_id, _signal, id = "saved-artwork") => id === "saved-artwork" ? pending.promise : { ...catalog(null), packId: id, packs } });
+  const first = late.store.load("major-0");
+  late.store.selectPack("empty"); await late.store.load("major-0");
+  pending.resolve({ ...catalog(null), packId: "saved-artwork", packs }); await first;
+  assert.equal(late.store.packId, "empty"); assert.equal(late.store.get("major-0").status, "missing");
+});
+
+test("selection discovery does not mask access/server failures or accept a wrong pack/revision", async () => {
+  for (const status of [401, 403, 500, 503]) {
+    const calls = [];
+    const { store } = selectionFixture([], "deleted", { catalog: async (_id, _signal, packId) => { calls.push(packId); throw Object.assign(new Error("unavailable"), { status }); } });
+    await assert.rejects(store.loadCatalog(), /unavailable/); assert.equal(calls.length, 1);
+  }
+  for (const invalid of [{ packId: "other", deckRevision: 1 }, { packId: "gpt", deckRevision: 2 }]) {
+    const { store, imagePacks } = selectionFixture([summary("saved-artwork", 0), summary("gpt", 1)], undefined, {
+      catalog: async (_id, _signal, packId = "saved-artwork") => ({ ...catalog(null), packId, packs: [summary("saved-artwork", 0), summary("gpt", 1)], ...(packId === "gpt" ? invalid : {}) }),
+    });
+    await assert.rejects(store.loadCatalog(), /mismatch/); assert.deepEqual(imagePacks, []);
+  }
+});
+
+test("pack content can include optional cover/back assets without redefining front coverage", () => {
+  const { resolveArtworkPack, hasArtworkContent } = require("../.test-build/artwork/selection.js");
+  for (const flag of ["hasCover", "hasCardBack"]) {
+    const pack = { ...summary("assets-only", 0), [flag]: true };
+    assert.equal(hasArtworkContent(pack), true);
+    assert.equal(resolveArtworkPack([summary("saved-artwork", 0), pack]), "assets-only");
+  }
+  assert.equal(hasArtworkContent({ cardCount: 0, hasCover: false, hasCardBack: false }), false);
+});
+
+test("selecting the current empty destination cancels an in-flight automatic switch", async () => {
+  const pending = deferred(); const packs = [summary("saved-artwork", 0), summary("gpt", 1)];
+  const { store } = selectionFixture(packs, undefined, { catalog: async (_id, _signal, id = "saved-artwork") => id === "gpt" ? pending.promise : { ...catalog(null), packId: id, packs } });
+  const first = store.load("major-0"); await new Promise(setImmediate);
+  store.selectPack("saved-artwork"); await store.load("major-0");
+  pending.resolve({ ...catalog(metadata({ packId: "gpt" })), packId: "gpt", packs }); await first;
+  assert.equal(store.packId, "saved-artwork"); assert.equal(store.get("major-0").status, "missing");
 });

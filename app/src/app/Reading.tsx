@@ -29,9 +29,11 @@ export function Reading({ deckId, token }: { deckId: string; token?: string }) {
       {artworkSelection && <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: "var(--s-4)" }}>
         <label htmlFor="reading-artwork-set" style={{ ...fieldLabel, margin: 0 }}>Artwork set</label>
         <select id="reading-artwork-set" value={artworkSelection.packId} onChange={(event) => artworkSelection.selectPack(event.target.value)} style={{ ...secondaryBtn, appearance: "auto", maxWidth: "100%" }}>
-          {!artworkSelection.packs.some((item) => item.id === artworkSelection.packId) && <option value={artworkSelection.packId}>{artworkSelection.packId} · unavailable</option>}
-          {artworkSelection.packs.map((item) => <option key={item.id} value={item.id}>{item.label} · {item.cardCount}/{deck.cards.length}</option>)}
+          {!artworkSelection.packId && <option value="" disabled>Choose an artwork set…</option>}
+          {artworkSelection.packId && !artworkSelection.packs.some((item) => item.id === artworkSelection.packId) && <option value={artworkSelection.packId}>{artworkSelection.packId} · unavailable</option>}
+          {artworkSelection.visiblePacks.map((item) => <option key={item.id} value={item.id}>{item.label} · {item.cardCount}/{deck.cards.length}</option>)}
         </select>
+        {!artworkSelection.packId && <span role="status" style={lede}>Choose artwork for this reading.</span>}
         {artworkSelection.error && <span role="alert" style={errorText}>{artworkSelection.error} <button type="button" onClick={artworkSelection.refresh} style={secondaryBtn}>Retry artwork</button></span>}
       </div>}
       {token ? <ReadingResult deck={deck} token={token} /> : <ReadingComposer deck={deck} />}

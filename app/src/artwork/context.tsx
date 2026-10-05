@@ -1,18 +1,22 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useSyncExternalStore } from "react";
 import { ArtworkStore, EMPTY_ARTWORK } from "./store";
-import { DEFAULT_ARTWORK_PACK_ID } from "./api";
+import { visibleArtworkPacks } from "./selection";
 const ArtworkContext = createContext<ArtworkStore | null>(null);
 const noSubscribe = () => () => {};
 const zero = () => 0;
 const preferenceKey = (deckId: string) => `arcana:artwork-set:${deckId}`;
 export function getArtworkPackId(deckId: string): string {
-  try { return window.localStorage.getItem(preferenceKey(deckId)) || DEFAULT_ARTWORK_PACK_ID; } catch { return DEFAULT_ARTWORK_PACK_ID; }
+  try { return window.localStorage.getItem(preferenceKey(deckId)) || ""; } catch { return ""; }
 }
 export function setArtworkPackId(deckId: string, packId: string): void {
   try { window.localStorage.setItem(preferenceKey(deckId), packId); } catch { /* selection still works with storage disabled */ }
 }
-export function CatalogArtworkProvider({ deckId, deckRevision, children }: { deckId: string; deckRevision: number; children: React.ReactNode }) {
-  const store = useMemo(() => new ArtworkStore(deckId, deckRevision, undefined, getArtworkPackId(deckId)), [deckId, deckRevision]);
+export function CatalogArtworkProvider({ deckId, deckRevision, selectedPackId, children }: { deckId: string; deckRevision: number; selectedPackId?: string; children: React.ReactNode }) {
+  const store = useMemo(() => {
+    const next = new ArtworkStore(deckId, deckRevision, undefined, getArtworkPackId(deckId));
+    if (selectedPackId) next.selectPack(selectedPackId);
+    return next;
+  }, [deckId, deckRevision, selectedPackId]);
   useLayoutEffect(() => () => store.clear(), [store]);
   return <ArtworkContext.Provider value={store}>{children}</ArtworkContext.Provider>;
 }
@@ -29,6 +33,8 @@ export function useArtworkSelection() {
   useEffect(() => { void store?.loadCatalog().catch(() => {}); }, [store, packId]);
   return store ? {
     packId: store.packId, packs: store.packs, status: store.catalogStatus, error: store.catalogError,
+    resolved: store.selectionReady,
+    visiblePacks: visibleArtworkPacks(store.packs, store.packId),
     selectPack: (id: string) => { setArtworkPackId(store.deckId, id); store.selectPack(id); },
     refresh: () => { store.clear(); void store.loadCatalog().catch(() => {}); },
   } : null;

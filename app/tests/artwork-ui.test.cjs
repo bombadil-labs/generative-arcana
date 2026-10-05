@@ -595,3 +595,99 @@ test("reading cards use the saved set without substituting a runtime spread or c
   assert.equal(document.querySelector("img"), null); assert.doesNotMatch(document.body.innerHTML, /unrelated-reading\.png/);
   assert.equal(document.querySelector("pre").textContent, prompt);
 });
+
+function populatedHandler(populated, calls = []) {
+  const packs = [packInfo("saved-artwork"), packInfo("watercolor"), packInfo("ink")].map(pack => ({ ...pack, cardCount: populated.includes(pack.id) ? 1 : 0 }));
+  return async (path, init) => {
+    calls.push([path, init]);
+    const packId = requestedPack(path);
+    if (path.includes("/image?")) return new Response("test", { headers: { "content-type": "image/webp" } });
+    if (!packs.some(pack => pack.id === packId)) return json({ message: "missing set" }, 404);
+    return json(setCatalog(packId, populated.includes(packId) ? metadata({ packId }) : null, packs));
+  };
+}
+
+for (const surface of ["browser", "reading", "editor"]) test(`${surface} automatically chooses the only populated set without storing an invented preference`, async () => {
+  const calls = []; handler = populatedHandler(["watercolor"], calls);
+  const component = surface === "browser" ? CardBrowser : surface === "reading" ? Reading : Editor;
+  await mount(React.createElement(component, { deckId: "deck" })); await flush();
+  const select = document.getElementById(surface === "editor" ? "artwork-set" : `${surface}-artwork-set`);
+  assert.equal(select.value, "watercolor");
+  assert.equal(window.localStorage.getItem("arcana:artwork-set:deck"), null);
+  if (surface !== "editor") assert.equal(select.options.length, 1);
+  else {
+    assert.equal(select.options.length, 3, "empty destinations remain available for uploads");
+    await act(async () => changeSelect("artwork-set", "ink")); await flush();
+    assert.equal(document.getElementById("artwork-set").value, "ink");
+    assert.ok(document.getElementById("artwork-file"));
+  }
+  assert.ok(calls.every(([path, init]) => !init.method || init.method === "GET"), "selection makes no server writes");
+});
+
+for (const surface of ["browser", "reading", "editor"]) test(`${surface} asks for an explicit choice when multiple populated sets exist`, async () => {
+  handler = populatedHandler(["watercolor", "ink"]);
+  const component = surface === "browser" ? CardBrowser : surface === "reading" ? Reading : Editor;
+  await mount(React.createElement(component, { deckId: "deck" })); await flush();
+  const id = surface === "editor" ? "artwork-set" : `${surface}-artwork-set`;
+  assert.equal(document.getElementById(id).value, ""); assert.equal(document.querySelector("img"), null);
+  assert.match(document.body.textContent, /Choose.*artwork/);
+  if (surface === "editor") assert.equal(document.getElementById("artwork-file"), null, "no implicit default upload target");
+  await act(async () => changeSelect(id, "ink")); await flush();
+  assert.equal(document.getElementById(id).value, "ink");
+  assert.equal(window.localStorage.getItem("arcana:artwork-set:deck"), "ink");
+});
+
+for (const [preferred, expected] of [["saved-artwork", "watercolor"], ["removed", "watercolor"], ["watercolor", "watercolor"]]) test(`saved selection ${preferred} resolves to ${expected} using actual coverage`, async () => {
+  window.localStorage.setItem("arcana:artwork-set:deck", preferred);
+  handler = populatedHandler(["watercolor"]);
+  await mount(React.createElement(CardBrowser, { deckId: "deck" })); await flush();
+  assert.equal(document.getElementById("browser-artwork-set").value, expected); assert.ok(document.querySelector("img"));
+});
+
+test("a populated remembered selection is preserved across reloads with multiple options", async () => {
+  window.localStorage.setItem("arcana:artwork-set:deck", "ink");
+  handler = populatedHandler(["watercolor", "ink"]);
+  await mount(React.createElement(CardBrowser, { deckId: "deck" }));
+  assert.equal(document.getElementById("browser-artwork-set").value, "ink");
+  await act(async () => root.render(React.createElement("p", null, "Other route")));
+  await mount(React.createElement(Reading, { deckId: "deck" }));
+  assert.equal(document.getElementById("reading-artwork-set").value, "ink");
+});
+
+test("standalone editor resolves a stale remembered set and keeps empty destinations editable", async () => {
+  window.localStorage.setItem("arcana:artwork-set:deck", "removed");
+  handler = populatedHandler(["watercolor"]);
+  await act(async () => root.render(React.createElement(Provider, null, React.createElement(Editor, { deckId: "deck" }))));
+  await flush(); await flush();
+  assert.equal(document.getElementById("artwork-set").value, "watercolor");
+  await act(async () => changeSelect("artwork-set", "ink")); await flush();
+  assert.equal(document.getElementById("artwork-set").value, "ink"); assert.ok(document.getElementById("artwork-file"));
+});
+
+test("standalone editor preview stays within its explicit empty upload destination", async () => {
+  handler = populatedHandler(["watercolor"]);
+  await act(async () => root.render(React.createElement(Provider, null, React.createElement(Editor, { deckId: "deck" }))));
+  await flush(); await flush();
+  assert.ok(document.querySelector("img"));
+  await act(async () => changeSelect("artwork-set", "ink")); await flush();
+  assert.equal(document.getElementById("artwork-set").value, "ink");
+  assert.equal(document.querySelector("img"), null);
+});
+
+for (const conflict of [false, true]) test(`delayed artwork refresh preserves the ${conflict ? "conflict recovery instruction" : "upload success"}`, async () => {
+  const pending = deferred(); let refreshing = false, reads = 0;
+  handler = async (path, init) => {
+    if (init.method === "PUT") { refreshing = true; return conflict ? json({ message: "Changed" }, 409) : json(metadata()); }
+    if (path.includes("/image?")) return new Response("test", { headers: { "content-type": "image/webp" } });
+    if (path.startsWith("/api/me/")) { reads++; return json(catalog(refreshing ? metadata() : null)); }
+    return refreshing ? pending.promise : json(catalog());
+  };
+  await mount(); await act(async () => inputFile()); await act(async () => submit()); await flush();
+  const expected = conflict ? /Review the card, choose your image again/ : /Artwork saved/;
+  assert.match(document.body.textContent, expected);
+  assert.ok(document.getElementById("artwork-file"));
+  const ownerReads = reads;
+  await act(async () => pending.resolve(json(catalog(metadata())))); await flush();
+  assert.match(document.body.textContent, expected);
+  assert.equal(reads, ownerReads, "background preview refresh does not reload the owner editor");
+});

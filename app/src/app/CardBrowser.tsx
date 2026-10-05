@@ -125,9 +125,11 @@ export function CardBrowser({ deckId }: { deckId: string }) {
           {artworkSelection && <div style={{ display: "flex", alignItems: "center", gap: "var(--s-2)", flexWrap: "wrap", justifyContent: "flex-end" }}>
             <label htmlFor="browser-artwork-set" style={skinLabel}>Artwork set</label>
             <select id="browser-artwork-set" value={artworkSelection.packId} onChange={(event) => artworkSelection.selectPack(event.target.value)} style={selectStyle}>
-              {!artworkSelection.packs.some((item) => item.id === artworkSelection.packId) && <option value={artworkSelection.packId}>{artworkSelection.packId} · unavailable</option>}
-              {artworkSelection.packs.map((item) => <option key={item.id} value={item.id}>{item.label} · {item.cardCount}/{deck.cards.length}{item.complete ? " · complete" : ""}</option>)}
+              {!artworkSelection.packId && <option value="" disabled>Choose an artwork set…</option>}
+              {artworkSelection.packId && !artworkSelection.packs.some((item) => item.id === artworkSelection.packId) && <option value={artworkSelection.packId}>{artworkSelection.packId} · unavailable</option>}
+              {artworkSelection.visiblePacks.map((item) => <option key={item.id} value={item.id}>{item.label} · {item.cardCount}/{deck.cards.length}{item.complete ? " · complete" : ""}</option>)}
             </select>
+            {!artworkSelection.packId && <span role="status" style={skinCaption}>Choose which artwork to browse.</span>}
             {artworkSelection.status === "loading" && <span role="status" style={skinCaption}>Loading this artwork set…</span>}
             {artworkSelection.packs.find((item) => item.id === artworkSelection.packId)?.description && <span style={skinCaption}>{artworkSelection.packs.find((item) => item.id === artworkSelection.packId)?.description}</span>}
             {artworkSelection.error && <span role="alert" style={skinCaption}>{artworkSelection.error} <button type="button" onClick={artworkSelection.refresh} style={linkBtn}>Retry artwork</button></span>}
