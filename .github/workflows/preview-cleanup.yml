@@ -14,20 +14,21 @@ permissions:
 jobs:
   git-audit:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
+          package-manager-cache: false
       - run: node tools/preview-cleanup/run.mjs audit
         env:
           GITHUB_TOKEN: ${{ github.token }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: preview-cleanup-git-audit
           path: preview-cleanup-report.json
@@ -36,23 +37,24 @@ jobs:
     # Off until secure READ access and provider mapping are independently approved.
     # Forks and Dependabot keep the credential-free Git audit above.
     if: github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' && github.event.pull_request.user.login != 'dependabot[bot]' && vars.PREVIEW_PROVIDER_REPORTS_ENABLED == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
+          package-manager-cache: false
       - run: node tools/preview-cleanup/run.mjs report
         env:
           GITHUB_TOKEN: ${{ github.token }}
           CLOSED_PR_NUMBER: ${{ github.event.pull_request.number }}
           VERCEL_READ_TOKEN: ${{ secrets.PREVIEW_VERCEL_READ_TOKEN }}
           NEON_READ_TOKEN: ${{ secrets.PREVIEW_NEON_READ_TOKEN }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: success()
         with:
           name: preview-cleanup-closed-pr-manifest
@@ -60,23 +62,24 @@ jobs:
           retention-days: 1
   provider-plan:
     if: github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && inputs.pr_numbers != '[]'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
+          package-manager-cache: false
       - run: node tools/preview-cleanup/run.mjs plan
         env:
           GITHUB_TOKEN: ${{ github.token }}
           PR_NUMBERS: ${{ inputs.pr_numbers }}
           VERCEL_READ_TOKEN: ${{ secrets.PREVIEW_VERCEL_READ_TOKEN }}
           NEON_READ_TOKEN: ${{ secrets.PREVIEW_NEON_READ_TOKEN }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: success()
         with:
           name: preview-cleanup-provider-plan
