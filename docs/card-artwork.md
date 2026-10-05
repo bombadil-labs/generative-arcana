@@ -29,7 +29,7 @@ Migration 004 adds `arcana_visual_packs` and `arcana_visual_pack_artwork`. It do
 
 The checked-in feature is disabled by default and creates no bucket, credentials or database schema. Unconfigured website uploads return a clear unavailable response. All values are server-only. Use one dedicated feature-preview environment with a matching database branch, private bucket and narrowly anchored storage credential; do not reuse a production-root credential or configure one root bucket globally across automatic database previews.
 
-1. Review `mcp/migrations/002-card-artwork.sql` and `mcp/migrations/004-named-artwork-sets.sql` and the target database hostname. Preview additive SQL with `npm run db:migrate:domain --prefix mcp -- --include-artwork --include-visual-packs`; applying additionally requires `--apply --expected-host <reviewed host>` and the existing migration-role/backup review. No runtime schema creation occurs.
+1. Review `mcp/migrations/002-card-artwork.sql` and `mcp/migrations/004-named-artwork-sets.sql`, then follow the [versioned migration plan/baseline/apply procedure](domain-migrations.md). Retired opt-in flags are no longer supported; all pending catalog migrations run together after target and backup review. No runtime schema creation occurs.
 2. Provision an explicitly approved private bucket on that preview's Neon branch. A separate scoped storage credential is required; current Neon storage credentials are branch+descendant scoped. Creating/configuring that credential requires operator approval and secure secret handling.
 3. Configure only that preview branch's server environment:
    - `ARCANA_ARTWORK_ENABLED=true`

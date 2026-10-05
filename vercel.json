@@ -14,5 +14,10 @@
         "service": "arcana"
       }
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "dependabot/**": false
+    }
+  }
 }

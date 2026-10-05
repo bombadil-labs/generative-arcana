@@ -1,3 +1,5 @@
+Domain migrations now require the dedicated migration connection and [versioned plan/baseline/apply procedure](domain-migrations.md); existing schemas must be verified before baselining. Auth planning below remains separate.
+
 # Deploying self-hosted Better Auth with Neon
 
 The default account implementation is self-hosted **Better Auth**, hosted beside the Arcana web
@@ -171,7 +173,7 @@ startup, builds, health checks, and login requests do not run these migrations.
 
    ```bash
    npm ci --prefix mcp
-   npm --prefix mcp run db:migrate:domain
+   npm --prefix mcp run db:migrate:domain -- plan --target production --expected-host REVIEWED_DATABASE_HOST --expected-database REVIEWED_DATABASE --expected-user REVIEWED_MIGRATION_ROLE
    ```
 
 2. Capture a backup/restore reference, review `mcp/migrations/001-domain.sql`, and rehearse against a
@@ -195,7 +197,7 @@ startup, builds, health checks, and login requests do not run these migrations.
 4. Apply the domain migration and reviewed auth plan during the approved window:
 
    ```bash
-   npm --prefix mcp run db:migrate:domain -- --apply --expected-host REVIEWED_DATABASE_HOST
+   npm --prefix mcp run db:migrate:domain -- apply --target production --expected-host REVIEWED_DATABASE_HOST --expected-database REVIEWED_DATABASE --expected-user REVIEWED_MIGRATION_ROLE --backup-reference REVIEWED_BACKUP_REFERENCE
    npm --prefix mcp run db:auth:apply -- \
      --plan /secure/path/arcana-auth-plan.json \
      --expected-host REVIEWED_AUTH_DATABASE_HOST \
