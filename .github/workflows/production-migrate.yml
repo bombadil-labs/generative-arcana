@@ -1,0 +1,71 @@
+name: Approved production migration
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        description: 'Reviewed full commit SHA containing the migration catalog and runner'
+        required: true
+      operation:
+        type: choice
+        options: [plan, status, baseline, apply, reconcile-production]
+        default: plan
+      expected_host:
+        description: 'Must be ep-square-sun-b79gp0dh.c-13.us-east-1.aws.neon.tech'
+        required: true
+      expected_database:
+        description: 'Reviewed database name'
+        required: true
+      expected_user:
+        description: 'Reviewed authorized migration role'
+        required: true
+      backup_reference:
+        description: 'Verified production restore evidence reference; required for every write'
+      baseline_through:
+        description: 'Explicit historical version, baseline only'
+permissions:
+  contents: read
+concurrency:
+  group: arcana-production-migration
+  cancel-in-progress: false
+jobs:
+  migrate:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    environment: arcana-production-migrations
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Validate immutable revision
+        env:
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+        run: '[[ "$REVIEWED_SHA" =~ ^[0-9a-f]{40}$ ]]'
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: npm ci --prefix mcp --ignore-scripts
+      - name: Prepare migration-only libpq client
+        shell: bash
+        run: |
+          python3.12 -m venv "$RUNNER_TEMP/arcana-migration-python"
+          "$RUNNER_TEMP/arcana-migration-python/bin/python" -m pip install --require-hashes --only-binary=:all: -r mcp/scripts/libpq/requirements.txt
+          echo "MIGRATION_PYTHON=$RUNNER_TEMP/arcana-migration-python/bin/python" >> "$GITHUB_ENV"
+      - name: Run reviewed migration operation
+        env:
+          DATABASE_MIGRATION_URL: ${{ secrets.ARCANA_PRODUCTION_MIGRATION_URL }}
+          OPERATION: ${{ inputs.operation }}
+          EXPECTED_HOST: ${{ inputs.expected_host }}
+          EXPECTED_DATABASE: ${{ inputs.expected_database }}
+          EXPECTED_USER: ${{ inputs.expected_user }}
+          BACKUP_REFERENCE: ${{ inputs.backup_reference }}
+          BASELINE_THROUGH: ${{ inputs.baseline_through }}
+        shell: bash
+        run: |
+          [[ "$EXPECTED_HOST" == "ep-square-sun-b79gp0dh.c-13.us-east-1.aws.neon.tech" && "$EXPECTED_DATABASE" == "neondb" ]]
+          args=("$OPERATION" --target production --expected-host "$EXPECTED_HOST" --expected-database "$EXPECTED_DATABASE" --expected-user "$EXPECTED_USER")
+          if [[ -n "$BACKUP_REFERENCE" ]]; then args+=(--backup-reference "$BACKUP_REFERENCE"); fi
+          if [[ -n "$BASELINE_THROUGH" ]]; then args+=(--through "$BASELINE_THROUGH"); fi
+          npm run db:migrate:domain --prefix mcp -- "${args[@]}"

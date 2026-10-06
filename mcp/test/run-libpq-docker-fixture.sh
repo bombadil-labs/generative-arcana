@@ -34,3 +34,7 @@ if [[ "$ready" != true ]]; then docker logs "$container"; exit 1; fi
 export MIGRATION_LIBPQ_TEST=1 MIGRATION_TEST_CA_FILE="$cluster/server.crt" MIGRATION_TEST_KEY_FILE="$cluster/server.key"
 "$MIGRATION_PYTHON" -I mcp/test/libpq-fixture.py
 npm run test:migration-libpq --prefix mcp
+
+if [[ "$POSTGRES_VERSION" == 18 ]]; then
+  (cd mcp && ARCANA_RECONCILIATION_PG18_TEST=1 node --import tsx test/production-reconciliation.ts)
+fi
