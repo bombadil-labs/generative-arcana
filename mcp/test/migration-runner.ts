@@ -7,9 +7,10 @@ const url = 'postgresql://migration:secret@localhost/arcana';
 assert.throws(() => target({DATABASE_URL:url}, flags), /Dedicated/);
 for (const key of ['expected-host','expected-database','expected-user']) assert.throws(() => target({DATABASE_MIGRATION_URL:url}, {...flags,[key]:'wrong'}), /target/);
 assert.throws(() => target({DATABASE_MIGRATION_URL:url+'?host=evil'}, flags), /parameters/);
-assert.throws(() => target({DATABASE_MIGRATION_URL:url+'?sslmode=require&channel_binding=require'}, flags), /channel_binding=require cannot be enforced/);
-assert.throws(() => target({DATABASE_MIGRATION_URL:url+'?channel_binding=prefer&channel_binding=require'}, flags), /channel_binding=require cannot be enforced/);
-assert.throws(() => target({DATABASE_MIGRATION_URL:url+'?channel_binding=disable'}, flags), /parameters/);
+assert.equal(target({DATABASE_MIGRATION_URL:url+'?sslmode=require&channel_binding=require'}, flags),url+'?sslmode=require&channel_binding=require');
+assert.throws(() => target({DATABASE_MIGRATION_URL:url+'?channel_binding=prefer&channel_binding=require'}, flags), /duplicate/);
+assert.throws(() => target({DATABASE_MIGRATION_URL:url+'?channel_binding=disable'}, flags), /Channel binding requires/);
+assert.throws(() => target({DATABASE_MIGRATION_URL:url+'?sslmode=disable&channel_binding=require'}, flags), /Channel binding requires/);
 assert.throws(() => target({DATABASE_MIGRATION_URL:url}, {...flags,target:''}), /Explicit/);
 assert.equal(target({DATABASE_MIGRATION_URL:url}, flags),url);
 async function fixture(test: (db: Connection) => Promise<void>) {

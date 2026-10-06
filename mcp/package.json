@@ -60,6 +60,7 @@
     "test:mcp-efficiency": "node --import tsx test/manifest-uploads.ts && node --import tsx test/manifest-upload-tools.ts && node --import tsx test/deck-edits.ts && node --import tsx test/tool-result.ts && node --import tsx test/manifest-diagnostics.ts && node --import tsx test/native-file-transport.ts && node --import tsx test/manifest-draft-operations.ts && node --import tsx test/manifest-drafts.ts && node --import tsx test/manifest-draft-tools.ts && node --import tsx test/deck-summary-revision.ts",
     "test:migration-runner": "node --import tsx test/migration-runner.ts",
     "test:migration-concurrency": "node --import tsx test/migration-concurrency.ts",
+    "test:migration-libpq": "node --import tsx test/migration-libpq.ts",
     "db:domain:catalog:check": "node --import tsx scripts/build-migration-catalog.ts --check",
     "db:domain:catalog:append": "node --import tsx scripts/build-migration-catalog.ts"
   },

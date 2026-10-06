@@ -42,11 +42,9 @@ export function target(env: NodeJS.ProcessEnv, flags: Record<string,string>) {
   if (!env.DATABASE_MIGRATION_URL) throw new MigrationSafetyError('Dedicated DATABASE_MIGRATION_URL required; DATABASE_URL is never used');
   let url: URL;
   try { url = new URL(env.DATABASE_MIGRATION_URL); } catch { throw new MigrationSafetyError('Invalid migration URL'); }
-  // pg 8.23.1 only prefers SCRAM-SHA-256-PLUS with enableChannelBinding;
-  // it can fall back to SCRAM-SHA-256 and does not enforce the URI's require.
-  // Never silently strip the parameter or treat preference as enforcement.
-  if (url.searchParams.getAll('channel_binding').includes('require')) throw new MigrationSafetyError('channel_binding=require cannot be enforced by the installed pg driver public API. No connection attempted. Review tested driver support; do not remove the requirement.');
-  if (!['postgres:', 'postgresql:'].includes(url.protocol) || [...url.searchParams.keys()].some(k => k !== 'sslmode') || url.hash) throw new MigrationSafetyError('Unsupported migration connection parameters');
+  const keys = [...url.searchParams.keys()];
+  if (!['postgres:', 'postgresql:'].includes(url.protocol) || keys.some(k => !['sslmode','channel_binding'].includes(k)) || new Set(keys).size !== keys.length || url.hash) throw new MigrationSafetyError('Unsupported or duplicate migration connection parameters');
+  if (url.searchParams.has('channel_binding') && (url.searchParams.get('channel_binding') !== 'require' || !['require','verify-full'].includes(url.searchParams.get('sslmode') ?? '') || !url.password)) throw new MigrationSafetyError('Channel binding requires explicit credentials, channel_binding=require and sslmode=require or verify-full');
   if (!['preview','production','test'].includes(flags.target)) throw new MigrationSafetyError('Explicit --target preview|production|test required');
   if (!flags['expected-host'] || url.hostname !== flags['expected-host'] ||
       !flags['expected-database'] || decodeURIComponent(url.pathname.slice(1)) !== flags['expected-database'] ||
