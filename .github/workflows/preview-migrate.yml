@@ -7,7 +7,7 @@ on:
         required: true
       operation:
         type: choice
-        options: [plan, status, baseline, apply]
+        options: [plan, status, baseline, apply, reconcile-preview]
         default: plan
       expected_host:
         description: 'Reviewed direct hostname of the EXISTING preview database'
@@ -19,7 +19,7 @@ on:
         description: 'Reviewed authorized migration role'
         required: true
       backup_reference:
-        description: 'Reviewed backup/recovery evidence; required for baseline/apply'
+        description: 'Reviewed recovery evidence or disposable-staging:user-approval-reference; required for writes'
       baseline_through:
         description: 'Explicit historical version, baseline only'
 permissions:
