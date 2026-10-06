@@ -2,6 +2,8 @@
 # Disposable PostgreSQL17 TLS fixture; no external database credentials.
 set -euo pipefail
 : "${MIGRATION_PYTHON:?Set the reviewed Python interpreter}"
+POSTGRES_VERSION="${POSTGRES_VERSION:-17}"
+case "$POSTGRES_VERSION" in 17|18) ;; *) exit 1;; esac
 cluster=$(mktemp -d "${TMPDIR:-/tmp}/arcana-libpq-docker.XXXXXX")
 container="arcana-libpq-$(basename "$cluster")"
 trap 'docker stop "$container" >/dev/null 2>&1 || true' EXIT
@@ -17,7 +19,7 @@ HBA
 docker run --rm -d --name "$container" -p 127.0.0.1:54481:5432 \
   -v "$cluster:/fixture:ro" -e POSTGRES_USER=migration_test \
   -e POSTGRES_PASSWORD=local-test-only -e POSTGRES_DB=postgres \
-  --entrypoint bash postgres:17 -ec '
+  --entrypoint bash "postgres:$POSTGRES_VERSION" -ec '
     cp /fixture/server.key /tmp/server.key
     cp /fixture/server.crt /tmp/server.crt
     cp /fixture/pg_hba.conf /tmp/pg_hba.conf
@@ -34,3 +36,7 @@ if [[ "$ready" != true ]]; then docker logs "$container"; exit 1; fi
 export MIGRATION_LIBPQ_TEST=1 MIGRATION_TEST_CA_FILE="$cluster/server.crt" MIGRATION_TEST_KEY_FILE="$cluster/server.key"
 "$MIGRATION_PYTHON" -I mcp/test/libpq-fixture.py
 npm run test:migration-libpq --prefix mcp
+
+if [[ "$POSTGRES_VERSION" == 18 ]]; then
+  (cd mcp && ARCANA_RECONCILIATION_PG18_TEST=1 node --import tsx test/preview-reconciliation.ts)
+fi

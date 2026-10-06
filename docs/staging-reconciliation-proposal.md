@@ -1,30 +1,15 @@
-# Staging adoption proposal — not implemented for live use
+# Disposable PR105 staging reconciliation — implementation review
 
-Scope: reconcile only the independently verified existing PR105 staging database. No publication, live query, DDL, data/ledger write, role/secret change or resource creation is authorized by this document. The app-to-Neon mapping is still unverified and must be established before any repair. Current target metadata came from read-only run37401671687 on PostgreSQL18.6.
+User confirmation `Sentinel_35f5cd63ea448191b751aeef71acdbb5` says nothing in this staging branch needs preserving. No backup/provenance detour is required for this branch. This does not authorize deletion, reset or arbitrary schema changes. Production policy is unchanged.
 
-## Evidence and unknown cause
+## Exact effects and guards
 
-The inspected schema equals catalog004 except (1) public.arcana_card_artwork is absent and (2) the named-artwork mediaType CHECK has the exact fingerprint of the older equality-only check, without IS NOT NULL.005 draft additions and006 cover/back table are absent. No exact baseline is currently valid.
+New explicit command `reconcile-preview` is limited to preview, host `ep-fragrant-morning-b7w91pb6.c-13.us-east-1.aws.neon.tech`, database `neondb`, user `neondb_owner`, port5432. It uses the existing dedicated native migration connection and verifies connected database/user. That target was already verified by the successful read-only plan. Effective app-to-Neon mapping is a later readiness check, not a prerequisite for repairing this explicitly selected disposable branch.
 
-Repository commit e669c4c introduced004 with the stricter check. Its old migrate-domain runner automatically included002 when --include-visual-packs was selected, even without --include-artwork; commit5ef42a4 retained that dependency. Migration004 explicitly promises to preserve the legacy table. No DROP/RENAME of arcana_card_artwork was found in numbered SQL history. Therefore normal execution of those committed runners does not explain this state. Manual/older external DDL, restore/branch provenance or later changes are possible but unverified; the cause is UNKNOWN. Do not claim the table was safely unused, newly missing, or deleted. Creating an empty table cannot recover former rows, object keys or lost content. Investigate available existing backup/audit/provenance evidence before deciding whether recovery is necessary.
+Under one transaction,5s lock timeout,30s statement timeout, advisory lock184734901 and an ACCESS EXCLUSIVE named-artwork lock:
 
-## Minimal versioned adoption path
-
-Do not edit SQL001–006/catalog entries, add a force flag, weaken baseline matching, or pretend007 can fix an untracked noncanonical prefix. Instead, if approved, implement a separate immutable adoption recipe named staging-domain-adoption-v1, with reviewed code/recipe checksum and exact approved source-profile fingerprint, using the same dedicated native migration connection and host/database/user guards. Its CI audit record must identify target, reviewed revision, recipe checksum, recovery evidence and outcomes. It is not a new numbered migration or evidence that001–004 originally ran. No live-capable recipe is included here; only an in-memory test simulation.
-
-1. Verify app/deployment→Neon project/branch/endpoint mapping. Review usable recovery coverage for this branch and potential legacy-table loss: timestamp, retention/expiry, restoration procedure/access and responsible operator. Do not create a backup branch implicitly. Coordinate quiescence of schema writers and a short application-write maintenance window.
-2. Perform the separately approved count-only compliance query below in a read-only transaction. If the count is nonzero, STOP. Do not delete/quarantine rows, add guessed mediaType values, rewrite JSON, skip validation or ignore the mismatch. Existing data must remain unchanged. A data-owner review of actual asset provenance and a separately approved corrective/recovery plan is needed; neither row contents nor object keys should enter public CI logs. No row-level access is authorized here.
-3. In the future repair operation, BEGIN; set the existing5s lock/30s statement timeouts and search_path; take advisory transaction lock184734901. Acquire ACCESS EXCLUSIVE on public.arcana_visual_pack_artwork so concurrent writes cannot race the compliance check/constraint validation. Other schema writers must remain quiescent; an advisory lock cannot stop arbitrary DDL. Reverify absence of a migration ledger and exact match to the specifically observed source profile (canonical004 minus legacy table, plus exactly the known weaker constraint). Any additional drift, pre-existing legacy table, ledger or target discrepancy stops the repair.
-4. Recheck the same aggregate compliance predicate under the table lock. Only zero permits the following two changes, in one transaction:
-   - Execute exact immutable002 SQL, creating the previously absent legacy arcana_card_artwork table with its committed columns, keys, FK and checks. No named-front rows are copied or moved. No artwork/private storage is touched. The table begins EMPTY, not recovered.
-   - Replace only arcana_visual_pack_artwork_asset_check with its exact committed004 predicate. Use a normally validated ADD CONSTRAINT, never NOT VALID. PostgreSQL must validate existing rows; failure aborts the transaction.
-5. Re-read the entire domain schema with the existing strict schema reader. Require byte-equivalent serialized snapshot004. Only then COMMIT. This operation creates no migration ledger and performs no row INSERT/UPDATE/DELETE. Failure rolls back both DDL changes together. Existing rows, JSON and revisions stay unchanged.
-6. Run normal read-only plan. It must return verifiedBaselineCandidate=4. After approval, normal baseline --through4 independently re-verifies the exact schema under the standard lock and records001–004 as operation=baseline, with original immutable checksums. This asserts verified schema equivalence, not fabricated execution history. If intervening drift appears, stop.
-7. Normal plan must now list only005 and006. After review, normal apply executes them and records their original checksums atomically. Then status must be current; a second apply must be a no-op. Verify app readiness and feature smoke tests against the mapped deployment before PR105 merge. Auth remains separate; neither this repair nor006 guarantees readiness.
-
-## Exact proposed aggregate and DDL effects
-
-Read-only preflight (and the identical recheck inside the locked repair transaction):
+1. Require no ledger and the EXACT observed schema: catalog004 minus legacy artwork table, with the known weaker mediaType check only. Additional drift or an already-created table refuses.
+2. Run only this aggregate against existing data; any nonzero result refuses without edits:
 
 ```sql
 SELECT count(*)::text AS noncompliant_count
@@ -33,26 +18,32 @@ WHERE ((asset->>'mediaType') IS NOT NULL
        AND (asset->>'mediaType')='image/webp') IS NOT TRUE;
 ```
 
-Only noncompliant_count is emitted; no row identifiers, JSON, keys or samples. The exact-source check includes RLS flags, and the approved owner role must have full visibility. Permission/RLS uncertainty is a blocker, not evidence that a zero count covers all rows. Missing JSON mediaType and JSON null both fail the new predicate. Existing equality-only CHECK permits SQLNULL, so zero cannot be assumed.
+3. Create the empty legacy table with002's committed definition. Remove only its IF NOT EXISTS execution modifier so a concurrently created table causes failure instead of silent adoption; the immutable SQL file is unchanged. Copy/move no rows or blobs.
+4. Replace only arcana_visual_pack_artwork_asset_check with fully validated004 CHECK `(asset->>'mediaType' IS NOT NULL AND asset->>'mediaType'='image/webp')`. No NOT VALID shortcut.
+5. Require the complete strict snapshot004, then commit. No ledger or row INSERT/UPDATE/DELETE occurs. Emit recipe ID/checksum, schema version4, zero noncompliance, empty-table-created and ledgerWritten=false. Failure rolls back both DDL changes.
 
-The legacy table definition is reused verbatim from mcp/migrations/002-card-artwork.sql. The sole existing-object alteration is:
+The source profile includes RLS=false. Lack of full count visibility/permissions is an error, never proof of compliance. Missing/null mediaType rows stop for separate review; the disposable decision does not silently authorize deleting or rewriting them. Keep schema writers quiescent; the advisory lock coordinates cooperating runners only.
 
-```sql
-ALTER TABLE public.arcana_visual_pack_artwork
-  DROP CONSTRAINT arcana_visual_pack_artwork_asset_check,
-  ADD CONSTRAINT arcana_visual_pack_artwork_asset_check
-    CHECK (asset->>'mediaType' IS NOT NULL
-           AND asset->>'mediaType'='image/webp');
-```
+## Transparent write evidence
 
-Creating the legacy table provides future compatibility only. It must never be described as restoring missing artwork. Tightening the CHECK changes acceptance of future missing/null mediaType values but does not modify existing rows.
+Use existing `backup_reference` input with literal:
 
-## Failure and recovery
+`disposable-staging:Sentinel_35f5cd63ea448191b751aeef71acdbb5`
 
-Before commit, any lock timeout, nonzero count, DDL/validation error or failed canonical postcondition rolls back the complete repair. After an uncertain connection/commit result, run read-only plan/diagnostics to establish state before retry; no blind rerun. A subsequent baseline failure leaves an untracked but canonical004 schema for investigation/retry. Normal005/006 already roll back together on transactional failure.
+The CLI logs `writeEvidence.kind=disposable-staging-risk-acceptance`, not a backup. That prefix is accepted ONLY for the exact approved preview target, including later baseline/apply; production refuses it. Existing ordinary recovery references remain supported. No fake backup is claimed, and write evidence is still required. No new approval system or runtime fallback is added.
 
-After commit, do not automatically drop the new table or weaken the CHECK: new data may exist and weakening restores invalid-data acceptance. Keep the verified recovery mechanism available and prefer reviewed forward repair. Any restore, data remediation, down change or new branch/resource requires separate coordination. Application rollback alone does not reverse additive schema and cannot recover missing historical rows.
+After approved repair: normal plan must EXACTLY return candidate4; normal baseline --through4 re-verifies and records001–004 with operation=baseline and original checksums. Then normal plan lists005/006; normal apply runs both, status becomes current, second apply is a no-op. No automatic reconciliation or baseline is hidden in ordinary plan/apply. On uncertain commit inspect plan/status before retry. No automatic table drop, constraint weakening, restore or down migration is provided.
 
-## Local verification
+## Cause and data limits
 
-mcp/test/staging-reconciliation-proposal.ts uses only fresh in-memory PGlite databases and accepts no connection URI or secrets. It reproduces the exact observed noncanonical profile; proves missing/null mediaType rows cause refusal with all rows/schema unchanged; tests unexpected drift refusal and injected post-DDL failure rollback; verifies an empty legacy table, unchanged existing fronts/packs/deck revisions, strict004 postcondition, normal baseline001–004, normal005/006 apply, original ledger checksums and no-op repeat. These are proposal tests, not a live repair implementation or live-data compliance evidence. PostgreSQL18 locking/validation in an isolated server should also be verified before a future repair runner is reviewed for deployment.
+Cause of missing legacy table is UNKNOWN. In commit e669c4c (and5ef42a4), old --include-visual-packs automatically included002 even without --include-artwork;004 originally declared the strict check. No DROP/RENAME was found in numbered SQL history. Do not infer harmless absence or claim recovery: creating an empty table restores future compatibility only, never historical artwork/keys/content. User has accepted this staging content risk.
+
+## Smallest dispatcher publication path
+
+The isolated change to main's existing preview-migrate.yml is exactly two lines: add `reconcile-preview` to operation choices; describe backup_reference as recovery or explicit disposable-staging evidence. It keeps dispatch-main guard, scoped environment, exact reviewed-SHA checkout, target inputs and plan default unchanged. A feature-branch workflow edit cannot change main's dispatcher. Land only these dispatcher lines through a separately reviewed maintenance change on main, then use the reviewed PR105 implementation SHA. Do not merge PR105's feature prematurely or send an undocumented choice. No dispatcher publication or live execution has occurred in this task.
+
+## Tests and remaining readiness evidence
+
+mcp/test/preview-reconciliation.ts tests the actual implementation in fresh PGlite or explicitly opted-in loopback PostgreSQL18 fixtures using fixed fake credentials. It checks source/target/evidence guards, noncompliance refusal, unexpected drift, pre-existing legacy table refusal, injected post-DDL rollback, strict004 baseline, normal005/006 checksums/no-op and preservation of named fronts/packs/revisions. NativePG18 additionally tests conflicting ACCESS EXCLUSIVE lock timeout, unchanged schema and retry after release. CI harness is extended fromPG17 toPG17/18, with reconciliation on18; not yet published/run in CI.
+
+Provider metadata confirms PR105 deployment→Git branch/SHA but does not expose its effective database endpoint without decrypting a sensitive variable. Missing evidence for end-to-end readiness: a nonsecret effective deployed database host/database or an authoritative deployment→Neon branchID/endpoint mapping. No credential extraction is proposed. After schema work, verify app readiness and feature smoke tests before105merge; auth remains separate.
