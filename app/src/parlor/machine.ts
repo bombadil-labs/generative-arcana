@@ -87,7 +87,7 @@ export class ParlorMachine {
     const finish = () => this.set({ phase: segment === 3 ? "complete" : "ready", segment: segment + 1, error: "" });
     this.set({ phase: "speaking", error: "" });
     void this.run(async (signal, current) => {
-      if (muted || !this.settings.elevenKey.trim()) {
+      if (muted || (!this.settings.elevenKey.trim() && !(this.settings.hosted && this.settings.voiceId))) {
         reveal();
         // Keep the action gated through the flip, including double clicks in captions mode.
         await new Promise<void>((resolve) => {
@@ -97,7 +97,7 @@ export class ParlorMachine {
         if (current()) finish();
         return;
       }
-      await this.service.speak(this.settings, text, signal, () => { if (current()) reveal(); });
+      await this.service.speak(this.settings, text, signal, () => { if (current()) reveal(); }, this.state.reading);
       if (current()) finish();
     });
   }

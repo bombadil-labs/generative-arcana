@@ -75,7 +75,14 @@ await fixture(async db => {
 });
 console.log('Migration safety tests passed: clean, partial, baseline, drift, checksums, target, credentials, rollback, idempotence.');
 await fixture(async db => {
-  const before = await prepareVersionSixUpgrade(db,entries);
-  await run(db,entries,'apply');
-  await verifyVersionSixUpgrade(db,entries,before);
+  const six=entries.slice(0,6);
+  const before = await prepareVersionSixUpgrade(db,six);
+  await run(db,six,'apply');
+  await verifyVersionSixUpgrade(db,six,before);
+  const prior=(await db.query('SELECT * FROM arcana_migration_history ORDER BY version')).rows;
+  assert.deepEqual((await run(db,entries,'plan')).pending.map(e=>e.version),[7]);
+  await assert.rejects(run(db,entries.map(e=>e.version===7?{...e,schema:[]}:e),'apply'),/Schema verification failed/);
+  assert.deepEqual((await db.query('SELECT * FROM arcana_migration_history ORDER BY version')).rows,prior);
+  await run(db,entries,'apply');await run(db,entries,'apply');
+  assert.equal((await db.query('SELECT count(*)::int AS n FROM arcana_entitlements')).rows[0].n,0,'migration grants nobody');
 });

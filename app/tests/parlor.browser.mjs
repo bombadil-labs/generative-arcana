@@ -10,7 +10,7 @@ const { chromium }=await import(process.env.PLAYWRIGHT_MODULE ? pathToFileURL(pr
 const data=JSON.parse(await readFile(resolve(root,'../decks/deep-time/deck.json'),'utf8'));
 const deck={id:'parlor-fixture',slug:data.slug,name:data.name,tagline:'Synthetic browser fixture',revision:1,visibility:'private',createdAt:'',updatedAt:'',manifest:{data,tagline:'Synthetic fixture'}};
 let server,browser,context,page;
-let authenticated=false,accountId='host-a',calls=0,mode='ok',release,audioMode='error';
+let authenticated=false,accountId='host-a',calls=0,mode='ok',release,audioMode='error',deploymentMode='byok',hostedDenied=false;
 const evidence=resolve(root,'../..','parlor-verification');
 const json=(route,body,status=200)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
 async function captureLayout(name) {
@@ -67,6 +67,13 @@ try {
     if(url.hostname==='api.elevenlabs.io')return audioMode==='hold'?route.fulfill({status:200,contentType:'audio/mpeg',body:'synthetic mocked audio'}):json(route,{message:'Synthetic audio failure'},503);
     if(url.hostname!=='127.0.0.1')return route.abort();
     if(path==='/auth/session')return json(route,authenticated?{authenticated:true,accountId,user:{email:'synthetic@example.test'}}:{authenticated:false});
+    if(path==='/api/parlor/capabilities')return hostedDenied?json(route,{},403):json(route,{mode:deploymentMode,models:[{provider:'anthropic',id:'server-approved-model'}],voices:[]});
+    if(path==='/api/parlor/narrate'){
+      if(hostedDenied)return json(route,{},403);
+      const request=route.request().postDataJSON();assert.ok(!JSON.stringify(request).includes('synthetic-browser-key'));
+      const token=JSON.parse(Buffer.from(request.token,'base64url').toString());
+      return json(route,{cards:token.c.map(([slug])=>({slug,text:'A hosted reflection on the authored meaning of this card.'})),synthesis:'A synthetic hosted synthesis.'});
+    }
     if(path==='/api/me/decks')return json(route,[deck]);
     if(path==='/api/decks/parlor-fixture')return json(route,deck);
     if(path.startsWith('/api/decks/parlor-fixture/artwork/assets/'))return json(route,{},404);
@@ -173,6 +180,16 @@ try {
   await page.getByRole('button',{name:'Start the show',exact:true}).click();
   authenticated=false;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.getByRole('button',{name:'Sign in to enter',exact:true}).waitFor();
   await captureLayout('logged-out-mobile');
+  authenticated=true;deploymentMode='hosted';await page.setViewportSize({width:1280,height:960});await page.goto('http://127.0.0.1:4187/parlor');
+  await page.getByLabel('Hosted model',{exact:true}).waitFor();assert.equal(await page.locator('input[type=password]').count(),0);
+  assert.equal(await page.getByLabel('Hosted model',{exact:true}).locator('option').count(),1);
+  await captureLayout('hosted-settings-desktop');const directCalls=calls;
+  await guest();for(let n=1;n<=3;n++)await page.getByRole('button',{name:`Reveal card ${n}`,exact:true}).click();
+  await page.getByRole('button',{name:'Hear the synthesis',exact:true}).waitFor();await captureLayout('hosted-reading-desktop');
+  await page.setViewportSize({width:390,height:844});await captureLayout('hosted-reading-mobile');assert.equal(calls,directCalls);
+  await escaped();hostedDenied=true;await guest();await page.getByText('Hosted access is unavailable. Exit the show and check your account.',{exact:true}).waitFor();
+  assert.equal(calls,directCalls);await escaped();await page.reload();await page.getByText('This account does not have hosted parlor access.',{exact:true}).waitFor();
+  assert.equal(await page.locator('input[type=password]').count(),0);assert.equal(await page.getByRole('button',{name:'Start the show',exact:true}).count(),0);
   console.log('PASS: production /parlor and /parlor/, login return, masked restoration, chosen set, confirmation, single draw request, captions/audio failure, repeated clicks, synthesis, follow-up, reset, retry, interruption, Escape before reading/during audio/generation/conversation, audio cleanup, focus restoration, repeated entry/touch exit, Back navigation, desktop/mobile layout, reduced motion and entrance fade, logout during show. Mock providers only.');
 } catch (error) {
   await mkdir(evidence,{recursive:true});

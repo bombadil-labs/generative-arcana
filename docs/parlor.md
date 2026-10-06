@@ -1,5 +1,7 @@
 # The parlor
 
+The deployment now explicitly selects `disabled` (default), `hosted`, or `byok`. See [Hosted parlor rollout](hosted-parlor.md) for the new entitlement, server-only keys, conservative budgets and reviewed migration/grant procedure. Hosted mode has no key inputs and never falls back to browser credentials. The browser-key details below apply only when the operator explicitly selects `PARLOR_MODE=byok`.
+
 `/parlor` is an authenticated, browser-only party reading. `/parlor/` also loads the built app. Existing hash routes and subdirectory builds retain their relative asset behavior. The login return validators accept only the exact new literal path (and its trailing slash), without question/query parameters.
 
 Sign in, choose an account deck and its artwork set, select a storyteller, and configure Anthropic or OpenAI. Model IDs are deliberately editable and have no guessed default: use a Messages-compatible Anthropic model or Chat Completions-compatible OpenAI model available to the key. An optional ElevenLabs key and voice ID enable narration; its speech model is `eleven_multilingual_v2`. No provider request happens until the host opens the parlor and a guest confirms a question.

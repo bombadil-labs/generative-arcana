@@ -1,5 +1,6 @@
 export type Provider = "anthropic" | "openai";
 export interface Settings {
+  hosted?: boolean;
   provider: Provider;
   anthropicKey: string;
   anthropicModel: string;
@@ -44,6 +45,7 @@ export function saveSettings(storage: Storage, accountId: string, settings: Sett
 }
 export function clearKeys(settings: Settings): Settings { return { ...settings, anthropicKey: "", openaiKey: "", elevenKey: "" }; }
 export function readySettings(settings: Settings): boolean {
+  if(settings.hosted)return !!(settings.provider==='anthropic'?settings.anthropicModel:settings.openaiModel);
   return !!(settings.provider === "anthropic" ? settings.anthropicKey.trim() && settings.anthropicModel.trim() : settings.openaiKey.trim() && settings.openaiModel.trim())
     && (!settings.elevenKey.trim() || !!settings.voiceId.trim());
 }

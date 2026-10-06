@@ -9,6 +9,7 @@ import { getPackArtworkAsset, type PackArtworkAsset } from "../artwork/api";
 import { useArtworkSelection, useArtworkStore } from "../artwork/context";
 import { characters, clearKeys, defaultSettings, readSettings, readySettings, saveSettings, type Settings } from "./settings";
 import { ParlorMachine } from "./machine";
+import { readParlorCapabilities, type ParlorCapabilities } from './hosted';
 import "./parlor.css";
 
 export function Parlor({ onShowChange }: { onShowChange(showing: boolean): void }) {
@@ -18,11 +19,22 @@ export function Parlor({ onShowChange }: { onShowChange(showing: boolean): void 
     <p>{session.status === "loading" ? "Checking your invitation…" : "Sign in to host a reading at your private table."}</p>
     {session.status !== "loading" && <><button onClick={() => signIn("/parlor")}>Sign in to enter</button><button onClick={() => void refresh()}>Check account again</button></>}
   </section>;
-  return <Host key={session.accountId} accountId={session.accountId} onShowChange={onShowChange} />;
+  return <ParlorAccess key={session.accountId} accountId={session.accountId} onShowChange={onShowChange} />;
 }
 
-function Host({ accountId, onShowChange }: { accountId: string; onShowChange(showing: boolean): void }) {
-  const [restored] = useState(() => { try { return readSettings(window.localStorage, accountId); } catch { return { settings: defaultSettings(), remember: false }; } });
+function ParlorAccess(props:{accountId:string;onShowChange(showing:boolean):void}) {
+  const [capabilities,setCapabilities]=useState<ParlorCapabilities|null>(null);
+  const [error,setError]=useState('');const [attempt,setAttempt]=useState(0);
+  useEffect(()=>{const controller=new AbortController();setError('');void readParlorCapabilities(controller.signal).then(value=>{if(!controller.signal.aborted)setCapabilities(value);}).catch(error=>{if(!controller.signal.aborted)setError(error instanceof Error?error.message:'Parlor unavailable.');});return()=>controller.abort();},[attempt]);
+  if(!capabilities)return <section className="parlor parlor-gate"><h1>The parlor</h1><p role={error?'alert':'status'}>{error||'Checking parlor access.'}</p>{error&&<button onClick={()=>setAttempt(n=>n+1)}>Check parlor access again</button>}</section>;
+  return <Host {...props} capabilities={capabilities}/>;
+}
+function Host({ accountId, onShowChange, capabilities }: { accountId: string; onShowChange(showing: boolean): void; capabilities:ParlorCapabilities }) {
+  const hosted=capabilities.mode==='hosted';
+  const [restored] = useState(() => {
+    if(hosted){const first=capabilities.models[0];return {settings:{...defaultSettings(),hosted:true,provider:first.provider,anthropicModel:capabilities.models.find(m=>m.provider==='anthropic')?.id??'',openaiModel:capabilities.models.find(m=>m.provider==='openai')?.id??''},remember:false};}
+    try { return readSettings(window.localStorage, accountId); } catch { return { settings: defaultSettings(), remember: false }; }
+  });
   const [settings, setSettings] = useState(restored.settings);
   const [remember, setRemember] = useState(restored.remember);
   const [storageError, setStorageError] = useState(false);
@@ -58,6 +70,7 @@ function Host({ accountId, onShowChange }: { accountId: string; onShowChange(sho
   }, [attempt]);
   const update = (next: Settings, persist = remember) => {
     setSettings(next); setRemember(persist);
+    if(hosted)return;
     try { setStorageError(!saveSettings(window.localStorage, accountId, next, persist)); } catch { setStorageError(true); }
   };
   return <section className={`parlor${hosting ? " parlor-show" : ""}`} aria-label={hosting ? "Parlor show" : "Parlor setup"}>
@@ -76,7 +89,10 @@ function Host({ accountId, onShowChange }: { accountId: string; onShowChange(sho
           {Object.entries(characters).map(([id, character]) => <option key={id} value={id}>{character.name}</option>)}
         </select></label>
       </div>
-      <div><h2>The reader</h2><label>Language provider<select aria-label="Language provider" value={settings.provider} onChange={(event) => update({ ...settings, provider: event.target.value as Settings["provider"] })}><option value="anthropic">Anthropic</option><option value="openai">OpenAI</option></select></label>
+      {hosted?<><div><h2>The reader</h2><p>Hosted parlor · access and usage limits are managed by the server.</p>
+        <label>Hosted model<select aria-label="Hosted model" value={`${settings.provider}:${settings.provider==='anthropic'?settings.anthropicModel:settings.openaiModel}`} onChange={event=>{const choice=capabilities.models.find(m=>`${m.provider}:${m.id}`===event.target.value)!;update({...settings,provider:choice.provider,...(choice.provider==='anthropic'?{anthropicModel:choice.id}:{openaiModel:choice.id})});}}>{capabilities.models.map(m=><option key={`${m.provider}:${m.id}`} value={`${m.provider}:${m.id}`}>{m.provider} · {m.id}</option>)}</select></label></div>
+        <div><h2>The voice</h2><label>Hosted voice<select aria-label="Hosted voice" value={settings.voiceId} onChange={event=>update({...settings,voiceId:event.target.value})}><option value="">Captions only</option>{capabilities.voices.map(voice=><option key={voice} value={voice}>{voice}</option>)}</select></label><p>Hosted provider keys are never sent to this browser. Previously remembered browser-mode keys can be removed by clearing site data. Retries consume a new usage reservation, including after an interrupted request.</p></div></>:
+      <><div><h2>The reader</h2><p>Browser-key mode · your own provider credentials.</p><label>Language provider<select aria-label="Language provider" value={settings.provider} onChange={(event) => update({ ...settings, provider: event.target.value as Settings["provider"] })}><option value="anthropic">Anthropic</option><option value="openai">OpenAI</option></select></label>
         <KeyInput label="Anthropic API key" value={settings.anthropicKey} change={(value) => update({ ...settings, anthropicKey: value })} />
         <label>Anthropic model ID<input value={settings.anthropicModel} onChange={(event) => update({ ...settings, anthropicModel: event.target.value })} maxLength={160} placeholder="Enter a model available to your account" /></label>
         <KeyInput label="OpenAI API key" value={settings.openaiKey} change={(value) => update({ ...settings, openaiKey: value })} />
@@ -89,7 +105,7 @@ function Host({ accountId, onShowChange }: { accountId: string; onShowChange(sho
         <label className="parlor-check"><input type="checkbox" checked={remember} onChange={(event) => update(settings, event.target.checked)} />Remember keys on this device (plaintext)</label>
         <button onClick={() => update(clearKeys(settings), false)}>Clear keys from this device</button>
         {storageError && <p role="alert">Browser storage could not be updated. Keys work in memory, but previously saved keys may remain; clear site data in your browser.</p>}
-      </div>
+      </div></>}
     </div>}
     {deckId && <RemoteDeckBoundary key={deckId} deckId={deckId} routeKey="/parlor">
       <TableSetup deckId={deckId} settings={settings} hosting={hosting} start={() => setHosting(true)} startButton={startButton} />

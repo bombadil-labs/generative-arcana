@@ -1,6 +1,7 @@
 import type { ArcanaReading } from "../engine/types";
 import { arcanaEngine } from "../engine/ArcanaEngine";
 import { characters, type Settings } from "./settings";
+import { hostedRequest } from './hosted';
 
 export interface Narration { cards: { slug: string; text: string }[]; synthesis: string }
 export interface Turn { role: "user" | "assistant"; content: string }
@@ -58,6 +59,7 @@ async function generate(settings: Settings, system: string, turns: Turn[], signa
   }
 }
 export async function narrate(settings: Settings, reading: ArcanaReading, signal: AbortSignal): Promise<Narration> {
+  if(settings.hosted){try{return parseNarration(JSON.stringify(await (await hostedRequest('narrate',settings,reading,signal)).json()),reading);}catch(error){if(signal.aborted)throw error;throw new ParlorError(error instanceof Error?error.message:'Hosted narration unavailable.');}}
   const system = `${instructions(settings)} Return only JSON: {"cards":[{"slug":"exact-card-slug","text":"interpretation"}],"synthesis":"closing synthesis"}. Exactly three cards in the given order. Each card text: 2–3 sentences about its position and authored meaning. Synthesis: 2–3 sentences weaving the cards together. Never reveal later cards in an earlier segment.`;
   const identities = reading.placements.map(({ card, position, reversed }) => ({ slug: card.slug, name: card.name, position: position.name, reversed }));
   const result = parseNarration(await generate(settings, system, [{ role: "user", content: `${arcanaEngine.buildInterpretationContext(reading)}\n\nCARD IDENTITIES IN ORDER\n${JSON.stringify(identities)}` }], signal), reading);
@@ -68,15 +70,16 @@ export async function narrate(settings: Settings, reading: ArcanaReading, signal
   return result;
 }
 export function converse(settings: Settings, reading: ArcanaReading, turns: Turn[], signal: AbortSignal): Promise<string> {
+  if(settings.hosted)return hostedRequest('converse',settings,reading,signal,{turns}).then(r=>r.json()).then(value=>{if(typeof value.text!=='string'||!value.text.trim()||value.text.length>4000)throw new Error('Invalid hosted response.');return value.text as string;}).catch(error=>{if(signal.aborted)throw error;throw new ParlorError(error instanceof Error?error.message:'Hosted conversation unavailable.');});
   return generate(settings, `${instructions(settings)} Answer follow-up questions in 2–4 sentences using this same reading; do not draw new cards.\n${arcanaEngine.buildInterpretationContext(reading)}`, turns, signal);
 }
 
 /** One bounded audio resource, released on completion, interruption, failure and unmount. */
-export async function speak(settings: Settings, text: string, signal: AbortSignal, onPlaying: () => void): Promise<void> {
+export async function speak(settings: Settings, text: string, signal: AbortSignal, onPlaying: () => void, reading?: ArcanaReading): Promise<void> {
   let url: string | undefined;
   let audio: HTMLAudioElement | undefined;
   try {
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(settings.voiceId.trim())}`, {
+    const response = settings.hosted ? await hostedRequest('speech',settings,reading!,signal,{text,voiceId:settings.voiceId}) : await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(settings.voiceId.trim())}`, {
       method: "POST", signal, credentials: "omit", cache: "no-store", redirect: "error", referrerPolicy: "no-referrer",
       headers: { "content-type": "application/json", accept: "audio/mpeg", "xi-api-key": settings.elevenKey.trim() },
       body: JSON.stringify({ text, model_id: "eleven_multilingual_v2" }),

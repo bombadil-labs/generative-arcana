@@ -11,7 +11,7 @@ Object.defineProperty(global,'navigator',{configurable:true,value:dom.window.nav
 const { createRoot } = require('react-dom/client');
 const { act } = React;
 let vite,root,App,Provider,useSession,sessionControl,router,settingsApi;
-let authenticated,accountId,providerCalls,lateResolve,delayed;
+let authenticated,accountId,providerCalls,lateResolve,delayed,accessMode,hostedDenied,hostedBodies;
 const data=rawDeck();
 const deck={id:'parlor-deck',slug:data.slug,name:data.name,tagline:'Fixture deck',revision:1,visibility:'private',createdAt:'',updatedAt:'',manifest:{data,tagline:'Fixture deck'}};
 const flush=()=>act(async()=>{await new Promise(r=>setTimeout(r,0));});
@@ -32,9 +32,17 @@ before(async()=>{
 });
 beforeEach(async()=>{
   authenticated=true;accountId='test-account';providerCalls=0;delayed=false;lateResolve=undefined;
+  accessMode='byok';hostedDenied=false;hostedBodies=[];
   window.history.replaceState(null,'','/parlor');window.localStorage.clear();
   settingsApi.saveSettings(window.localStorage,accountId,{...settingsApi.defaultSettings(),anthropicKey:'synthetic-ui-key',anthropicModel:'synthetic-model'},true);
   global.fetch=async(path,init={})=>{
+    if(path==='/api/parlor/capabilities')return hostedDenied?json({},403):json({mode:accessMode,models:[{provider:'anthropic',id:'server-model'}],voices:[]});
+    if(path==='/api/parlor/narrate'){
+      hostedBodies.push(JSON.parse(init.body));if(hostedDenied)return json({},403);
+      const token=JSON.parse(Buffer.from(hostedBodies.at(-1).token,'base64url').toString());
+      const response=json({cards:token.c.map(([slug])=>({slug,text:'Hosted synthetic narration.'})),synthesis:'Hosted synthetic synthesis.'});
+      if(delayed)return new Promise(resolve=>{lateResolve=()=>resolve(response);});return response;
+    }
     if(path==='/auth/session')return json(authenticated?{authenticated:true,accountId,user:{email:'host@example.test'}}:{authenticated:false});
     if(path==='/api/auth/sign-out'){authenticated=false;return json({success:true});}
     if(path==='/api/me/decks')return json([deck]);
@@ -99,4 +107,18 @@ test('Escape exits before reading and during generation, restores focus, and fen
   delayed=true;await guest();assert.ok(lateResolve);await escape();lateResolve();await settle();
   assert.equal(document.querySelectorAll('.parlor-card').length,0);assert.ok(!document.body.textContent.includes('Private guest'));
   assert.equal(document.activeElement,button('Start the show'));await click('Start the show');assert.ok(button('Take a seat'));await escape();
+});
+
+test('hosted mode has server model choices and no key fields, never restores or sends browser keys',async()=>{
+  accessMode='hosted';await mount();assert.equal(document.querySelectorAll('input[type=password]').length,0);assert.ok(button('Start the show'));
+  await guest();assert.equal(hostedBodies.length,1);assert.equal(providerCalls,0);
+  assert.equal(hostedBodies[0].model,'server-model');assert.ok(!JSON.stringify(hostedBodies).includes('synthetic-ui-key'));
+  assert.ok(!Object.keys(hostedBodies[0]).some(k=>/key/i.test(k)));assert.ok(!JSON.stringify(window.localStorage).includes('Private guest'));
+});
+test('denied or disabled hosted access does not offer browser-key fallback',async()=>{
+  accessMode='hosted';hostedDenied=true;await mount();assert.ok(!button('Start the show'));assert.equal(document.querySelectorAll('input[type=password]').length,0);assert.equal(providerCalls,0);
+});
+test('revoked hosted request stays in hosted mode and logout fences a late hosted result',async()=>{
+  accessMode='hosted';await mount();hostedDenied=true;await guest();assert.equal(providerCalls,0);assert.ok(button('Retry / resume'));assert.equal(document.querySelectorAll('input[type=password]').length,0);
+  hostedDenied=false;delayed=true;await click('Retry / resume');assert.ok(lateResolve);await act(async()=>sessionControl.signOut());await settle();lateResolve();await settle();assert.ok(button('Sign in to enter'));assert.equal(document.querySelectorAll('.parlor-card').length,0);
 });
