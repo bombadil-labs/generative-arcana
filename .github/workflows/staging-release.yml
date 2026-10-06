@@ -1,0 +1,102 @@
+name: Reviewed persistent staging release
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        description: 'Full current staging SHA with successful push CI'
+        required: true
+      operation:
+        type: choice
+        options: [plan, status, apply, release]
+        default: plan
+      plan_digest:
+        description: 'SHA-256 from a reviewed plan for this exact candidate; writes only'
+      recovery_reference:
+        description: 'Verified root recovery evidence; no PR105 disposable waiver'
+      confirmation:
+        description: 'For writes: APPLY or RELEASE, a space, and the exact reviewed SHA'
+permissions:
+  contents: read
+  actions: read
+# Shared with the existing manual preview migrator, including across workflow files.
+concurrency:
+  group: arcana-preview-migration
+  cancel-in-progress: false
+env:
+  REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+  OPERATION: ${{ inputs.operation }}
+  PLAN_DIGEST: ${{ inputs.plan_digest }}
+  RECOVERY_REFERENCE: ${{ inputs.recovery_reference }}
+  CONFIRMATION: ${{ inputs.confirmation }}
+jobs:
+  migration:
+    if: github.ref == 'refs/heads/main'
+    environment: arcana-staging-release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      STAGING_WRITES_ENABLED: ${{ vars.STAGING_WRITES_ENABLED }}
+      STAGING_MIGRATION_ROLE: ${{ vars.STAGING_MIGRATION_ROLE }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Verify current staging SHA and its completed validation
+        run: node tools/staging/release.mjs guard
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          path: candidate
+          persist-credentials: false
+      - run: npm ci --prefix candidate/mcp --ignore-scripts
+      - name: Prepare pinned migration transport
+        shell: bash
+        run: |
+          python3.12 -m venv "$RUNNER_TEMP/arcana-migration-python"
+          "$RUNNER_TEMP/arcana-migration-python/bin/python" -m pip install --require-hashes --only-binary=:all: -r candidate/mcp/scripts/libpq/requirements.txt
+          echo "MIGRATION_PYTHON=$RUNNER_TEMP/arcana-migration-python/bin/python" >> "$GITHUB_ENV"
+      - name: Plan, explicitly apply if requested, and verify status
+        run: node tools/staging/release.mjs migrate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          DATABASE_MIGRATION_URL: ${{ secrets.ARCANA_STAGING_MIGRATION_URL }}
+  deploy:
+    needs: migration
+    if: inputs.operation == 'release'
+    environment: arcana-staging-release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      STAGING_WRITES_ENABLED: ${{ vars.STAGING_WRITES_ENABLED }}
+      STAGING_DEPLOY_ENABLED: ${{ vars.STAGING_DEPLOY_ENABLED }}
+      STAGING_ENVIRONMENT_ID: ${{ vars.STAGING_ENVIRONMENT_ID }}
+      STAGING_ALIAS: ${{ vars.STAGING_ALIAS }}
+      STAGING_MAPPING_REVIEW: ${{ vars.STAGING_MAPPING_REVIEW }}
+      STAGING_MANUAL_ALIAS_REVIEW: ${{ vars.STAGING_MANUAL_ALIAS_REVIEW }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          path: candidate
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Deploy exact migrated SHA, verify readiness, then assign staging alias
+        run: node tools/staging/release.mjs deploy
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          VERCEL_STAGING_TOKEN: ${{ secrets.VERCEL_STAGING_TOKEN }}
+          STAGING_PROTECTION_BYPASS: ${{ secrets.STAGING_PROTECTION_BYPASS }}
