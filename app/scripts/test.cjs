@@ -11,7 +11,7 @@ try {
   mkdirSync(output, { recursive: true });
   writeFileSync(resolve(output, "package.json"), '{"type":"commonjs"}');
   const tests = readdirSync(resolve(root, "tests")).filter((f) => f.endsWith(".test.cjs")).sort().map((f) => `tests/${f}`);
-  execFileSync(process.execPath, ["--test", ...tests], { cwd: root, stdio: "inherit" });
+  execFileSync(process.execPath, ["--test", "--test-concurrency=1", ...tests], { cwd: root, stdio: "inherit" });
 } catch (error) {
   process.exitCode = typeof error.status === "number" ? error.status : 1;
 } finally {
