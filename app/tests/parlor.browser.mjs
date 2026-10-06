@@ -13,6 +13,30 @@ let server,browser,context,page;
 let authenticated=false,accountId='host-a',calls=0,mode='ok',release;
 const evidence=resolve(root,'../..','parlor-verification');
 const json=(route,body,status=200)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
+async function captureLayout(name) {
+  const inspect=()=>page.evaluate(()=>{
+    const header=document.querySelector('header'), parlor=document.querySelector('.parlor');
+    const rect=header.getBoundingClientRect();
+    return {headers:document.querySelectorAll('header').length,top:rect.top,bottom:rect.bottom,scrollY,
+      parlorTop:parlor.getBoundingClientRect().top,overflow:document.documentElement.scrollWidth>innerWidth};
+  });
+  const before=await inspect();
+  assert.equal(before.headers,1,'exactly one app header');
+  assert.equal(before.top,0,'sticky header remains at viewport top after interaction');
+  assert.equal(before.overflow,false,'no horizontal overflow');
+  console.log(name,'before capture',JSON.stringify(before));
+  await page.evaluate(()=>window.scrollTo(0,160));
+  assert.equal((await inspect()).top,0,'header stays at viewport top when scrolled');
+  // Full-page capture retains a sticky header at the current scroll offset.
+  // Return to the document top before capturing the layout for review.
+  await page.evaluate(()=>window.scrollTo(0,0));
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  const top=await inspect();
+  assert.equal(top.scrollY,0);
+  assert.equal(top.parlorTop,top.bottom,'parlor starts directly below the app header');
+  await page.screenshot({path:resolve(evidence,name+'.png'),fullPage:true});
+  await page.screenshot({path:resolve(evidence,name+'-viewport.png')});
+}
 try {
   server=await preview({root,preview:{host:'127.0.0.1',port:4187,strictPort:true}});
   browser=await chromium.launch({headless:true,...(process.env.PARLOR_BROWSER ? {executablePath:process.env.PARLOR_BROWSER} : {channel:'msedge'})});
@@ -58,7 +82,7 @@ try {
   await page.getByLabel('Remember keys on this device (plaintext)').check();
   await page.reload();assert.equal(await key.getAttribute('type'),'password');assert.equal((await key.inputValue()).length,21);
   await page.getByLabel('Artwork set',{exact:true}).selectOption('party');
-  await mkdir(evidence,{recursive:true});await page.screenshot({path:resolve(evidence,'settings-desktop.png'),fullPage:true});
+  await mkdir(evidence,{recursive:true});await captureLayout('settings-desktop');
   const guest=async()=>{
     await page.getByRole('button',{name:'Open the parlor',exact:true}).click();
     await page.getByRole('button',{name:'Take a seat',exact:true}).click();
@@ -67,13 +91,15 @@ try {
     await page.getByRole('button',{name:'Confirm & deal three cards',exact:true}).dblclick();
   };
   await guest();await page.getByRole('button',{name:'Reveal card 1',exact:true}).waitFor();assert.equal(calls,1);assert.equal(await page.locator('.parlor-card').count(),3);assert.equal(await page.locator('.is-revealed').count(),0);
-  await page.screenshot({path:resolve(evidence,'face-down-desktop.png'),fullPage:true});
+  await captureLayout('face-down-desktop');
   await page.getByRole('button',{name:'Reveal card 1',exact:true}).click();await page.getByRole('button',{name:'Continue with captions',exact:true}).waitFor();
   await page.getByRole('button',{name:'Continue with captions',exact:true}).click();await page.getByRole('button',{name:'Reveal card 2',exact:true}).waitFor();
   await page.getByRole('button',{name:'Mute',exact:true}).click();
   await page.getByRole('button',{name:'Reveal card 2',exact:true}).dblclick();await page.getByRole('button',{name:'Reveal card 3',exact:true}).waitFor();assert.equal(await page.locator('.is-revealed').count(),2);
   await page.getByRole('button',{name:'Reveal card 3',exact:true}).click();await page.getByRole('button',{name:'Hear the synthesis',exact:true}).waitFor();
-  await page.screenshot({path:resolve(evidence,'revealed-desktop.png'),fullPage:true});
+  await captureLayout('revealed-desktop');
+  await page.setViewportSize({width:390,height:844});await captureLayout('revealed-mobile');
+  await page.setViewportSize({width:1280,height:960});
   await page.getByRole('button',{name:'Hear the synthesis',exact:true}).click();await page.getByLabel('Ask a follow-up (captions)').waitFor();
   await page.getByLabel('Ask a follow-up (captions)').fill('What could I reflect on?');await page.getByRole('button',{name:'Ask the reader',exact:true}).click();
   await page.getByText('Follow the meaning that resonates, and keep your own judgment.',{exact:false}).first().waitFor();
@@ -90,10 +116,12 @@ try {
   await page.getByRole('button',{name:'My Decks',exact:true}).click();await page.waitForURL('**/#/my-decks');
   await page.goBack();await page.waitForURL('**/parlor');await page.getByRole('button',{name:'Open the parlor',exact:true}).waitFor();
   assert.equal(await page.locator('.parlor-card').count(),0);assert.equal(await key.inputValue(),'');
-  await page.setViewportSize({width:390,height:844});await page.screenshot({path:resolve(evidence,'settings-mobile.png'),fullPage:true});
+  await captureLayout('returned-desktop');
+  await page.setViewportSize({width:390,height:844});await captureLayout('settings-mobile');
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth),false);
   authenticated=false;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.getByRole('button',{name:'Sign in to enter',exact:true}).waitFor();
-  console.log('PASS: production /parlor and /parlor/, login return, masked restoration, chosen set, confirmation, single draw request, captions/audio failure, repeated clicks, synthesis, follow-up, reset, retry, interruption, mobile overflow, logout. Mock providers only.');
+  await captureLayout('logged-out-mobile');
+  console.log('PASS: production /parlor and /parlor/, login return, masked restoration, chosen set, confirmation, single draw request, captions/audio failure, repeated clicks, synthesis, follow-up, reset, retry, interruption, Back navigation, desktop/mobile single header at viewport top, content below header, no overflow, logout. Mock providers only.');
 } catch (error) {
   await mkdir(evidence,{recursive:true});
   if(page&&!page.isClosed())await page.screenshot({path:resolve(evidence,'failure.png'),fullPage:true});

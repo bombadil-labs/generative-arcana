@@ -43,3 +43,5 @@ node tests/parlor.browser.mjs
 ```
 
 The serial unit/UI suite covers draw-once retries, abort and stale results, playback synchronization, error redaction, captions/mute, key persistence and masking, login/account changes, logout, pagehide and navigation. The standalone production-preview browser test mocks all account/provider traffic, blocks other external requests, uses only synthetic keys, captures masked screenshots, and closes its one context, browser and server in `finally`. No real profile is opened. The existing app test runner now explicitly uses `--test-concurrency=1`.
+
+The browser test also measures the single app header at viewport top before and after scrolling, checks that the parlor begins immediately below it at document top, and verifies desktop/mobile overflow, Back navigation, and logout. Full-page screenshots return to scroll position zero first: otherwise Chromium captures the sticky header at the current document scroll offset, making it appear displaced over the page title even though it is pinned correctly in the live viewport. Both viewport and full-page images are saved for comparison.
