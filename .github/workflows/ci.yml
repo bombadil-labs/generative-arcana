@@ -220,3 +220,22 @@ jobs:
       - run: npm run test:migration-concurrency --prefix mcp
         env:
           ARCANA_DISPOSABLE_POSTGRES: '1'
+
+  migration-native-transport:
+    name: Native libpq TLS and PostgreSQL17 migrations
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: npm ci --prefix mcp --ignore-scripts
+      - name: Prepare pinned migration client
+        shell: bash
+        run: |
+          python3.12 -m venv "$RUNNER_TEMP/arcana-migration-python"
+          "$RUNNER_TEMP/arcana-migration-python/bin/python" -m pip install --require-hashes --only-binary=:all: -r mcp/scripts/libpq/requirements.txt
+          echo "MIGRATION_PYTHON=$RUNNER_TEMP/arcana-migration-python/bin/python" >> "$GITHUB_ENV"
+      - run: bash mcp/test/run-libpq-docker-fixture.sh
