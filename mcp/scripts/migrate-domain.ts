@@ -1,5 +1,5 @@
-import { Pool } from 'pg';
 import { catalog, run, target, MigrationSafetyError } from './domain-migrations';
+import { connectMigration, type MigrationConnection } from './migration-connection';
 
 const [command = 'plan', ...args] = process.argv.slice(2);
 if (!['plan','status','apply','baseline'].includes(command)) throw new Error('Expected plan, status, apply or baseline');
@@ -16,20 +16,21 @@ if (flags.through && (command !== 'baseline' || !/^[1-9][0-9]*$/.test(flags.thro
 if (command === 'baseline' && !flags.through) throw new Error('Baseline requires explicit --through');
 if (flags['backup-reference'] && (flags['backup-reference'].length > 256 || /[\r\n\0]/.test(flags['backup-reference']))) throw new Error('Use a short backup reference, never backup content');
 const entries = await catalog();
-const pool = new Pool({connectionString, max:1, connectionTimeoutMillis:10_000});
+let client: MigrationConnection | undefined;
 try {
-  const client = await pool.connect();
-  try {
+    client = await connectMigration(connectionString);
     const identity = (await client.query('SELECT current_database() AS db, current_user AS role')).rows[0];
     if (identity.db !== flags['expected-database'] || identity.role !== flags['expected-user']) throw new Error('Connected database identity mismatch');
     const result = await run(client, entries, command, Number(flags.through));
-    console.log(JSON.stringify({target:flags.target, host:flags['expected-host'], database:identity.db,
+    console.log(JSON.stringify({target:flags.target, host:flags['expected-host'], database:identity.db, transport:client.transport,
       backupReference:flags['backup-reference'], ...result}, null, 2));
     if (command === 'status' && (result.baselineRequired || result.pending.length)) process.exitCode = 2;
-  } finally { client.release(); }
 } catch (error) {
   // Driver errors can include connection details. Never print connection strings.
   if (error instanceof MigrationSafetyError) console.error(error.message);
   console.error('Migration stopped. Check target, catalog/history, schema drift, lock timeout and database logs. Inspect status before retrying after an uncertain connection/commit outcome.');
   process.exitCode = 1;
-} finally { await pool.end(); }
+} finally {
+  try { await client?.close(); }
+  catch { console.error('Migration connection cleanup failed; inspect status before retrying.'); process.exitCode = 1; }
+}
