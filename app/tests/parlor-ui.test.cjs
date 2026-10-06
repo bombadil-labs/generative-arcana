@@ -21,7 +21,7 @@ function Capture({children}) { sessionControl=useSession(); return children; }
 function button(text){return [...document.querySelectorAll('button')].find(el=>el.textContent===text);}
 async function click(text){const target=button(text);assert.ok(target,`button exists: ${text}`);await act(async()=>target.click());await settle();}
 async function input(label,value){const field=[...document.querySelectorAll('label')].find(el=>el.childNodes[0].textContent===label)?.querySelector('input,textarea,select');assert.ok(field,`input exists: ${label}`);await act(async()=>{const proto=field.tagName==='TEXTAREA'?dom.window.HTMLTextAreaElement.prototype:dom.window.HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(field,value);field.dispatchEvent(new dom.window.Event('input',{bubbles:true}));});await flush();}
-async function guest(){await click('Open the parlor');await click('Take a seat');await input('What would you like to explore?','Private guest question');await act(async()=>document.querySelector('form').dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true})));await settle();await click('Confirm & deal three cards');}
+async function guest(){await click('Start the show');await click('Take a seat');await input('What would you like to explore?','Private guest question');await act(async()=>document.querySelector('form').dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true})));await settle();await click('Confirm & deal three cards');}
 
 before(async()=>{
   const {createServer}=await import('vite');
@@ -71,7 +71,7 @@ test('confirm then reset and navigation clear guest state; no questions in URL/s
   assert.equal(window.location.pathname,'/parlor');assert.equal(window.location.hash,'');assert.ok(!JSON.stringify(window.localStorage).includes('Private guest'));
   await click('Next guest');assert.ok(button('Take a seat'));assert.ok(!document.body.textContent.includes('Private guest'));assert.equal(document.querySelectorAll('.parlor-card').length,0);
   await act(async()=>router.navigate('/my-decks'));await settle();assert.equal(window.location.pathname,'/');assert.equal(window.location.hash,'#/my-decks');
-  await act(async()=>router.navigate('/parlor'));await settle();assert.equal(window.location.pathname,'/parlor');assert.ok(button('Open the parlor'));
+  await act(async()=>router.navigate('/parlor'));await settle();assert.equal(window.location.pathname,'/parlor');assert.ok(button('Start the show'));
 });
 test('account change with same email interrupts and fences pending response',async()=>{
   await mount();delayed=true;await guest();assert.equal(providerCalls,1);assert.ok(lateResolve);
@@ -85,9 +85,18 @@ test('navigation away during generation fences the response; browser Back opens 
   await mount();delayed=true;await guest();assert.ok(lateResolve);
   await act(async()=>router.navigate('/my-decks'));await settle();lateResolve();await settle();
   await act(async()=>window.history.back());await settle();
-  assert.equal(window.location.pathname,'/parlor');assert.ok(button('Open the parlor'));
+  assert.equal(window.location.pathname,'/parlor');assert.ok(button('Start the show'));
   assert.equal(document.querySelectorAll('.parlor-card').length,0);assert.ok(!document.body.textContent.includes('Private guest'));
 });
-test('literal trailing slash and pagehide restore a cleared guest experience',async()=>{
-  window.history.replaceState(null,'','/parlor/');await mount();await guest();await act(async()=>window.dispatchEvent(new dom.window.Event('pagehide')));await settle();assert.ok(button('Take a seat'));assert.equal(document.querySelectorAll('.parlor-card').length,0);
+test('literal trailing slash and pagehide return to setup with a cleared guest experience',async()=>{
+  window.history.replaceState(null,'','/parlor/');await mount();await guest();await act(async()=>window.dispatchEvent(new dom.window.Event('pagehide')));await settle();assert.ok(button('Start the show'));assert.equal(document.querySelectorAll('.parlor-card').length,0);
+});
+
+test('Escape exits before reading and during generation, restores focus, and fences stale replies',async()=>{
+  await mount();await click('Start the show');assert.equal(document.querySelector('header').style.display,'none');
+  const escape=async()=>{await act(async()=>window.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));await settle();};
+  await escape();assert.equal(document.activeElement,button('Start the show'));assert.notEqual(document.querySelector('header').style.display,'none');
+  delayed=true;await guest();assert.ok(lateResolve);await escape();lateResolve();await settle();
+  assert.equal(document.querySelectorAll('.parlor-card').length,0);assert.ok(!document.body.textContent.includes('Private guest'));
+  assert.equal(document.activeElement,button('Start the show'));await click('Start the show');assert.ok(button('Take a seat'));await escape();
 });

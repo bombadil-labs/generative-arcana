@@ -8,6 +8,8 @@ The first version uses typed questions and captions, with spoken card interpreta
 
 ## Credentials and privacy
 
+**Start the show** fades into a tabletop presentation with setup and app navigation removed. Typed questions, confirmation, captions and the next reading action remain visible; optional Mute and Next guest controls sit in the Show controls disclosure. Escape or the touch-friendly Exit show button ends the reading and returns focus to Start the show in setup. Exiting disposes the reading machine, aborts pending generation/conversation, stops audio and clears guest state; late responses cannot reopen the show. Host settings remain available for the next show. Reduced motion disables the entrance fade and card flip. Browser Back, navigation, logout/account changes and pagehide also tear down the show without requiring browser fullscreen.
+
 - All three API-key inputs are always password fields, including pasted/restored values. There is no reveal toggle. Masking is visual, not encryption.
 - Keys stay in browser memory by default. Remember-on-device is explicit, account-scoped, plaintext localStorage. Unchecking it removes the saved record; Clear keys empties all key fields and removes the record. Storage failures are reported without claiming erasure succeeded.
 - Remembered keys can be read by same-origin scripts, extensions or people with browser access. Account gating is not a localStorage security boundary. Use a trusted device and limited provider credentials.

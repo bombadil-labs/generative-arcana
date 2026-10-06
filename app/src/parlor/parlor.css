@@ -48,3 +48,15 @@
 .parlor-actions { text-align: center; }
 @media (max-width: 800px) { .parlor-settings { grid-template-columns: 1fr; } .parlor { padding: 24px 16px; } .parlor-table figcaption strong { font-size: 16px; } .parlor-caption { font-size: 19px; } }
 @media (prefers-reduced-motion: reduce) { .parlor-card-turn { transition: none; } }
+
+.parlor-show { min-height: 100vh; min-height: 100dvh; padding-top: 88px; animation: parlor-arrive 450ms ease-out; }
+.parlor-show .parlor-ritual { max-width: 1200px; margin: auto; outline: none; }
+.parlor-show .parlor-table { margin-top: 24px; }
+.parlor button.parlor-exit { position: fixed; top: 12px; right: 12px; z-index: 60; background: #211b30; font-size: 12px; min-height: 44px; }
+.parlor-exit span { color: #b4a8bb; }
+.parlor-show-controls { position: fixed; top: 16px; left: 16px; z-index: 60; background: #211b30; border: 1px solid #635369; border-radius: 6px; font-size: 12px; }
+.parlor-show-controls summary { padding: 12px; min-height: 44px; cursor: pointer; }
+.parlor-show-controls[open] { box-shadow: 0 12px 30px #0006; }
+.parlor-show-hint { font-size: 13px; }
+@keyframes parlor-arrive { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .parlor-show { animation: none; } }

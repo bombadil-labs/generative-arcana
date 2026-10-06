@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useBrowserSession } from "../auth/session";
 import { listMyDecks, type CatalogDeckSummary } from "../catalog/api";
 import { RemoteDeckBoundary } from "../app/RemoteDeckBoundary";
@@ -11,17 +11,17 @@ import { characters, clearKeys, defaultSettings, readSettings, readySettings, sa
 import { ParlorMachine } from "./machine";
 import "./parlor.css";
 
-export function Parlor() {
+export function Parlor({ onShowChange }: { onShowChange(showing: boolean): void }) {
   const { session, signIn, refresh } = useBrowserSession();
   if (session.status !== "authenticated" || !session.accountId) return <section className="parlor parlor-gate">
     <p className="parlor-eyebrow">Generative Arcana · After dark</p><h1>The parlor</h1>
     <p>{session.status === "loading" ? "Checking your invitation…" : "Sign in to host a reading at your private table."}</p>
     {session.status !== "loading" && <><button onClick={() => signIn("/parlor")}>Sign in to enter</button><button onClick={() => void refresh()}>Check account again</button></>}
   </section>;
-  return <Host key={session.accountId} accountId={session.accountId} />;
+  return <Host key={session.accountId} accountId={session.accountId} onShowChange={onShowChange} />;
 }
 
-function Host({ accountId }: { accountId: string }) {
+function Host({ accountId, onShowChange }: { accountId: string; onShowChange(showing: boolean): void }) {
   const [restored] = useState(() => { try { return readSettings(window.localStorage, accountId); } catch { return { settings: defaultSettings(), remember: false }; } });
   const [settings, setSettings] = useState(restored.settings);
   const [remember, setRemember] = useState(restored.remember);
@@ -31,6 +31,25 @@ function Host({ accountId }: { accountId: string }) {
   const [status, setStatus] = useState("loading");
   const [attempt, setAttempt] = useState(0);
   const [hosting, setHosting] = useState(false);
+  const startButton = useRef<HTMLButtonElement>(null);
+  const showing = useRef(false);
+  useLayoutEffect(() => {
+    onShowChange(hosting);
+    if (hosting) document.scrollingElement?.scrollTo({ top: 0 });
+    if (!hosting && showing.current) startButton.current?.focus();
+    showing.current = hosting;
+    return () => onShowChange(false);
+  }, [hosting, onShowChange]);
+  useEffect(() => {
+    if (!hosting) return;
+    const exit = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !event.isComposing) { event.preventDefault(); setHosting(false); }
+    };
+    const leave = () => setHosting(false);
+    window.addEventListener("keydown", exit);
+    window.addEventListener("pagehide", leave);
+    return () => { window.removeEventListener("keydown", exit); window.removeEventListener("pagehide", leave); };
+  }, [hosting]);
   useEffect(() => {
     const abort = new AbortController(); setStatus("loading");
     void listMyDecks(abort.signal).then((items) => { if (!abort.signal.aborted) { setDecks(items); setDeckId((previous) => items.some((deck) => deck.id === previous) ? previous : items[0]?.id ?? ""); setStatus("ready"); } })
@@ -41,9 +60,11 @@ function Host({ accountId }: { accountId: string }) {
     setSettings(next); setRemember(persist);
     try { setStorageError(!saveSettings(window.localStorage, accountId, next, persist)); } catch { setStorageError(true); }
   };
-  return <section className="parlor">
+  return <section className={`parlor${hosting ? " parlor-show" : ""}`} aria-label={hosting ? "Parlor show" : "Parlor setup"}>
+    {hosting && <button className="parlor-exit" onClick={() => setHosting(false)} aria-keyshortcuts="Escape">Exit show <span aria-hidden>· Esc</span></button>}
+    {!hosting &&
     <div className="parlor-heading"><div><p className="parlor-eyebrow">Generative Arcana · After dark</p><h1>The parlor</h1></div>
-      {hosting && <button onClick={() => setHosting(false)}>Host settings · end reading</button>}</div>
+    </div>}
     {!hosting && <div className="parlor-settings">
       <div><h2>Set the table</h2><p>Choose a deck, a storyteller, and the voice of the evening.</p>
         <label>Deck<select aria-label="Deck" value={deckId} onChange={(event) => setDeckId(event.target.value)} disabled={status !== "ready"}>
@@ -71,14 +92,14 @@ function Host({ accountId }: { accountId: string }) {
       </div>
     </div>}
     {deckId && <RemoteDeckBoundary key={deckId} deckId={deckId} routeKey="/parlor">
-      <TableSetup deckId={deckId} settings={settings} hosting={hosting} start={() => setHosting(true)} />
+      <TableSetup deckId={deckId} settings={settings} hosting={hosting} start={() => setHosting(true)} startButton={startButton} />
     </RemoteDeckBoundary>}
   </section>;
 }
 function KeyInput({ label, value, change }: { label: string; value: string; change(value: string): void }) {
   return <label>{label}<input type="password" value={value} onChange={(event) => change(event.target.value)} autoComplete="off" autoCapitalize="none" spellCheck={false} maxLength={4096} data-1p-ignore data-lpignore="true" /></label>;
 }
-function TableSetup({ deckId, settings, hosting, start }: { deckId: string; settings: Settings; hosting: boolean; start(): void }) {
+function TableSetup({ deckId, settings, hosting, start, startButton }: { deckId: string; settings: Settings; hosting: boolean; start(): void; startButton: React.RefObject<HTMLButtonElement> }) {
   const artwork = useArtworkSelection();
   const deck = getDeck(deckId)!;
   const ready = readySettings(settings) && deck.cards.length >= 3 && (!artwork || (artwork.resolved && !!artwork.packId));
@@ -92,7 +113,8 @@ function TableSetup({ deckId, settings, hosting, start }: { deckId: string; sett
     {artwork?.status === "error" && <p role="alert">Artwork could not be checked. <button onClick={artwork.refresh}>Retry artwork</button></p>}
     <p>Questions and conversation stay in memory here and clear for the next guest. Your selected provider receives the question and deck context; ElevenLabs receives narration when enabled. Their retention policies apply. This app does not save guest readings.</p>
     {deck.cards.length < 3 && <p role="alert">Choose a deck with at least three cards.</p>}
-    <button className="parlor-primary" disabled={!ready} onClick={start}>Open the parlor</button>
+    <button ref={startButton} className="parlor-primary" disabled={!ready} onClick={start}>Start the show</button>
+    <p className="parlor-show-hint">The setup and navigation fade away. Press Escape or Exit show to end the reading and return here.</p>
   </div>;
 }
 function Ritual({ deckId, settings }: { deckId: string; settings: Settings }) {
@@ -105,6 +127,15 @@ function Ritual({ deckId, settings }: { deckId: string; settings: Settings }) {
   const [muted, setMuted] = useState(false);
   const [followup, setFollowup] = useState("");
   const [back, setBack] = useState<PackArtworkAsset | null>(null);
+  const stage = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    // Keep keyboard focus in the current, visible step when its initiating control disappears.
+    const active = document.activeElement;
+    if (!active || active === document.body || (stage.current?.contains(active) && !active.closest(".parlor-show-controls"))) {
+      const target = stage.current?.querySelector<HTMLElement>("textarea, .parlor-primary, .parlor-actions button");
+      (target ?? stage.current)?.focus({ preventScroll: true });
+    }
+  }, [state.phase]);
   useLayoutEffect(() => () => machine.dispose(), [machine]);
   useEffect(() => {
     const abort = new AbortController(); setBack(null);
@@ -118,14 +149,14 @@ function Ritual({ deckId, settings }: { deckId: string; settings: Settings }) {
     return () => window.removeEventListener("pagehide", clear);
   }, [machine]);
   const busy = ["drawing", "generating", "speaking", "conversation"].includes(state.phase);
-  return <div className="parlor-ritual" onClickCapture={(event) => {
+  return <div ref={stage} tabIndex={-1} className="parlor-ritual" onClickCapture={(event) => {
     // A fast response can replace Retry with Pause underneath the second half of a double click.
     if (event.detail > 1) { event.preventDefault(); event.stopPropagation(); }
   }}>
-    <div className="parlor-toolbar"><p>{characters[settings.character].name}</p><div>
+    <details className="parlor-show-controls"><summary>Show controls</summary><div>
       <button aria-pressed={muted} onClick={() => { const next = !muted; setMuted(next); if (next && state.phase === "speaking") machine.captions(); }}>{muted ? "Unmute" : "Mute"}</button>
       <button onClick={() => { machine.reset(); setFollowup(""); }}>Next guest</button>
-    </div></div>
+    </div></details>
     {state.phase === "greeting" && <div className="parlor-intro"><div className="parlor-sigil" aria-hidden>☾</div><h2>A seat between worlds</h2><p>{characters[settings.character].greeting}</p><button className="parlor-primary" onClick={() => machine.begin()}>Take a seat</button><small>For reflection and entertainment. You may stop at any time.</small></div>}
     {state.phase === "question" && <form className="parlor-question" onSubmit={(event) => { event.preventDefault(); machine.review(); }}><label>What would you like to explore?<textarea value={state.question} onChange={(event) => machine.question(event.target.value)} maxLength={1200} autoFocus /></label><button className="parlor-primary" disabled={!state.question.trim()}>Bring this question</button></form>}
     {state.phase === "confirm" && <div className="parlor-question"><h2>Shall we ask the cards?</h2><blockquote>{state.question}</blockquote><button onClick={() => machine.edit()}>Edit question</button><button className="parlor-primary" onClick={() => machine.confirm()}>Confirm & deal three cards</button></div>}

@@ -10,18 +10,19 @@ const { chromium }=await import(process.env.PLAYWRIGHT_MODULE ? pathToFileURL(pr
 const data=JSON.parse(await readFile(resolve(root,'../decks/deep-time/deck.json'),'utf8'));
 const deck={id:'parlor-fixture',slug:data.slug,name:data.name,tagline:'Synthetic browser fixture',revision:1,visibility:'private',createdAt:'',updatedAt:'',manifest:{data,tagline:'Synthetic fixture'}};
 let server,browser,context,page;
-let authenticated=false,accountId='host-a',calls=0,mode='ok',release;
+let authenticated=false,accountId='host-a',calls=0,mode='ok',release,audioMode='error';
 const evidence=resolve(root,'../..','parlor-verification');
 const json=(route,body,status=200)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
 async function captureLayout(name) {
   const inspect=()=>page.evaluate(()=>{
     const header=document.querySelector('header'), parlor=document.querySelector('.parlor');
     const rect=header.getBoundingClientRect();
-    return {headers:document.querySelectorAll('header').length,top:rect.top,bottom:rect.bottom,scrollY,
+    return {headers:document.querySelectorAll('header').length,show:!!document.querySelector('.parlor-show'),headerVisible:rect.height>0,top:rect.top,bottom:rect.bottom,scrollY,
       parlorTop:parlor.getBoundingClientRect().top,overflow:document.documentElement.scrollWidth>innerWidth};
   });
   const before=await inspect();
   assert.equal(before.headers,1,'exactly one app header');
+  assert.equal(before.headerVisible,!before.show,'navigation disappears only during the show');
   assert.equal(before.top,0,'sticky header remains at viewport top after interaction');
   assert.equal(before.overflow,false,'no horizontal overflow');
   console.log(name,'before capture',JSON.stringify(before));
@@ -42,6 +43,15 @@ try {
   browser=await chromium.launch({headless:true,...(process.env.PARLOR_BROWSER ? {executablePath:process.env.PARLOR_BROWSER} : {channel:'msedge'})});
   context=await browser.newContext({viewport:{width:1280,height:960},reducedMotion:'reduce'});
   context.setDefaultTimeout(12000);
+  await context.addInitScript(()=>{
+    window.__showAudio={playing:0,paused:0,cleared:0};
+    window.Audio=class {
+      play(){window.__showAudio.playing++;queueMicrotask(()=>this.onplaying?.());return Promise.resolve();}
+      pause(){window.__showAudio.paused++;}
+      removeAttribute(name){if(name==='src')window.__showAudio.cleared++;}
+      load(){}
+    };
+  });
   await context.route('**/*',async route=>{
     const url=new URL(route.request().url()),path=url.pathname;
     if(url.hostname==='api.anthropic.com'||url.hostname==='api.openai.com') {
@@ -54,7 +64,7 @@ try {
       if(mode==='delay') await new Promise(resolve=>{release=resolve;});
       return json(route,url.hostname==='api.anthropic.com'?{content:[{type:'text',text}]}:{choices:[{message:{content:text}}]});
     }
-    if(url.hostname==='api.elevenlabs.io')return json(route,{message:'Synthetic audio failure'},503);
+    if(url.hostname==='api.elevenlabs.io')return audioMode==='hold'?route.fulfill({status:200,contentType:'audio/mpeg',body:'synthetic mocked audio'}):json(route,{message:'Synthetic audio failure'},503);
     if(url.hostname!=='127.0.0.1')return route.abort();
     if(path==='/auth/session')return json(route,authenticated?{authenticated:true,accountId,user:{email:'synthetic@example.test'}}:{authenticated:false});
     if(path==='/api/me/decks')return json(route,[deck]);
@@ -84,17 +94,30 @@ try {
   await page.getByLabel('Artwork set',{exact:true}).selectOption('party');
   await mkdir(evidence,{recursive:true});await captureLayout('settings-desktop');
   const guest=async()=>{
-    await page.getByRole('button',{name:'Open the parlor',exact:true}).click();
+    await page.getByRole('button',{name:'Start the show',exact:true}).click();
     await page.getByRole('button',{name:'Take a seat',exact:true}).click();
     await page.getByLabel('What would you like to explore?').fill('A synthetic party question');
     await page.getByRole('button',{name:'Bring this question',exact:true}).click();
     await page.getByRole('button',{name:'Confirm & deal three cards',exact:true}).dblclick();
   };
+  const controls=async()=>{if(!await page.locator('.parlor-show-controls').getAttribute('open').then(value=>value!==null))await page.getByText('Show controls',{exact:true}).click();};
+  const escaped=async()=>{
+    await page.keyboard.press('Escape');await page.getByRole('button',{name:'Start the show',exact:true}).waitFor();
+    assert.equal(await page.evaluate(()=>document.activeElement?.textContent),'Start the show');
+    assert.equal(await page.locator('.parlor-card').count(),0);
+    assert.equal(await page.locator('header').first().isVisible(),true);
+  };
+  await page.getByRole('button',{name:'Start the show',exact:true}).click();
+  assert.equal(await page.locator('header').first().isVisible(),false);
+  assert.equal(await page.locator('input[type=password]').count(),0);
+  assert.equal(await page.evaluate(()=>getComputedStyle(document.querySelector('.parlor-show')).animationName),'none');
+  assert.equal(await page.evaluate(()=>document.activeElement?.textContent),'Take a seat');
+  await escaped();
   await guest();await page.getByRole('button',{name:'Reveal card 1',exact:true}).waitFor();assert.equal(calls,1);assert.equal(await page.locator('.parlor-card').count(),3);assert.equal(await page.locator('.is-revealed').count(),0);
   await captureLayout('face-down-desktop');
   await page.getByRole('button',{name:'Reveal card 1',exact:true}).click();await page.getByRole('button',{name:'Continue with captions',exact:true}).waitFor();
   await page.getByRole('button',{name:'Continue with captions',exact:true}).click();await page.getByRole('button',{name:'Reveal card 2',exact:true}).waitFor();
-  await page.getByRole('button',{name:'Mute',exact:true}).click();
+  await controls();await page.getByRole('button',{name:'Mute',exact:true}).click();await page.getByText('Show controls',{exact:true}).click();
   await page.getByRole('button',{name:'Reveal card 2',exact:true}).dblclick();await page.getByRole('button',{name:'Reveal card 3',exact:true}).waitFor();assert.equal(await page.locator('.is-revealed').count(),2);
   await page.getByRole('button',{name:'Reveal card 3',exact:true}).click();await page.getByRole('button',{name:'Hear the synthesis',exact:true}).waitFor();
   await captureLayout('revealed-desktop');
@@ -105,23 +128,52 @@ try {
   await page.getByText('Follow the meaning that resonates, and keep your own judgment.',{exact:false}).first().waitFor();
   assert.equal(new URL(page.url()).pathname,'/parlor');assert.equal(new URL(page.url()).hash,'');
   assert.equal(await page.evaluate(()=>JSON.stringify(localStorage).includes('synthetic party question')),false);
-  await page.getByRole('button',{name:'Next guest',exact:true}).click();assert.equal(await page.locator('.parlor-card').count(),0);
-  await page.getByRole('button',{name:'Host settings · end reading',exact:true}).click();
+  await controls();await page.getByRole('button',{name:'Next guest',exact:true}).click();assert.equal(await page.locator('.parlor-card').count(),0);
+  await page.getByRole('button',{name:'Exit show',exact:true}).click();
   mode='error';await guest();await page.getByRole('button',{name:'Retry / resume',exact:true}).waitFor();const before=calls;mode='ok';await page.getByRole('button',{name:'Retry / resume',exact:true}).dblclick();await page.getByRole('button',{name:'Reveal card 1',exact:true}).waitFor();assert.equal(calls,before+1);
-  await page.getByRole('button',{name:'Host settings · end reading',exact:true}).click();mode='delay';await guest();
-  await page.getByRole('button',{name:'Pause / interrupt',exact:true}).click();await page.getByRole('button',{name:'Next guest',exact:true}).click();release?.();mode='ok';
+  await page.getByRole('button',{name:'Exit show',exact:true}).click();mode='delay';await guest();
+  await page.getByRole('button',{name:'Pause / interrupt',exact:true}).click();await controls();await page.getByRole('button',{name:'Next guest',exact:true}).click();release?.();mode='ok';
   await page.getByRole('button',{name:'Take a seat',exact:true}).waitFor();assert.equal(await page.locator('.parlor-card').count(),0);
-  await page.getByRole('button',{name:'Host settings · end reading',exact:true}).click();
+  await page.getByRole('button',{name:'Exit show',exact:true}).click();
   await page.getByRole('button',{name:'Clear keys from this device',exact:true}).click();assert.equal(await key.inputValue(),'');
   await page.getByRole('button',{name:'My Decks',exact:true}).click();await page.waitForURL('**/#/my-decks');
-  await page.goBack();await page.waitForURL('**/parlor');await page.getByRole('button',{name:'Open the parlor',exact:true}).waitFor();
+  await page.goBack();await page.waitForURL('**/parlor');await page.getByRole('button',{name:'Start the show',exact:true}).waitFor();
   assert.equal(await page.locator('.parlor-card').count(),0);assert.equal(await key.inputValue(),'');
   await captureLayout('returned-desktop');
   await page.setViewportSize({width:390,height:844});await captureLayout('settings-mobile');
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth),false);
+  // Re-enter with synthetic credentials after the clear-key/navigation checks above.
+  await key.fill('synthetic-browser-key');await page.getByLabel('Anthropic model ID',{exact:true}).fill('synthetic-model');
+  await page.getByLabel('ElevenLabs API key',{exact:true}).fill('synthetic-voice-key');await page.getByLabel('ElevenLabs voice ID',{exact:true}).fill('synthetic-voice');
+  audioMode='hold';await guest();await page.getByRole('button',{name:'Reveal card 1',exact:true}).click();
+  await page.waitForFunction(()=>window.__showAudio.playing>0);
+  await escaped();assert.ok(await page.evaluate(()=>window.__showAudio.paused>0&&window.__showAudio.cleared>0));
+  mode='delay';release=undefined;await guest();await page.getByText(/^The reader considers your cards/).waitFor();
+  await page.waitForTimeout(100);assert.ok(release);await escaped();release();mode='ok';
+  assert.equal(await page.locator('.parlor-card').count(),0);
+  await page.getByLabel('ElevenLabs API key',{exact:true}).fill('');await guest();
+  for(let n=1;n<=3;n++)await page.getByRole('button',{name:`Reveal card ${n}`,exact:true}).click();
+  await page.getByRole('button',{name:'Hear the synthesis',exact:true}).click();
+  await page.getByLabel('Ask a follow-up (captions)').fill('Synthetic exit during conversation');
+  mode='delay';release=undefined;await page.getByRole('button',{name:'Ask the reader',exact:true}).click();
+  await page.getByText(/^Considering your question/).waitFor();await page.waitForTimeout(100);assert.ok(release);
+  await escaped();release();mode='ok';
+  assert.equal(await page.getByText('Synthetic exit during conversation',{exact:true}).count(),0);
+  await page.getByRole('button',{name:'My Decks',exact:true}).click();await page.waitForURL('**/#/my-decks');
+  await page.getByRole('button',{name:'Parlor',exact:true}).click();await page.waitForURL('**/parlor');
+  await key.fill('synthetic-browser-key');await page.getByLabel('Anthropic model ID',{exact:true}).fill('synthetic-model');
+  await page.getByRole('button',{name:'Start the show',exact:true}).click();await page.goBack();await page.waitForURL('**/#/my-decks');
+  assert.equal(await page.locator('header').first().isVisible(),true);await page.goForward();await page.getByRole('button',{name:'Start the show',exact:true}).waitFor();
+  await key.fill('synthetic-browser-key');await page.getByLabel('Anthropic model ID',{exact:true}).fill('synthetic-model');
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  await page.getByRole('button',{name:'Start the show',exact:true}).click();
+  assert.equal(await page.evaluate(()=>getComputedStyle(document.querySelector('.parlor-show')).animationName),'parlor-arrive');
+  await page.getByRole('button',{name:'Exit show',exact:true}).click();
+  assert.equal(await page.evaluate(()=>document.activeElement?.textContent),'Start the show');
+  await page.getByRole('button',{name:'Start the show',exact:true}).click();
   authenticated=false;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.getByRole('button',{name:'Sign in to enter',exact:true}).waitFor();
   await captureLayout('logged-out-mobile');
-  console.log('PASS: production /parlor and /parlor/, login return, masked restoration, chosen set, confirmation, single draw request, captions/audio failure, repeated clicks, synthesis, follow-up, reset, retry, interruption, Back navigation, desktop/mobile single header at viewport top, content below header, no overflow, logout. Mock providers only.');
+  console.log('PASS: production /parlor and /parlor/, login return, masked restoration, chosen set, confirmation, single draw request, captions/audio failure, repeated clicks, synthesis, follow-up, reset, retry, interruption, Escape before reading/during audio/generation/conversation, audio cleanup, focus restoration, repeated entry/touch exit, Back navigation, desktop/mobile layout, reduced motion and entrance fade, logout during show. Mock providers only.');
 } catch (error) {
   await mkdir(evidence,{recursive:true});
   if(page&&!page.isClosed())await page.screenshot({path:resolve(evidence,'failure.png'),fullPage:true});

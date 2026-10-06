@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useState, type CSSProperties } from "react";
 import { useBrowserSession } from "@/auth/session";
 import { Account } from "@/auth/Account";
 import { parseAccountRoute } from "@/auth/api";
@@ -24,6 +24,7 @@ type Tab = "about" | "browse" | "read";
 export function App() {
   const route = useHashRoute();
   const { session } = useBrowserSession();
+  const [showMode, setShowMode] = useState(false);
 
   // Clear authenticated snapshots before the new session's passive loading effects start.
   useLayoutEffect(() => { catalogDeckRuntime.clear(); }, [session]);
@@ -34,7 +35,7 @@ export function App() {
   let tab: Tab | null = null;
   const accountRoute = parseAccountRoute(route, window.location.search);
   if (accountRoute) content = <Account key={route} route={accountRoute} />;
-  else if (route.match(/^\/parlor\/?$/)) content = <Parlor />;
+  else if (route.match(/^\/parlor\/?$/)) content = <Parlor onShowChange={setShowMode} />;
   else if (route.match(/^\/community\/?$/)) content = <Community />;
   else if (route.match(/^\/my-decks\/?$/)) content = <MyDecks key={session.status === "authenticated" ? session.user.email : session.status} />;
   else if ((m = route.match(/^\/deck\/([^/]+)\/artwork\/?$/))) { deckId = m[1]; content = <RemoteDeckBoundary deckId={deckId} routeKey={route}><ArtworkEditor deckId={deckId} /></RemoteDeckBoundary>; }
@@ -59,8 +60,8 @@ export function App() {
     : "My Decks";
 
   return (
-    <div style={{ minHeight: "100vh" }}>
-      <header style={header}>
+    <div style={{ minHeight: "100vh", ...(showMode ? { background: "#14121b" } : {}) }}>
+      <header style={{ ...header, ...(showMode ? { display: "none" } : {}) }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <button onClick={() => navigate("/")} style={brand} aria-label="Generative Arcana — home">
             <BrandMark />
