@@ -157,6 +157,14 @@ EOF
 
 Confirm the save and report the path. If the user also asked to import it into a connected account, follow `references/validation.md` and treat that as a separate explicit mutation after validation. (No renderer is part of this skill yet — the canonical JSON manifest is the authoring deliverable.)
 
+## Artwork handoff: fronts, deck cover, and card back
+
+When illustration is in scope, discuss and agree all three artwork roles within the existing visual-language dialogue. Each visual pack should have a coherent deck cover and card back as well as its card fronts. Agree the cover/back concepts before generating images. Preserve approved artwork unless replacement is explicitly requested.
+
+Recommended raster masters (width × height): **card fronts 1024 × 1536, portrait 2:3; deck cover 1536 × 1024, landscape 3:2; card back 1024 × 1536, portrait 2:3**. These are authoring targets, not retroactive validation or upload restrictions. Keep existing alternate proportions intact. See `references/visual_language.md` for composition and safe areas.
+
+Deliver cover and back as separate set-level assets in the same visual pack as the fronts, using `cover` and `cardBack` bindings when a VisualPackManifest is supported. They are not semantic cards or required DeckManifest fields. Do not invent card slugs, alter deck/card counts, put image bytes into DeckManifest, or declare fronts complete because these extras exist. Generation, transfer, and upload are distinct steps; check current host byte/format limits separately and upload only within the user's authorized scope.
+
 ## Working with feedback
 
 - Iterate through dialogue; explain the dependent content affected by a revision and agree the change before regenerating it (re-running the transversal re-derives every station; changing N re-walks the whole deck).

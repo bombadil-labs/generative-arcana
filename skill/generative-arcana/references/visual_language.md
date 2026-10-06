@@ -165,6 +165,18 @@ For sequential ranks/courts, view the whole row. Does visual form actually progr
 
 Describe the visual system with all proper nouns and theme-specific subjects removed. Could it plausibly describe ten unrelated AI-art decks? If yes, the deck-level material language and family grammars are too generic. Strengthen concrete medium, surface, mark-making, spatial, edge, value, and finish decisions.
 
+## Artwork formats and set-level composition
+
+Agree these alongside the shared material language when artwork is requested:
+
+| Artwork | Recommended master (width × height) | Composition |
+| --- | --- | --- |
+| Card front | 1024 × 1536 (2:3 portrait) | Resolve the card's scene and inherited visual grammar; retain the host's label-safe areas. |
+| Deck cover | 1536 × 1024 (3:2 landscape) | A deck-level frontispiece in the pack's shared visual language, distinct from a card illustration. Keep essential detail inside an outer 5% safe area; allow a small card stack to overlap the lower-right region. Avoid baked-in UI titles, buttons, or controls. |
+| Card back | 1024 × 1536 (2:3 portrait) | One coherent back per pack, with a quiet border and outer 5% safe area. Use 180-degree rotational symmetry when reversals must stay concealed. Avoid card-specific names, numbers, or directional text. |
+
+These dimensions are recommendations, not schema constraints. Preserve existing alternate proportions with contained presentation rather than forced cropping. Discuss deliberate departures with the user. Covers and backs belong to the visual pack, outside the semantic deck and front completeness counts. Missing slots retain neutral paper/glyph fallbacks, never another pack's image. Byte limits and accepted upload formats are a separate transport concern, not a reason to change an agreed composition.
+
 ## Rendering contract
 
 A complete visual system is successful when these are both true:

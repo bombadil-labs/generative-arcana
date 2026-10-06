@@ -31,6 +31,16 @@ component/SSR regressions, and geometry checks for the archived glyph corpus. Th
 only as a development dependency (Node 20.19+, 22.13+, or 24+); production uses the browser DOM.
 Keep DOMPurify patched as security updates are released.
 
+For cover/detail layout regressions, start `npm run dev` and run `npm run test:layout`
+in another terminal (Node 24 recommended). The suite uses `playwright-core` with
+installed Edge by default; set `ARCANA_BROWSER_CHANNEL=chrome` or
+`ARCANA_BROWSER_EXECUTABLE` to a Chromium test binary. `ARCANA_TEST_ORIGIN` can
+override the default local Vite origin. All account/catalog/artwork requests are
+intercepted with neutral fixtures; no live deck data is used or written. Screenshots
+and geometry results are saved under ignored `test-results/deck-presentation/`.
+Checks cover 320/375/768/1440px, contained image loading, keyboard/Back navigation,
+set changes, stale requests, missing/corrupt artwork, and reduced motion.
+
 ## Visual skins
 
 A **skin is just a name.** Each card's renderer is resolved *per card* from whatever content is
