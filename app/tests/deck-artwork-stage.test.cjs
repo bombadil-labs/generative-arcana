@@ -58,9 +58,16 @@ test.after(async () => {
 
 test("featured front survives parent rerenders, loading notifications, and pack round-trips", async () => {
   await render(); const first = slug(); assert.ok(["major-1", "major-2"].includes(first));
+  const assertBacks = () => {
+    const backs = [...document.querySelectorAll(".deck-artwork-back")];
+    assert.equal(backs.length, 3);
+    assert.ok(backs.every(back => back.querySelector("img")), "every visible back uses artwork instead of a stray placeholder");
+  };
+  assertBacks();
   for (let tick = 1; tick <= 4; tick++) { await render({ tick }); assert.equal(slug(), first); }
   await act(async () => store.load(first, true)); await flush(); assert.equal(slug(), first);
   await act(async () => selection.selectPack("ink")); await flush(); assert.equal(slug(), first);
+  assertBacks();
   await act(async () => selection.selectPack("saved-artwork")); await flush(); assert.equal(slug(), first);
   assert.ok(calls.filter(path => path.includes("/cards/")).every(path => path.includes(first)));
 });

@@ -78,7 +78,8 @@ async function until(predicate) {
 }
 async function heroLoaded() {
   await page.waitForFunction(()=>document.querySelector(".deck-artwork-front img")?.style.opacity==="1" &&
-    [...document.querySelectorAll(".deck-artwork-cover img,.deck-artwork-back img")].length===3 &&
+    [...document.querySelectorAll(".deck-artwork-cover img,.deck-artwork-back img")].length===4 &&
+    [...document.querySelectorAll(".deck-artwork-back")].every(back=>back.querySelector("img")) &&
     [...document.querySelectorAll(".deck-artwork-stage img")].every(img=>img.complete&&img.naturalWidth>0));
 }
 async function bounds() {

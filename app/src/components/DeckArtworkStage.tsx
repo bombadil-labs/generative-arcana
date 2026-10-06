@@ -21,7 +21,9 @@ export function DeckArtworkStage({ deck }: { deck: DeckModule }) {
       <PackAssetImage asset={catalog?.cover} scope={store} alt="" fallback={<DeckEmblem />} />
     </div>
     <div className="deck-artwork-stack">
-      <div className="deck-artwork-card deck-artwork-back rear"><DeckEmblem /></div>
+      <div className="deck-artwork-card deck-artwork-back rear">
+        <PackAssetImage asset={catalog?.cardBack} scope={store} alt="" fallback={<DeckEmblem />} />
+      </div>
       <div className="deck-artwork-card deck-artwork-back middle">
         <PackAssetImage asset={catalog?.cardBack} scope={store} alt="" fallback={<DeckEmblem />} />
       </div>
