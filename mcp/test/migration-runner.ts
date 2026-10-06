@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { PGlite } from '@electric-sql/pglite';
 import { catalog, run, schema, target, type Connection } from '../scripts/domain-migrations';
+import { prepareVersionSixUpgrade, verifyVersionSixUpgrade } from './migration-six-fixture';
 const entries = await catalog();
 const flags = {target:'test','expected-host':'localhost','expected-database':'arcana','expected-user':'migration'};
 const url = 'postgresql://migration:secret@localhost/arcana';
@@ -73,3 +74,8 @@ await fixture(async db => {
   await assert.rejects(run(db,entries,'apply'), /drift/);
 });
 console.log('Migration safety tests passed: clean, partial, baseline, drift, checksums, target, credentials, rollback, idempotence.');
+await fixture(async db => {
+  const before = await prepareVersionSixUpgrade(db,entries);
+  await run(db,entries,'apply');
+  await verifyVersionSixUpgrade(db,entries,before);
+});

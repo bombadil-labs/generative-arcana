@@ -12,6 +12,7 @@ import {
   setMyDeckVisibility,
   type CatalogDeckSummary,
 } from "@/catalog/api";
+import { DeckCover } from "../components/DeckCover";
 import { navigate } from "./router";
 
 type Visibility = CatalogDeckSummary["visibility"];
@@ -310,7 +311,7 @@ function DeckRow({
   return (
     <article style={deckRow}>
       <button onClick={() => navigate(`/deck/${deck.id}`)} style={deckIdentity}>
-        <div style={deckGlyph} aria-hidden>✦</div>
+        <div style={deckGlyph}><DeckCover deckId={deck.id} deckRevision={deck.revision} name={deck.name} fallback={<span aria-hidden>✦</span>} /></div>
         <div style={{ minWidth: 0 }}>
           <div style={deckName}>{deck.name}</div>
           <div style={tagline}>{deck.tagline}</div>

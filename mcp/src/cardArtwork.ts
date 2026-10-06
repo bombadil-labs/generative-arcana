@@ -16,7 +16,12 @@ export const artworkMissing = () => new ArtworkError(404, "not_found", "Card art
 export const artworkConflict = () => new ArtworkError(409, "artwork_conflict", "This deck or artwork changed. Refresh before uploading again.");
 export const DEFAULT_ARTWORK_PACK_ID = "saved-artwork";
 export interface ArtworkPack { id: string; label: string; description?: string; createdAt?: string }
-export interface ArtworkPackSummary extends ArtworkPack { cardCount: number; complete: boolean }
+export interface ArtworkPackSummary extends ArtworkPack { cardCount: number; complete: boolean; hasCover: boolean; hasCardBack: boolean }
+export type PackAssetSlot = "cover" | "cardBack";
+export function packAssetSlot(value: string): PackAssetSlot {
+  if (value !== "cover" && value !== "cardBack") throw new ArtworkError(400, "artwork_slot", "Choose cover or cardBack.");
+  return value;
+}
 export const defaultArtworkPack = (): ArtworkPack => ({ id: DEFAULT_ARTWORK_PACK_ID, label: "Saved artwork" });
 export function artworkPackId(value = DEFAULT_ARTWORK_PACK_ID): string {
   if (!/^[a-z0-9]+(?:[-_.][a-z0-9]+)*$/.test(value) || value.length > 80) throw new ArtworkError(400, "artwork_pack", "Choose a visual set id with lowercase letters, numbers, hyphens, dots or underscores (up to 80 characters).");
@@ -27,7 +32,13 @@ export interface ArtworkRecord {
   mediaType: "image/webp"; width: number; height: number; byteLength: number; integrity: string;
   createdAt: string;
 }
+export interface PackArtworkRecord extends Omit<ArtworkRecord, "cardSlug"> { slot: PackAssetSlot }
+export interface PackArtworkMetadata extends Omit<PackArtworkRecord, "objectKey"> { deckRevision: number; visualPack: VisualPackManifest; imageUrl: string }
 export interface ArtworkRepository {
+  getPackAsset(deckId: string, slot: PackAssetSlot, packId: string): Promise<PackArtworkRecord | null>;
+  listPackAssets(deckId: string, packId?: string): Promise<PackArtworkRecord[]>;
+  /** Same deck lock, owner/revision/pack and prior-asset checks as card attachment. */
+  attachPackAsset(ownerId: string, expectedDeckRevision: number, expectedArtworkId: string | null, record: PackArtworkRecord): Promise<PackArtworkRecord | null>;
   get(deckId: string, cardSlug: string, packId?: string): Promise<ArtworkRecord | null>;
   list(deckId: string, packId?: string): Promise<ArtworkRecord[]>;
   listPacks(deckId: string): Promise<ArtworkPack[]>;
@@ -52,6 +63,17 @@ export function artworkMetadata(record: ArtworkRecord, deckRevision: number, pac
       schemaVersion: 1, id: record.packId, label: pack.label,
       assets: { image: { kind: "image", path: `${record.id}.webp`, mediaType: record.mediaType, integrity: record.integrity } },
       cards: { [record.cardSlug]: { asset: "image" } },
+    },
+  };
+}
+
+export function packArtworkMetadata(record: PackArtworkRecord, deckRevision: number, pack = defaultArtworkPack()): PackArtworkMetadata {
+  const { objectKey: _privateKey, ...asset } = record;
+  return { ...asset, deckRevision,
+    imageUrl: `/api/decks/${encodeURIComponent(record.deckId)}/artwork/assets/${record.slot}/image?version=${encodeURIComponent(record.id)}&packId=${encodeURIComponent(record.packId)}`,
+    visualPack: { schemaVersion: 1, id: record.packId, label: pack.label,
+      assets: { image: { kind: "image", path: `${record.id}.webp`, mediaType: record.mediaType, integrity: record.integrity } },
+      [record.slot]: { asset: "image" },
     },
   };
 }
@@ -83,7 +105,8 @@ export class CardArtworkService {
     if (id === DEFAULT_ARTWORK_PACK_ID || !label || label.length > 80 || (description?.length ?? 0) > 500) throw new ArtworkError(400, "artwork_pack", "Choose a new set id and a name up to 80 characters, with an optional description up to 500 characters.");
     const pack = await this.records.createPack(input.ownerId, input.deckId, input.expectedDeckRevision, { id, label, ...(description ? { description } : {}), createdAt: new Date().toISOString() });
     const cards = (await this.records.list(input.deckId, id)).filter(record => Object.hasOwn(deck.manifest.data.cards, record.cardSlug));
-    return { ...pack, cardCount: cards.length, complete: cards.length === Object.keys(deck.manifest.data.cards).length };
+    const assets = await this.records.listPackAssets(input.deckId, id);
+    return { ...pack, cardCount: cards.length, complete: cards.length === Object.keys(deck.manifest.data.cards).length, hasCover: assets.some(asset => asset.slot === "cover"), hasCardBack: assets.some(asset => asset.slot === "cardBack") };
   }
 
   async listPacks(viewerId: string | null, deckId: string): Promise<ArtworkPackSummary[]> {
@@ -91,9 +114,10 @@ export class CardArtworkService {
     const packs = await this.records.listPacks(deckId);
     if (!packs.some(pack => pack.id === DEFAULT_ARTWORK_PACK_ID)) packs.unshift(defaultArtworkPack());
     const records = await this.records.list(deckId);
+    const assets = await this.records.listPackAssets(deckId);
     return packs.map(pack => {
       const count = records.filter(record => record.packId === pack.id && Object.hasOwn(deck.manifest.data.cards, record.cardSlug)).length;
-      return { ...pack, cardCount: count, complete: count === Object.keys(deck.manifest.data.cards).length };
+      return { ...pack, cardCount: count, complete: count === Object.keys(deck.manifest.data.cards).length, hasCover: assets.some(asset => asset.packId === pack.id && asset.slot === "cover"), hasCardBack: assets.some(asset => asset.packId === pack.id && asset.slot === "cardBack") };
     });
   }
 
@@ -114,7 +138,9 @@ export class CardArtworkService {
       const record = records.get(slug);
       return { slug, name: card.name, artwork: record ? artworkMetadata(record, deck.revision, pack) : null };
     });
-    return { enabled: true as const, deckRevision: deck.revision, packId, packs: await this.listPacks(viewerId, deck.id), cards };
+    const assets = await this.records.listPackAssets(deck.id, packId);
+    const metadata = (slot: PackAssetSlot) => { const asset = assets.find(asset => asset.slot === slot); return asset ? packArtworkMetadata(asset, deck.revision, pack) : null; };
+    return { enabled: true as const, deckRevision: deck.revision, packId, packs: await this.listPacks(viewerId, deck.id), cards, cover: metadata("cover"), cardBack: metadata("cardBack") };
   }
 
   async metadata(viewerId: string | null, deckId: string, cardSlug: string, packId = DEFAULT_ARTWORK_PACK_ID): Promise<ArtworkMetadata> {
@@ -153,15 +179,7 @@ export class CardArtworkService {
   async upload(input: { ownerId: string; deckId: string; cardSlug: string; packId?: string; expectedDeckRevision: number; expectedArtworkId: string | null; mediaType: string } & ({ bytes: Uint8Array; loadBytes?: never } | { bytes?: never; loadBytes: () => Promise<Uint8Array> })): Promise<ArtworkMetadata> {
     const packId = artworkPackId(input.packId);
     await this.assertUpload(input.ownerId, input.deckId, input.cardSlug, input.expectedDeckRevision, input.expectedArtworkId, packId);
-    if (this.allowUpload && !await this.allowUpload(input.ownerId)) throw new ArtworkError(429, "artwork_rate_limit", "Too many uploads. Try again in a minute.");
-    if (this.activeDecodes >= 2) throw new ArtworkError(429, "artwork_busy", "Artwork processing is busy. Try again shortly.");
-    this.activeDecodes++;
-    let image: Awaited<ReturnType<typeof normalizeArtwork>>;
-    // Only the internal lazy native-file path gets the larger fetch budget. Browser/raw bytes stay at 3 MB.
-    try { image = input.loadBytes
-      ? await normalizeArtworkWithinLimit(await input.loadBytes(), input.mediaType, MAX_NATIVE_ARTWORK_INPUT_BYTES)
-      : await normalizeArtwork(input.bytes, input.mediaType); }
-    finally { this.activeDecodes--; }
+    const image = await this.prepareImage(input);
     const id = randomUUID();
     const record: ArtworkRecord = {
       id, deckId: input.deckId, packId, cardSlug: input.cardSlug,
@@ -179,6 +197,68 @@ export class CardArtworkService {
     if (previous) await this.storage.delete(previous.objectKey).catch(() => undefined);
     return artworkMetadata(record, input.expectedDeckRevision, await this.packFor(input.deckId, packId));
   }
+  private async prepareImage(input: { ownerId: string; mediaType: string } & ({ bytes: Uint8Array; loadBytes?: never } | { bytes?: never; loadBytes: () => Promise<Uint8Array> })) {
+    if (this.allowUpload && !await this.allowUpload(input.ownerId)) throw new ArtworkError(429, "artwork_rate_limit", "Too many uploads. Try again in a minute.");
+    if (this.activeDecodes >= 2) throw new ArtworkError(429, "artwork_busy", "Artwork processing is busy. Try again shortly.");
+    this.activeDecodes++;
+    let image: Awaited<ReturnType<typeof normalizeArtwork>>;
+    // Only the internal lazy native-file path gets the larger fetch budget. Browser/raw bytes stay at 3 MB.
+    try { image = input.loadBytes
+      ? await normalizeArtworkWithinLimit(await input.loadBytes(), input.mediaType, MAX_NATIVE_ARTWORK_INPUT_BYTES)
+      : await normalizeArtwork(input.bytes, input.mediaType); }
+    finally { this.activeDecodes--; }
+    return image;
+  }
+
+  async packAssetMetadata(viewerId: string | null, deckId: string, slot: PackAssetSlot, packId = DEFAULT_ARTWORK_PACK_ID): Promise<PackArtworkMetadata> {
+    packAssetSlot(slot);
+    const deck = await this.deckFor(viewerId, deckId);
+    const pack = await this.packFor(deckId, packId);
+    const asset = await this.records.getPackAsset(deckId, slot, packId);
+    if (!asset) throw artworkMissing();
+    return packArtworkMetadata(asset, deck.revision, pack);
+  }
+
+  async packAssetImage(viewerId: string | null, deckId: string, slot: PackAssetSlot, version?: string, packId = DEFAULT_ARTWORK_PACK_ID) {
+    const metadata = await this.packAssetMetadata(viewerId, deckId, slot, packId);
+    if (version && metadata.id !== version) throw artworkMissing();
+    const record = await this.records.getPackAsset(deckId, slot, packId);
+    if (!record || record.id !== metadata.id) throw artworkMissing();
+    const bytes = await this.storage.get(record.objectKey);
+    if (bytes.byteLength !== record.byteLength || bytes.byteLength > MAX_ARTWORK_OUTPUT_BYTES || digest(bytes) !== record.integrity) throw new ArtworkError(503, "artwork_unavailable", "Artwork could not be verified. Try again later.");
+    const current = await this.packAssetMetadata(viewerId, deckId, slot, packId);
+    if (current.id !== metadata.id) throw artworkMissing();
+    return { metadata: current, bytes };
+  }
+
+  async assertPackAssetUpload(ownerId: string, deckId: string, slot: PackAssetSlot, expectedDeckRevision: number, expectedArtworkId: string | null, packId = DEFAULT_ARTWORK_PACK_ID) {
+    packAssetSlot(slot);
+    const deck = await this.deckFor(ownerId, deckId, true);
+    if (deck.revision !== expectedDeckRevision) throw artworkConflict();
+    await this.packFor(deckId, packId);
+    const current = await this.records.getPackAsset(deckId, slot, packId);
+    if ((current?.id ?? null) !== expectedArtworkId) throw artworkConflict();
+  }
+
+  async uploadPackAsset(input: { ownerId: string; deckId: string; slot: PackAssetSlot; packId?: string; expectedDeckRevision: number; expectedArtworkId: string | null; mediaType: string } & ({ bytes: Uint8Array; loadBytes?: never } | { bytes?: never; loadBytes: () => Promise<Uint8Array> })): Promise<PackArtworkMetadata> {
+    const packId = artworkPackId(input.packId);
+    await this.assertPackAssetUpload(input.ownerId, input.deckId, input.slot, input.expectedDeckRevision, input.expectedArtworkId, packId);
+    const image = await this.prepareImage(input);
+    const id = randomUUID();
+    const record: PackArtworkRecord = { id, deckId: input.deckId, packId, slot: input.slot,
+      objectKey: `pack-artwork/${id}.webp`, mediaType: "image/webp", width: image.width, height: image.height,
+      byteLength: image.bytes.byteLength, integrity: digest(image.bytes), createdAt: new Date().toISOString() };
+    await this.storage.put(record.objectKey, image.bytes);
+    let previous: PackArtworkRecord | null;
+    try { previous = await this.records.attachPackAsset(input.ownerId, input.expectedDeckRevision, input.expectedArtworkId, record); }
+    catch (error) {
+      if (error instanceof ArtworkError && [404, 409].includes(error.status)) await this.storage.delete(record.objectKey).catch(() => undefined);
+      throw error;
+    }
+    if (previous) await this.storage.delete(previous.objectKey).catch(() => undefined);
+    return packArtworkMetadata(record, input.expectedDeckRevision, await this.packFor(input.deckId, packId));
+  }
+
 }
 
 export async function normalizeArtwork(bytes: Uint8Array, mediaType: string) {
@@ -235,6 +315,23 @@ function digest(bytes: Uint8Array) { return `sha256-${createHash("sha256").updat
 export class InMemoryArtworkRepository implements ArtworkRepository {
   private records = new Map<string, ArtworkRecord>();
   private packs = new Map<string, ArtworkPack>();
+  private packAssets = new Map<string, PackArtworkRecord>();
+  async getPackAsset(deckId: string, slot: PackAssetSlot, packId: string) { return structuredClone(this.packAssets.get(JSON.stringify([deckId, packId, slot])) ?? null); }
+  async listPackAssets(deckId: string, packId?: string) { return structuredClone([...this.packAssets.values()].filter(asset => asset.deckId === deckId && (packId === undefined || asset.packId === packId))); }
+  attachPackAsset(ownerId: string, revision: number, expected: string | null, record: PackArtworkRecord): Promise<PackArtworkRecord | null> {
+    return this.serial(async () => {
+      packAssetSlot(record.slot);
+      const deck = await this.catalog.get(record.deckId);
+      if (!deck || deck.ownerId !== ownerId) throw artworkMissing();
+      if (deck.revision !== revision) throw artworkConflict();
+      if (record.packId !== DEFAULT_ARTWORK_PACK_ID && !this.packs.has(JSON.stringify([record.deckId, record.packId]))) throw artworkMissing();
+      const key = JSON.stringify([record.deckId, record.packId, record.slot]);
+      const previous = this.packAssets.get(key) ?? null;
+      if ((previous?.id ?? null) !== expected) throw artworkConflict();
+      this.packAssets.set(key, structuredClone(record));
+      return structuredClone(previous);
+    });
+  }
   private tail: Promise<void> = Promise.resolve();
   constructor(private readonly catalog: UserDeckCatalogRepository) {}
   async get(deckId: string, cardSlug: string, packId = DEFAULT_ARTWORK_PACK_ID) { return structuredClone(this.records.get(JSON.stringify([deckId, packId, cardSlug])) ?? null); }

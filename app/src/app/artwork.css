@@ -22,3 +22,12 @@
 .artwork-create-set { padding: 20px; margin-top: 24px; max-width: 620px; border: 1px solid var(--line-2); border-radius: var(--r-2); background: var(--paper-2); }
 .artwork-create-set h2 { margin: 0; font: 400 24px/1.2 var(--font-display); }
 .artwork-create-actions { display: flex; gap: 12px; margin-top: 20px; }
+
+.pack-assets { margin-top: 48px; border-top: 1px solid var(--line); padding-top: 24px; }
+.pack-assets h2 { font: 400 28px/1.2 var(--font-display); margin: 0 0 12px; }
+.pack-assets-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.pack-asset-form { min-width: 0; padding: 20px; border: 1px solid var(--line); border-radius: var(--r-2); }
+.pack-asset-form h3 { font: 400 23px/1.2 var(--font-display); margin: 0; }
+.pack-asset-preview { height: 220px; width: 100%; background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--r-2); overflow: hidden; }
+.pack-asset-preview .artwork-hint { padding: 16px; text-align: center; }
+@media (max-width: 600px) { .pack-assets-grid { grid-template-columns: minmax(0, 1fr); } }

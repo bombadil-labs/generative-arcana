@@ -16,7 +16,7 @@ global.window = dom.window; global.document = dom.window.document; global.IS_REA
 // Node 20 has no global navigator; newer Node versions expose a getter-only property.
 Object.defineProperty(global, "navigator", { configurable: true, value: dom.window.navigator });
 const { createRoot } = require("react-dom/client");
-let vite, root, Editor, Provider, useSession, ArtworkProvider, useArtworkStore, useArtworkSelection, useCardArtwork, CardArt, CardBrowser, Reading, visuals, Boundary, catalogRuntime, domain, controls, card, deck;
+let vite, root, Editor, Home, Provider, useSession, ArtworkProvider, useArtworkStore, useArtworkSelection, useCardArtwork, CardArt, CardBrowser, Reading, visuals, Boundary, catalogRuntime, domain, controls, card, deck;
 let handler, images, revoked, anonymous = false;
 let accountId = "account-one";
 function json(body, status = 200) { return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } }); }
@@ -41,6 +41,7 @@ test.before(async () => {
   const { createServer } = await import("vite");
   vite = await createServer({ root: resolve(__dirname, ".."), server: { middlewareMode: true }, appType: "custom", optimizeDeps: { noDiscovery: true, include: [] } });
   ({ ArtworkEditor: Editor } = await vite.ssrLoadModule("/src/app/ArtworkEditor.tsx"));
+  ({ DeckHome: Home } = await vite.ssrLoadModule("/src/app/DeckHome.tsx"));
   ({ BrowserSessionProvider: Provider, useBrowserSession: useSession } = await vite.ssrLoadModule("/src/auth/session.tsx"));
   ({ CatalogArtworkProvider: ArtworkProvider, useArtworkStore, useArtworkSelection, useCardArtwork } = await vite.ssrLoadModule("/src/artwork/context.tsx"));
   ({ CardArt } = await vite.ssrLoadModule("/src/components/CardArt.tsx"));
@@ -690,4 +691,52 @@ for (const conflict of [false, true]) test(`delayed artwork refresh preserves th
   await act(async () => pending.resolve(json(catalog(metadata())))); await flush();
   assert.match(document.body.textContent, expected);
   assert.equal(reads, ownerReads, "background preview refresh does not reload the owner editor");
+});
+
+test("a card-front upload completing after a cover upload preserves both independent assets", async () => {
+  const coverPending = deferred(), frontPending = deferred();
+  const cover = { id: "cover-1", deckId: "deck", packId: "saved-artwork", slot: "cover", mediaType: "image/webp", width: 400, height: 100, byteLength: 4, integrity: "sha256-test", deckRevision: 1 };
+  handler = async (path, init) => {
+    if (init.method === "PUT") return path.includes("/assets/cover") ? coverPending.promise : frontPending.promise;
+    if (path.includes("/image?")) return new Response("test", { headers: { "content-type": "image/webp" } });
+    return json(catalog());
+  };
+  await mount();
+  await act(async () => {
+    const input = document.getElementById("artwork-cover-file");
+    Object.defineProperty(input, "files", { configurable: true, value: [new File(["data"], "cover.png", { type: "image/png" })] });
+    input.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+  });
+  await act(async () => document.getElementById("artwork-cover-form").dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true })));
+  await act(async () => inputFile()); await act(async () => submit());
+  await act(async () => coverPending.resolve(json(cover, 201))); await flush();
+  assert.ok(document.querySelector('img[alt="Cover preview"]'));
+  await act(async () => frontPending.resolve(json(metadata(), 201))); await flush();
+  assert.ok(document.querySelector('img[alt="Cover preview"]'), "later front response must preserve saved cover");
+  assert.match(document.getElementById("artwork-cover-form").textContent, /Replace cover/);
+  assert.match(document.getElementById("artwork-set").selectedOptions[0].textContent, /1 illustrated/);
+});
+
+
+test("deck home asks for an ambiguous artwork set and displays only that set’s cover", async () => {
+  window.matchMedia = (query) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} });
+  const cover = { id: "cover-1", deckId: "deck", packId: "watercolor", slot: "cover", mediaType: "image/webp", width: 400, height: 100, byteLength: 4, integrity: "sha256-test", deckRevision: 1 };
+  let imagesFetched = 0;
+  handler = async (path) => {
+    if (path.includes("/image?")) { ++imagesFetched; return new Response("test", { headers: { "content-type": "image/webp" } }); }
+    const packId = requestedPack(path);
+    return json({ ...setCatalog(packId), packs: [
+      { id: "saved-artwork", label: "Saved artwork", cardCount: 0, complete: false },
+      { id: "watercolor", label: "Watercolor", cardCount: 0, complete: false, hasCover: true },
+      { id: "ink", label: "Ink", cardCount: 0, complete: false, hasCardBack: true },
+    ], cover: packId === "watercolor" ? cover : null });
+  };
+  await mount(React.createElement(Home, { deckId: "deck" }));
+  assert.equal(document.getElementById("home-artwork-set").value, "");
+  assert.match(document.body.textContent, /Choose an artwork set to see its cover/); assert.equal(imagesFetched, 0);
+  await act(async () => changeSelect("home-artwork-set", "watercolor")); await flush();
+  const img = document.querySelector("img"); assert.ok(img); assert.equal(img.style.objectFit, "contain");
+  await act(async () => changeSelect("home-artwork-set", "ink")); await flush();
+  assert.equal(document.querySelector("img"), null); assert.equal(imagesFetched, 1);
+  assert.equal(window.localStorage.getItem("arcana:artwork-set:deck"), "ink");
 });

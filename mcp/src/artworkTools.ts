@@ -30,6 +30,20 @@ export function registerArtworkTools(server: McpServer, options: { artwork?: Car
       return { content: [{ type: "text" as const, text: JSON.stringify(metadata) }, { type: "image" as const, mimeType: metadata.mediaType, data: Buffer.from(bytes).toString("base64") }], structuredContent: { result: metadata } };
     } catch (error) { return failed(error); }
   });
+  server.registerTool("get_visual_pack_asset", {
+    description: "Read one visual set's website cover or stored cardBack. Omitted packId uses saved-artwork; never borrows another set's art. includeImage:false returns metadata and prior artwork id. A missing slot returns an error; use list_visual_packs for hasCover/hasCardBack and current get_deck revision before a first upload. Backs are stored only, with no reveal behavior.",
+    inputSchema: z.object({ deckId: ids.deckId, packId: ids.packId, slot: z.enum(["cover", "cardBack"]), includeImage: z.boolean().optional() }),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    ...(oauth ? { _meta: { securitySchemes: optionalOAuthSecuritySchemes(readScopes, oauth?.requestOfflineAccess) } } : {}),
+  }, async ({ deckId, packId, slot, includeImage }) => {
+    try {
+      if (!artwork) return unavailable();
+      const viewer = principal && (!oauth || principalHasScopes(principal, readScopes)) ? principal.id : null;
+      if (includeImage === false) return result(await artwork.packAssetMetadata(viewer, deckId, slot, packId));
+      const { metadata, bytes } = await artwork.packAssetImage(viewer, deckId, slot, undefined, packId);
+      return { content: [{ type: "text" as const, text: JSON.stringify(metadata) }, { type: "image" as const, mimeType: metadata.mediaType, data: Buffer.from(bytes).toString("base64") }], structuredContent: { result: metadata } };
+    } catch (error) { return failed(error); }
+  });
   if (!principal && !oauth) return;
   server.registerTool("create_visual_pack", {
     description: "Create an independent named static-artwork set on one owned deck, for example Claude or GPT. Stable packId selects the set for subsequent card uploads and reads. Leaves existing images and all deck meanings unchanged. Repeating the same id/name/description is safe; changing an existing set is not supported here.",
@@ -57,17 +71,35 @@ export function registerArtworkTools(server: McpServer, options: { artwork?: Car
       if (file) return result(await artwork.upload({ ...input, ownerId: principal.id,
         loadBytes: () => fetchNativeFile(file, { maxBytes: MAX_NATIVE_ARTWORK_INPUT_BYTES, mediaTypes: ["image/png", "image/jpeg", "image/webp", "application/octet-stream"] }),
       }));
-      let bytes: Uint8Array;
-      {
-        if (!base64 || base64.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(base64)) throw new ArtworkError(400, "artwork_base64", "Supply canonical base64 file bytes, without a data URL prefix.");
-        const decoded = Buffer.from(base64, "base64");
-        if (decoded.length > MAX_MCP_ARTWORK_BYTES || decoded.toString("base64") !== base64) throw new ArtworkError(413, "artwork_size", "Inline artwork uploads must be at most 1 MB. Use a native file for files up to 5 MB or the website for files up to 3 MB.");
-        bytes = decoded;
-      }
+      const bytes = inlineArtworkBytes(base64);
       return result(await artwork.upload({ ...input, ownerId: principal.id, bytes }));
     } catch (error) { return failed(error); }
   });
+  server.registerTool("set_visual_pack_asset", {
+    description: "Upload/replace one owned visual set's website cover or stored cardBack, separately from its card fronts and meanings. Supply exactly one native file (up to 5 MB) or canonical base64 (up to 1 MB), mediaType, current deck revision and prior slot artwork id (null for first upload). Omitted packId uses saved-artwork. Static PNG/JPEG/WebP only; server validates and re-encodes without cropping. Card backs are stored for future rendering; 180-degree rotational symmetry is recommended for reversal-neutral backs. No face-down/reveal behavior is enabled.",
+    inputSchema: z.object({ deckId: ids.deckId, packId: ids.packId, slot: z.enum(["cover", "cardBack"]), mediaType: z.enum(["image/png", "image/jpeg", "image/webp"]), base64: z.string().min(4).max(4 * Math.ceil(MAX_MCP_ARTWORK_BYTES / 3)).optional(), file: nativeManifestFileSchema.optional(), expectedDeckRevision: z.number().int().positive(), expectedArtworkId: z.string().uuid().nullable() }).refine(input => Number(input.base64 !== undefined) + Number(input.file !== undefined) === 1, { message: "Supply exactly one of file or base64." }),
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+    _meta: { ...(oauth ? { securitySchemes: requiredOAuthSecuritySchemes(writeScopes, oauth?.requestOfflineAccess) } : {}), "openai/fileParams": ["file"] },
+  }, async ({ base64, file, ...input }) => {
+    if (!principal || !principalHasScopes(principal, writeScopes)) return denied();
+    try {
+      if (!artwork) return unavailable();
+      await artwork.assertPackAssetUpload(principal.id, input.deckId, input.slot, input.expectedDeckRevision, input.expectedArtworkId, input.packId);
+      if (file) return result(await artwork.uploadPackAsset({ ...input, ownerId: principal.id,
+        loadBytes: () => fetchNativeFile(file, { maxBytes: MAX_NATIVE_ARTWORK_INPUT_BYTES, mediaTypes: ["image/png", "image/jpeg", "image/webp", "application/octet-stream"] }),
+      }));
+      return result(await artwork.uploadPackAsset({ ...input, ownerId: principal.id, bytes: inlineArtworkBytes(base64) }));
+    } catch (error) { return failed(error); }
+  });
+
 }
 function result(value: object) { return { content: [{ type: "text" as const, text: JSON.stringify(value) }], structuredContent: { result: value } }; }
 function unavailable() { return { content: [{ type: "text" as const, text: "Artwork storage is not configured yet." }], isError: true }; }
 function failed(error: unknown) { return { content: [{ type: "text" as const, text: error instanceof ArtworkError || error instanceof ManifestUploadError ? error.message : "Artwork is temporarily unavailable. Try again later." }], isError: true }; }
+
+function inlineArtworkBytes(base64?: string): Uint8Array {
+  if (!base64 || base64.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(base64)) throw new ArtworkError(400, "artwork_base64", "Supply canonical base64 file bytes, without a data URL prefix.");
+  const decoded = Buffer.from(base64, "base64");
+  if (decoded.length > MAX_MCP_ARTWORK_BYTES || decoded.toString("base64") !== base64) throw new ArtworkError(413, "artwork_size", "Inline artwork uploads must be at most 1 MB. Use a native file for files up to 5 MB or the website for files up to 3 MB.");
+  return decoded;
+}

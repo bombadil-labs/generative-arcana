@@ -154,6 +154,7 @@ const dependencies = createDeploymentDependencyMonitor({
       await sql.query("SELECT deck_id, card_slug, asset FROM arcana_card_artwork LIMIT 0", [], { fetchOptions: { signal } });
       await sql.query("SELECT deck_id,pack_id,label FROM arcana_visual_packs LIMIT 0", [], { fetchOptions: { signal } });
       await sql.query("SELECT deck_id,pack_id,card_slug,asset FROM arcana_visual_pack_artwork LIMIT 0", [], { fetchOptions: { signal } });
+      await sql.query("SELECT deck_id,pack_id,slot,asset FROM arcana_visual_pack_assets LIMIT 0", [], { fetchOptions: { signal } });
     }
   } } : {}),
   ...(oauth ? { issuerDiscovery: async (signal: AbortSignal) => {

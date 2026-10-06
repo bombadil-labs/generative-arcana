@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { PGlite } from "@electric-sql/pglite";
 import type { Pool } from "pg";
 import { NeonArtworkRepository } from "../src/neonArtworkRepository";
-import { ArtworkError, type ArtworkRecord } from "../src/cardArtwork";
+import { ArtworkError, type ArtworkRecord, type PackArtworkRecord } from "../src/cardArtwork";
 import { neutralManifest } from "./protocol-fixtures";
 
 const db = new PGlite();
@@ -17,6 +17,8 @@ try {
   await db.query("INSERT INTO arcana_card_artwork(deck_id,card_slug,asset) VALUES($1,$2,$3::jsonb)", ["legacy-deck","major-0",JSON.stringify(legacy)]);
   const setsMigration = await readFile(new URL("../migrations/004-named-artwork-sets.sql", import.meta.url), "utf8");
   await db.exec(setsMigration); await db.exec(setsMigration);
+  const packAssetsMigration = await readFile(new URL("../migrations/006-visual-pack-assets.sql", import.meta.url), "utf8");
+  await db.exec(packAssetsMigration); await db.exec(packAssetsMigration);
   const retained = (await db.query<{asset:unknown}>("SELECT asset FROM arcana_card_artwork WHERE deck_id='legacy-deck'")).rows[0]?.asset;
   assert.deepEqual(retained,legacy,"additive migration leaves existing JSON, ids and object keys unchanged");
   await db.query("INSERT INTO arcana_card_artwork(deck_id,card_slug,asset) VALUES($1,$2,$3::jsonb) ON CONFLICT(deck_id,card_slug) DO UPDATE SET asset=EXCLUDED.asset", ["legacy-deck","major-0",JSON.stringify(legacy)]);
@@ -50,6 +52,21 @@ try {
   assert.deepEqual(await repository.get("deck","major-0","claude"),independent);
   assert.equal((await repository.list("deck")).length,2);
   await assert.rejects(repository.attach("alice",1,null,{...record(),packId:"missing"}),fails(404));
+  const packAsset = (packId = "saved-artwork", slot: "cover" | "cardBack" = "cover"): PackArtworkRecord => { const { cardSlug: _card, ...asset } = record(); return { ...asset, packId, slot }; };
+  const cover = packAsset();
+  await assert.rejects(repository.attachPackAsset("bob",1,null,cover),fails(404));
+  await assert.rejects(repository.attachPackAsset("alice",2,null,cover),fails(409));
+  await assert.rejects(repository.attachPackAsset("alice",1,null,packAsset("missing")),fails(404));
+  assert.equal(await repository.attachPackAsset("alice",1,null,cover),null);
+  const back = packAsset("claude","cardBack");
+  assert.equal(await repository.attachPackAsset("alice",1,null,back),null);
+  assert.deepEqual(await repository.getPackAsset("deck","cardBack","claude"),back);
+  assert.equal(await repository.getPackAsset("deck","cardBack","saved-artwork"),null);
+  const assetRaces = await Promise.allSettled([repository.attachPackAsset("alice",1,cover.id,packAsset()),repository.attachPackAsset("alice",1,cover.id,packAsset())]);
+  assert.equal(assetRaces.filter(result => result.status === "fulfilled").length,1);
+  assert.equal((await repository.listPackAssets("deck")).length,2);
+  assert.equal((await repository.listPackAssets("deck","claude")).length,1);
+  assert.equal((await repository.list("deck")).length,2,"cover/back assets never inflate front coverage");
   const current = await repository.get("deck", "major-0");
   await db.query("UPDATE arcana_user_decks SET revision=2 WHERE id='deck'");
   await assert.rejects(repository.attach("alice", 1, current!.id, record()), fails(409));
@@ -57,6 +74,8 @@ try {
   await assert.rejects(repository.attach("alice", 2, current!.id, record()), fails(404));
   await db.query("DELETE FROM arcana_user_decks WHERE id='deck'");
   assert.equal(await repository.get("deck", "major-0"), null, "FK cascades metadata deletion");
+  assert.equal((await repository.listPackAssets("deck")).length,0,"deck deletion cascades cover/back metadata");
+  await assert.rejects(repository.attachPackAsset("alice",2,null,packAsset()),fails(404));
   assert.equal((await repository.listPacks("deck")).length,0,"deck deletion cascades named set metadata");
   assert.equal(await repository.get("deck","major-0","claude"),null);
   await assert.rejects(repository.attach("alice", 2, null, record()), fails(404));

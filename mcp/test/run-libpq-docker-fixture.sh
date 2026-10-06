@@ -38,5 +38,6 @@ export MIGRATION_LIBPQ_TEST=1 MIGRATION_TEST_CA_FILE="$cluster/server.crt" MIGRA
 npm run test:migration-libpq --prefix mcp
 
 if [[ "$POSTGRES_VERSION" == 18 ]]; then
+  (cd mcp && ARCANA_RECONCILIATION_PG18_TEST=1 node --import tsx test/preview-reconciliation.ts)
   (cd mcp && ARCANA_RECONCILIATION_PG18_TEST=1 node --import tsx test/production-reconciliation.ts)
 fi

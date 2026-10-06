@@ -3132,5 +3132,940 @@
         "policies": null
       }
     ]
+  },
+  {
+    "version": 6,
+    "file": "006-visual-pack-assets.sql",
+    "sha256": "61afdfd2b6134f8b0b39de66db9be6444590ce65d1f4d6d80e9b0f5c8111d34d",
+    "schema": [
+      {
+        "name": "arcana_card_artwork",
+        "kind": "r",
+        "rls": false,
+        "force_rls": false,
+        "columns": [
+          [
+            "deck_id",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "card_slug",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "asset",
+            "jsonb",
+            true,
+            null,
+            "",
+            ""
+          ]
+        ],
+        "constraints": [
+          [
+            "arcana_card_artwork_asset_check",
+            "CHECK (((asset ->> 'mediaType'::text) = 'image/webp'::text))",
+            true
+          ],
+          [
+            "arcana_card_artwork_check",
+            "CHECK ((((asset ->> 'deckId'::text) = deck_id) AND ((asset ->> 'cardSlug'::text) = card_slug)))",
+            true
+          ],
+          [
+            "arcana_card_artwork_deck_id_fkey",
+            "FOREIGN KEY (deck_id) REFERENCES arcana_user_decks(id) ON DELETE CASCADE",
+            true
+          ],
+          [
+            "arcana_card_artwork_pkey",
+            "PRIMARY KEY (deck_id, card_slug)",
+            true
+          ]
+        ],
+        "indexes": [
+          [
+            "arcana_card_artwork_pkey",
+            "CREATE UNIQUE INDEX arcana_card_artwork_pkey ON public.arcana_card_artwork USING btree (deck_id, card_slug)",
+            true
+          ]
+        ],
+        "triggers": null,
+        "policies": null
+      },
+      {
+        "name": "arcana_external_identities",
+        "kind": "r",
+        "rls": false,
+        "force_rls": false,
+        "columns": [
+          [
+            "issuer",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "subject",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "principal_id",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            "now()",
+            "",
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            "now()",
+            "",
+            ""
+          ]
+        ],
+        "constraints": [
+          [
+            "arcana_external_identities_pkey",
+            "PRIMARY KEY (issuer, subject)",
+            true
+          ]
+        ],
+        "indexes": [
+          [
+            "arcana_external_identities_pkey",
+            "CREATE UNIQUE INDEX arcana_external_identities_pkey ON public.arcana_external_identities USING btree (issuer, subject)",
+            true
+          ],
+          [
+            "arcana_external_identities_principal_idx",
+            "CREATE INDEX arcana_external_identities_principal_idx ON public.arcana_external_identities USING btree (principal_id)",
+            true
+          ]
+        ],
+        "triggers": null,
+        "policies": null
+      },
+      {
+        "name": "arcana_host_state",
+        "kind": "r",
+        "rls": false,
+        "force_rls": false,
+        "columns": [
+          [
+            "scope_id",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "state",
+            "jsonb",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            "now()",
+            "",
+            ""
+          ]
+        ],
+        "constraints": [
+          [
+            "arcana_host_state_pkey",
+            "PRIMARY KEY (scope_id)",
+            true
+          ]
+        ],
+        "indexes": [
+          [
+            "arcana_host_state_pkey",
+            "CREATE UNIQUE INDEX arcana_host_state_pkey ON public.arcana_host_state USING btree (scope_id)",
+            true
+          ]
+        ],
+        "triggers": null,
+        "policies": null
+      },
+      {
+        "name": "arcana_identity_link_audit",
+        "kind": "r",
+        "rls": false,
+        "force_rls": false,
+        "columns": [
+          [
+            "id",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "principal_id",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "source_issuer",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "source_subject",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "target_issuer",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "target_subject",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "evidence_reference",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            "now()",
+            "",
+            ""
+          ]
+        ],
+        "constraints": [
+          [
+            "arcana_identity_link_audit_pkey",
+            "PRIMARY KEY (id)",
+            true
+          ]
+        ],
+        "indexes": [
+          [
+            "arcana_identity_link_audit_pkey",
+            "CREATE UNIQUE INDEX arcana_identity_link_audit_pkey ON public.arcana_identity_link_audit USING btree (id)",
+            true
+          ]
+        ],
+        "triggers": null,
+        "policies": null
+      },
+      {
+        "name": "arcana_manifest_uploads",
+        "kind": "r",
+        "rls": false,
+        "force_rls": false,
+        "columns": [
+          [
+            "id",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "owner_id",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "ticket_hash",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "expected_bytes",
+            "integer",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "expected_sha256",
+            "text",
+            false,
+            null,
+            "",
+            ""
+          ],
+          [
+            "raw_json",
+            "text",
+            false,
+            null,
+            "",
+            ""
+          ],
+          [
+            "sha256",
+            "text",
+            false,
+            null,
+            "",
+            ""
+          ],
+          [
+            "byte_length",
+            "integer",
+            false,
+            null,
+            "",
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            "now()",
+            "",
+            ""
+          ],
+          [
+            "expires_at",
+            "timestamp with time zone",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "import_request",
+            "jsonb",
+            false,
+            null,
+            "",
+            ""
+          ],
+          [
+            "import_result",
+            "jsonb",
+            false,
+            null,
+            "",
+            ""
+          ],
+          [
+            "draft_version",
+            "integer",
+            false,
+            null,
+            "",
+            ""
+          ],
+          [
+            "draft_key",
+            "text",
+            false,
+            null,
+            "",
+            ""
+          ],
+          [
+            "draft_history",
+            "jsonb",
+            false,
+            null,
+            "",
+            ""
+          ],
+          [
+            "draft_json",
+            "text",
+            false,
+            null,
+            "",
+            ""
+          ]
+        ],
+        "constraints": [
+          [
+            "arcana_manifest_draft_bounds",
+            "CHECK ((((draft_version IS NULL) AND (draft_key IS NULL) AND (draft_history IS NULL) AND (draft_json IS NULL)) OR ((draft_version IS NOT NULL) AND (draft_key IS NOT NULL) AND (draft_history IS NOT NULL) AND ((draft_version >= 1) AND (draft_version <= 513)) AND ((length(draft_key) >= 1) AND (length(draft_key) <= 80)) AND (draft_key ~ '^[A-Za-z0-9_-]+$'::text) AND (jsonb_typeof(draft_history) = 'object'::text) AND (octet_length((draft_history)::text) <= 131072) AND (raw_json IS NULL) AND ((draft_json IS NULL) OR (octet_length(draft_json) <= 2000000)) AND ((draft_json IS NULL) = (import_result IS NOT NULL)))))",
+            true
+          ],
+          [
+            "arcana_manifest_uploads_byte_length_check",
+            "CHECK (((byte_length IS NULL) OR ((byte_length >= 1) AND (byte_length <= 2000000))))",
+            true
+          ],
+          [
+            "arcana_manifest_uploads_check",
+            "CHECK (((import_request IS NULL) = (import_result IS NULL)))",
+            true
+          ],
+          [
+            "arcana_manifest_uploads_expected_bytes_check",
+            "CHECK (((expected_bytes >= 1) AND (expected_bytes <= 2000000)))",
+            true
+          ],
+          [
+            "arcana_manifest_uploads_expected_sha256_check",
+            "CHECK (((expected_sha256 IS NULL) OR (expected_sha256 ~ '^[0-9a-f]{64}$'::text)))",
+            true
+          ],
+          [
+            "arcana_manifest_uploads_pkey",
+            "PRIMARY KEY (id)",
+            true
+          ],
+          [
+            "arcana_manifest_uploads_raw_json_check",
+            "CHECK (((raw_json IS NULL) OR (octet_length(raw_json) <= 2000000)))",
+            true
+          ],
+          [
+            "arcana_manifest_uploads_sha256_check",
+            "CHECK (((sha256 IS NULL) OR (sha256 ~ '^[0-9a-f]{64}$'::text)))",
+            true
+          ]
+        ],
+        "indexes": [
+          [
+            "arcana_manifest_drafts_owner_key",
+            "CREATE UNIQUE INDEX arcana_manifest_drafts_owner_key ON public.arcana_manifest_uploads USING btree (owner_id, draft_key) WHERE (draft_key IS NOT NULL)",
+            true
+          ],
+          [
+            "arcana_manifest_uploads_expiry",
+            "CREATE INDEX arcana_manifest_uploads_expiry ON public.arcana_manifest_uploads USING btree (expires_at)",
+            true
+          ],
+          [
+            "arcana_manifest_uploads_owner_expiry",
+            "CREATE INDEX arcana_manifest_uploads_owner_expiry ON public.arcana_manifest_uploads USING btree (owner_id, expires_at)",
+            true
+          ],
+          [
+            "arcana_manifest_uploads_pkey",
+            "CREATE UNIQUE INDEX arcana_manifest_uploads_pkey ON public.arcana_manifest_uploads USING btree (id)",
+            true
+          ]
+        ],
+        "triggers": null,
+        "policies": null
+      },
+      {
+        "name": "arcana_rate_limits",
+        "kind": "r",
+        "rls": false,
+        "force_rls": false,
+        "columns": [
+          [
+            "key",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "bucket",
+            "bigint",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "count",
+            "integer",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "expires_at",
+            "timestamp with time zone",
+            true,
+            null,
+            "",
+            ""
+          ]
+        ],
+        "constraints": [
+          [
+            "arcana_rate_limits_count_check",
+            "CHECK ((count > 0))",
+            true
+          ],
+          [
+            "arcana_rate_limits_pkey",
+            "PRIMARY KEY (key)",
+            true
+          ]
+        ],
+        "indexes": [
+          [
+            "arcana_rate_limits_expiry_idx",
+            "CREATE INDEX arcana_rate_limits_expiry_idx ON public.arcana_rate_limits USING btree (expires_at)",
+            true
+          ],
+          [
+            "arcana_rate_limits_pkey",
+            "CREATE UNIQUE INDEX arcana_rate_limits_pkey ON public.arcana_rate_limits USING btree (key)",
+            true
+          ]
+        ],
+        "triggers": null,
+        "policies": null
+      },
+      {
+        "name": "arcana_user_decks",
+        "kind": "r",
+        "rls": false,
+        "force_rls": false,
+        "columns": [
+          [
+            "id",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "owner_id",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "slug",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "manifest",
+            "jsonb",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "visibility",
+            "text",
+            true,
+            "'private'::text",
+            "",
+            ""
+          ],
+          [
+            "revision",
+            "integer",
+            true,
+            "1",
+            "",
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            "now()",
+            "",
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            "now()",
+            "",
+            ""
+          ],
+          [
+            "published_at",
+            "timestamp with time zone",
+            false,
+            null,
+            "",
+            ""
+          ]
+        ],
+        "constraints": [
+          [
+            "arcana_user_decks_owner_id_slug_key",
+            "UNIQUE (owner_id, slug)",
+            true
+          ],
+          [
+            "arcana_user_decks_pkey",
+            "PRIMARY KEY (id)",
+            true
+          ],
+          [
+            "arcana_user_decks_revision_check",
+            "CHECK ((revision > 0))",
+            true
+          ],
+          [
+            "arcana_user_decks_visibility_check",
+            "CHECK ((visibility = ANY (ARRAY['private'::text, 'unlisted'::text, 'public'::text])))",
+            true
+          ]
+        ],
+        "indexes": [
+          [
+            "arcana_user_decks_owner_id_slug_key",
+            "CREATE UNIQUE INDEX arcana_user_decks_owner_id_slug_key ON public.arcana_user_decks USING btree (owner_id, slug)",
+            true
+          ],
+          [
+            "arcana_user_decks_owner_updated_idx",
+            "CREATE INDEX arcana_user_decks_owner_updated_idx ON public.arcana_user_decks USING btree (owner_id, updated_at DESC)",
+            true
+          ],
+          [
+            "arcana_user_decks_pkey",
+            "CREATE UNIQUE INDEX arcana_user_decks_pkey ON public.arcana_user_decks USING btree (id)",
+            true
+          ],
+          [
+            "arcana_user_decks_public_published_idx",
+            "CREATE INDEX arcana_user_decks_public_published_idx ON public.arcana_user_decks USING btree (published_at DESC, updated_at DESC) WHERE (visibility = 'public'::text)",
+            true
+          ]
+        ],
+        "triggers": null,
+        "policies": null
+      },
+      {
+        "name": "arcana_visual_pack_artwork",
+        "kind": "r",
+        "rls": false,
+        "force_rls": false,
+        "columns": [
+          [
+            "deck_id",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "pack_id",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "card_slug",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "asset",
+            "jsonb",
+            true,
+            null,
+            "",
+            ""
+          ]
+        ],
+        "constraints": [
+          [
+            "arcana_visual_pack_artwork_asset_check",
+            "CHECK ((((asset ->> 'mediaType'::text) IS NOT NULL) AND ((asset ->> 'mediaType'::text) = 'image/webp'::text)))",
+            true
+          ],
+          [
+            "arcana_visual_pack_artwork_check",
+            "CHECK ((((asset ->> 'deckId'::text) IS NOT NULL) AND ((asset ->> 'deckId'::text) = deck_id)))",
+            true
+          ],
+          [
+            "arcana_visual_pack_artwork_check1",
+            "CHECK ((((asset ->> 'packId'::text) IS NOT NULL) AND ((asset ->> 'packId'::text) = pack_id)))",
+            true
+          ],
+          [
+            "arcana_visual_pack_artwork_check2",
+            "CHECK ((((asset ->> 'cardSlug'::text) IS NOT NULL) AND ((asset ->> 'cardSlug'::text) = card_slug)))",
+            true
+          ],
+          [
+            "arcana_visual_pack_artwork_deck_id_pack_id_fkey",
+            "FOREIGN KEY (deck_id, pack_id) REFERENCES arcana_visual_packs(deck_id, pack_id) ON DELETE CASCADE",
+            true
+          ],
+          [
+            "arcana_visual_pack_artwork_pkey",
+            "PRIMARY KEY (deck_id, pack_id, card_slug)",
+            true
+          ]
+        ],
+        "indexes": [
+          [
+            "arcana_visual_pack_artwork_pkey",
+            "CREATE UNIQUE INDEX arcana_visual_pack_artwork_pkey ON public.arcana_visual_pack_artwork USING btree (deck_id, pack_id, card_slug)",
+            true
+          ]
+        ],
+        "triggers": null,
+        "policies": null
+      },
+      {
+        "name": "arcana_visual_pack_assets",
+        "kind": "r",
+        "rls": false,
+        "force_rls": false,
+        "columns": [
+          [
+            "deck_id",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "pack_id",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "slot",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "asset",
+            "jsonb",
+            true,
+            null,
+            "",
+            ""
+          ]
+        ],
+        "constraints": [
+          [
+            "arcana_visual_pack_assets_asset_check",
+            "CHECK ((NOT (asset ? 'cardSlug'::text)))",
+            true
+          ],
+          [
+            "arcana_visual_pack_assets_asset_check1",
+            "CHECK ((((asset ->> 'mediaType'::text) IS NOT NULL) AND ((asset ->> 'mediaType'::text) = 'image/webp'::text)))",
+            true
+          ],
+          [
+            "arcana_visual_pack_assets_check",
+            "CHECK ((((asset ->> 'deckId'::text) IS NOT NULL) AND ((asset ->> 'deckId'::text) = deck_id)))",
+            true
+          ],
+          [
+            "arcana_visual_pack_assets_check1",
+            "CHECK ((((asset ->> 'packId'::text) IS NOT NULL) AND ((asset ->> 'packId'::text) = pack_id)))",
+            true
+          ],
+          [
+            "arcana_visual_pack_assets_check2",
+            "CHECK ((((asset ->> 'slot'::text) IS NOT NULL) AND ((asset ->> 'slot'::text) = slot)))",
+            true
+          ],
+          [
+            "arcana_visual_pack_assets_deck_id_fkey",
+            "FOREIGN KEY (deck_id) REFERENCES arcana_user_decks(id) ON DELETE CASCADE",
+            true
+          ],
+          [
+            "arcana_visual_pack_assets_pack_id_check",
+            "CHECK ((((length(pack_id) >= 1) AND (length(pack_id) <= 80)) AND (pack_id ~ '^[a-z0-9]+([-_.][a-z0-9]+)*$'::text)))",
+            true
+          ],
+          [
+            "arcana_visual_pack_assets_pkey",
+            "PRIMARY KEY (deck_id, pack_id, slot)",
+            true
+          ],
+          [
+            "arcana_visual_pack_assets_slot_check",
+            "CHECK ((slot = ANY (ARRAY['cover'::text, 'cardBack'::text])))",
+            true
+          ]
+        ],
+        "indexes": [
+          [
+            "arcana_visual_pack_assets_pkey",
+            "CREATE UNIQUE INDEX arcana_visual_pack_assets_pkey ON public.arcana_visual_pack_assets USING btree (deck_id, pack_id, slot)",
+            true
+          ]
+        ],
+        "triggers": null,
+        "policies": null
+      },
+      {
+        "name": "arcana_visual_packs",
+        "kind": "r",
+        "rls": false,
+        "force_rls": false,
+        "columns": [
+          [
+            "deck_id",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "pack_id",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "label",
+            "text",
+            true,
+            null,
+            "",
+            ""
+          ],
+          [
+            "description",
+            "text",
+            false,
+            null,
+            "",
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            "now()",
+            "",
+            ""
+          ]
+        ],
+        "constraints": [
+          [
+            "arcana_visual_packs_deck_id_fkey",
+            "FOREIGN KEY (deck_id) REFERENCES arcana_user_decks(id) ON DELETE CASCADE",
+            true
+          ],
+          [
+            "arcana_visual_packs_description_check",
+            "CHECK (((description IS NULL) OR (length(description) <= 500)))",
+            true
+          ],
+          [
+            "arcana_visual_packs_label_check",
+            "CHECK (((length(label) >= 1) AND (length(label) <= 80)))",
+            true
+          ],
+          [
+            "arcana_visual_packs_pack_id_check",
+            "CHECK ((pack_id <> 'saved-artwork'::text))",
+            true
+          ],
+          [
+            "arcana_visual_packs_pack_id_check1",
+            "CHECK ((((length(pack_id) >= 1) AND (length(pack_id) <= 80)) AND (pack_id ~ '^[a-z0-9]+([-_.][a-z0-9]+)*$'::text)))",
+            true
+          ],
+          [
+            "arcana_visual_packs_pkey",
+            "PRIMARY KEY (deck_id, pack_id)",
+            true
+          ]
+        ],
+        "indexes": [
+          [
+            "arcana_visual_packs_pkey",
+            "CREATE UNIQUE INDEX arcana_visual_packs_pkey ON public.arcana_visual_packs USING btree (deck_id, pack_id)",
+            true
+          ]
+        ],
+        "triggers": null,
+        "policies": null
+      }
+    ]
   }
 ]

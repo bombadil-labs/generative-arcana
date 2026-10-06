@@ -1,9 +1,13 @@
 import { getDeck } from "@/decks";
 import { AxisExplorer } from "./AxisExplorer";
+import { DeckCover } from "../components/DeckCover";
+import { useArtworkSelection, useArtworkStore } from "../artwork/context";
 import { navigate } from "./router";
 
 export function DeckHome({ deckId }: { deckId: string }) {
   const deck = getDeck(deckId);
+  const artworkStore = useArtworkStore();
+  const artworkSelection = useArtworkSelection();
   if (!deck) return <NotFound id={deckId} />;
   const d = deck.data;
   const transversalName = (d.transversal as { name?: string } | undefined)?.name ?? "";
@@ -16,6 +20,18 @@ export function DeckHome({ deckId }: { deckId: string }) {
           {transversalName}{transversalName && creator ? " · " : ""}{creator ? `a deck by ${creator}` : ""}
         </p>
 
+        {artworkStore && <div style={{ width: "min(280px, 100%)", height: 220, marginBottom: "var(--s-4)", background: "var(--paper-2)", border: "1px solid var(--line)", borderRadius: "var(--r-2)", overflow: "hidden", color: "var(--accent)", fontSize: 64 }}><DeckCover deckId={deck.id} deckRevision={artworkStore.deckRevision} name={deck.name} fallback={<span aria-hidden>✦</span>} /></div>}
+        {artworkSelection && <div style={{ maxWidth: 420, marginBottom: "var(--s-4)", color: "var(--ink-2)", font: "400 13px/1.5 var(--font-body)" }}>
+          <label htmlFor="home-artwork-set" style={{ display: "block", marginBottom: 6 }}>Artwork set</label>
+          <select id="home-artwork-set" value={artworkSelection.packId} onChange={(event) => artworkSelection.selectPack(event.target.value)} style={{ width: "100%", padding: "9px 12px", border: "1px solid var(--line-2)", borderRadius: "var(--r-2)", background: "var(--paper-2)", color: "var(--ink)", font: "inherit" }}>
+            {!artworkSelection.packId && <option value="" disabled>Choose an artwork set…</option>}
+            {artworkSelection.packId && !artworkSelection.packs.some((pack) => pack.id === artworkSelection.packId) && <option value={artworkSelection.packId}>{artworkSelection.packId} · unavailable</option>}
+            {artworkSelection.visiblePacks.map((pack) => <option key={pack.id} value={pack.id}>{pack.label}</option>)}
+          </select>
+          {!artworkSelection.packId && <p role="status">Choose an artwork set to see its cover and card illustrations.</p>}
+          {artworkSelection.status === "loading" && <p role="status">Loading artwork sets…</p>}
+          {artworkSelection.error && <p role="alert">{artworkSelection.error} <button type="button" onClick={artworkSelection.refresh}>Retry artwork</button></p>}
+        </div>}
         <h1 style={headline}>{deck.name}</h1>
 
         <p style={description}>{d.theme.description}</p>

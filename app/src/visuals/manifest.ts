@@ -55,6 +55,10 @@ export interface VisualPackManifest {
   assets: Record<string, VisualAssetDeclaration>;
   cards?: Record<string, VisualAssetBinding>;
   spreads?: Record<string, VisualAssetBinding>;
+  /** Optional website presentation art, separate from card-front coverage. */
+  cover?: VisualAssetBinding;
+  /** Stored for future face-down rendering; never a synthetic card slug. */
+  cardBack?: VisualAssetBinding;
 }
 
 export type VisualPackValidation =
@@ -131,7 +135,9 @@ export function validateVisualPackManifest(value: unknown): VisualPackValidation
 
     const cards = optionalBindings(pack.cards, "visualPack.cards", assets);
     const spreads = optionalBindings(pack.spreads, "visualPack.spreads", assets);
-    if (!cards && !spreads) fail("visualPack", "must bind at least one card or spread");
+    const cover = optionalImageBinding(pack.cover, "visualPack.cover", assets);
+    const cardBack = optionalImageBinding(pack.cardBack, "visualPack.cardBack", assets);
+    if (!cards && !spreads && !cover && !cardBack) fail("visualPack", "must bind at least one card, spread, cover, or cardBack");
 
     const normalized: VisualPackManifest = {
       schemaVersion: CURRENT_VISUAL_PACK_SCHEMA_VERSION,
@@ -141,6 +147,8 @@ export function validateVisualPackManifest(value: unknown): VisualPackValidation
       assets,
       ...(cards ? { cards } : {}),
       ...(spreads ? { spreads } : {}),
+      ...(cover ? { cover } : {}),
+      ...(cardBack ? { cardBack } : {}),
     };
     return { ok: true, pack: immutableJsonSnapshot(normalized, "Visual pack manifest") };
   } catch (error) {
@@ -191,6 +199,14 @@ function optionalBindings(
     result[slot] = { asset, ...(fallback ? { fallback } : {}) };
   }
   return result;
+}
+
+/** Pack-level slots currently support only static images, never executable artwork. */
+function optionalImageBinding(value: unknown, path: string, assets: Record<string, VisualAssetDeclaration>): VisualAssetBinding | undefined {
+  if (value === undefined) return undefined;
+  const binding = optionalBindings({ slot: value }, path, assets)!.slot;
+  if (assets[binding.asset].kind !== "image") fail(path, "must reference an image asset");
+  return binding;
 }
 
 function optionalCapabilities(value: unknown, path: string): VisualProgramCapability[] | undefined {

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { Pool } from 'pg';
 import { catalog, run, schema } from '../scripts/domain-migrations';
+import { prepareVersionSixUpgrade, verifyVersionSixUpgrade } from './migration-six-fixture';
 // This executable is only for the disposable service declared in migration CI.
 // No inherited migration/runtime connection string is accepted.
 if (process.env.GITHUB_ACTIONS !== 'true' || process.env.ARCANA_DISPOSABLE_POSTGRES !== '1') throw new Error('CI disposable PostgreSQL service required');
@@ -10,7 +11,9 @@ const a = await pool.connect();
 const b = await pool.connect();
 try {
   assert.deepEqual(await schema(a),[], 'CI database must be empty');
+  const before = await prepareVersionSixUpgrade(a,entries);
   await Promise.all([run(a,entries,'apply'),run(b,entries,'apply')]);
+  await verifyVersionSixUpgrade(a,entries,before);
   assert.equal((await a.query('SELECT count(*)::int AS n FROM arcana_migration_history')).rows[0].n,entries.length);
   assert.equal((await run(a,entries,'status')).pending.length,0);
   await a.query('BEGIN');

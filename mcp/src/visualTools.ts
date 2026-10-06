@@ -60,10 +60,10 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
     }
   };
   const packChoices = async (deckId: string, includeEmptyDefault = false): Promise<VisualPackChoice[]> => {
-    const saved = (await savedPacks(deckId)).filter(pack => includeEmptyDefault || pack.id !== DEFAULT_ARTWORK_PACK_ID || pack.cardCount > 0);
+    const saved = (await savedPacks(deckId)).filter(pack => includeEmptyDefault || pack.id !== DEFAULT_ARTWORK_PACK_ID || pack.cardCount > 0 || pack.hasCover || pack.hasCardBack);
     return [
       ...visuals.listPacks(deckId).map(pack => ({ pack, saved: false })),
-      ...saved.map(pack => ({ saved: true, pack: { deckId, id: pack.id, label: pack.label, ...(pack.description ? { description: pack.description } : {}), renderer: "static-image" as const, mimeType: "image/webp", complete: pack.complete, cardCount: pack.cardCount } })),
+      ...saved.map(pack => ({ saved: true, pack: { deckId, id: pack.id, label: pack.label, ...(pack.description ? { description: pack.description } : {}), renderer: "static-image" as const, mimeType: "image/webp", complete: pack.complete, cardCount: pack.cardCount, hasCover: pack.hasCover, hasCardBack: pack.hasCardBack } })),
     ];
   };
   const listPacks = async (deckId: string) => (await packChoices(deckId)).map(choice => choice.pack);
@@ -110,7 +110,7 @@ export function registerArcanaVisualTools(server: McpServer, options: RegisterAr
   server.registerTool(
     "list_visual_packs",
     {
-      description: "List named saved-artwork sets and server-renderable visual packs for one deck, including empty named sets and their coverage. Image tools automatically select the only usable populated pack; multiple usable packs require packId.",
+      description: "List named saved-artwork sets and server-renderable visual packs for one deck, including empty named sets, front coverage, and separate hasCover/hasCardBack flags. Image tools automatically select the only usable populated pack; multiple usable packs require packId.",
       inputSchema: z.object({ deckId: z.string().min(1) }),
       annotations: readOnlyAnnotations,
       ...(authMeta ? { _meta: authMeta } : {}),

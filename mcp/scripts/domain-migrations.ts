@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { diagnoseSchema } from './migration-schema-diagnostics';
 import { readFile, readdir } from 'node:fs/promises';
 
 export class MigrationSafetyError extends Error {}
@@ -53,7 +54,13 @@ export function target(env: NodeJS.ProcessEnv, flags: Record<string,string>) {
   if (url.hostname.includes('-pooler.')) throw new MigrationSafetyError('Use a direct migration connection, not a pooler');
   return env.DATABASE_MIGRATION_URL;
 }
-export async function run(db: Connection, entries: (Entry & {sql:string})[], command: string, baseline?: number) {
+export interface MigrationReport {
+  command:string; recordedThrough:number; pending:{version:number;file:string;sha256:string}[];
+  baselineRequired?:boolean; verifiedBaselineCandidate?:number|null;
+  diagnosticContext?:{server_version_num:string;transaction_read_only:string};
+  schemaDiagnostics?:ReturnType<typeof diagnoseSchema>;
+}
+export async function run(db: Connection, entries: (Entry & {sql:string})[], command: string, baseline?: number):Promise<MigrationReport> {
   if (!['plan','status','apply','baseline'].includes(command)) throw new MigrationSafetyError('Expected plan, status, apply or baseline');
   const write = command === 'apply' || command === 'baseline';
   await db.query(write ? 'BEGIN' : 'BEGIN READ ONLY');
@@ -77,8 +84,9 @@ export async function run(db: Connection, entries: (Entry & {sql:string})[], com
       through = baseline;
     } else if (!exists && actual.length && !write) {
       const candidate = entries.find(e => equal(actual, e.schema))?.version ?? null;
+      const diagnosticContext = candidate === null ? (await db.query("SELECT current_setting('server_version_num') AS server_version_num, current_setting('transaction_read_only') AS transaction_read_only")).rows[0] : undefined;
       await db.query('COMMIT');
-      return {command, recordedThrough:0, baselineRequired:true, verifiedBaselineCandidate:candidate, pending:[]};
+      return {command, recordedThrough:0, baselineRequired:true, verifiedBaselineCandidate:candidate, pending:[], ...(candidate === null ? {diagnosticContext, schemaDiagnostics:diagnoseSchema(actual, entries)} : {})};
     } else if (!equal(actual, through ? entries[through - 1].schema : [])) {
       throw new MigrationSafetyError(through ? 'Schema drift from recorded migration state' : 'Untracked domain schema: verified baseline required');
     }
