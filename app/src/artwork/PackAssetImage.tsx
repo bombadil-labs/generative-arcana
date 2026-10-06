@@ -18,9 +18,10 @@ export function PackAssetImage({ asset, scope, alt, fallback }: { asset?: PackAr
     }).catch(() => { /* Missing, denied and corrupt images keep the trusted fallback. */ });
     return () => { controller.abort(); release(); };
   }, [asset, scope]);
-  return <div style={{ position: "relative", width: "100%", height: "100%", display: "grid", placeItems: "center" }}>
+  // Zero-minimum tracks keep intrinsic image dimensions from expanding the preview.
+  return <div style={{ position: "relative", width: "100%", height: "100%", display: "grid", gridTemplateRows: "minmax(0, 1fr)", gridTemplateColumns: "minmax(0, 1fr)", placeItems: "center" }}>
     {!current?.loaded && <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center" }}>{fallback}</div>}
-    {current && <img key={current.url} src={current.url} alt={alt} aria-hidden={!current.loaded} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", opacity: current.loaded ? 1 : 0 }} onLoad={() => {
+    {current && <img key={current.url} src={current.url} alt={alt} aria-hidden={!current.loaded} style={{ minWidth: 0, minHeight: 0, width: "100%", height: "100%", objectFit: "contain", display: "block", opacity: current.loaded ? 1 : 0 }} onLoad={() => {
       setImage((previous) => previous === current ? { ...previous, loaded: true } : previous);
     }} onError={() => {
       current.release();
