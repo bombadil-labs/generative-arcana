@@ -16,7 +16,7 @@ on:
         description: 'Reviewed database name'
         required: true
       expected_user:
-        description: 'Reviewed dedicated migration role'
+        description: 'Reviewed authorized migration role'
         required: true
       backup_reference:
         description: 'Reviewed backup/recovery evidence; required for baseline/apply'
@@ -47,6 +47,12 @@ jobs:
           node-version: 24
           package-manager-cache: false
       - run: npm ci --prefix mcp --ignore-scripts
+      - name: Prepare migration-only libpq client
+        shell: bash
+        run: |
+          python3.12 -m venv "$RUNNER_TEMP/arcana-migration-python"
+          "$RUNNER_TEMP/arcana-migration-python/bin/python" -m pip install --require-hashes --only-binary=:all: -r mcp/scripts/libpq/requirements.txt
+          echo "MIGRATION_PYTHON=$RUNNER_TEMP/arcana-migration-python/bin/python" >> "$GITHUB_ENV"
       - name: Run reviewed migration operation
         env:
           DATABASE_MIGRATION_URL: ${{ secrets.ARCANA_PREVIEW_MIGRATION_URL }}
