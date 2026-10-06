@@ -36,7 +36,7 @@ export function Community() {
       {decks && decks.length > 0 && (
         <div style={grid}>
           {decks.map((deck) => (
-            <button key={deck.id} onClick={() => navigate(`/deck/${deck.id}`)} style={tile}>
+            <button className="community-deck" key={deck.id} onClick={() => navigate(`/deck/${deck.id}`)} style={tile}>
               <div style={preview}><DeckCover deckId={deck.id} deckRevision={deck.revision} name={deck.name} fallback={<span style={sigil} aria-hidden>✦</span>} /></div>
               <div style={body}>
                 <div style={deckName}>{deck.name}</div>
@@ -65,9 +65,9 @@ const page: React.CSSProperties = { maxWidth: 1180, margin: "0 auto", padding: "
 const kicker: React.CSSProperties = { font: "400 12px/1.4 var(--font-mono)", letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--ink-3)", marginBottom: "var(--s-3)" };
 const headline: React.CSSProperties = { font: "400 clamp(38px,6vw,72px)/1.04 var(--font-display)", letterSpacing: "-0.01em", color: "var(--ink)", margin: 0 };
 const lede: React.CSSProperties = { font: "400 17px/1.6 var(--font-body)", color: "var(--ink-2)", maxWidth: "62ch", margin: "var(--s-4) 0 0" };
-const grid: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(248px,1fr))", gap: "var(--s-4)" };
+const grid: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(min(248px,100%),1fr))", gap: "var(--s-4)" };
 const tile: React.CSSProperties = { all: "unset", cursor: "pointer", display: "block", overflow: "hidden", background: "var(--card)", border: "1px solid var(--line)", borderRadius: "var(--r-3)", boxShadow: "var(--e-1)" };
-const preview: React.CSSProperties = { height: 108, display: "grid", placeItems: "center", borderBottom: "1px solid var(--line)", background: "radial-gradient(circle at 50% 45%, var(--accent-wash), transparent 64%), var(--paper-2)", color: "var(--accent)" };
+const preview: React.CSSProperties = { aspectRatio: "3 / 2", position: "relative", minWidth: 0, minHeight: 0, overflow: "hidden", display: "grid", gridTemplateRows: "minmax(0,1fr)", gridTemplateColumns: "minmax(0,1fr)", placeItems: "center", borderBottom: "1px solid var(--line)", background: "radial-gradient(circle at 50% 45%, var(--accent-wash), transparent 64%), var(--paper-2)", color: "var(--accent)" };
 const sigil: React.CSSProperties = { font: "400 54px/1 var(--font-display)", opacity: 0.7 };
 const body: React.CSSProperties = { padding: "var(--s-3) var(--s-4) var(--s-4)" };
 const deckName: React.CSSProperties = { font: "400 21px/1.15 var(--font-display)", color: "var(--ink)" };

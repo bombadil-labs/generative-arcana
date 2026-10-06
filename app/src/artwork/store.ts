@@ -36,6 +36,8 @@ export class ArtworkStore {
   subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => this.listeners.delete(listener); };
   getVersion = (): number => this.version;
   get selectionReady(): boolean { return this.selectionResolved; }
+  /** Only the current, validated set; clear/selection changes remove it synchronously. */
+  get currentCatalog(): OwnedArtworkCatalog | null { return this.catalogStatus === "ready" ? this.catalog : null; }
   get(slug: string): ArtworkState { return this.states.get(slug) ?? EMPTY_ARTWORK; }
   has(slug: string): boolean { return this.get(slug).status === "ready"; }
   hasArtwork(slug: string): boolean { return !!this.catalog?.cards.find((card) => card.slug === slug)?.artwork; }

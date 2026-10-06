@@ -85,7 +85,7 @@ function AssetSlotEditor({ deckId, packId, session, catalog, disabled, slot, onS
   }
   return <form id={`artwork-${slot}-form`} className="pack-asset-form" onSubmit={upload} aria-busy={current.busy}>
     <h3>{label}</h3>
-    <p className="artwork-hint">{slot === "cover" ? "Shown on the deck’s home page and library tiles for the selected set." : "Stored with this set for future use. Card backs are not shown during readings yet. Use 180° rotational symmetry if reversals should stay hidden."}</p>
+    <p className="artwork-hint">{slot === "cover" ? "Shown on the deck’s home page and library tiles. Recommended: 1536 × 1024 (3:2 landscape)." : "Shown in the deck preview stack. Recommended: 1024 × 1536 (2:3 portrait). Card backs are not shown during readings yet. Use 180° rotational symmetry if reversals should stay hidden."}</p>
     <div className="pack-asset-preview"><PackAssetImage asset={asset} scope={session} alt={`${label} preview`} fallback={<span className="artwork-hint">{asset ? `${label} preview unavailable` : `No ${label.toLowerCase()} yet`}</span>} /></div>
     <label htmlFor={`artwork-${slot}-file`}>{asset ? `Replace ${label.toLowerCase()}` : `Image for ${label.toLowerCase()}`}</label>
     <input ref={input} id={`artwork-${slot}-file`} type="file" accept="image/png,image/jpeg,image/webp" disabled={current.busy || current.needsRefresh || disabled} aria-describedby={`artwork-${slot}-limits`} onChange={(event) => {

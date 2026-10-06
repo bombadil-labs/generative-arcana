@@ -1,0 +1,58 @@
+.deck-artwork-stage {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  max-width: 840px;
+  aspect-ratio: 8 / 5;
+  margin: 0 auto 24px;
+  pointer-events: none;
+  user-select: none;
+}
+.deck-artwork-cover {
+  position: absolute;
+  top: 3%;
+  left: 12.5%;
+  width: 75%;
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  background: var(--paper-2);
+  box-shadow: 0 12px 36px color-mix(in srgb, var(--ink) 12%, transparent);
+}
+.deck-artwork-stack { position: absolute; inset: 0; }
+.deck-artwork-card {
+  position: absolute;
+  width: 21%;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border: 3px solid var(--paper-2);
+  border-radius: 7px;
+  background: var(--paper-2);
+  box-shadow: 0 5px 15px color-mix(in srgb, var(--ink) 22%, transparent);
+}
+.deck-artwork-back { bottom: 6%; left: 57%; }
+.deck-artwork-back.rear { transform: translate(-12%, -2%) rotate(-12deg); }
+.deck-artwork-back.middle { transform: translate(-6%, -1%) rotate(-7deg); }
+.deck-artwork-back.top { transform: rotate(-2deg); }
+.deck-artwork-front { bottom: 5%; left: 70%; transform: rotate(6deg); }
+.deck-artwork-emblem {
+  width: 100%; height: 100%; display: grid; place-items: center;
+  color: var(--accent); background: radial-gradient(ellipse, var(--accent-wash), var(--paper-2) 75%);
+  outline: 1px solid var(--line-2); outline-offset: -12px;
+  font: 400 clamp(32px, 6vw, 72px)/1 var(--font-display);
+}
+.deck-home-hero { text-align: center; margin-bottom: var(--s-6); }
+.deck-home-hero h1 { overflow-wrap: anywhere; }
+.deck-home-tagline { max-width: 58ch; margin: 0 auto; font: 400 18px/1.6 var(--font-body); color: var(--ink-2); }
+.deck-home-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--s-3); margin: var(--s-4) 0; }
+.deck-home-about { max-width: 760px; margin: 0 auto var(--s-5); }
+.deck-home-hero button:focus-visible, .community-deck:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+@media (max-width: 560px) {
+  .deck-artwork-stage { aspect-ratio: 1; margin-bottom: 20px; }
+  .deck-artwork-cover { width: 94%; left: 3%; top: 2%; }
+  .deck-artwork-card { width: 28%; border-width: 2px; }
+  .deck-artwork-back { left: 41%; bottom: 5%; }
+  .deck-artwork-front { left: 63%; bottom: 5%; }
+  .deck-home-actions > button { text-align: center; }
+}

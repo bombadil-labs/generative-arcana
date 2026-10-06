@@ -80,6 +80,8 @@ host that supports skills, or have the model read `get_deck_authoring_guide` thr
 A custom skill package alone does not create an OAuth connection or save to an account.
 No OpenAI-specific field belongs in `DeckManifest`.
 
+When artwork is requested, the canonical bundle also guides separate cover and card-back authoring: cover 1536 × 1024 (3:2), fronts/backs 1024 × 1536 (2:3), all width × height recommendations. Hosts should distribute this guidance from the canonical skill rather than inventing their own dimensions or semantic fields.
+
 ## Reading the authoring guide
 
 Call `get_deck_authoring_guide({})` before planning. No arguments return all 23 canonical source

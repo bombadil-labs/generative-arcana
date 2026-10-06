@@ -22,6 +22,8 @@ interface VisualPackManifest {
   assets: Record<string, ImageVisualAsset | ProgramVisualAsset>;
   cards?: Record<CardSlug, VisualAssetBinding>;
   spreads?: Record<SpreadId, VisualAssetBinding>;
+  cover?: VisualAssetBinding;    // set-level image, not a card
+  cardBack?: VisualAssetBinding; // set-level image, not a card
 }
 
 interface VisualAssetBinding {
@@ -31,6 +33,8 @@ interface VisualAssetBinding {
 ```
 
 Asset keys are logical names inside the portable bundle. Asset declarations use safe relative POSIX paths rather than URLs. A future import/storage service may assign opaque asset records and object-storage locations without rewriting card/spread bindings or exposing provider URLs to the authored model.
+
+Recommended artwork masters are 1536 × 1024 (3:2 landscape) for `cover` and 1024 × 1536 (2:3 portrait) for card fronts and `cardBack`. These are composition targets, not schema or upload restrictions. Existing alternate proportions remain valid; covers/backs do not add to card counts. Follow the canonical authoring bundle’s visual-language dialogue for approval and composition.
 
 ### Images
 

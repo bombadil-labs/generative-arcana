@@ -25,15 +25,16 @@ export interface CardArtProps {
   prefer?: string;
   mode?: "live" | "poster";
   paused?: boolean;
+  fit?: "cover" | "contain";
   onSignal?: (name: string, detail?: unknown) => void;
 }
 
-export function CardArt({ card, deckId, deck, prefer, mode = "live", paused, onSignal }: CardArtProps) {
+export function CardArt({ card, deckId, deck, prefer, mode = "live", paused, fit = "cover", onSignal }: CardArtProps) {
   const { state: artwork, pending, selected, fail } = useCardArtwork(deckId, card.slug);
   // The semantic face means "no saved art", not "we have not checked yet".
   if (pending) return <LoadingArtwork name={card.name} />;
   if (artwork.status === "ready") {
-    return <SavedArtwork key={`${deckId}/${card.slug}/${artwork.url}`} url={artwork.url} name={card.name} onError={fail} />;
+    return <SavedArtwork key={`${deckId}/${card.slug}/${artwork.url}`} url={artwork.url} name={card.name} fit={fit} onError={fail} />;
   }
   if (selected) return <CardPlaceholder card={card} deck={deck} />;
   const visual = deckId ? resolveVisual(deckId, card.slug, prefer) : null;
@@ -46,7 +47,7 @@ export function CardArt({ card, deckId, deck, prefer, mode = "live", paused, onS
   }
   if (visual?.kind === "image") {
     return <img src={visual.url} alt={card.name} loading="lazy" draggable={false}
-      style={{ ...FILL, width: "100%", height: "100%", objectFit: "cover", display: "block" }} />;
+      style={{ ...FILL, width: "100%", height: "100%", objectFit: fit, display: "block" }} />;
   }
   return <CardPlaceholder card={card} deck={deck} />;
 }
@@ -59,7 +60,7 @@ function LoadingArtwork({ name }: { name: string }) {
   </div>;
 }
 
-function SavedArtwork({ url, name, onError }: { url: string; name: string; onError: () => void }) {
+function SavedArtwork({ url, name, fit, onError }: { url: string; name: string; fit: "cover" | "contain"; onError: () => void }) {
   const [loaded, setLoaded] = useState(false);
   const image = useRef<HTMLImageElement>(null);
   // A shared blob may already be decoded when another card view mounts.
@@ -68,6 +69,6 @@ function SavedArtwork({ url, name, onError }: { url: string; name: string; onErr
     {!loaded && <LoadingArtwork name={name} />}
     <img ref={image} src={url} alt={`${name} artwork`} onLoad={() => setLoaded(true)} onError={onError}
       aria-hidden={!loaded} loading="lazy" draggable={false}
-      style={{ ...FILL, width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: loaded ? 1 : 0 }} />
+      style={{ ...FILL, width: "100%", height: "100%", objectFit: fit, display: "block", opacity: loaded ? 1 : 0 }} />
   </>;
 }
