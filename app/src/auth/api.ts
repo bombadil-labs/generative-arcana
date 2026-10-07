@@ -42,6 +42,7 @@ export async function accountRequest<T = Record<string, unknown>>(
 
 /** Only app fragments are valid ordinary return destinations. OAuth is a separate server flow. */
 export function safeAccountReturnTo(value: string | null | undefined): string {
+  if (value === "/parlor" || value === "/parlor/") return "/parlor";
   if (!value || /[\u0000-\u0020\u007f\\]/.test(value)) return "/#/my-decks";
   if (!/^\/#\/(?:$|my-decks(?:\?|$)|community(?:\?|$)|deck\/[^?#]+(?:\?|$)|account\/connections(?:\?|$))/.test(value)) return "/#/my-decks";
   try {

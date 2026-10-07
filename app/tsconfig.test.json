@@ -8,6 +8,8 @@
     "outDir": ".test-build"
   },
   "include": [
+    "src/parlor/machine.ts",
+    "src/parlor/settings.ts",
     "src/decks/card.ts",
     "src/decks/cardMeta.ts",
     "src/decks/jsonSnapshot.ts",

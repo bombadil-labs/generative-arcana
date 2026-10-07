@@ -11,6 +11,7 @@ WORKDIR /srv
 COPY app/package.json app/package-lock.json ./app/
 RUN cd app && npm ci
 COPY app ./app
+COPY tools/check-parlor-bundle.mjs ./tools/check-parlor-bundle.mjs
 RUN cd app && npm run build
 
 FROM node:24-alpine

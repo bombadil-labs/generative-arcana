@@ -99,6 +99,8 @@ jobs:
             command: npm run test:better-auth-ownership --prefix mcp
           - check: domain migrations and shared rate limits
             command: npm run test:domain-migrations --prefix mcp
+          - check: hosted parlor access and budgets
+            command: npm run test:parlor --prefix mcp
           - check: auth migration review guards
             command: npm run test:auth-schema --prefix mcp
           - check: staging read-only preflight
