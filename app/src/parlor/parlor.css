@@ -7,7 +7,7 @@
 .parlor-heading, .parlor-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; max-width: 1200px; margin: auto; }
 .parlor button { border: 1px solid #85718c; border-radius: 6px; background: #322638; color: #fff4df; padding: 12px 18px; font: 600 14px var(--font-body); cursor: pointer; margin: 4px; }
 .parlor button.parlor-primary { background: var(--parlor-gold); color: #241c2b; border-color: var(--parlor-gold); }
-.parlor button:disabled { opacity: .45; cursor: not-allowed; }
+.parlor button:disabled, .parlor button[aria-disabled=true] { opacity: .45; cursor: not-allowed; }
 .parlor :focus-visible { outline: 3px solid #f3d497; outline-offset: 4px; }
 .parlor label { display: grid; gap: 8px; font-size: 13px; margin: 16px 0; color: #f6efe0; }
 .parlor input, .parlor select, .parlor textarea { width: 100%; min-width: 0; box-sizing: border-box; background: #1c1924; color: #f6efe0; border: 1px solid #796882; border-radius: 6px; padding: 12px; font: 15px var(--font-body); }
@@ -49,14 +49,9 @@
 @media (max-width: 800px) { .parlor-settings { grid-template-columns: 1fr; } .parlor { padding: 24px 16px; } .parlor-table figcaption strong { font-size: 16px; } .parlor-caption { font-size: 19px; } }
 @media (prefers-reduced-motion: reduce) { .parlor-card-turn { transition: none; } }
 
-.parlor-show { min-height: 100vh; min-height: 100dvh; padding-top: 88px; animation: parlor-arrive 450ms ease-out; }
-.parlor-show .parlor-ritual { max-width: 1200px; margin: auto; outline: none; }
-.parlor-show .parlor-table { margin-top: 24px; }
-.parlor button.parlor-exit { position: fixed; top: 12px; right: 12px; z-index: 60; background: #211b30; font-size: 12px; min-height: 44px; }
-.parlor-exit span { color: #b4a8bb; }
-.parlor-show-controls { position: fixed; top: 16px; left: 16px; z-index: 60; background: #211b30; border: 1px solid #635369; border-radius: 6px; font-size: 12px; }
-.parlor-show-controls summary { padding: 12px; min-height: 44px; cursor: pointer; }
-.parlor-show-controls[open] { box-shadow: 0 12px 30px #0006; }
+.parlor-show { height: 100vh; height: 100dvh; min-height: 0; box-sizing: border-box; display: grid; place-items: center; padding: clamp(12px, 3vw, 40px); overflow: hidden; animation: parlor-arrive 450ms ease-out; }
+.parlor-show .parlor-ritual { width: 100%; max-width: 1200px; margin: auto; outline: none; }
+.parlor-show .parlor-table { width: min(100%, 150vh); width: min(100%, 150dvh); max-width: 1100px; margin: 0 auto; }
 .parlor-show-hint { font-size: 13px; }
 @keyframes parlor-arrive { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .parlor-show { animation: none; } }

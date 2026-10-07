@@ -21,7 +21,9 @@ function Capture({children}) { sessionControl=useSession(); return children; }
 function button(text){return [...document.querySelectorAll('button')].find(el=>el.textContent===text);}
 async function click(text){const target=button(text);assert.ok(target,`button exists: ${text}`);await act(async()=>target.click());await settle();}
 async function input(label,value){const field=[...document.querySelectorAll('label')].find(el=>el.childNodes[0].textContent===label)?.querySelector('input,textarea,select');assert.ok(field,`input exists: ${label}`);await act(async()=>{const proto=field.tagName==='TEXTAREA'?dom.window.HTMLTextAreaElement.prototype:dom.window.HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(field,value);field.dispatchEvent(new dom.window.Event('input',{bubbles:true}));});await flush();}
-async function guest(){await click('Start the show');await click('Take a seat');await input('What would you like to explore?','Private guest question');await act(async()=>document.querySelector('form').dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true})));await settle();await click('Confirm & deal three cards');}
+async function guest(){await input('What would you like to explore?','Private guest question');await click('Start the show');}
+async function escape(){await act(async()=>window.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));await settle();}
+
 
 before(async()=>{
   const {createServer}=await import('vite');
@@ -75,9 +77,9 @@ test('restored and pasted keys always remain password fields; clearing keys remo
   assert.equal([...Array(window.localStorage.length)].map((_,i)=>window.localStorage.key(i)).filter(k=>k.startsWith('arcana:parlor:credentials')).length,0);
 });
 test('confirm then reset and navigation clear guest state; no questions in URL/storage',async()=>{
-  await mount();await guest();assert.equal(document.querySelectorAll('.parlor-card').length,3);assert.equal(document.querySelectorAll('.is-revealed').length,0);assert.equal(providerCalls,1);
+  await mount();await guest();assert.equal(document.querySelectorAll('.parlor-card').length,3);assert.equal(providerCalls,1);assert.equal(document.querySelectorAll('.parlor-show button,.parlor-show textarea,.parlor-show summary,.parlor-show figcaption').length,0);
   assert.equal(window.location.pathname,'/parlor');assert.equal(window.location.hash,'');assert.ok(!JSON.stringify(window.localStorage).includes('Private guest'));
-  await click('Next guest');assert.ok(button('Take a seat'));assert.ok(!document.body.textContent.includes('Private guest'));assert.equal(document.querySelectorAll('.parlor-card').length,0);
+  await escape();assert.ok(button('Start the show'));assert.ok(!document.body.textContent.includes('Private guest'));assert.equal(document.querySelectorAll('.parlor-card').length,0);
   await act(async()=>router.navigate('/my-decks'));await settle();assert.equal(window.location.pathname,'/');assert.equal(window.location.hash,'#/my-decks');
   await act(async()=>router.navigate('/parlor'));await settle();assert.equal(window.location.pathname,'/parlor');assert.ok(button('Start the show'));
 });
@@ -101,12 +103,12 @@ test('literal trailing slash and pagehide return to setup with a cleared guest e
 });
 
 test('Escape exits before reading and during generation, restores focus, and fences stale replies',async()=>{
-  await mount();await click('Start the show');assert.equal(document.querySelector('header').style.display,'none');
+  await mount();await guest();assert.equal(document.querySelector('header').style.display,'none');
   const escape=async()=>{await act(async()=>window.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));await settle();};
   await escape();assert.equal(document.activeElement,button('Start the show'));assert.notEqual(document.querySelector('header').style.display,'none');
   delayed=true;await guest();assert.ok(lateResolve);await escape();lateResolve();await settle();
   assert.equal(document.querySelectorAll('.parlor-card').length,0);assert.ok(!document.body.textContent.includes('Private guest'));
-  assert.equal(document.activeElement,button('Start the show'));await click('Start the show');assert.ok(button('Take a seat'));await escape();
+  assert.equal(document.activeElement,button('Start the show'));delayed=false;await guest();assert.equal(document.querySelectorAll('.parlor-card').length,3);await escape();
 });
 
 test('hosted mode has server model choices and no key fields, never restores or sends browser keys',async()=>{
@@ -119,6 +121,18 @@ test('denied or disabled hosted access does not offer browser-key fallback',asyn
   accessMode='hosted';hostedDenied=true;await mount();assert.ok(!button('Start the show'));assert.equal(document.querySelectorAll('input[type=password]').length,0);assert.equal(providerCalls,0);
 });
 test('revoked hosted request stays in hosted mode and logout fences a late hosted result',async()=>{
-  accessMode='hosted';await mount();hostedDenied=true;await guest();assert.equal(providerCalls,0);assert.ok(button('Retry / resume'));assert.equal(document.querySelectorAll('input[type=password]').length,0);
-  hostedDenied=false;delayed=true;await click('Retry / resume');assert.ok(lateResolve);await act(async()=>sessionControl.signOut());await settle();lateResolve();await settle();assert.ok(button('Sign in to enter'));assert.equal(document.querySelectorAll('.parlor-card').length,0);
+  accessMode='hosted';await mount();hostedDenied=true;await guest();assert.equal(providerCalls,0);assert.ok(button('Start the show'));assert.ok(document.querySelector('[role=alert]'));assert.equal(document.querySelectorAll('input[type=password]').length,0);
+  hostedDenied=false;delayed=true;await guest();assert.ok(lateResolve);await act(async()=>sessionControl.signOut());await settle();lateResolve();await settle();assert.ok(button('Sign in to enter'));assert.equal(document.querySelectorAll('.parlor-card').length,0);
+});
+
+test('kiosk advances all three cards without focusable controls or guest text',async()=>{
+  await mount();await guest();
+  await act(async()=>{await new Promise(r=>setTimeout(r,1100));});
+  await act(async()=>{await new Promise(r=>setTimeout(r,1100));});
+  await act(async()=>{await new Promise(r=>setTimeout(r,1100));});
+  assert.equal(document.querySelectorAll('.is-revealed').length,3);
+  const show=document.querySelector('.parlor-show');
+  assert.equal(show.querySelectorAll('button,input,textarea,select,summary,a,[tabindex="0"]').length,0);
+  assert.ok(!show.textContent.includes('Mock interpretation'));assert.ok(!show.textContent.includes('Private guest'));
+  await escape();assert.equal(document.activeElement,button('Start the show'));
 });
