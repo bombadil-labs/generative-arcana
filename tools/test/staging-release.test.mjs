@@ -96,6 +96,29 @@ test('combined release checks mappings before migrations; migration-only operati
   }
 });
 
+test('migration children receive only database/process settings while trusted deployment retains credentials', async () => {
+  const transport = { DATABASE_MIGRATION_URL: base.DATABASE_MIGRATION_URL, DATABASE_MIGRATION_CA_FILE: '/fixture/ca.pem', MIGRATION_PYTHON: '/fixture/python', PATH: '/fixture/bin', TMPDIR: '/fixture/tmp' };
+  const env = { ...write, ...transport, STAGING_PROTECTION_BYPASS: 'synthetic-bypass', GITHUB_TOKEN: 'synthetic-github', GH_TOKEN: 'synthetic-gh', VERCEL_TOKEN: 'synthetic-other-vercel', ACTIONS_RUNTIME_TOKEN: 'synthetic-runner', DATABASE_URL: 'synthetic-runtime-database', FUTURE_DEPLOY_SECRET: 'synthetic-future' };
+  const before = { ...env }, operations = [];
+  const execute = (_, args, options) => {
+    operations.push(args[3]);
+    assert.deepEqual(options.env, transport);
+    for (const key of ['VERCEL_STAGING_TOKEN','STAGING_PROTECTION_BYPASS','GITHUB_TOKEN','GH_TOKEN','VERCEL_TOKEN','ACTIONS_RUNTIME_TOKEN','DATABASE_URL','FUTURE_DEPLOY_SECRET']) assert.equal(Object.hasOwn(options.env, key), false);
+    if (args[3] === 'apply') assert.equal(args[args.indexOf('--backup-reference') + 1], env.RECOVERY_REFERENCE);
+    return JSON.stringify(args[3] === 'plan' ? plan : { pending: [] });
+  };
+  const f = fixture();
+  await migratePhase(env, { ...f.deps, execute });
+  assert.deepEqual(operations.splice(0), ['plan','apply','status']);
+  for (const operation of ['plan','status','apply']) {
+    migration({ ...env, OPERATION: operation, CONFIRMATION: `${operation.toUpperCase()} ${sha}` }, execute);
+    assert.deepEqual(operations.splice(0), operation === 'apply' ? ['plan','apply','status'] : [operation]);
+  }
+  assert.deepEqual(env, before, 'child filtering must not mutate trusted parent');
+  await deploy(env, { ...f.deps, vc: (path, body) => { assert.equal(env.VERCEL_STAGING_TOKEN, before.VERCEL_STAGING_TOKEN); return f.deps.vc(path, body); }, ready: async (...args) => { assert.equal(env.STAGING_PROTECTION_BYPASS, before.STAGING_PROTECTION_BYPASS); return f.deps.ready(...args); } });
+  assert.equal(f.calls.filter(x => typeof x === 'object').length, 2);
+});
+
 test('exact migrated SHA deployment precedes readiness and manual alias, with final verification', async () => {
   const f = fixture(); await deploy(write, f.deps);
   const writes = f.calls.filter(x => typeof x === 'object');

@@ -49,8 +49,13 @@ export function migration(env, execute = execFileSync) {
   const uri = new URL(env.DATABASE_MIGRATION_URL || 'invalid:');
   ensure(['postgres:', 'postgresql:'].includes(uri.protocol) && uri.hostname === target.host && uri.pathname === `/${target.database}` && decodeURIComponent(uri.username) === role && (!uri.port || uri.port === '5432'), 'Pinned staging database target mismatch');
   const args = ['--target', 'preview', '--expected-host', target.host, '--expected-database', target.database, '--expected-user', role, '--restricted-role', 'true'];
+  // Candidate code receives only its database transport and basic process settings.
+  // Keep deployment, readiness-bypass, GitHub and runner credentials in trusted main.
+  const allowed = new Set(['PATH', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP', 'TMPDIR', 'LANG', 'LC_ALL', 'TZ',
+    'DATABASE_MIGRATION_URL', 'DATABASE_MIGRATION_CA_FILE', 'MIGRATION_PYTHON']);
+  const childEnv = Object.fromEntries(Object.entries(env).filter(([key]) => allowed.has(key.toUpperCase())));
   const run = operation => JSON.parse(execute(process.execPath, ['--import', 'tsx', 'scripts/migrate-domain.ts', operation, ...args,
-    ...(operation === 'apply' ? ['--backup-reference', env.RECOVERY_REFERENCE] : [])], { cwd: 'candidate/mcp', encoding: 'utf8', env, stdio: ['ignore', 'pipe', 'pipe'], timeout: 240000 }));
+    ...(operation === 'apply' ? ['--backup-reference', env.RECOVERY_REFERENCE] : [])], { cwd: 'candidate/mcp', encoding: 'utf8', env: childEnv, stdio: ['ignore', 'pipe', 'pipe'], timeout: 240000 }));
   if (c.operation === 'status') return run('status');
   const plan = run('plan');
   ensure(!plan.baselineRequired, 'Schema adoption requires a separately reviewed operation');
