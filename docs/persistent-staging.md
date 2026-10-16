@@ -16,6 +16,8 @@ The custom environment ID, stable alias, migration role and recovery evidence mu
 
 ## Platform prerequisites and temporary holds
 
+The existing persistent root needs the separately reviewed [one-time bootstrap and role handoff](staging-bootstrap.md) before the normal release path can adopt it. Its owner credential is confined to that temporary path; ongoing releases require a restricted application migrator.
+
 1. Protect `staging` and Git `main`; require review and CI for candidate changes. Merge this infrastructure separately from feature PR110. Create/update staging only through the approved integration process. This change does not merge that feature.
 2. Create GitHub environment `arcana-staging-release` with required reviewers, no self-approval where available, and a deployment branch policy allowing **only Git main**, because the trusted dispatcher runs there. Restrict who can edit its configuration. Candidate code gets migration credentials only after review of the exact staging SHA; CI success alone is not a security review.
 3. Configure these environment secret REFERENCES securely: `ARCANA_STAGING_MIGRATION_URL` (dedicated direct application-schema migrator), `VERCEL_STAGING_TOKEN` (least available scope for the pinned project/team), and optional `STAGING_PROTECTION_BYPASS` for protected readiness checks. Never reuse production credentials, expose them as workflow inputs, or place operator credentials in application runtime. This repository contains no secret values.

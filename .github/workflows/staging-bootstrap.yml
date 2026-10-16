@@ -1,0 +1,67 @@
+name: Reviewed one-time staging bootstrap
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        description: 'Exact reviewed main SHA containing this bootstrap'
+        required: true
+      operation:
+        type: choice
+        options: [plan, apply, baseline]
+        default: plan
+      plan_digest:
+        description: 'Digest from reviewed bootstrap plan; required for apply'
+      recovery_json:
+        description: 'Nonsecret recovery evidence JSON; required for writes, never credentials'
+      confirmation:
+        description: 'For writes: APPLY or BASELINE, a space, and reviewed SHA'
+permissions:
+  contents: read
+concurrency:
+  group: arcana-preview-migration
+  cancel-in-progress: false
+jobs:
+  bootstrap:
+    if: github.ref == 'refs/heads/main'
+    environment: arcana-staging-bootstrap
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Validate revision and deliberate write request
+        env:
+          SHA: ${{ inputs.reviewed_sha }}
+          OPERATION: ${{ inputs.operation }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ && "$SHA" == "$GITHUB_SHA" ]]
+          if [[ "$OPERATION" != plan ]]; then [[ "$CONFIRMATION" == "${OPERATION^^} $SHA" ]]; fi
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.reviewed_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: npm ci --prefix mcp --ignore-scripts
+      - name: Prepare reviewed transport and nonsecret evidence
+        env:
+          RECOVERY_JSON: ${{ inputs.recovery_json }}
+        run: |
+          python3.12 -m venv "$RUNNER_TEMP/arcana-migration-python"
+          "$RUNNER_TEMP/arcana-migration-python/bin/python" -m pip install --require-hashes --only-binary=:all: -r mcp/scripts/libpq/requirements.txt
+          echo "MIGRATION_PYTHON=$RUNNER_TEMP/arcana-migration-python/bin/python" >> "$GITHUB_ENV"
+          node -e 'require("node:fs").writeFileSync(process.env.RUNNER_TEMP+"/staging-recovery.json",process.env.RECOVERY_JSON||"{}",{mode:0o600})'
+      - name: Run one pinned bootstrap operation
+        env:
+          DATABASE_MIGRATION_URL: ${{ secrets.ARCANA_STAGING_BOOTSTRAP_URL }}
+          STAGING_BOOTSTRAP_ENABLED: ${{ vars.STAGING_BOOTSTRAP_ENABLED }}
+          SHA: ${{ inputs.reviewed_sha }}
+          OPERATION: ${{ inputs.operation }}
+          PLAN_DIGEST: ${{ inputs.plan_digest }}
+        run: |
+          args=("$OPERATION" --target preview --expected-host ep-purple-hill-b7kz7n0g.c-13.us-east-1.aws.neon.tech --expected-database neondb --expected-user neondb_owner --reviewed-sha "$SHA")
+          if [[ "$OPERATION" == apply ]]; then args+=(--plan-digest "$PLAN_DIGEST"); fi
+          if [[ "$OPERATION" != plan ]]; then args+=(--recovery-file "$RUNNER_TEMP/staging-recovery.json"); fi
+          cd mcp
+          node --import tsx scripts/bootstrap-staging.ts "${args[@]}"

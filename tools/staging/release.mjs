@@ -45,9 +45,10 @@ export async function verifyCandidate(env, gh) {
 export function migration(env, execute = execFileSync) {
   const c = config(env), role = env.STAGING_MIGRATION_ROLE;
   ensure(/^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/.test(role || ''), 'Reviewed staging migration role required');
+  ensure(role !== 'neondb_owner', 'One-time owner credentials must not be used for ongoing staging releases');
   const uri = new URL(env.DATABASE_MIGRATION_URL || 'invalid:');
   ensure(['postgres:', 'postgresql:'].includes(uri.protocol) && uri.hostname === target.host && uri.pathname === `/${target.database}` && decodeURIComponent(uri.username) === role && (!uri.port || uri.port === '5432'), 'Pinned staging database target mismatch');
-  const args = ['--target', 'preview', '--expected-host', target.host, '--expected-database', target.database, '--expected-user', role];
+  const args = ['--target', 'preview', '--expected-host', target.host, '--expected-database', target.database, '--expected-user', role, '--restricted-role', 'true'];
   const run = operation => JSON.parse(execute(process.execPath, ['--import', 'tsx', 'scripts/migrate-domain.ts', operation, ...args,
     ...(operation === 'apply' ? ['--backup-reference', env.RECOVERY_REFERENCE] : [])], { cwd: 'candidate/mcp', encoding: 'utf8', env, stdio: ['ignore', 'pipe', 'pipe'], timeout: 240000 }));
   if (c.operation === 'status') return run('status');

@@ -18,13 +18,32 @@ test('latest failed validation cannot reuse an older passing run', async () => {
 });
 test('plan/status never apply; reviewed writes use plan, apply, status in order', () => {
   const operations = [];
-  const execute = (_, args) => { const op = args[3]; operations.push(op); assert.ok(args.includes(target.host)); return JSON.stringify(op === 'plan' ? plan : { pending: [] }); };
+  const execute = (_, args) => { const op = args[3]; operations.push(op); assert.ok(args.includes(target.host)); assert.equal(args[args.indexOf('--restricted-role')+1], 'true'); return JSON.stringify(op === 'plan' ? plan : { pending: [] }); };
   migration(base, execute); assert.deepEqual(operations.splice(0), ['plan']);
   migration({ ...base, OPERATION: 'status' }, execute); assert.deepEqual(operations.splice(0), ['status']);
   migration(write, execute); assert.deepEqual(operations.splice(0), ['plan', 'apply', 'status']);
   assert.throws(() => migration({ ...write, PLAN_DIGEST: 'c'.repeat(64) }, execute), /Plan changed/); assert.deepEqual(operations.splice(0), ['plan']);
   assert.throws(() => migration(write, () => JSON.stringify({ ...plan, baselineRequired: true })), /adoption/);
   for (const uri of ['postgresql://staging_migrator:fake@production.example/neondb', `postgresql://other:fake@${target.host}/neondb`, `postgresql://staging_migrator:fake@${target.host}/other`]) assert.throws(() => migration({ ...write, DATABASE_MIGRATION_URL: uri }, execute), /target mismatch/);
+});
+
+test('one-time owner cannot be used by recurring release', () => {
+  assert.throws(() => migration({ ...base, STAGING_MIGRATION_ROLE: 'neondb_owner', DATABASE_MIGRATION_URL: `postgresql://neondb_owner:fake@${target.host}/neondb?sslmode=require` }, () => { throw Error('must not execute'); }), /owner|restricted/i);
+});
+
+test('bootstrap dispatcher is isolated, pinned, manual and held', () => {
+  const workflow = readFileSync('.github/workflows/staging-bootstrap.yml', 'utf8');
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.doesNotMatch(workflow, /^  (push|pull_request|workflow_run):/m);
+  assert.match(workflow, /environment: arcana-staging-bootstrap/);
+  assert.match(workflow, /group: arcana-preview-migration/);
+  assert.match(workflow, /cancel-in-progress: false/);
+  assert.match(workflow, /secrets.ARCANA_STAGING_BOOTSTRAP_URL/);
+  assert.match(workflow, /vars.STAGING_BOOTSTRAP_ENABLED/);
+  assert.doesNotMatch(workflow, /ARCANA_STAGING_MIGRATION_URL|ARCANA_PRODUCTION_MIGRATION_URL/);
+  assert.match(workflow, /\$SHA.*==.*\$GITHUB_SHA/);
+  assert.match(workflow, /ref: \$\{\{ inputs.reviewed_sha \}\}/);
+  assert.match(workflow, /--expected-user neondb_owner/);
 });
 test('failed apply or status stops the migration gate', () => {
   for (const failure of ['apply', 'status']) {
