@@ -68,7 +68,13 @@ await fixture(async db=>{
   await assert.rejects(restrictedMigrator(db),/Restricted/);
   await db.query('DROP TABLE public.arcana_auth_unexpected');
 });
-const limitedRole={direct:true,limited:true,no_memberships:true,no_database_create:true,no_auth_ownership:true,no_other_schema_create:true};
+await fixture(async db=>{
+  await db.query('RESET ROLE; CREATE ROLE schema_owner LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS; ALTER SCHEMA public OWNER TO schema_owner; GRANT SELECT ON public.arcana_auth_fixture TO schema_owner; SET SESSION AUTHORIZATION schema_owner');
+  assert.equal((await db.query("SELECT pg_get_userbyid(nspowner) AS owner FROM pg_namespace WHERE nspname='public'")).rows[0].owner,'schema_owner');
+  assert.equal((await db.query("SELECT pg_get_userbyid(relowner) AS owner FROM pg_class WHERE oid='public.arcana_auth_fixture'::regclass")).rows[0].owner,'neondb_owner');
+  await assert.rejects(restrictedMigrator(db),/Restricted/);
+});
+const limitedRole={direct:true,limited:true,no_memberships:true,no_schema_ownership:true,no_database_create:true,no_auth_ownership:true,no_other_schema_create:true};
 for(const key of Object.keys(limitedRole)) {
   await assert.rejects(restrictedMigrator({query:async()=>({rows:[{...limitedRole,[key]:false}]})}),/Restricted/);
 }

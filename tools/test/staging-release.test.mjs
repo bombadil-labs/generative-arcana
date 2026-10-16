@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { config, target, planDigest, migration, verifyCandidate, deploy, request } from '../staging/release.mjs';
+import { config, target, planDigest, migration, migratePhase, verifyCandidate, deploy, request } from '../staging/release.mjs';
 const sha = 'a'.repeat(40);
 const base = { REVIEWED_SHA: sha, OPERATION: 'plan', GITHUB_REPOSITORY: target.repository, GITHUB_REF: 'refs/heads/main', STAGING_MIGRATION_ROLE: 'staging_migrator', DATABASE_MIGRATION_URL: `postgresql://staging_migrator:fake@${target.host}/neondb?sslmode=require` };
 const plan = { recordedThrough: 6, pending: [{ version: 7, file: '007-fixture.sql', sha256: 'b'.repeat(64) }] };
-const write = { ...base, OPERATION: 'release', STAGING_WRITES_ENABLED: 'true', CONFIRMATION: `RELEASE ${sha}`, PLAN_DIGEST: planDigest(sha, base.STAGING_MIGRATION_ROLE, plan), RECOVERY_REFERENCE: 'reviewed-restore-test', STAGING_DEPLOY_ENABLED: 'true', STAGING_ENVIRONMENT_ID: 'env_fixture', STAGING_ALIAS: 'arcana-staging.example.com', STAGING_MAPPING_REVIEW: 'mapping-review', STAGING_MANUAL_ALIAS_REVIEW: 'alias-review' };
+const write = { ...base, OPERATION: 'release', STAGING_WRITES_ENABLED: 'true', CONFIRMATION: `RELEASE ${sha}`, PLAN_DIGEST: planDigest(sha, base.STAGING_MIGRATION_ROLE, plan), RECOVERY_REFERENCE: 'reviewed-restore-test', STAGING_DEPLOY_ENABLED: 'true', VERCEL_STAGING_TOKEN: 'synthetic-token', STAGING_ENVIRONMENT_ID: 'env_fixture', STAGING_ALIAS: 'arcana-staging.example.com', STAGING_MAPPING_REVIEW: 'mapping-review', STAGING_MANUAL_ALIAS_REVIEW: 'alias-review' };
 function github(overrides = {}) { return async path => path.startsWith('/git/ref') ? { object: { sha: overrides.sha || sha } } : { workflow_runs: [{ id: 2, head_sha: sha, head_branch: 'staging', event: 'push', status: 'completed', conclusion: overrides.conclusion || 'success' }] }; }
 test('disabled writes, wrong dispatch, confirmation, recovery and candidate all fail closed', async () => {
   for (const patch of [{ STAGING_WRITES_ENABLED: '' }, { CONFIRMATION: 'release' }, { RECOVERY_REFERENCE: 'disposable-staging:old-waiver' }, { GITHUB_REF: 'refs/heads/staging' }, { REVIEWED_SHA: 'main' }]) assert.throws(() => config({ ...write, ...patch }));
@@ -57,13 +57,45 @@ function fixture(overrides = {}) {
   const d = { id: 'dpl_fixture', url: 'fixture.vercel.app', projectId: target.project, customEnvironment: { id: write.STAGING_ENVIRONMENT_ID }, target: null, gitSource: { type: 'github', repoId: target.repositoryId, sha }, readyState: 'READY', ...overrides.deployment };
   return { calls, deps: { candidateConfig: { git: { deploymentEnabled: { staging: false } } }, gh: overrides.gh || github(), sleep: async () => {}, ready: async () => { calls.push('ready'); if (overrides.readinessFailure) throw Error('not ready'); }, vc: async (path, body) => {
     calls.push(body ? { path, body } : path);
-    if (path.includes('custom-environments')) return { id: write.STAGING_ENVIRONMENT_ID, slug: 'staging', type: 'preview', domains: overrides.domains || [] };
+    if (path.includes('custom-environments')) return { id: write.STAGING_ENVIRONMENT_ID, slug: 'staging', type: 'preview', domains: overrides.domains || [], ...overrides.environment };
     if (path.includes('/domains?')) return { domains: overrides.projectDomains || [] };
     if (path === '/v13/deployments') return { id: d.id };
     if (path.includes('/aliases')) return body ? { alias: body.alias } : { deploymentId: d.id };
     return d;
   } } };
 }
+test('combined release rejects deployment prerequisites before any migration operation', async () => {
+  const patches = ['STAGING_DEPLOY_ENABLED','VERCEL_STAGING_TOKEN','STAGING_ENVIRONMENT_ID','STAGING_ALIAS','STAGING_MAPPING_REVIEW','STAGING_MANUAL_ALIAS_REVIEW'].map(key => ({ [key]: '' }));
+  for (const patch of patches) {
+    const f = fixture(), operations = [];
+    await assert.rejects(migratePhase({ ...write, ...patch }, { ...f.deps, execute: (_, args) => { operations.push(args[3]); return JSON.stringify(plan); } }));
+    assert.deepEqual(operations, []);
+  }
+  for (const overrides of [{ environment: { id: 'env_wrong' } }, { environment: { type: 'production' } }, { environment: { branchMatcher: { type: 'equals', pattern: 'main' } } }, { domains: [{ name: write.STAGING_ALIAS }] }, { projectDomains: [{ gitBranch: 'staging' }] }, { projectDomains: [{ customEnvironmentId: write.STAGING_ENVIRONMENT_ID }] }]) {
+    const f = fixture(overrides), operations = [];
+    await assert.rejects(migratePhase(write, { ...f.deps, execute: (_, args) => { operations.push(args[3]); return JSON.stringify(plan); } }));
+    assert.deepEqual(operations, []);
+    assert.equal(f.calls.filter(x => typeof x === 'object').length, 0);
+  }
+  for (const deps of [{ ...fixture().deps, candidateConfig: {} }, { ...fixture().deps, vc: async () => { throw Error('provider unavailable'); } }]) {
+    let executed = false;
+    await assert.rejects(migratePhase(write, { ...deps, execute: () => { executed = true; } }));
+    assert.equal(executed, false);
+  }
+});
+
+test('combined release checks mappings before migrations; migration-only operations need no deployment access', async () => {
+  const f = fixture(), operations = [];
+  const execute = (_, args) => { operations.push(args[3]); return JSON.stringify(args[3] === 'plan' ? plan : { pending: [] }); };
+  await migratePhase(write, { ...f.deps, execute: (...args) => { assert.ok(f.calls.some(x => typeof x === 'string' && x.includes('/domains?'))); return execute(...args); } });
+  assert.deepEqual(operations.splice(0), ['plan', 'apply', 'status']);
+  assert.equal(f.calls.filter(x => typeof x === 'object').length, 0);
+  for (const operation of ['apply','plan','status']) {
+    await migratePhase({ ...write, OPERATION: operation, CONFIRMATION: `${operation.toUpperCase()} ${sha}`, STAGING_DEPLOY_ENABLED: 'false', VERCEL_STAGING_TOKEN: '', STAGING_ENVIRONMENT_ID: '', STAGING_ALIAS: '' }, { gh: github(), vc: async () => { assert.fail('migration-only must not contact Vercel'); }, execute });
+    assert.deepEqual(operations.splice(0), operation === 'apply' ? ['plan','apply','status'] : [operation]);
+  }
+});
+
 test('exact migrated SHA deployment precedes readiness and manual alias, with final verification', async () => {
   const f = fixture(); await deploy(write, f.deps);
   const writes = f.calls.filter(x => typeof x === 'object');
@@ -95,6 +127,9 @@ test('workflow has manual-only writes, shared lock, immutable refs and migration
   assert.match(workflow, /workflow_dispatch:/); assert.doesNotMatch(workflow, /^  (push|pull_request|workflow_run):/m);
   assert.match(workflow, /group: arcana-preview-migration\n  cancel-in-progress: false/);
   assert.match(workflow, /needs: migration/); assert.match(workflow, /if: inputs.operation == 'release'/);
+  const migrationJob = workflow.split('  deploy:')[0];
+  for (const key of ['STAGING_DEPLOY_ENABLED','STAGING_ENVIRONMENT_ID','STAGING_ALIAS','STAGING_MAPPING_REVIEW','STAGING_MANUAL_ALIAS_REVIEW','VERCEL_STAGING_TOKEN']) assert.ok(migrationJob.includes(key), `${key} available before migrations`);
+  assert.match(migrationJob, /inputs.operation == 'release' && secrets.VERCEL_STAGING_TOKEN/);
   assert.equal((workflow.match(/ref: \$\{\{ inputs.reviewed_sha \}\}/g) || []).length, 2);
   assert.match(workflow, /secrets.ARCANA_STAGING_MIGRATION_URL/); assert.doesNotMatch(workflow, /ARCANA_PRODUCTION_MIGRATION_URL|ARCANA_PREVIEW_MIGRATION_URL/);
   const vercel = JSON.parse(readFileSync('vercel.json', 'utf8')); assert.equal(vercel.git.deploymentEnabled.staging, false); assert.equal(vercel.git.deploymentEnabled['dependabot/**'], false);

@@ -65,6 +65,7 @@ export function migration(env, execute = execFileSync) {
 }
 export function deploymentConfig(env) {
   ensure(env.STAGING_DEPLOY_ENABLED === 'true', 'Staging deployment remains disabled');
+  ensure(env.VERCEL_STAGING_TOKEN, 'Staging deployment credential required');
   ensure(/^env_[a-zA-Z0-9]+$/.test(env.STAGING_ENVIRONMENT_ID || ''), 'Verified custom environment ID required');
   ensure(/^[a-z0-9][a-z0-9.-]+\.[a-z]+$/.test(env.STAGING_ALIAS || '') && env.STAGING_ALIAS !== 'generative-arcana.vercel.app', 'Verified non-production staging alias required');
   ensure(env.STAGING_MAPPING_REVIEW && env.STAGING_MANUAL_ALIAS_REVIEW, 'Platform mapping and manual alias review required');
@@ -80,23 +81,31 @@ export function verifyDeployment(d, env, sha) {
   ensure(d.gitSource?.sha === sha && d.gitSource?.type === 'github' && String(d.gitSource?.repoId) === String(target.repositoryId), 'Deployment source SHA/repository mismatch');
   ensure(/^dpl_[a-zA-Z0-9]+$/.test(d.id || '') && /^[a-zA-Z0-9-]+\.vercel\.app$/.test(d.url || ''), 'Invalid deployment identity');
 }
-export async function deploy(env, { gh, vc, ready, candidateConfig = JSON.parse(readFileSync('candidate/vercel.json', 'utf8')), sleep = ms => new Promise(resolve => setTimeout(resolve, ms)) }) {
-  const c = await verifyCandidate(env, gh);
-  ensure(c.operation === 'release', 'Release operation required');
+export async function deploymentPrerequisites(env, { vc, candidateConfig = JSON.parse(readFileSync('candidate/vercel.json', 'utf8')) }) {
   deploymentConfig(env);
   const environmentPath = `/v9/projects/${target.project}/custom-environments/${env.STAGING_ENVIRONMENT_ID}`;
   ensure(candidateConfig.git?.deploymentEnabled?.staging === false, 'Candidate must disable automatic staging Git deployments');
-  const verifyPlatform = async () => {
-    verifyEnvironment(await vc(environmentPath), env);
-    let cursor, pages = 0;
-    do {
-      ensure(++pages <= 20, 'Domain inventory exceeded bounded verification');
-      const domains = await vc(`/v9/projects/${target.project}/domains?limit=100${cursor ? `&until=${encodeURIComponent(cursor)}` : ''}`);
-      ensure(Array.isArray(domains.domains), 'Project domain mapping unavailable');
-      ensure(domains.domains.every(domain => domain.gitBranch !== 'staging' && domain.customEnvironmentId !== env.STAGING_ENVIRONMENT_ID && domain.name !== env.STAGING_ALIAS), 'Staging alias must be manually managed, not attached to automatic project domain assignment');
-      cursor = domains.pagination?.next;
-    } while (cursor);
-  };
+  verifyEnvironment(await vc(environmentPath), env);
+  let cursor, pages = 0;
+  do {
+    ensure(++pages <= 20, 'Domain inventory exceeded bounded verification');
+    const domains = await vc(`/v9/projects/${target.project}/domains?limit=100${cursor ? `&until=${encodeURIComponent(cursor)}` : ''}`);
+    ensure(Array.isArray(domains.domains), 'Project domain mapping unavailable');
+    ensure(domains.domains.every(domain => domain.gitBranch !== 'staging' && domain.customEnvironmentId !== env.STAGING_ENVIRONMENT_ID && domain.name !== env.STAGING_ALIAS), 'Staging alias must be manually managed, not attached to automatic project domain assignment');
+    cursor = domains.pagination?.next;
+  } while (cursor);
+}
+// The CLI migration phase must pass release prerequisites before invoking any DB operation.
+// Explicit apply/plan/status remain independent of deployment configuration and provider access.
+export async function migratePhase(env, deps) {
+  const c = await verifyCandidate(env, deps.gh);
+  if (c.operation === 'release') await deploymentPrerequisites(env, deps);
+  return migration(env, deps.execute);
+}
+export async function deploy(env, { gh, vc, ready, candidateConfig = JSON.parse(readFileSync('candidate/vercel.json', 'utf8')), sleep = ms => new Promise(resolve => setTimeout(resolve, ms)) }) {
+  const c = await verifyCandidate(env, gh);
+  ensure(c.operation === 'release', 'Release operation required');
+  const verifyPlatform = () => deploymentPrerequisites(env, { vc, candidateConfig });
   await verifyPlatform();
   const created = await vc('/v13/deployments', { name: 'generative-arcana', project: target.project,
     customEnvironmentSlugOrId: env.STAGING_ENVIRONMENT_ID,
@@ -125,10 +134,9 @@ export async function main(env = process.env) {
   const gh = path => request(`https://api.github.com/repos/${target.repository}${path}`, env.GITHUB_TOKEN);
   const phase = process.argv[2];
   if (phase === 'guard') { await verifyCandidate(env, gh); return; }
-  if (phase === 'migrate') { await verifyCandidate(env, gh); console.log(JSON.stringify(migration(env))); return; }
-  ensure(phase === 'deploy', 'Unknown release phase');
-  ensure(env.VERCEL_STAGING_TOKEN, 'Staging deployment credential required');
   const vc = (path, body) => request(`https://api.vercel.com${path}${path.includes('?') ? '&' : '?'}teamId=${target.team}`, env.VERCEL_STAGING_TOKEN, body);
+  if (phase === 'migrate') { console.log(JSON.stringify(await migratePhase(env, { gh, vc }))); return; }
+  ensure(phase === 'deploy', 'Unknown release phase');
   const ready = async (origin, sha) => {
     const response = await fetch(`${origin}/readyz`, { redirect: 'error', headers: env.STAGING_PROTECTION_BYPASS ? { 'x-vercel-protection-bypass': env.STAGING_PROTECTION_BYPASS } : {}, signal: AbortSignal.timeout(30000) });
     ensure(response.ok, 'Candidate readiness failed');
