@@ -50,12 +50,13 @@ import { DurableRateLimiter } from "./durableRateLimiter";
 import { requestClientIp } from "./requestIp";
 import { serveArcanaWebApp } from "./webAppStatic";
 import { accountDeploymentReadiness, createDeploymentDependencyMonitor, deploymentBuildIdentity } from "./deploymentReadiness";
+import { deploymentAllowedHosts } from "./deploymentHosts";
 import { createArcanaAuthoringRequestHandler, isArcanaAuthoringPath } from "./authoringApi";
 import { withArcanaHttpToolAuthorization, type ArcanaHttpOAuthOptions } from "./httpToolAuthorization";
 
 const port = envPort(process.env.PORT, 3000);
 const host = process.env.HOST?.trim() || "127.0.0.1";
-const allowedHosts = csv(process.env.MCP_ALLOWED_HOSTS) ?? deploymentAllowlist(host);
+const allowedHosts = deploymentAllowedHosts(host);
 const allowedOrigins = csv(process.env.MCP_ALLOWED_ORIGINS) ?? allowedHosts;
 const alphaToken = optionalEnv(process.env.MCP_ALPHA_TOKEN);
 const alphaPrincipalId = optionalEnv(process.env.MCP_ALPHA_PRINCIPAL_ID) ?? "alpha-user-v1";
@@ -537,20 +538,6 @@ function csv(value: string | undefined): string[] | undefined {
 function optionalEnv(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
-}
-
-function deploymentAllowlist(bindHost: string): string[] {
-  const hosts = new Set<string>();
-  if (["127.0.0.1", "localhost", "::1", "[::1]"].includes(bindHost)) {
-    hosts.add("localhost");
-    hosts.add("127.0.0.1");
-    hosts.add("[::1]");
-  }
-  for (const value of [process.env.VERCEL_URL, process.env.VERCEL_PROJECT_PRODUCTION_URL, process.env.VERCEL_BRANCH_URL]) {
-    const hostname = value?.trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-    if (hostname) hosts.add(hostname);
-  }
-  return [...hosts];
 }
 
 function envPort(value: string | undefined, fallback: number): number {

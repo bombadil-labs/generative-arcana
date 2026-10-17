@@ -3,12 +3,23 @@ name: Validate app and MCP
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, staging]
 
 permissions:
   contents: read
 
 jobs:
+  staging-release:
+    name: Staging release safety
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: node --test tools/test/staging-release.test.mjs
+
   preview-cleanup:
     name: Preview cleanup safety tests
     runs-on: ubuntu-24.04
