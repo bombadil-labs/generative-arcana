@@ -342,6 +342,7 @@ function requireSameOrigin(request: Request, baseURL: string) {
   if (request.headers.get("origin") !== baseURL || request.headers.get("sec-fetch-site") === "cross-site") throw new APIError("FORBIDDEN", { message: "Same-origin request required." });
 }
 function safeReturnTo(value: string | null) {
+  if (value === "/parlor" || value === "/parlor/") return "/parlor";
   if (!value) return "/#/my-decks";
   if (!value.startsWith("/#/") || value.includes("\\") || /[\r\n]/.test(value)) throw new Error("returnTo must be a same-origin application route.");
   return value;

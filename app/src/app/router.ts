@@ -7,10 +7,15 @@ import { useEffect, useState } from "react";
  */
 export function currentRoute(): string {
   if (typeof window === "undefined") return "/";
-  return window.location.hash.replace(/^#/, "") || "/";
+  return window.location.hash.replace(/^#/, "") || (/^\/parlor\/?$/.test(window.location.pathname) ? "/parlor" : "/");
 }
 
 export function navigate(to: string) {
+  if (to === "/parlor" || /^\/parlor\/?$/.test(window.location.pathname)) {
+    window.history.pushState(null, "", to === "/parlor" ? "/parlor" : `/#${to.startsWith("/") ? to : `/${to}`}`);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    return;
+  }
   window.location.hash = to.startsWith("/") ? to : `/${to}`;
 }
 
@@ -19,7 +24,8 @@ export function useHashRoute(): string {
   useEffect(() => {
     const onChange = () => setRoute(currentRoute());
     window.addEventListener("hashchange", onChange);
-    return () => window.removeEventListener("hashchange", onChange);
+    window.addEventListener("popstate", onChange);
+    return () => { window.removeEventListener("hashchange", onChange); window.removeEventListener("popstate", onChange); };
   }, []);
   return route;
 }

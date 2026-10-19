@@ -25,6 +25,22 @@ const oauthFailure = async (response: Response, error: string) => {
   else { const body = await response.json(); assert.equal(body.error, error, JSON.stringify(body)); }
 };
 try {
+  for (const returnTo of ["/parlor", "/parlor/"]) {
+    const response = await h.request(`/auth/login?${new URLSearchParams({ returnTo })}`);
+    assert.equal(response.status, 303);
+    const destination = new URL(response.headers.get("location")!);
+    assert.equal(destination.origin, AUTH_TEST_ORIGIN);
+    assert.equal(destination.pathname, "/");
+    assert.equal(destination.hash, "#/account/login?returnTo=%2Fparlor");
+    assert.equal(response.headers.get("cache-control"), "no-store");
+  }
+  for (const returnTo of ["/parlor?question=private", "/parlor#private", "/parlor/../elsewhere", "/%70arlor", "//evil.example/parlor", "https://evil.example/parlor", "/parlor\\evil", "/parlor\n"]) {
+    const response = await h.request(`/auth/login?${new URLSearchParams({ returnTo })}`);
+    assert.equal(response.status, 400, "invalid literal return destination must fail closed");
+    assert.equal(response.headers.get("location"), null);
+  }
+  const ordinaryLogin = await h.request("/auth/login");
+  assert.equal(new URL(ordinaryLogin.headers.get("location")!).hash, "#/account/login?returnTo=%2F%23%2Fmy-decks");
   const timestamp = "1790867532395";
   assert.equal(types.getTypeParser(types.builtins.INT8, "text")(timestamp), timestamp, "global pg int8 parser must remain unchanged");
   assert.equal(AUTH_POSTGRES_TYPES.getTypeParser(types.builtins.INT8, "text")(timestamp), BigInt(timestamp));
