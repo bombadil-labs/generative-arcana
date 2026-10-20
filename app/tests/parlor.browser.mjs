@@ -66,7 +66,7 @@ try {
     }
     if(url.hostname==='api.elevenlabs.io')return audioMode==='hold'?route.fulfill({status:200,contentType:'audio/mpeg',body:'synthetic mocked audio'}):json(route,{message:'Synthetic audio failure'},503);
     if(url.hostname!=='127.0.0.1')return route.abort();
-    if(path==='/auth/session')return json(route,authenticated?{authenticated:true,accountId,user:{email:'synthetic@example.test'}}:{authenticated:false});
+    if(path==='/auth/session')return json(route,authenticated?{authenticated:true,accountId,parlorAllowed:true,user:{email:'synthetic@example.test'}}:{authenticated:false});
     if(path==='/api/parlor/capabilities')return hostedDenied?json(route,{},403):json(route,{mode:deploymentMode,models:[{provider:'anthropic',id:'server-approved-model'}],voices:[]});
     if(path==='/api/parlor/narrate'){
       if(hostedDenied)return json(route,{},403);
@@ -86,10 +86,9 @@ try {
   });
   page=await context.newPage();
   await page.goto('http://127.0.0.1:4187/parlor/');
-  await page.getByRole('button',{name:'Sign in to enter',exact:true}).waitFor();
+  await page.getByText('Parlor access is restricted.',{exact:true}).waitFor();
   assert.equal(await page.locator('input[type=password]').count(),0);
-  await page.getByRole('button',{name:'Sign in to enter',exact:true}).click();
-  await page.waitForURL('**/#/account/login?returnTo=%2Fparlor');
+  assert.equal(await page.getByRole('button',{name:'Parlor',exact:true}).count(),0);
   authenticated=true;await page.goto('http://127.0.0.1:4187/parlor');
   const key=page.getByLabel('Anthropic API key',{exact:true});
   await key.fill('synthetic-browser-key');await page.getByLabel('Anthropic model ID',{exact:true}).fill('synthetic-model');
@@ -147,7 +146,7 @@ try {
   await page.goForward();await page.getByRole('button',{name:'Start the show',exact:true}).waitFor();
   await key.fill('synthetic-browser-key');await page.getByLabel('Anthropic model ID',{exact:true}).fill('synthetic-model');await page.getByLabel('ElevenLabs API key',{exact:true}).fill('');
   mode='delay';release=undefined;await guest();await page.waitForTimeout(150);
-  authenticated=false;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.getByRole('button',{name:'Sign in to enter',exact:true}).waitFor();release?.();mode='ok';
+  authenticated=false;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.getByText('Parlor access is restricted.',{exact:true}).waitFor();release?.();mode='ok';
   assert.equal(await page.locator('.parlor-card').count(),0);
   authenticated=true;deploymentMode='hosted';await page.setViewportSize({width:1280,height:960});await page.goto('http://127.0.0.1:4187/parlor');
   await page.getByLabel('Hosted model',{exact:true}).waitFor();assert.equal(await page.locator('input[type=password]').count(),0);

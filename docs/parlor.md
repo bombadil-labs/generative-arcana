@@ -1,5 +1,17 @@
 # The parlor
 
+The initial production release is restricted to one verified production auth
+issuer/subject in `mcp/src/parlorAccess.ts`. The server checks the current verified
+browser session before serving `/parlor`, its private JavaScript/CSS, or any
+`/api/parlor` endpoint. Responses are private and not stored in shared caches.
+The navigation and lazy UI require the server's `parlorAllowed` permission;
+hash navigation still must pass the capabilities check before loading decks.
+GitHub Pages excludes the private assets because it has no server authorization.
+
+Production uses `PARLOR_MODE=byok`. It needs no Parlor tables, entitlement grants,
+database migration, hosted credentials, or hosted billing. The hosted migration
+and budget implementation remain dormant and are not part of this activation.
+
 The deployment now explicitly selects `disabled` (default), `hosted`, or `byok`. See [Hosted parlor rollout](hosted-parlor.md) for the new entitlement, server-only keys, conservative budgets and reviewed migration/grant procedure. Hosted mode has no key inputs and never falls back to browser credentials. The browser-key details below apply only when the operator explicitly selects `PARLOR_MODE=byok`.
 
 `/parlor` is an authenticated, browser-only party reading. `/parlor/` also loads the built app. Existing hash routes and subdirectory builds retain their relative asset behavior. The login return validators accept only the exact new literal path (and its trailing slash), without question/query parameters.

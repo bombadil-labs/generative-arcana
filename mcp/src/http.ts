@@ -52,6 +52,7 @@ import { PostgresParlorStore } from "./parlorStore";
 import { createParlorHandler, isParlorPath } from "./parlorApi";
 import { requestClientIp } from "./requestIp";
 import { serveArcanaWebApp } from "./webAppStatic";
+import { createParlorAccessGuard, isPrivateParlorPath, parlorPathname } from "./parlorAccess";
 import { accountDeploymentReadiness, createDeploymentDependencyMonitor, deploymentBuildIdentity } from "./deploymentReadiness";
 import { deploymentAllowedHosts } from "./deploymentHosts";
 import { createArcanaAuthoringRequestHandler, isArcanaAuthoringPath } from "./authoringApi";
@@ -115,7 +116,8 @@ const { hosts, catalog, stateMode } = createHostStore({ databaseUrl, stateDir })
 const hostedParlorConfig = parlorConfig(process.env);
 if (hostedParlorConfig.mode === 'hosted' && (!databaseUrl || !browserPrincipalResolver || !catalog)) throw new Error('Hosted parlor requires durable catalog and browser authentication.');
 const parlorPool = hostedParlorConfig.mode === 'hosted' ? new Pool({connectionString:databaseUrl,max:3,connectionTimeoutMillis:10000,statement_timeout:10000,query_timeout:11000}) : undefined;
-const parlorHandler = createParlorHandler({config:hostedParlorConfig,store:parlorPool?new PostgresParlorStore(parlorPool):undefined,principal:browserPrincipalResolver,catalog});
+const parlorAccess = createParlorAccessGuard(browserAuth?.browserAuthenticator);
+const parlorHandler = createParlorHandler({config:hostedParlorConfig,authorize:parlorAccess,store:parlorPool?new PostgresParlorStore(parlorPool):undefined,principal:browserPrincipalResolver,catalog});
 const artworkConfig = artworkStorageConfiguration();
 if (artworkConfig && (!databaseUrl || !catalog)) throw new Error("Artwork requires a durable database catalog.");
 const artworkPool = artworkConfig ? new Pool({ connectionString: databaseUrl, max: 3, connectionTimeoutMillis: 10_000 }) : undefined;
@@ -278,6 +280,11 @@ async function handleHttpRequest(req: IncomingMessage, res: ServerResponse): Pro
     return;
   }
 
+  // This runs before the generic SPA fallback, including encoded paths and private chunks.
+  const privateParlorRequest = isPrivateParlorPath(parlorPathname(req.url ?? "/"));
+  if (privateParlorRequest) {
+    if (!validateHost(req, res) || !await parlorAccess(req, res)) return;
+  }
   const isManifestUploadRequest = isManifestUploadPath(url.pathname);
   const isParlorRequest = isParlorPath(url.pathname);
   const isAuthoringRequest = isArcanaAuthoringPath(url.pathname);
@@ -285,7 +292,7 @@ async function handleHttpRequest(req: IncomingMessage, res: ServerResponse): Pro
   const isBrowserAuthRequest = browserAuth ? isBetterAuthRequestPath(url.pathname)
     : ["/auth/login", "/auth/session", "/auth/logout"].includes(url.pathname);
   if (url.pathname !== "/mcp" && !isAuthoringRequest && !isWebCatalogRequest && !isBrowserAuthRequest && !isManifestUploadRequest && !isParlorRequest) {
-    if (webAppDistDir && validateHost(req, res) && serveArcanaWebApp(req, res, webAppDistDir)) return;
+    if (webAppDistDir && validateHost(req, res) && serveArcanaWebApp(req, res, webAppDistDir, privateParlorRequest)) return;
     if (res.headersSent) return;
     res.writeHead(404, { "content-type": "application/json" });
     res.end(JSON.stringify({ error: "not_found" }));

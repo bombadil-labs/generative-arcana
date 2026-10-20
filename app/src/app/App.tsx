@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState, type CSSProperties } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useState, type CSSProperties } from "react";
 import { useBrowserSession } from "@/auth/session";
 import { Account } from "@/auth/Account";
 import { parseAccountRoute } from "@/auth/api";
@@ -12,7 +12,7 @@ import { CardBrowser } from "./CardBrowser";
 import { Reading } from "./Reading";
 import { RemoteDeckBoundary } from "./RemoteDeckBoundary";
 import { ArtworkEditor } from "./ArtworkEditor";
-import { Parlor } from "../parlor/Parlor";
+const Parlor = lazy(() => import("../parlor/Parlor").then(module => ({ default: module.Parlor })));
 
 /**
  * App shell + hash router. Deck routes use the canonical runtime/resource id. If an id is not
@@ -35,7 +35,9 @@ export function App() {
   let tab: Tab | null = null;
   const accountRoute = parseAccountRoute(route, window.location.search);
   if (accountRoute) content = <Account key={route} route={accountRoute} />;
-  else if (route.match(/^\/parlor\/?$/)) content = <Parlor onShowChange={setShowMode} />;
+  else if (route.match(/^\/parlor\/?$/)) content = session.status === "authenticated" && session.parlorAllowed === true
+    ? <Suspense fallback={<p>Loading your private table…</p>}><Parlor onShowChange={setShowMode} /></Suspense>
+    : <p role="status">{session.status === "loading" ? "Checking access…" : "Parlor access is restricted."}</p>;
   else if (route.match(/^\/community\/?$/)) content = <Community />;
   else if (route.match(/^\/my-decks\/?$/)) content = <MyDecks key={session.status === "authenticated" ? session.user.email : session.status} />;
   else if ((m = route.match(/^\/deck\/([^/]+)\/artwork\/?$/))) { deckId = m[1]; content = <RemoteDeckBoundary deckId={deckId} routeKey={route}><ArtworkEditor deckId={deckId} /></RemoteDeckBoundary>; }
@@ -69,7 +71,7 @@ export function App() {
           </button>
           {!deckId && <button onClick={() => navigate("/community")} style={libraryLink} aria-current={route.match(/^\/community\/?$/) ? "page" : undefined}>Community</button>}
           <button onClick={() => navigate("/my-decks")} style={libraryLink} aria-current={route.match(/^\/my-decks\/?$/) ? "page" : undefined}>{accountLabel}</button>
-          <button onClick={() => navigate("/parlor")} style={libraryLink} aria-current={route === "/parlor" ? "page" : undefined}>Parlor</button>
+          {session.status === "authenticated" && session.parlorAllowed === true && <button onClick={() => navigate("/parlor")} style={libraryLink} aria-current={route === "/parlor" ? "page" : undefined}>Parlor</button>}
           <button onClick={() => navigate(session.status === "authenticated" ? "/account/connections" : "/account/login")} style={libraryLink} aria-current={accountRoute ? "page" : undefined}>{session.status === "authenticated" ? "Account" : "Sign in"}</button>
         </div>
         {tabs.length > 0 && (

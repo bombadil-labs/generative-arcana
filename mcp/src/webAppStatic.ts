@@ -2,12 +2,14 @@ import { createReadStream, existsSync, statSync } from "node:fs";
 import { extname, resolve, sep } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { isArchivedPublicPath } from "../../app/src/distributionPolicy";
+import { isPrivateParlorPath, parlorPathname } from "./parlorAccess";
 
 /** Serve the built Vite application without coupling the app or domain to the HTTP transport. */
 export function serveArcanaWebApp(
   req: IncomingMessage,
   res: ServerResponse,
   distDir: string,
+  parlorAuthorized = false,
 ): boolean {
   if (req.method !== "GET" && req.method !== "HEAD") return false;
 
@@ -18,6 +20,8 @@ export function serveArcanaWebApp(
   try { pathname = decodeURIComponent(url.pathname); }
   catch { return false; }
   if (pathname.includes("\0") || isArcanaMachinePath(pathname) || isArchivedPublicPath(pathname)) return false;
+  const privateParlor = isPrivateParlorPath(parlorPathname(req.url ?? "/"));
+  if (privateParlor && !parlorAuthorized) return false;
 
   const relative = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
   const requested = resolve(root, relative);
@@ -32,10 +36,11 @@ export function serveArcanaWebApp(
   const headers: Record<string, string> = {
     "content-type": contentType(file),
     "x-content-type-options": "nosniff",
-    "cache-control": file.includes(`${sep}assets${sep}`)
+    "cache-control": privateParlor ? "private, no-store" : file.includes(`${sep}assets${sep}`)
       ? "public, max-age=31536000, immutable"
       : "no-cache",
   };
+  if (privateParlor) headers.vary = "Cookie";
   const size = statSync(file).size;
   headers["content-length"] = String(size);
   res.writeHead(200, headers);

@@ -11,7 +11,7 @@ Object.defineProperty(global,'navigator',{configurable:true,value:dom.window.nav
 const { createRoot } = require('react-dom/client');
 const { act } = React;
 let vite,root,App,Provider,useSession,sessionControl,router,settingsApi;
-let authenticated,accountId,providerCalls,lateResolve,delayed,accessMode,hostedDenied,hostedBodies;
+let authenticated,accountId,providerCalls,lateResolve,delayed,accessMode,hostedDenied,hostedBodies,parlorAllowed,deckCalls;
 const data=rawDeck();
 const deck={id:'parlor-deck',slug:data.slug,name:data.name,tagline:'Fixture deck',revision:1,visibility:'private',createdAt:'',updatedAt:'',manifest:{data,tagline:'Fixture deck'}};
 const flush=()=>act(async()=>{await new Promise(r=>setTimeout(r,0));});
@@ -33,7 +33,7 @@ before(async()=>{
   router=await vite.ssrLoadModule('/src/app/router.ts'); settingsApi=await vite.ssrLoadModule('/src/parlor/settings.ts');
 });
 beforeEach(async()=>{
-  authenticated=true;accountId='test-account';providerCalls=0;delayed=false;lateResolve=undefined;
+  authenticated=true;parlorAllowed=true;deckCalls=0;accountId='test-account';providerCalls=0;delayed=false;lateResolve=undefined;
   accessMode='byok';hostedDenied=false;hostedBodies=[];
   window.history.replaceState(null,'','/parlor');window.localStorage.clear();
   settingsApi.saveSettings(window.localStorage,accountId,{...settingsApi.defaultSettings(),anthropicKey:'synthetic-ui-key',anthropicModel:'synthetic-model'},true);
@@ -45,9 +45,9 @@ beforeEach(async()=>{
       const response=json({cards:token.c.map(([slug])=>({slug,text:'Hosted synthetic narration.'})),synthesis:'Hosted synthetic synthesis.'});
       if(delayed)return new Promise(resolve=>{lateResolve=()=>resolve(response);});return response;
     }
-    if(path==='/auth/session')return json(authenticated?{authenticated:true,accountId,user:{email:'host@example.test'}}:{authenticated:false});
+    if(path==='/auth/session')return json(authenticated?{authenticated:true,accountId,parlorAllowed,user:{email:'host@example.test'}}:{authenticated:false});
     if(path==='/api/auth/sign-out'){authenticated=false;return json({success:true});}
-    if(path==='/api/me/decks')return json([deck]);
+    if(path==='/api/me/decks'){deckCalls++;return json([deck]);}
     if(path==='/api/decks/parlor-deck')return json(deck);
     if(path.startsWith('/api/decks/parlor-deck/artwork/assets/'))return json({},404);
     if(path.startsWith('/api/decks/parlor-deck/artwork'))return json({enabled:true,deckRevision:1,packId:'saved-artwork',packs:[{id:'saved-artwork',label:'Chosen set',cardCount:0,complete:false}],cards:[]});
@@ -61,12 +61,24 @@ beforeEach(async()=>{
   };
   root=createRoot(document.getElementById('root'));
 });
-async function mount(){await act(async()=>root.render(React.createElement(Provider,null,React.createElement(Capture,null,React.createElement(App)))));await settle();}
+async function mount(){
+  await act(async()=>root.render(React.createElement(Provider,null,React.createElement(Capture,null,React.createElement(App)))));await settle();
+  // The private module is intentionally loaded only after server permission arrives.
+  for(let i=0;i<150&&/Loading your private table|Checking parlor access/.test(document.body.textContent);i++)
+    await act(async()=>{await new Promise(resolve=>setTimeout(resolve,10));});
+  await settle();
+}
 afterEach(async()=>{await act(async()=>root.unmount());document.getElementById('root').replaceChildren();});
 after(async()=>{await vite?.close();dom.window.close();global.window=original.window;global.document=original.document;global.fetch=original.fetch;global.PopStateEvent=original.PopStateEvent;if(original.navigator)Object.defineProperty(global,'navigator',original.navigator);else delete global.navigator;delete global.IS_REACT_ACT_ENVIRONMENT;});
 
 test('anonymous /parlor is gated before settings and no provider request is made',async()=>{
-  authenticated=false;await mount();assert.ok(button('Sign in to enter'));assert.equal(document.querySelectorAll('input[type=password]').length,0);assert.equal(providerCalls,0);
+  authenticated=false;await mount();assert.match(document.body.textContent,/Parlor access is restricted/);assert.ok(!button('Parlor'));assert.equal(document.querySelectorAll('input[type=password]').length,0);assert.equal(providerCalls,0);assert.equal(deckCalls,0);
+});
+
+test('other accounts and hash URLs cannot load settings or decks; missing permission fails closed',async()=>{
+  parlorAllowed=undefined;window.history.replaceState(null,'','/#/parlor');await mount();
+  assert.match(document.body.textContent,/Parlor access is restricted/);assert.ok(!button('Parlor'));
+  assert.equal(document.querySelectorAll('input[type=password]').length,0);assert.equal(deckCalls,0);assert.equal(providerCalls,0);
 });
 test('restored and pasted keys always remain password fields; clearing keys removes persisted values',async()=>{
   await mount();assert.equal(document.querySelectorAll('input[type=password]').length,3);assert.ok(!document.body.textContent.includes('synthetic-ui-key'));
@@ -81,7 +93,8 @@ test('confirm then reset and navigation clear guest state; no questions in URL/s
   assert.equal(window.location.pathname,'/parlor');assert.equal(window.location.hash,'');assert.ok(!JSON.stringify(window.localStorage).includes('Private guest'));
   await escape();assert.ok(button('Start the show'));assert.ok(!document.body.textContent.includes('Private guest'));assert.equal(document.querySelectorAll('.parlor-card').length,0);
   await act(async()=>router.navigate('/my-decks'));await settle();assert.equal(window.location.pathname,'/');assert.equal(window.location.hash,'#/my-decks');
-  await act(async()=>router.navigate('/parlor'));await settle();assert.equal(window.location.pathname,'/parlor');assert.ok(button('Start the show'));
+  // Real entry uses a document navigation so the server rechecks authorization.
+  await act(async()=>{window.history.pushState(null,'','/parlor');window.dispatchEvent(new dom.window.PopStateEvent('popstate'));});await settle();assert.equal(window.location.pathname,'/parlor');assert.ok(button('Start the show'));
 });
 test('account change with same email interrupts and fences pending response',async()=>{
   await mount();delayed=true;await guest();assert.equal(providerCalls,1);assert.ok(lateResolve);
@@ -89,7 +102,7 @@ test('account change with same email interrupts and fences pending response',asy
   assert.ok(!document.body.textContent.includes('Private guest'));assert.equal(document.querySelectorAll('.parlor-card').length,0);assert.equal(document.querySelector('input[type=password]').value,'');
 });
 test('logout interrupts pending generation and the late response cannot reopen the table',async()=>{
-  await mount();delayed=true;await guest();await act(async()=>sessionControl.signOut());await settle();lateResolve();await settle();assert.ok(button('Sign in to enter'));assert.equal(document.querySelectorAll('.parlor-card').length,0);
+  await mount();delayed=true;await guest();await act(async()=>sessionControl.signOut());await settle();lateResolve();await settle();assert.match(document.body.textContent,/Parlor access is restricted/);assert.equal(document.querySelectorAll('.parlor-card').length,0);
 });
 test('navigation away during generation fences the response; browser Back opens a fresh host screen',async()=>{
   await mount();delayed=true;await guest();assert.ok(lateResolve);
@@ -122,7 +135,7 @@ test('denied or disabled hosted access does not offer browser-key fallback',asyn
 });
 test('revoked hosted request stays in hosted mode and logout fences a late hosted result',async()=>{
   accessMode='hosted';await mount();hostedDenied=true;await guest();assert.equal(providerCalls,0);assert.ok(button('Start the show'));assert.ok(document.querySelector('[role=alert]'));assert.equal(document.querySelectorAll('input[type=password]').length,0);
-  hostedDenied=false;delayed=true;await guest();assert.ok(lateResolve);await act(async()=>sessionControl.signOut());await settle();lateResolve();await settle();assert.ok(button('Sign in to enter'));assert.equal(document.querySelectorAll('.parlor-card').length,0);
+  hostedDenied=false;delayed=true;await guest();assert.ok(lateResolve);await act(async()=>sessionControl.signOut());await settle();lateResolve();await settle();assert.match(document.body.textContent,/Parlor access is restricted/);assert.equal(document.querySelectorAll('.parlor-card').length,0);
 });
 
 test('kiosk advances all three cards without focusable controls or guest text',async()=>{

@@ -16,6 +16,7 @@ import { getMigrations } from "better-auth/db/migration";
 import { createAuthEmailSender, createAuthSmtpConfigurationFromEnv, type AuthEmailSender, type AuthSmtpConfiguration } from "./authEmail.js";
 import { AUTH_POSTGRES_TYPES } from "./authPostgres.js";
 import type { BrowserSessionAuthenticator } from "./browserSession.js";
+import { isParlorOwner } from "./parlorAccess.js";
 import { OAuthPrincipalError, type BearerIdentityVerifier } from "./oauthIdentity.js";
 
 export const BETTER_AUTH_BASE_PATH = "/api/auth";
@@ -253,6 +254,7 @@ export function isBetterAuthRequestPath(pathname: string): boolean {
 }
 
 function createBrowserHandler(auth: Auth, baseURL: string, resource: string) {
+  const issuer = `${baseURL}${BETTER_AUTH_BASE_PATH}`;
   return async (request: Request): Promise<Response> => {
     const url = new URL(request.url);
     if (["/.well-known/oauth-authorization-server", "/.well-known/openid-configuration"].includes(url.pathname)) {
@@ -292,7 +294,7 @@ function createBrowserHandler(auth: Auth, baseURL: string, resource: string) {
       }
       const session = await auth.api.getSession({ headers: request.headers });
       if (url.pathname === "/auth/session" && request.method === "GET") return json(200, session?.user.emailVerified ? {
-        authenticated: true, accountId: session.user.id, mcpUrl: resource, user: { email: session.user.email, displayName: session.user.name, emailVerified: session.user.emailVerified, ...(session.user.image ? { avatarUrl: session.user.image } : {}) },
+        authenticated: true, accountId: session.user.id, parlorAllowed: isParlorOwner({ issuer, subject: session.user.id }), mcpUrl: resource, user: { email: session.user.email, displayName: session.user.name, emailVerified: session.user.emailVerified, ...(session.user.image ? { avatarUrl: session.user.image } : {}) },
       } : { authenticated: false });
       if (url.pathname === "/auth/oauth/context" && request.method === "GET") {
         const oauthQuery = url.searchParams.get("oauth_query") ?? "";

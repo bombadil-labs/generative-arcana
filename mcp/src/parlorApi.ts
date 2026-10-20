@@ -8,7 +8,7 @@ import { ParlorFault, publicParlorConfig, type ParlorConfig } from './parlorConf
 import type { ParlorStore, Reservation } from './parlorStore';
 
 export const isParlorPath=(path: string)=>path==='/api/parlor' || path.startsWith('/api/parlor/');
-const json=(res:ServerResponse,status:number,body:unknown)=>{ if (!res.destroyed&&!res.writableEnded) {res.writeHead(status,{'content-type':'application/json','cache-control':'no-store'});res.end(JSON.stringify(body));} };
+const json=(res:ServerResponse,status:number,body:unknown)=>{ if (!res.destroyed&&!res.writableEnded) {res.writeHead(status,{'content-type':'application/json','cache-control':'private, no-store'});res.end(JSON.stringify(body));} };
 const record=(value:unknown):value is Record<string,unknown>=>!!value && typeof value==='object' && !Array.isArray(value);
 const text=(value:unknown,max:number)=>{if(typeof value!=='string'||!value.trim()||value.length>max)throw new ParlorFault(400,'invalid_parlor_request');return value;};
 async function readBody(req:IncomingMessage,signal:AbortSignal) {
@@ -32,9 +32,13 @@ export function rejectParlorSecrets(value:unknown,c:ParlorConfig):void {
   if(Array.isArray(value))for(const item of value)rejectParlorSecrets(item,c);
   else if(record(value))for(const item of Object.values(value))rejectParlorSecrets(item,c);
 }
-export function createParlorHandler(options:{config:ParlorConfig;store?:ParlorStore;principal?:BrowserPrincipalResolver;catalog?:UserDeckCatalogRepository;fetch?:typeof fetch}) {
+export function createParlorHandler(options:{config:ParlorConfig;authorize?:(req:IncomingMessage,res:ServerResponse)=>Promise<boolean>;store?:ParlorStore;principal?:BrowserPrincipalResolver;catalog?:UserDeckCatalogRepository;fetch?:typeof fetch}) {
   const {config:c,store,principal,catalog}=options;const send=options.fetch??fetch;
   return async(req:IncomingMessage,res:ServerResponse)=>{
+    // Also guard direct handler use: BYOK capabilities must never bypass authorization.
+    if (!options.authorize) return json(res,503,{error:'parlor_auth_unavailable'});
+    try { if (!await options.authorize(req,res)) return; }
+    catch { return json(res,503,{error:'parlor_auth_unavailable'}); }
     let reservation:Reservation|undefined;let success=false;
     const abort=new AbortController();const disconnected=()=>abort.abort();res.once('close',disconnected);
     const timer=setTimeout(()=>{json(res,408,{error:'parlor_deadline_exceeded'});abort.abort();},c.timeoutMs||10000);

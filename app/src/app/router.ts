@@ -11,8 +11,12 @@ export function currentRoute(): string {
 }
 
 export function navigate(to: string) {
-  if (to === "/parlor" || /^\/parlor\/?$/.test(window.location.pathname)) {
-    window.history.pushState(null, "", to === "/parlor" ? "/parlor" : `/#${to.startsWith("/") ? to : `/${to}`}`);
+  if (to === "/parlor") {
+    window.location.assign("/parlor");
+    return;
+  }
+  if (/^\/parlor\/?$/.test(window.location.pathname)) {
+    window.history.pushState(null, "", `/#${to.startsWith("/") ? to : `/${to}`}`);
     window.dispatchEvent(new PopStateEvent("popstate"));
     return;
   }

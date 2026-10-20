@@ -29,9 +29,7 @@ async function main(): Promise<void> {
 
     for (const path of ["/parlor", "/parlor/"]) {
       const parlor = await fetch(`${base}${path}`);
-      assert.equal(parlor.status, 200);
-      assert.match(parlor.headers.get("content-type") ?? "", /^text\/html/);
-      assert.match(await parlor.text(), /Arcana/);
+      assert.equal(parlor.status, 404, "generic static handler cannot serve a private page");
     }
 
     response = await fetch(`${base}/assets/app.js`);

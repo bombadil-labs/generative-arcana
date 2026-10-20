@@ -71,7 +71,8 @@ try {
     if(url.includes('openai')){assert.equal(prompt.store,false);return Response.json({choices:[{message:{content}}]});}
     return Response.json({content:[{type:'text',text:content}]});
   };
-  const handler=createParlorHandler({config,store,principal:{resolve:async()=>principal?{id:principal}:null},catalog:catalogFixture,fetch:providerFetch});
+  // Owner guard is exercised with real sessions in parlor-access.ts; this suite isolates budgets.
+  const handler=createParlorHandler({config,authorize:async()=>true,store,principal:{resolve:async()=>principal?{id:principal}:null},catalog:catalogFixture,fetch:providerFetch});
   server=createServer((req,res)=>{void handler(req,res);});await new Promise<void>(resolve=>server!.listen(0,'127.0.0.1',resolve));
   const port=(server.address() as {port:number}).port;
   const request=(kind:string,extra:Record<string,unknown>={},origin=config.origin,signal?:AbortSignal)=>fetch(`http://127.0.0.1:${port}/api/parlor/${kind}`,{method:'POST',headers:{origin,'content-type':'application/json'},signal,body:JSON.stringify({operationId:randomUUID(),deckId:'hosted-deck',token:reading.token,provider:'anthropic',model:'mock-a',character:'keeper',...extra})});
