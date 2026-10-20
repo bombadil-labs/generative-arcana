@@ -1,0 +1,57 @@
+.parlor { --parlor-gold: #e9c98a; color: #f6efe0; background: radial-gradient(ellipse at 50% 35%, #32203b, #14121b 75%); min-height: calc(100vh - 60px); padding: clamp(24px, 4vw, 56px); font-family: var(--font-body); }
+.parlor h1, .parlor h2 { font-family: var(--font-display); font-weight: 400; color: #f6efe0; }
+.parlor h1 { font-size: clamp(42px, 6vw, 72px); margin: 0 0 20px; }
+.parlor h2 { font-size: 28px; margin: 0 0 16px; }
+.parlor p { line-height: 1.65; color: #ded2dd; }
+.parlor-eyebrow { font: 11px var(--font-mono); text-transform: uppercase; letter-spacing: .2em; color: var(--parlor-gold) !important; }
+.parlor-heading, .parlor-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; max-width: 1200px; margin: auto; }
+.parlor button { border: 1px solid #85718c; border-radius: 6px; background: #322638; color: #fff4df; padding: 12px 18px; font: 600 14px var(--font-body); cursor: pointer; margin: 4px; }
+.parlor button.parlor-primary { background: var(--parlor-gold); color: #241c2b; border-color: var(--parlor-gold); }
+.parlor button:disabled, .parlor button[aria-disabled=true] { opacity: .45; cursor: not-allowed; }
+.parlor :focus-visible { outline: 3px solid #f3d497; outline-offset: 4px; }
+.parlor label { display: grid; gap: 8px; font-size: 13px; margin: 16px 0; color: #f6efe0; }
+.parlor input, .parlor select, .parlor textarea { width: 100%; min-width: 0; box-sizing: border-box; background: #1c1924; color: #f6efe0; border: 1px solid #796882; border-radius: 6px; padding: 12px; font: 15px var(--font-body); }
+.parlor input[type=password]::-ms-reveal, .parlor input[type=password]::-ms-clear { display: none; }
+.parlor textarea { min-height: 100px; resize: vertical; }
+.parlor-settings { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; max-width: 1200px; margin: 24px auto; }
+.parlor-settings > div { border-top: 1px solid #635369; padding-top: 24px; }
+.parlor .parlor-warning { font-size: 12px; line-height: 1.65; }
+.parlor label.parlor-check { display: flex; align-items: flex-start; line-height: 1.5; }
+.parlor-check input { width: 18px; height: 18px; flex: 0 0 auto; }
+.parlor-launch { max-width: 800px; margin: 32px auto; text-align: center; }
+.parlor-launch label { max-width: 360px; margin: auto; text-align: left; }
+.parlor-intro, .parlor-gate { text-align: center; }
+.parlor-intro { padding: 48px 12px; }
+.parlor-intro h2 { font-size: clamp(30px, 4vw, 50px); }
+.parlor-intro p { max-width: 500px; margin: 24px auto; font-size: 20px; }
+.parlor-intro small { display: block; margin-top: 24px; color: #b4a8bb; }
+.parlor-sigil { color: var(--parlor-gold); font-size: 80px; }
+.parlor-question { max-width: 620px; margin: 50px auto; }
+.parlor-question blockquote { border-left: 2px solid var(--parlor-gold); margin: 24px 0; padding: 20px; font: 24px/1.5 var(--font-display); overflow-wrap: anywhere; }
+.parlor-table { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(12px, 3vw, 36px); max-width: 860px; margin: 38px auto 20px; }
+.parlor-table figure { margin: 0; min-width: 0; }
+.parlor-card { aspect-ratio: 2 / 3; perspective: 1200px; }
+.parlor-card-turn { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform 900ms cubic-bezier(.2,.7,.2,1); }
+.parlor-card.is-revealed .parlor-card-turn { transform: rotateY(180deg); }
+.parlor-card-back, .parlor-card-front { position: absolute; inset: 0; backface-visibility: hidden; border: 1px solid #a78b60; border-radius: 10px; overflow: hidden; background: #211b30; box-shadow: 0 15px 36px #0006; }
+.parlor-card-front { transform: rotateY(180deg); }
+.parlor-card-back { padding: 7px; }
+.parlor-back-symbol { color: var(--parlor-gold); font-size: clamp(22px, 5vw, 48px); text-align: center; line-height: 1.5; }
+.parlor-table figcaption { text-align: center; margin-top: 16px; min-height: 72px; }
+.parlor-table figcaption span { font: 11px var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--parlor-gold); }
+.parlor-table figcaption strong, .parlor-table figcaption small { display: block; margin-top: 7px; }
+.parlor-table figcaption strong { font: 20px var(--font-display); }
+.parlor-table figcaption small { color: #c8bbc9; }
+.parlor-caption { max-width: 750px; margin: 20px auto; text-align: center; font: 22px/1.6 var(--font-display); min-height: 72px; overflow-wrap: anywhere; }
+.parlor-meanings, .parlor-conversation { max-width: 720px; margin: 28px auto; line-height: 1.6; }
+.parlor-meanings summary { color: var(--parlor-gold); cursor: pointer; }
+.parlor-actions { text-align: center; }
+@media (max-width: 800px) { .parlor-settings { grid-template-columns: 1fr; } .parlor { padding: 24px 16px; } .parlor-table figcaption strong { font-size: 16px; } .parlor-caption { font-size: 19px; } }
+@media (prefers-reduced-motion: reduce) { .parlor-card-turn { transition: none; } }
+
+.parlor-show { height: 100vh; height: 100dvh; min-height: 0; box-sizing: border-box; display: grid; place-items: center; padding: clamp(12px, 3vw, 40px); overflow: hidden; animation: parlor-arrive 450ms ease-out; }
+.parlor-show .parlor-ritual { width: 100%; max-width: 1200px; margin: auto; outline: none; }
+.parlor-show .parlor-table { width: min(100%, 150vh); width: min(100%, 150dvh); max-width: 1100px; margin: 0 auto; }
+.parlor-show-hint { font-size: 13px; }
+@keyframes parlor-arrive { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .parlor-show { animation: none; } }

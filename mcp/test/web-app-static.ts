@@ -27,6 +27,11 @@ async function main(): Promise<void> {
     assert.match(response.headers.get("content-type") ?? "", /^text\/html/);
     assert.match(await response.text(), /Arcana/);
 
+    for (const path of ["/parlor", "/parlor/"]) {
+      const parlor = await fetch(`${base}${path}`);
+      assert.equal(parlor.status, 404, "generic static handler cannot serve a private page");
+    }
+
     response = await fetch(`${base}/assets/app.js`);
     assert.equal(response.status, 200);
     assert.match(response.headers.get("cache-control") ?? "", /immutable/);
