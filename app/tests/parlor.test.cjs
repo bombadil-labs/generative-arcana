@@ -149,7 +149,46 @@ test('each card waits for explicit advance and permits repeated spoken discussio
 });
 test('discussion audio retry reuses the answer and never skips the current card',async()=>{
   let generated=0,spoken=0;const {machine}=setup({converse:async()=>{generated++;return 'Answer';},speak:async(_,text,signal,playing,reading,caption)=>{if(text==='Answer'&&++spoken===1)throw new ParlorError('Audio failed');playing();caption(text,'aligned');}});
-  try{await confirm(machine);await until(machine,'ready');machine.next();await until(machine,'ready');machine.ask('Why?');await until(machine,'error');assert.equal(machine.getSnapshot().turns.length,0);machine.retry();await until(machine,'ready');assert.equal(generated,1);assert.equal(spoken,2);assert.equal(machine.getSnapshot().turns.length,2);assert.equal(machine.getSnapshot().segment,1);}finally{machine.dispose();}
+  try{await confirm(machine);await until(machine,'ready');machine.next();await until(machine,'ready');machine.ask('Why?');await until(machine,'error');assert.equal(machine.getSnapshot().turns.length,2);machine.retry();await until(machine,'ready');assert.equal(generated,1);assert.equal(spoken,2);assert.equal(machine.getSnapshot().turns.length,4);assert.equal(machine.getSnapshot().segment,1);}finally{machine.dispose();}
+});
+
+test('follow-up provider requests retain completed narration and discussion across cards, excluding future content',async()=>{
+  const original=global.fetch;
+  try{for(const provider of ['anthropic','openai','hosted']){
+    const requests=[];let answerNumber=0;
+    global.fetch=async(url,init)=>{const body=JSON.parse(init.body);requests.push(body);const text=`DISCUSSION_REPLY_${++answerNumber}`;return Response.json(provider==='hosted'?{text}:provider==='anthropic'?{content:[{type:'text',text}]}:{choices:[{message:{content:text}}]});};
+    const machine=new ParlorMachine(deck.id,{...settings,provider:provider==='openai'?'openai':'anthropic',hosted:provider==='hosted'}, {
+      draw:async(_,q)=>engine.castReading(deck.id,'three-card',q),
+      narrate:async(_,reading)=>({cards:reading.placements.map((p,i)=>({slug:p.card.slug,text:`CARD_NARRATION_${i+1}`})),synthesis:'CLOSING_NARRATION'}),
+      speak:async(_,text,signal,playing,reading,caption)=>{playing();caption(text,'aligned');},
+    });
+    try{
+      await confirm(machine);await until(machine,'ready');machine.next();await until(machine,'ready');
+      machine.ask('What did you mean by that?');await until(machine,'ready');
+      const turns=body=>provider==='hosted'?body.turns:body.messages.filter(turn=>turn.role!=='system');
+      assert.deepEqual(turns(requests[0]).map(turn=>turn.content),['The reader has revealed card 1.','CARD_NARRATION_1','What did you mean by that?']);
+      for(const unseen of ['CARD_NARRATION_2','CARD_NARRATION_3','CLOSING_NARRATION'])assert.ok(!JSON.stringify(requests[0]).includes(unseen),`${provider} excludes ${unseen}`);
+      machine.next();await until(machine,'ready');machine.ask('How does this connect to what we discussed?');await until(machine,'ready');
+      assert.deepEqual(turns(requests[1]).map(turn=>turn.content),['The reader has revealed card 1.','CARD_NARRATION_1','What did you mean by that?','DISCUSSION_REPLY_1','The reader has revealed card 2.','CARD_NARRATION_2','How does this connect to what we discussed?']);
+      for(const unseen of ['CARD_NARRATION_3','CLOSING_NARRATION'])assert.ok(!JSON.stringify(requests[1]).includes(unseen));
+      machine.next();await until(machine,'ready');machine.ask('Stay with the third card');await until(machine,'ready');
+      assert.ok(JSON.stringify(requests[2]).includes('CARD_NARRATION_3'));assert.ok(!JSON.stringify(requests[2]).includes('CLOSING_NARRATION'));
+      machine.next();await until(machine,'complete');machine.ask('What did the closing mean?');await until(machine,'complete');
+      assert.ok(JSON.stringify(requests[3]).includes('CLOSING_NARRATION'));
+    }finally{machine.dispose();}
+  }}finally{global.fetch=original;}
+});
+
+test('cancelled or failed narration is not committed; completed caption retry commits exactly once',async()=>{
+  const late=deferred();let attempts=0;
+  const {machine}=setup({speak:async(_,text,signal,playing,reading)=>{if(!reading)return;playing();if(++attempts===1)await late.promise;else throw new ParlorError('Audio failed');}});
+  try{
+    await confirm(machine);await until(machine,'ready');machine.next();assert.equal(machine.getSnapshot().revealed,1);assert.deepEqual(machine.getSnapshot().turns,[]);
+    machine.cancel();late.resolve();await tick();assert.deepEqual(machine.getSnapshot().turns,[]);
+    machine.retry();await until(machine,'error');assert.deepEqual(machine.getSnapshot().turns,[]);
+    machine.captions();await until(machine,'ready');assert.equal(machine.getSnapshot().turns.length,2);assert.equal(machine.getSnapshot().turns[1].content,machine.getSnapshot().narration.cards[0].text);
+    machine.retry();assert.equal(machine.getSnapshot().turns.length,2);
+  }finally{machine.dispose();}
 });
 test('discussion context includes only revealed meanings and current card, never hidden card identities',async()=>{
   const reading=await engine.castReading(deck.id,'three-card','Question');const original=global.fetch;let body;

@@ -27,6 +27,11 @@ card follows the query. Each card's narration ends at a pause: talk repeatedly
 about that card, or press Next card. After card three, Hear the closing requests
 the synthesis. Nothing advances on a timer. Discussion context contains only
 revealed card names, positions, orientations and authored meanings.
+Completed card narration joins the recent discussion history in order, so a
+question such as “What did you mean by that?” includes the interpretation just
+delivered. Advancing retains recent discussion alongside the next completed
+narration. Future narration and unspoken synthesis are excluded; interrupted or
+failed delivery is not committed until a retry or explicit silent fallback completes.
 
 Narration appears below the cards. ElevenLabs' [speech-with-timing endpoint](https://elevenlabs.io/docs/api-reference/text-to-speech/convert-with-timestamps)
 returns audio and character alignment. Valid returned character **end** times
@@ -93,7 +98,7 @@ Backgrounding pauses in-flight narration and cancels microphone input; resuming
 requires an explicit retry. A failed step stays at the table with retry controls.
 Retries preserve the original draw. Retrying discussion audio reuses the generated
 answer rather than charging for another language-model response. Conversation
-history is bounded to ten exchanges while allowing further discussion.
+history is bounded to ten narration/discussion pairs while allowing further discussion.
 
 ## Verification
 

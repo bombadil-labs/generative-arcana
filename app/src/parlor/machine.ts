@@ -114,7 +114,14 @@ export class ParlorMachine {
       if (!current()) return;
       this.speech = undefined;
       if (speech.kind === "greeting") this.set({ phase: "question" });
-      else if (speech.kind === "card") this.set({ phase: speech.segment === 3 ? "complete" : "ready", segment: speech.segment + 1 });
+      else if (speech.kind === "card") {
+        // Record only completed delivery, not the pre-generated reading. Keep a user/assistant
+        // pair for provider compatibility and preserve recent discussion across card advances.
+        const turns: Turn[] = [...this.state.turns.slice(-18),
+          { role: "user", content: speech.segment === 3 ? "The reader is closing the reading." : `The reader has revealed card ${speech.segment + 1}.` },
+          { role: "assistant", content: speech.text }];
+        this.set({ phase: speech.segment === 3 ? "complete" : "ready", segment: speech.segment + 1, turns });
+      }
       else this.set({ phase: this.state.segment > 3 ? "complete" : "ready", pendingQuestion: "", turns: speech.turns! });
     });
   }
