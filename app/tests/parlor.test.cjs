@@ -4,7 +4,7 @@ const { ArcanaEngine } = require('../.test-build/engine/ArcanaEngine.js');
 const { DeckRegistry } = require('../.test-build/decks/registry.js');
 const { ParlorMachine } = require('../.test-build/parlor/machine.js');
 const { defaultSettings, saveSettings, readSettings } = require('../.test-build/parlor/settings.js');
-const { narrate, speak, parseNarration, ParlorError } = require('../.test-build/parlor/providers.js');
+const { narrate, speak, converse, parseNarration, ParlorError } = require('../.test-build/parlor/providers.js');
 const { safeAccountReturnTo } = require('../.test-build/auth/api.js');
 const { rawDeck } = require('./fixtures.cjs');
 const tick = () => new Promise(resolve => setImmediate(resolve));
@@ -18,14 +18,14 @@ function setup(overrides = {}) {
   const machine = new ParlorMachine(deck.id, settings, { draw: async (_, q) => { draws++; return engine.castReading(deck.id, 'three-card', q); }, narrate: async (_, reading) => narration(reading), speak: async (_, text, signal, playing) => playing(), ...overrides });
   return { machine, draws: () => draws };
 }
-function confirm(machine) { machine.begin(); machine.question('A private question'); machine.review(); machine.confirm(); machine.confirm(); }
+async function confirm(machine) { machine.begin(); machine.captions(); await until(machine,'question'); machine.question('A private question'); machine.review(); machine.confirm(); machine.confirm(); }
 async function until(machine, phase) { for (let i=0;i<50 && machine.getSnapshot().phase !== phase;i++) await tick(); assert.equal(machine.getSnapshot().phase, phase); }
 
 test('draw once; failed generation and repeated retry preserve exact identities and question', async () => {
   let calls = 0;
   const { machine, draws } = setup({ narrate: async (_, reading) => { if (++calls === 1) throw new ParlorError('Try again'); return narration(reading); } });
   try {
-    confirm(machine); await until(machine, 'error');
+    await confirm(machine); await until(machine, 'error');
     const reading = machine.getSnapshot().reading;
     machine.retry(false); machine.retry(false); await until(machine, 'ready');
     assert.equal(draws(), 1); assert.equal(calls, 2); assert.equal(machine.getSnapshot().reading, reading);
@@ -36,22 +36,22 @@ test('reset fences a late generation response and clears every guest field', asy
   const late = deferred(); let signal;
   const { machine } = setup({ narrate: async (_, reading, s) => { signal = s; await late.promise; return narration(reading); } });
   try {
-    confirm(machine); await until(machine, 'generating'); machine.reset(); assert.equal(signal.aborted, true);
+    await confirm(machine); await until(machine, 'generating'); machine.reset(); assert.equal(signal.aborted, true);
     late.resolve(); await tick(); await tick();
-    assert.deepEqual(machine.getSnapshot(), { phase:'greeting', question:'', revealed:0, segment:0, caption:'', error:'', turns:[], pendingQuestion:'' });
+    assert.deepEqual(machine.getSnapshot(), { phase:'greeting', question:'', revealed:0, segment:0, caption:'', timing:'aligned', error:'', turns:[], pendingQuestion:'', userText:'' });
   } finally { machine.dispose(); }
 });
 test('cancel during asynchronous draw then retry awaits the same draw', async () => {
   const late = deferred(); let count = 0;
   const { machine } = setup({ draw: async () => { count++; await late.promise; return engine.castReading(deck.id, 'three-card', 'A private question'); } });
-  try { confirm(machine); await tick(); machine.cancel(); machine.retry(false); late.resolve(); await until(machine,'ready'); assert.equal(count,1); }
+  try { await confirm(machine); await tick(); machine.cancel(); machine.retry(false); late.resolve(); await until(machine,'ready'); assert.equal(count,1); }
   finally { machine.dispose(); }
 });
 test('a queued draw keeps its confirmed question across an immediate guest reset', async () => {
   const questions=[];
   const {machine}=setup({draw:async(_,question)=>{questions.push(question);return engine.castReading(deck.id,'three-card',question);}});
   try {
-    confirm(machine);machine.reset();machine.begin();machine.question('New guest question');
+    await confirm(machine);machine.reset();machine.begin();machine.captions();await until(machine,'question');machine.question('New guest question');
     await tick();await tick();assert.deepEqual(questions,['A private question']);assert.equal(machine.getSnapshot().reading,undefined);
   } finally { machine.dispose(); }
 });
@@ -59,7 +59,7 @@ test('flip follows playing; repeat click, audio interruption and stale playing a
   let playing, signal; const late = deferred();
   const { machine } = setup({ speak: async (_, text, s, fn) => { playing = fn; signal = s; await late.promise; } });
   try {
-    confirm(machine); await until(machine, 'ready'); machine.next(false); machine.next(false);
+    await confirm(machine); await until(machine, 'ready'); machine.next(false); machine.next(false);
     assert.equal(machine.getSnapshot().revealed,0); playing(); assert.equal(machine.getSnapshot().revealed,1);
     machine.cancel(); assert.equal(signal.aborted,true); machine.reset(); playing(); late.resolve(); await tick();
     assert.equal(machine.getSnapshot().revealed,0); assert.equal(machine.getSnapshot().caption,'');
@@ -68,16 +68,16 @@ test('flip follows playing; repeat click, audio interruption and stale playing a
 test('audio failure permits captions; muted repeat clicks do not skip cards', async () => {
   const { machine } = setup({ speak: async () => { throw new ParlorError('Audio unavailable'); } });
   try {
-    confirm(machine); await until(machine,'ready'); machine.next(false); await until(machine,'error'); machine.captions(); machine.next(true);
+    await confirm(machine); await until(machine,'ready'); machine.next(false); await until(machine,'error'); machine.captions(); machine.next(true);
     assert.equal(machine.getSnapshot().revealed,1); assert.equal(machine.getSnapshot().segment,0);
-    await new Promise(r=>setTimeout(r,1000)); assert.equal(machine.getSnapshot().segment,1);
+    await tick(); assert.equal(machine.getSnapshot().segment,1);
   } finally { machine.dispose(); }
 });
 test('conversation retry does not duplicate turns and reset ignores its late response', async () => {
   const late = deferred(); let attempts = 0;
   const { machine, draws } = setup({ converse: async () => { if (++attempts === 1) throw new ParlorError('retry'); await late.promise; return 'answer'; } });
   try {
-    confirm(machine); await until(machine,'ready');
+    await confirm(machine); await until(machine,'ready');
     for (let i=0;i<4;i++) { machine.next(false); await until(machine,i===3?'complete':'ready'); }
     machine.ask('Follow up'); machine.ask('Duplicate'); await until(machine,'error');
     machine.retry(false); machine.retry(false); machine.reset(); late.resolve(); await tick();
@@ -125,7 +125,7 @@ test('audio releases its object URL and player on abort without accepting late p
   const original={fetch:global.fetch,Audio:global.Audio,create:URL.createObjectURL,revoke:URL.revokeObjectURL};
   let player,revoked=0,paused=0,played=0;
   try {
-    global.fetch=async()=>new Response(new Blob(['audio'],{type:'audio/mpeg'}));
+    global.fetch=async()=>Response.json({audio_base64:btoa('audio'),alignment:null});
     URL.createObjectURL=()=> 'blob:synthetic'; URL.revokeObjectURL=()=>revoked++;
     global.Audio=class { constructor(){player=this;} play(){return Promise.resolve();} pause(){paused++;} removeAttribute(){} load(){} };
     const abort=new AbortController(); const pending=speak(settings,'caption',abort.signal,()=>played++);
@@ -133,4 +133,27 @@ test('audio releases its object URL and player on abort without accepting late p
     assert.ok(player); player.onplaying(); abort.abort();
     await assert.rejects(pending,e=>e.name==='AbortError'); assert.equal(played,1); assert.equal(revoked,1); assert.ok(paused); assert.equal(player.onplaying,null);
   } finally { global.fetch=original.fetch; global.Audio=original.Audio; URL.createObjectURL=original.create; URL.revokeObjectURL=original.revoke; }
+});
+
+test('spoken greeting invites hold-to-talk and no cards are drawn until a query is submitted',async()=>{
+  const speech=deferred();let caption,spoken;const {machine,draws}=setup({speak:async(_,text,signal,playing,reading,update)=>{spoken=text;caption=update;playing();await speech.promise;}});
+  try{machine.begin();assert.match(spoken,/Hold the talk button/);assert.equal(machine.getSnapshot().question,'');assert.equal(machine.getSnapshot().caption,'');assert.equal(draws(),0);machine.submit('too early');assert.equal(draws(),0);caption('Come closer','aligned');assert.equal(machine.getSnapshot().caption,'Come closer');speech.resolve();await until(machine,'question');machine.submit('My spoken query');await until(machine,'ready');assert.equal(draws(),1);assert.equal(machine.getSnapshot().userText,'My spoken query');}finally{machine.dispose();}
+});
+test('each card waits for explicit advance and permits repeated spoken discussion without drawing again',async()=>{
+  const seen=[];const {machine,draws}=setup({converse:async(_,reading,turns,signal,revealed)=>{seen.push({turns,revealed});return 'A spoken answer.';},speak:async(_,text,signal,playing,reading,caption)=>{playing();caption(text,'aligned');}});
+  try{await confirm(machine);await until(machine,'ready');machine.next();await until(machine,'ready');assert.equal(machine.getSnapshot().revealed,1);await tick();assert.equal(machine.getSnapshot().segment,1);
+    for(let n=0;n<12;n++){machine.ask(`Follow-up ${n}`);await until(machine,'ready');assert.equal(machine.getSnapshot().segment,1);assert.equal(machine.getSnapshot().caption,'A spoken answer.');}
+    assert.equal(seen.length,12);assert.ok(seen.every(x=>x.revealed===1&&x.turns.length<=19));assert.equal(machine.getSnapshot().turns.length,20);
+    machine.next();await until(machine,'ready');assert.equal(machine.getSnapshot().revealed,2);assert.equal(draws(),1);
+  }finally{machine.dispose();}
+});
+test('discussion audio retry reuses the answer and never skips the current card',async()=>{
+  let generated=0,spoken=0;const {machine}=setup({converse:async()=>{generated++;return 'Answer';},speak:async(_,text,signal,playing,reading,caption)=>{if(text==='Answer'&&++spoken===1)throw new ParlorError('Audio failed');playing();caption(text,'aligned');}});
+  try{await confirm(machine);await until(machine,'ready');machine.next();await until(machine,'ready');machine.ask('Why?');await until(machine,'error');assert.equal(machine.getSnapshot().turns.length,0);machine.retry();await until(machine,'ready');assert.equal(generated,1);assert.equal(spoken,2);assert.equal(machine.getSnapshot().turns.length,2);assert.equal(machine.getSnapshot().segment,1);}finally{machine.dispose();}
+});
+test('discussion context includes only revealed meanings and current card, never hidden card identities',async()=>{
+  const reading=await engine.castReading(deck.id,'three-card','Question');const original=global.fetch;let body;
+  try{global.fetch=async(_,init)=>{body=JSON.parse(init.body);return Response.json({content:[{type:'text',text:'A thoughtful answer.'}]});};await converse(settings,reading,[{role:'user',content:'Tell me more'}],new AbortController().signal,1);
+    assert.ok(body.system.includes(reading.placements[0].meaning));assert.ok(!body.system.includes(reading.placements[1].card.name));assert.ok(!body.system.includes(reading.placements[2].card.name));
+  }finally{global.fetch=original;}
 });

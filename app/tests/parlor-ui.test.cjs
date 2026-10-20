@@ -21,7 +21,7 @@ function Capture({children}) { sessionControl=useSession(); return children; }
 function button(text){return [...document.querySelectorAll('button')].find(el=>el.textContent===text);}
 async function click(text){const target=button(text);assert.ok(target,`button exists: ${text}`);await act(async()=>target.click());await settle();}
 async function input(label,value){const field=[...document.querySelectorAll('label')].find(el=>el.childNodes[0].textContent===label)?.querySelector('input,textarea,select');assert.ok(field,`input exists: ${label}`);await act(async()=>{const proto=field.tagName==='TEXTAREA'?dom.window.HTMLTextAreaElement.prototype:dom.window.HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(field,value);field.dispatchEvent(new dom.window.Event('input',{bubbles:true}));});await flush();}
-async function guest(){await input('What would you like to explore?','Private guest question');await click('Start the show');}
+async function guest(){await click('Start the show');await click('Type instead');await input('Your words','Private guest question');await click('Send words');}
 async function escape(){await act(async()=>window.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));await settle();}
 
 
@@ -89,7 +89,7 @@ test('restored and pasted keys always remain password fields; clearing keys remo
   assert.equal([...Array(window.localStorage.length)].map((_,i)=>window.localStorage.key(i)).filter(k=>k.startsWith('arcana:parlor:credentials')).length,0);
 });
 test('confirm then reset and navigation clear guest state; no questions in URL/storage',async()=>{
-  await mount();await guest();assert.equal(document.querySelectorAll('.parlor-card').length,3);assert.equal(providerCalls,1);assert.equal(document.querySelectorAll('.parlor-show button,.parlor-show textarea,.parlor-show summary,.parlor-show figcaption').length,0);
+  await mount();await guest();assert.equal(document.querySelectorAll('.parlor-card').length,3);assert.equal(providerCalls,1);assert.ok(button('Hold to talk'));assert.ok(button('Next card'));assert.equal(document.querySelectorAll('.is-revealed').length,1);
   assert.equal(window.location.pathname,'/parlor');assert.equal(window.location.hash,'');assert.ok(!JSON.stringify(window.localStorage).includes('Private guest'));
   await escape();assert.ok(button('Start the show'));assert.ok(!document.body.textContent.includes('Private guest'));assert.equal(document.querySelectorAll('.parlor-card').length,0);
   await act(async()=>router.navigate('/my-decks'));await settle();assert.equal(window.location.pathname,'/');assert.equal(window.location.hash,'#/my-decks');
@@ -134,18 +134,20 @@ test('denied or disabled hosted access does not offer browser-key fallback',asyn
   accessMode='hosted';hostedDenied=true;await mount();assert.ok(!button('Start the show'));assert.equal(document.querySelectorAll('input[type=password]').length,0);assert.equal(providerCalls,0);
 });
 test('revoked hosted request stays in hosted mode and logout fences a late hosted result',async()=>{
-  accessMode='hosted';await mount();hostedDenied=true;await guest();assert.equal(providerCalls,0);assert.ok(button('Start the show'));assert.ok(document.querySelector('[role=alert]'));assert.equal(document.querySelectorAll('input[type=password]').length,0);
-  hostedDenied=false;delayed=true;await guest();assert.ok(lateResolve);await act(async()=>sessionControl.signOut());await settle();lateResolve();await settle();assert.match(document.body.textContent,/Parlor access is restricted/);assert.equal(document.querySelectorAll('.parlor-card').length,0);
+  accessMode='hosted';await mount();hostedDenied=true;await guest();assert.equal(providerCalls,0);assert.ok(button('Retry this step'));assert.ok(document.querySelector('[role=alert]'));assert.equal(document.querySelectorAll('input[type=password]').length,0);
+  await escape();hostedDenied=false;delayed=true;await guest();assert.ok(lateResolve);await act(async()=>sessionControl.signOut());await settle();lateResolve();await settle();assert.match(document.body.textContent,/Parlor access is restricted/);assert.equal(document.querySelectorAll('.parlor-card').length,0);
 });
 
-test('kiosk advances all three cards without focusable controls or guest text',async()=>{
+test('reading waits after each card and keeps user text above narrated text',async()=>{
   await mount();await guest();
   await act(async()=>{await new Promise(r=>setTimeout(r,1100));});
   await act(async()=>{await new Promise(r=>setTimeout(r,1100));});
   await act(async()=>{await new Promise(r=>setTimeout(r,1100));});
-  assert.equal(document.querySelectorAll('.is-revealed').length,3);
+  assert.equal(document.querySelectorAll('.is-revealed').length,1);await click('Next card');assert.equal(document.querySelectorAll('.is-revealed').length,2);await click('Next card');assert.equal(document.querySelectorAll('.is-revealed').length,3);await click('Hear the closing');
   const show=document.querySelector('.parlor-show');
-  assert.equal(show.querySelectorAll('button,input,textarea,select,summary,a,[tabindex="0"]').length,0);
-  assert.ok(!show.textContent.includes('Mock interpretation'));assert.ok(!show.textContent.includes('Private guest'));
+  assert.ok(button('Hold to talk'));assert.ok(button('Leave the table'));assert.ok(!button('Next card'));
+  assert.ok(show.textContent.includes('Mock synthesis'));assert.ok(show.textContent.includes('Private guest'));
+  assert.ok(show.querySelector('.parlor-user-transcript').compareDocumentPosition(show.querySelector('.parlor-table')) & 4);
+  assert.ok(show.querySelector('.parlor-table').compareDocumentPosition(show.querySelector('.parlor-caption')) & 4);
   await escape();assert.equal(document.activeElement,button('Start the show'));
 });
