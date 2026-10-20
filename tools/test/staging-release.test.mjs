@@ -1,0 +1,159 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { config, target, planDigest, migration, migratePhase, verifyCandidate, deploy, request } from '../staging/release.mjs';
+const sha = 'a'.repeat(40);
+const base = { REVIEWED_SHA: sha, OPERATION: 'plan', GITHUB_REPOSITORY: target.repository, GITHUB_REF: 'refs/heads/main', STAGING_MIGRATION_ROLE: 'staging_migrator', DATABASE_MIGRATION_URL: `postgresql://staging_migrator:fake@${target.host}/neondb?sslmode=require` };
+const plan = { recordedThrough: 6, pending: [{ version: 7, file: '007-fixture.sql', sha256: 'b'.repeat(64) }] };
+const write = { ...base, OPERATION: 'release', STAGING_WRITES_ENABLED: 'true', CONFIRMATION: `RELEASE ${sha}`, PLAN_DIGEST: planDigest(sha, base.STAGING_MIGRATION_ROLE, plan), RECOVERY_REFERENCE: 'reviewed-restore-test', STAGING_DEPLOY_ENABLED: 'true', VERCEL_STAGING_TOKEN: 'synthetic-token', STAGING_ENVIRONMENT_ID: 'env_fixture', STAGING_ALIAS: 'arcana-staging.example.com', STAGING_MAPPING_REVIEW: 'mapping-review', STAGING_MANUAL_ALIAS_REVIEW: 'alias-review' };
+function github(overrides = {}) { return async path => path.startsWith('/git/ref') ? { object: { sha: overrides.sha || sha } } : { workflow_runs: [{ id: 2, head_sha: sha, head_branch: 'staging', event: 'push', status: 'completed', conclusion: overrides.conclusion || 'success' }] }; }
+test('disabled writes, wrong dispatch, confirmation, recovery and candidate all fail closed', async () => {
+  for (const patch of [{ STAGING_WRITES_ENABLED: '' }, { CONFIRMATION: 'release' }, { RECOVERY_REFERENCE: 'disposable-staging:old-waiver' }, { GITHUB_REF: 'refs/heads/staging' }, { REVIEWED_SHA: 'main' }]) assert.throws(() => config({ ...write, ...patch }));
+  await assert.rejects(verifyCandidate(write, github({ sha: 'c'.repeat(40) })), /superseded/);
+  await assert.rejects(verifyCandidate(write, github({ conclusion: 'failure' })), /validation/);
+});
+test('latest failed validation cannot reuse an older passing run', async () => {
+  const gh = async path => path.startsWith('/git/ref') ? { object: { sha } } : { workflow_runs: [1, 2].map(id => ({ id, head_sha: sha, head_branch: 'staging', event: 'push', status: 'completed', conclusion: id === 1 ? 'success' : 'failure' })) };
+  await assert.rejects(verifyCandidate(write, gh), /validation/);
+});
+test('plan/status never apply; reviewed writes use plan, apply, status in order', () => {
+  const operations = [];
+  const execute = (_, args) => { const op = args[3]; operations.push(op); assert.ok(args.includes(target.host)); assert.equal(args[args.indexOf('--restricted-role')+1], 'true'); return JSON.stringify(op === 'plan' ? plan : { pending: [] }); };
+  migration(base, execute); assert.deepEqual(operations.splice(0), ['plan']);
+  migration({ ...base, OPERATION: 'status' }, execute); assert.deepEqual(operations.splice(0), ['status']);
+  migration(write, execute); assert.deepEqual(operations.splice(0), ['plan', 'apply', 'status']);
+  assert.throws(() => migration({ ...write, PLAN_DIGEST: 'c'.repeat(64) }, execute), /Plan changed/); assert.deepEqual(operations.splice(0), ['plan']);
+  assert.throws(() => migration(write, () => JSON.stringify({ ...plan, baselineRequired: true })), /adoption/);
+  for (const uri of ['postgresql://staging_migrator:fake@production.example/neondb', `postgresql://other:fake@${target.host}/neondb`, `postgresql://staging_migrator:fake@${target.host}/other`]) assert.throws(() => migration({ ...write, DATABASE_MIGRATION_URL: uri }, execute), /target mismatch/);
+});
+
+test('one-time owner cannot be used by recurring release', () => {
+  assert.throws(() => migration({ ...base, STAGING_MIGRATION_ROLE: 'neondb_owner', DATABASE_MIGRATION_URL: `postgresql://neondb_owner:fake@${target.host}/neondb?sslmode=require` }, () => { throw Error('must not execute'); }), /owner|restricted/i);
+});
+
+test('bootstrap dispatcher is isolated, pinned, manual and held', () => {
+  const workflow = readFileSync('.github/workflows/staging-bootstrap.yml', 'utf8');
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.doesNotMatch(workflow, /^  (push|pull_request|workflow_run):/m);
+  assert.match(workflow, /environment: arcana-staging-bootstrap/);
+  assert.match(workflow, /group: arcana-preview-migration/);
+  assert.match(workflow, /cancel-in-progress: false/);
+  assert.match(workflow, /secrets.ARCANA_STAGING_BOOTSTRAP_URL/);
+  assert.match(workflow, /vars.STAGING_BOOTSTRAP_ENABLED/);
+  assert.doesNotMatch(workflow, /ARCANA_STAGING_MIGRATION_URL|ARCANA_PRODUCTION_MIGRATION_URL/);
+  assert.match(workflow, /\$SHA.*==.*\$GITHUB_SHA/);
+  assert.match(workflow, /ref: \$\{\{ inputs.reviewed_sha \}\}/);
+  assert.match(workflow, /--expected-user neondb_owner/);
+});
+test('failed apply or status stops the migration gate', () => {
+  for (const failure of ['apply', 'status']) {
+    const operations = [];
+    assert.throws(() => migration(write, (_, args) => { const op = args[3]; operations.push(op); if (op === failure) throw Error('injected'); return JSON.stringify(plan); }), /injected/);
+    assert.deepEqual(operations, failure === 'apply' ? ['plan', 'apply'] : ['plan', 'apply', 'status']);
+  }
+});
+function fixture(overrides = {}) {
+  const calls = [];
+  const d = { id: 'dpl_fixture', url: 'fixture.vercel.app', projectId: target.project, customEnvironment: { id: write.STAGING_ENVIRONMENT_ID }, target: null, gitSource: { type: 'github', repoId: target.repositoryId, sha }, readyState: 'READY', ...overrides.deployment };
+  return { calls, deps: { candidateConfig: { git: { deploymentEnabled: { staging: false } } }, gh: overrides.gh || github(), sleep: async () => {}, ready: async () => { calls.push('ready'); if (overrides.readinessFailure) throw Error('not ready'); }, vc: async (path, body) => {
+    calls.push(body ? { path, body } : path);
+    if (path.includes('custom-environments')) return { id: write.STAGING_ENVIRONMENT_ID, slug: 'staging', type: 'preview', domains: overrides.domains || [], ...overrides.environment };
+    if (path.includes('/domains?')) return { domains: overrides.projectDomains || [] };
+    if (path === '/v13/deployments') return { id: d.id };
+    if (path.includes('/aliases')) return body ? { alias: body.alias } : { deploymentId: d.id };
+    return d;
+  } } };
+}
+test('combined release rejects deployment prerequisites before any migration operation', async () => {
+  const patches = ['STAGING_DEPLOY_ENABLED','VERCEL_STAGING_TOKEN','STAGING_ENVIRONMENT_ID','STAGING_ALIAS','STAGING_MAPPING_REVIEW','STAGING_MANUAL_ALIAS_REVIEW'].map(key => ({ [key]: '' }));
+  for (const patch of patches) {
+    const f = fixture(), operations = [];
+    await assert.rejects(migratePhase({ ...write, ...patch }, { ...f.deps, execute: (_, args) => { operations.push(args[3]); return JSON.stringify(plan); } }));
+    assert.deepEqual(operations, []);
+  }
+  for (const overrides of [{ environment: { id: 'env_wrong' } }, { environment: { type: 'production' } }, { environment: { branchMatcher: { type: 'equals', pattern: 'main' } } }, { domains: [{ name: write.STAGING_ALIAS }] }, { projectDomains: [{ gitBranch: 'staging' }] }, { projectDomains: [{ customEnvironmentId: write.STAGING_ENVIRONMENT_ID }] }]) {
+    const f = fixture(overrides), operations = [];
+    await assert.rejects(migratePhase(write, { ...f.deps, execute: (_, args) => { operations.push(args[3]); return JSON.stringify(plan); } }));
+    assert.deepEqual(operations, []);
+    assert.equal(f.calls.filter(x => typeof x === 'object').length, 0);
+  }
+  for (const deps of [{ ...fixture().deps, candidateConfig: {} }, { ...fixture().deps, vc: async () => { throw Error('provider unavailable'); } }]) {
+    let executed = false;
+    await assert.rejects(migratePhase(write, { ...deps, execute: () => { executed = true; } }));
+    assert.equal(executed, false);
+  }
+});
+
+test('combined release checks mappings before migrations; migration-only operations need no deployment access', async () => {
+  const f = fixture(), operations = [];
+  const execute = (_, args) => { operations.push(args[3]); return JSON.stringify(args[3] === 'plan' ? plan : { pending: [] }); };
+  await migratePhase(write, { ...f.deps, execute: (...args) => { assert.ok(f.calls.some(x => typeof x === 'string' && x.includes('/domains?'))); return execute(...args); } });
+  assert.deepEqual(operations.splice(0), ['plan', 'apply', 'status']);
+  assert.equal(f.calls.filter(x => typeof x === 'object').length, 0);
+  for (const operation of ['apply','plan','status']) {
+    await migratePhase({ ...write, OPERATION: operation, CONFIRMATION: `${operation.toUpperCase()} ${sha}`, STAGING_DEPLOY_ENABLED: 'false', VERCEL_STAGING_TOKEN: '', STAGING_ENVIRONMENT_ID: '', STAGING_ALIAS: '' }, { gh: github(), vc: async () => { assert.fail('migration-only must not contact Vercel'); }, execute });
+    assert.deepEqual(operations.splice(0), operation === 'apply' ? ['plan','apply','status'] : [operation]);
+  }
+});
+
+test('migration children receive only database/process settings while trusted deployment retains credentials', async () => {
+  const transport = { DATABASE_MIGRATION_URL: base.DATABASE_MIGRATION_URL, DATABASE_MIGRATION_CA_FILE: '/fixture/ca.pem', MIGRATION_PYTHON: '/fixture/python', PATH: '/fixture/bin', TMPDIR: '/fixture/tmp' };
+  const env = { ...write, ...transport, STAGING_PROTECTION_BYPASS: 'synthetic-bypass', GITHUB_TOKEN: 'synthetic-github', GH_TOKEN: 'synthetic-gh', VERCEL_TOKEN: 'synthetic-other-vercel', ACTIONS_RUNTIME_TOKEN: 'synthetic-runner', DATABASE_URL: 'synthetic-runtime-database', FUTURE_DEPLOY_SECRET: 'synthetic-future' };
+  const before = { ...env }, operations = [];
+  const execute = (_, args, options) => {
+    operations.push(args[3]);
+    assert.deepEqual(options.env, transport);
+    for (const key of ['VERCEL_STAGING_TOKEN','STAGING_PROTECTION_BYPASS','GITHUB_TOKEN','GH_TOKEN','VERCEL_TOKEN','ACTIONS_RUNTIME_TOKEN','DATABASE_URL','FUTURE_DEPLOY_SECRET']) assert.equal(Object.hasOwn(options.env, key), false);
+    if (args[3] === 'apply') assert.equal(args[args.indexOf('--backup-reference') + 1], env.RECOVERY_REFERENCE);
+    return JSON.stringify(args[3] === 'plan' ? plan : { pending: [] });
+  };
+  const f = fixture();
+  await migratePhase(env, { ...f.deps, execute });
+  assert.deepEqual(operations.splice(0), ['plan','apply','status']);
+  for (const operation of ['plan','status','apply']) {
+    migration({ ...env, OPERATION: operation, CONFIRMATION: `${operation.toUpperCase()} ${sha}` }, execute);
+    assert.deepEqual(operations.splice(0), operation === 'apply' ? ['plan','apply','status'] : [operation]);
+  }
+  assert.deepEqual(env, before, 'child filtering must not mutate trusted parent');
+  await deploy(env, { ...f.deps, vc: (path, body) => { assert.equal(env.VERCEL_STAGING_TOKEN, before.VERCEL_STAGING_TOKEN); return f.deps.vc(path, body); }, ready: async (...args) => { assert.equal(env.STAGING_PROTECTION_BYPASS, before.STAGING_PROTECTION_BYPASS); return f.deps.ready(...args); } });
+  assert.equal(f.calls.filter(x => typeof x === 'object').length, 2);
+});
+
+test('exact migrated SHA deployment precedes readiness and manual alias, with final verification', async () => {
+  const f = fixture(); await deploy(write, f.deps);
+  const writes = f.calls.filter(x => typeof x === 'object');
+  assert.equal(writes.length, 2); assert.equal(writes[0].body.gitSource.sha, sha);
+  assert.equal(writes[0].body.customEnvironmentSlugOrId, write.STAGING_ENVIRONMENT_ID);
+  assert.equal(writes[0].body.target, undefined);
+  assert.equal(writes[1].body.alias, write.STAGING_ALIAS);
+  assert.ok(f.calls.indexOf('ready') < f.calls.indexOf(writes[1]));
+});
+test('wrong SHA/environment, failed readiness or superseding push never promote', async () => {
+  let reads = 0;
+  for (const overrides of [{ deployment: { gitSource: { sha: 'b'.repeat(40) } } }, { deployment: { target: 'production' } }, { readinessFailure: true }, { deployment: { readyState: 'ERROR' } }, { gh: async path => path.startsWith('/git/ref') ? { object: { sha: ++reads > 1 ? 'c'.repeat(40) : sha } } : github()(path) }]) {
+    const f = fixture(overrides); await assert.rejects(deploy(write, f.deps));
+    assert.equal(f.calls.filter(x => typeof x === 'object' && x.path.includes('/aliases')).length, 0);
+  }
+});
+test('automatic staging domain assignment or disabled configuration never creates deployment', async () => {
+  for (const overrides of [{ domains: [{ name: write.STAGING_ALIAS }] }, { projectDomains: [{ gitBranch: 'staging' }] }]) {
+    const f = fixture(overrides); await assert.rejects(deploy(write, f.deps));
+    assert.equal(f.calls.filter(x => typeof x === 'object').length, 0);
+  }
+  const f = fixture(); await assert.rejects(deploy({ ...write, STAGING_DEPLOY_ENABLED: '' }, f.deps)); assert.equal(f.calls.length, 0);
+});
+test('provider errors stay generic and requests cannot redirect credentials', async () => {
+  await assert.rejects(request('https://api.example', 'fake', undefined, async (_, options) => { assert.equal(options.redirect, 'error'); return { ok: false, status: 403, text: () => 'SECRET' }; }), error => !error.message.includes('SECRET'));
+});
+test('workflow has manual-only writes, shared lock, immutable refs and migration dependency', () => {
+  const workflow = readFileSync('.github/workflows/staging-release.yml', 'utf8');
+  assert.match(workflow, /workflow_dispatch:/); assert.doesNotMatch(workflow, /^  (push|pull_request|workflow_run):/m);
+  assert.match(workflow, /group: arcana-preview-migration\n  cancel-in-progress: false/);
+  assert.match(workflow, /needs: migration/); assert.match(workflow, /if: inputs.operation == 'release'/);
+  const migrationJob = workflow.split('  deploy:')[0];
+  for (const key of ['STAGING_DEPLOY_ENABLED','STAGING_ENVIRONMENT_ID','STAGING_ALIAS','STAGING_MAPPING_REVIEW','STAGING_MANUAL_ALIAS_REVIEW','VERCEL_STAGING_TOKEN']) assert.ok(migrationJob.includes(key), `${key} available before migrations`);
+  assert.match(migrationJob, /inputs.operation == 'release' && secrets.VERCEL_STAGING_TOKEN/);
+  assert.equal((workflow.match(/ref: \$\{\{ inputs.reviewed_sha \}\}/g) || []).length, 2);
+  assert.match(workflow, /secrets.ARCANA_STAGING_MIGRATION_URL/); assert.doesNotMatch(workflow, /ARCANA_PRODUCTION_MIGRATION_URL|ARCANA_PREVIEW_MIGRATION_URL/);
+  const vercel = JSON.parse(readFileSync('vercel.json', 'utf8')); assert.equal(vercel.git.deploymentEnabled.staging, false); assert.equal(vercel.git.deploymentEnabled['dependabot/**'], false);
+});
