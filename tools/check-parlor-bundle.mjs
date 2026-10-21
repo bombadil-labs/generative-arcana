@@ -9,7 +9,7 @@ const html=await readFile(new URL('index.html',root),'utf8');
 assert.ok(!/<(?:script|link)[^>]*(?:src|href)="[^"]*assets\/parlor-/.test(html),'Public HTML must not preload Parlor assets');
 for(const name of files.filter(name=>/\.(?:js|css)$/.test(name)&&!name.startsWith('parlor-'))) {
   const content=await readFile(new URL(`assets/${name}`,root),'utf8');
-  for(const privateMarker of ['anthropic-dangerous-direct-browser-access','parlor-ritual','arcana:parlor:credentials'])
+  for(const privateMarker of ['anthropic-dangerous-direct-browser-access','parlor-ritual','arcana:parlor:credentials','scribe_v2','eleven_v3'])
     assert.ok(!content.includes(privateMarker),`Private Parlor implementation leaked into ${name}`);
   assert.ok(!/\b(?:import|export)[^;]*\bfrom\s*["'][^"']*\/parlor-/.test(content),`Public bundle statically imports private Parlor code: ${name}`);
 }

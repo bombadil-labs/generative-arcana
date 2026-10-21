@@ -9,6 +9,7 @@ import { getPackArtworkAsset, type PackArtworkAsset } from "../artwork/api";
 import { useArtworkSelection, useArtworkStore } from "../artwork/context";
 import { characters, clearKeys, defaultSettings, readSettings, readySettings, saveSettings, type Settings } from "./settings";
 import { ParlorMachine } from "./machine";
+import { ScribeMicrophone } from "./microphone";
 import { readParlorCapabilities, type ParlorCapabilities } from './hosted';
 import "./parlor.css";
 
@@ -43,7 +44,6 @@ function Host({ accountId, onShowChange, capabilities }: { accountId: string; on
   const [status, setStatus] = useState("loading");
   const [attempt, setAttempt] = useState(0);
   const [hosting, setHosting] = useState(false);
-  const [showError, setShowError] = useState("");
   const startButton = useRef<HTMLButtonElement>(null);
   const showing = useRef(false);
   useLayoutEffect(() => {
@@ -108,22 +108,19 @@ function Host({ accountId, onShowChange, capabilities }: { accountId: string; on
         {storageError && <p role="alert">Browser storage could not be updated. Keys work in memory, but previously saved keys may remain; clear site data in your browser.</p>}
       </div></>}
     </div>}
-    {!hosting && showError && <p role="alert">{showError}</p>}
     {deckId && <RemoteDeckBoundary key={deckId} deckId={deckId} routeKey="/parlor">
-      <TableSetup deckId={deckId} settings={settings} hosting={hosting} start={() => { setShowError(""); setHosting(true); }} fail={(error) => { setShowError(error); setHosting(false); }} startButton={startButton} />
+      <TableSetup deckId={deckId} settings={settings} hosting={hosting} start={() => setHosting(true)} leave={() => setHosting(false)} startButton={startButton} />
     </RemoteDeckBoundary>}
   </section>;
 }
 function KeyInput({ label, value, change }: { label: string; value: string; change(value: string): void }) {
   return <label>{label}<input type="password" value={value} onChange={(event) => change(event.target.value)} autoComplete="off" autoCapitalize="none" spellCheck={false} maxLength={4096} data-1p-ignore data-lpignore="true" /></label>;
 }
-function TableSetup({ deckId, settings, hosting, start, fail, startButton }: { deckId: string; settings: Settings; hosting: boolean; start(): void; fail(error: string): void; startButton: React.RefObject<HTMLButtonElement> }) {
-  const [question, setQuestion] = useState("");
-  useLayoutEffect(() => { if (!hosting) setQuestion(""); }, [hosting]);
+function TableSetup({ deckId, settings, hosting, start, leave, startButton }: { deckId: string; settings: Settings; hosting: boolean; start(): void; leave(): void; startButton: React.RefObject<HTMLButtonElement> }) {
   const artwork = useArtworkSelection();
   const deck = getDeck(deckId)!;
-  const ready = !!question.trim() && readySettings(settings) && deck.cards.length >= 3 && (!artwork || (artwork.resolved && !!artwork.packId));
-  if (hosting) return <Ritual key={`${deckId}:${artwork?.packId ?? ""}`} deckId={deckId} settings={settings} question={question} fail={fail} />;
+  const ready = readySettings(settings) && deck.cards.length >= 3 && (!artwork || (artwork.resolved && !!artwork.packId));
+  if (hosting) return <Ritual key={`${deckId}:${artwork?.packId ?? ""}`} deckId={deckId} settings={settings} leave={leave} />;
   return <div className="parlor-launch">
     {artwork && <label>Artwork set<select aria-label="Artwork set" value={artwork.packId} disabled={!artwork.resolved} onChange={(event) => artwork.selectPack(event.target.value)}>
       {!artwork.packId && <option value="">Choose an artwork set</option>}
@@ -133,31 +130,51 @@ function TableSetup({ deckId, settings, hosting, start, fail, startButton }: { d
     {artwork?.status === "error" && <p role="alert">Artwork could not be checked. <button onClick={artwork.refresh}>Retry artwork</button></p>}
     <p>Questions and conversation stay in memory here and clear for the next guest. Your selected provider receives the question and deck context; ElevenLabs receives narration when enabled. Their retention policies apply. This app does not save guest readings.</p>
     {deck.cards.length < 3 && <p role="alert">Choose a deck with at least three cards.</p>}
-    <label>What would you like to explore?<textarea value={question} onChange={event => setQuestion(event.target.value)} maxLength={1200} /></label>
+    <p>Hold to talk records only while held. On release, that clip goes to ElevenLabs Scribe using your ElevenLabs key and incurs transcription usage. Its transcript goes to your selected reader. Provider retention policies apply. You can type instead.</p>
     <button ref={startButton} className="parlor-primary" aria-disabled={!ready} onClick={() => { if (ready) start(); }}>Start the show</button>
-    <p className="parlor-show-hint">Starting confirms your question. Only the cards appear; reveals and optional audio continue automatically. Press Escape to stop, clear the reading and return to setup. Without a keyboard, use browser Back. For reflection and entertainment.</p>
+    <p className="parlor-show-hint">Enter, hear the greeting, then hold to talk. After each card, discuss it or choose the next card. Press Escape or Leave the table to stop and clear the reading. For reflection and entertainment.</p>
   </div>;
 }
-function Ritual({ deckId, settings, question, fail }: { deckId: string; settings: Settings; question: string; fail(error: string): void }) {
+function Ritual({ deckId, settings, leave }: { deckId: string; settings: Settings; leave(): void }) {
   const artwork = useArtworkStore();
   const machine = useMemo(() => new ParlorMachine(deckId, settings, { preload: async (reading) => {
     await Promise.all(reading.cards.map((card) => artwork?.load(card.slug)));
   } }), [deckId, settings, artwork]);
   const state = useSyncExternalStore(machine.subscribe, machine.getSnapshot, machine.getSnapshot);
+  const microphone = useMemo(() => new ScribeMicrophone(text => machine.submit(text), () => settings.hosted ? "" : settings.elevenKey), [machine, settings]);
+  const mic = useSyncExternalStore(microphone.subscribe, microphone.getSnapshot, microphone.getSnapshot);
+  const gesture = useRef<{ pointer?: number; key?: string } | null>(null);
+  const [typing, setTyping] = useState(false);
+  const [typed, setTyped] = useState("");
   const [back, setBack] = useState<PackArtworkAsset | null>(null);
   const stage = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => { stage.current?.focus({ preventScroll: true }); return () => machine.dispose(); }, [machine]);
-  useEffect(() => { machine.begin(); machine.question(question); machine.review(); machine.confirm(); }, [machine, question]);
+  useLayoutEffect(() => { stage.current?.focus({ preventScroll: true }); return () => { microphone.dispose(); machine.dispose(); }; }, [machine, microphone]);
+  useEffect(() => { machine.begin(); }, [machine]);
   useEffect(() => {
-    if (state.phase === "ready") machine.next(false);
-    if (state.phase === "error") fail(state.error);
-  }, [machine, state.phase, state.segment, state.error, fail]);
+    // Only the first card follows the spoken query. Later cards require an explicit action.
+    if (state.phase === "ready" && state.segment === 0 && state.revealed === 0) machine.next();
+  }, [machine, state.phase, state.segment, state.revealed]);
+  useEffect(() => {
+    const cancel = () => { gesture.current = null; microphone.cancel(); machine.cancel(); };
+    const hidden = () => { if (document.hidden) cancel(); };
+    const pointerUp = (event: PointerEvent) => { if (gesture.current?.pointer === event.pointerId) { gesture.current = null; microphone.release(); } };
+    const keyUp = (event: KeyboardEvent) => { if (gesture.current?.key === event.key) { gesture.current = null; microphone.release(); } };
+    window.addEventListener("blur", cancel); window.addEventListener("pagehide", cancel);
+    document.addEventListener("visibilitychange", hidden);
+    window.addEventListener("pointerup", pointerUp); window.addEventListener("keyup", keyUp);
+    return () => { window.removeEventListener("blur", cancel); window.removeEventListener("pagehide", cancel); document.removeEventListener("visibilitychange", hidden); window.removeEventListener("pointerup", pointerUp); window.removeEventListener("keyup", keyUp); };
+  }, [machine, microphone]);
   useEffect(() => {
     const abort = new AbortController();
     if (artwork?.packId) void getPackArtworkAsset(deckId, "cardBack", abort.signal, artwork.packId).then(asset => { if (!abort.signal.aborted) setBack(asset); }).catch(() => {});
     return () => abort.abort();
   }, [deckId, artwork]);
-  return <div ref={stage} tabIndex={-1} className="parlor-ritual" aria-label="Cards-only reading">
+  const canTalk = state.phase === "question" || state.phase === "complete" || (state.phase === "ready" && state.segment > 0);
+  const micBusy = ["checking", "listening", "finishing"].includes(mic.phase);
+  const cancelMic = () => { if (gesture.current) { gesture.current = null; microphone.cancel(); } };
+  const busy = ["drawing", "generating", "speaking", "conversation"].includes(state.phase);
+  return <div ref={stage} tabIndex={-1} className="parlor-ritual" aria-label="Interactive reading">
+    <div className="parlor-user-transcript" aria-label="Your words" aria-live="polite">{state.userText || "What have you brought to the table?"}</div>
     {state.reading && (
       <div className="parlor-table" aria-label="Three-card reading">
         {state.reading.placements.map((placement, index) => <figure key={placement.card.slug}>
@@ -171,5 +188,32 @@ function Ritual({ deckId, settings, question, fail }: { deckId: string; settings
         </figure>)}
       </div>
     )}
+    {!state.reading && <div className="parlor-waiting" aria-hidden="true">✧</div>}
+    <div className="parlor-caption" aria-label="Narrator transcript" aria-live="off">{state.caption}</div>
+    {state.timing === "segment" && <p className="parlor-timing">Timing is unavailable for this audio. Its transcript appears after the spoken segment ends.</p>}
+    {state.timing === "silent" && <p className="parlor-timing">Reading without audio.</p>}
+    <div className="parlor-actions">
+      <p className="parlor-status" role="status">{mic.phase === "listening" ? "Recording while held. Release to transcribe." : mic.phase === "checking" ? "Preparing microphone. Keep holding." : mic.phase === "finishing" ? "Transcribing with ElevenLabs Scribe." : state.phase === "drawing" || state.phase === "generating" ? "The cards are gathering…" : state.phase === "conversation" ? "The reader is reflecting…" : state.phase === "speaking" ? "Listen…" : state.phase === "paused" ? "The reading is paused." : canTalk ? state.reading ? "Stay with this card, or continue when you are ready." : "Hold to talk, then release to send." : ""}</p>
+      <button className={`parlor-talk${mic.phase === "listening" ? " is-listening" : ""}`} disabled={!canTalk || mic.phase === "finishing"} aria-pressed={mic.phase === "listening"} aria-label="Hold to talk"
+        onPointerDown={event => { if (!canTalk || event.button !== 0 || !event.isPrimary || gesture.current) return; event.preventDefault(); event.currentTarget.focus(); gesture.current = { pointer: event.pointerId }; try { event.currentTarget.setPointerCapture(event.pointerId); } catch {} void microphone.press(); }}
+        onPointerUp={event => { if (gesture.current?.pointer === event.pointerId) { gesture.current = null; microphone.release(); } }}
+        onPointerCancel={cancelMic} onLostPointerCapture={cancelMic} onBlur={cancelMic} onContextMenu={event => event.preventDefault()}
+        onKeyDown={event => { if ((event.key === " " || event.key === "Enter") && !event.nativeEvent.isComposing) { event.preventDefault(); if (!event.repeat && !gesture.current && canTalk) { gesture.current = { key: event.key }; void microphone.press(); } } }}
+        onKeyUp={event => { if (gesture.current?.key === event.key) { event.preventDefault(); gesture.current = null; microphone.release(); } }}>
+        {mic.phase === "listening" ? "Listening · release to send" : "Hold to talk"}
+      </button>
+      {state.phase === "ready" && state.segment > 0 && <button className="parlor-primary" disabled={micBusy} onClick={() => machine.next()}>{state.segment < 3 ? "Next card" : "Hear the closing"}</button>}
+      {busy && <button onClick={() => machine.cancel()}>Pause reading</button>}
+      {(state.phase === "error" || state.phase === "paused") && <><button onClick={() => machine.retry()}>Retry this step</button>{machine.canReadWithoutAudio() && <button onClick={() => machine.captions()}>Read without audio</button>}</>}
+      <button onClick={() => { microphone.cancel(); machine.cancel(); leave(); }}>Leave the table</button>
+      {state.error && <p role="alert">{state.error}</p>}
+      {mic.error && <p role="alert">{mic.error}</p>}
+      {mic.phase === "finishing" && <button onClick={() => microphone.cancel()}>Cancel transcription</button>}
+      {canTalk && <><button className="parlor-type-toggle" disabled={micBusy} onClick={() => setTyping(value => !value)}>{typing ? "Hide typing" : "Type instead"}</button>
+        {typing && <form className="parlor-typed" onSubmit={event => { event.preventDefault(); if (!micBusy && typed.trim()) { microphone.cancel(); machine.submit(typed); setTyped(""); setTyping(false); } }}>
+          <label>Your words<textarea value={typed} disabled={micBusy} onChange={event => setTyped(event.target.value)} maxLength={1200} autoFocus /></label>
+          <button type="submit" disabled={micBusy || !typed.trim()}>Send words</button>
+        </form>}</>}
+    </div>
   </div>;
 }

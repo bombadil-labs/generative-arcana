@@ -2,6 +2,7 @@ import type { ArcanaReading } from "../engine/types";
 import { arcanaEngine } from "../engine/ArcanaEngine";
 import { characters, type Settings } from "./settings";
 import { hostedRequest } from './hosted';
+import { boundedSpeechBody, parseAlignment, spokenCaption, type CaptionTiming, type SpeechAlignment } from './speech';
 
 export interface Narration { cards: { slug: string; text: string }[]; synthesis: string }
 export interface Turn { role: "user" | "assistant"; content: string }
@@ -69,38 +70,66 @@ export async function narrate(settings: Settings, reading: ArcanaReading, signal
   rejectKeyEcho(settings, result.synthesis);
   return result;
 }
-export function converse(settings: Settings, reading: ArcanaReading, turns: Turn[], signal: AbortSignal): Promise<string> {
-  if(settings.hosted)return hostedRequest('converse',settings,reading,signal,{turns}).then(r=>r.json()).then(value=>{if(typeof value.text!=='string'||!value.text.trim()||value.text.length>4000)throw new Error('Invalid hosted response.');return value.text as string;}).catch(error=>{if(signal.aborted)throw error;throw new ParlorError(error instanceof Error?error.message:'Hosted conversation unavailable.');});
-  return generate(settings, `${instructions(settings)} Answer follow-up questions in 2–4 sentences using this same reading; do not draw new cards.\n${arcanaEngine.buildInterpretationContext(reading)}`, turns, signal);
+export function conversationContext(reading: ArcanaReading, revealed: number): string {
+  const visible = reading.placements.slice(0, Math.max(0, Math.min(3, revealed)));
+  return JSON.stringify({ question: reading.question, deck: reading.deck.name, currentCard: visible[visible.length - 1]?.card.name,
+    cards: visible.map(p => ({ name: p.card.name, position: p.position.name, reversed: p.reversed, meaning: p.meaning })) });
+}
+export function converse(settings: Settings, reading: ArcanaReading, turns: Turn[], signal: AbortSignal, revealed = 3): Promise<string> {
+  if(settings.hosted)return hostedRequest('converse',settings,reading,signal,{turns,revealed}).then(r=>r.json()).then(value=>{if(typeof value.text!=='string'||!value.text.trim()||value.text.length>4000)throw new Error('Invalid hosted response.');return value.text as string;}).catch(error=>{if(signal.aborted)throw error;throw new ParlorError(error instanceof Error?error.message:'Hosted conversation unavailable.');});
+  return generate(settings, `${instructions(settings)} Discuss the current card and the guest's follow-up in 2-4 sentences. Only the revealed cards below are available. Do not invent, name or predict later cards, draw new cards, or advance the reading.\n${conversationContext(reading, revealed)}`, turns, signal).then(text => {
+    if (!prose(text)) throw new ParlorError("The reader returned an unusable answer. Retry this step.");
+    return text;
+  });
 }
 
 /** One bounded audio resource, released on completion, interruption, failure and unmount. */
-export async function speak(settings: Settings, text: string, signal: AbortSignal, onPlaying: () => void, reading?: ArcanaReading): Promise<void> {
+export async function speak(settings: Settings, text: string, signal: AbortSignal, onPlaying: () => void, reading?: ArcanaReading, onCaption: (text: string, timing: CaptionTiming) => void = () => {}): Promise<void> {
   let url: string | undefined;
   let audio: HTMLAudioElement | undefined;
   try {
-    const response = settings.hosted ? await hostedRequest('speech',settings,reading!,signal,{text,voiceId:settings.voiceId}) : await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(settings.voiceId.trim())}`, {
+    const response = settings.hosted ? await hostedRequest('speech',settings,reading!,signal,{text,voiceId:settings.voiceId}) : await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(settings.voiceId.trim())}/with-timestamps`, {
       method: "POST", signal, credentials: "omit", cache: "no-store", redirect: "error", referrerPolicy: "no-referrer",
-      headers: { "content-type": "application/json", accept: "audio/mpeg", "xi-api-key": settings.elevenKey.trim() },
-      body: JSON.stringify({ text, model_id: "eleven_multilingual_v2" }),
+      headers: { "content-type": "application/json", accept: "application/json", "xi-api-key": settings.elevenKey.trim() },
+      body: JSON.stringify({ text, model_id: "eleven_v3" }),
     });
-    if (!response.ok || !response.headers.get("content-type")?.startsWith("audio/")) throw new Error();
-    const blob = await response.blob();
+    const bytes = await boundedSpeechBody(response);
+    let blob: Blob, alignment: SpeechAlignment | undefined;
+    if (settings.hosted && response.headers.get("content-type")?.startsWith("audio/")) {
+      // Legacy hosted audio has no timing data: reveal only when the segment ends.
+      blob = new Blob([bytes as Uint8Array<ArrayBuffer>], { type: "audio/mpeg" });
+    } else {
+      if (!response.headers.get("content-type")?.includes("application/json")) throw new Error();
+      const value: unknown = JSON.parse(new TextDecoder().decode(bytes));
+      if (!record(value) || typeof value.audio_base64 !== "string" || !value.audio_base64.length || value.audio_base64.length > 10_700_000) throw new Error();
+      alignment = parseAlignment(value.normalized_alignment) ?? parseAlignment(value.alignment);
+      if (alignment) rejectKeyEcho(settings, alignment.characters.join(""));
+      const decoded = atob(value.audio_base64);
+      blob = new Blob([Uint8Array.from(decoded, c => c.charCodeAt(0))], { type: "audio/mpeg" });
+    }
     if (signal.aborted) throw new Error();
     if (blob.size > 8_000_000 || !blob.size) throw new Error();
     url = URL.createObjectURL(blob);
     audio = new Audio(url);
     const player = audio;
     await new Promise<void>((resolve, reject) => {
-      let began = false;
-      const clean = () => { signal.removeEventListener("abort", abort); player.onplaying = player.onended = player.onerror = null; };
+      let began = false, closed = false, frame: number | undefined, lastCaption = "";
+      const update = () => {
+        if (closed || !began || signal.aborted || !alignment) return;
+        const caption = spokenCaption(alignment, player.currentTime);
+        if (caption !== lastCaption) { lastCaption = caption; onCaption(caption, "aligned"); }
+      };
+      const animate = () => { if (closed || signal.aborted) return; update(); if (!closed && !signal.aborted) frame = requestAnimationFrame(animate); };
+      const clean = () => { closed = true; if (frame !== undefined) cancelAnimationFrame(frame); signal.removeEventListener("abort", abort); player.onplaying = player.onended = player.onerror = player.ontimeupdate = null; };
       const abort = () => { clean(); player.pause(); reject(new Error()); };
-      player.onplaying = () => { if (!began && !signal.aborted) { began = true; onPlaying(); } };
-      player.onended = () => { clean(); resolve(); };
+      player.onplaying = () => { if (!closed && !began && !signal.aborted) { began = true; onCaption("", alignment ? "aligned" : "segment"); onPlaying(); if (alignment && typeof requestAnimationFrame === "function") animate(); } };
+      player.ontimeupdate = update;
+      player.onended = () => { clean(); if (!signal.aborted && began) onCaption(alignment ? alignment.characters.join("") : text, alignment ? "aligned" : "segment"); resolve(); };
       player.onerror = () => { clean(); reject(new Error()); };
       signal.addEventListener("abort", abort, { once: true });
       if (signal.aborted) { abort(); return; }
-      void player.play().catch(() => { clean(); reject(new Error()); });
+      try { void player.play().catch(() => { clean(); reject(new Error()); }); }
+      catch { clean(); reject(new Error()); }
     });
   } catch {
     if (signal.aborted) throw new DOMException("Cancelled", "AbortError");

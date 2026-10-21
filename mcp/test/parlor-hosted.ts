@@ -97,6 +97,11 @@ try {
   assert.equal((await request('narrate',{operationId})).status,409);assert.equal(calls,1);
   assert.equal((await request('narrate',{provider:'openai',model:'mock-o'})).status,200);
   assert.equal((await request('converse',{turns:[{role:'user',content:'Private follow-up never persisted'}]})).status,200);
+  assert.equal((await request('converse',{revealed:1,turns:[{role:'user',content:'Stay with this card'}]})).status,200);
+  assert.ok(seenBody.includes(reading.placements[0].card.name));
+  assert.ok(!seenBody.includes(reading.placements[1].card.name));
+  assert.ok(!seenBody.includes(reading.placements[2].card.name));
+  assert.equal((await request('converse',{revealed:4,turns:[{role:'user',content:'Invalid count'}]})).status,400);
   assert.equal((await request('speech',{text:'Memory-only audio words',voiceId:'mock-voice'})).status,200);
   assert.equal((await request('speech',{text:'a'.repeat(4001),voiceId:'mock-voice'})).status,400);
   assert.equal((await request('speech',{text:'Hello',voiceId:'unknown'})).status,400);
