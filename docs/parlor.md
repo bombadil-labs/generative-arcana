@@ -49,38 +49,44 @@ its captions therefore use segment completion. Its opening is silent because
 hosted speech requires a drawn-reading token. This PR does not activate hosted
 mode or change its pricing/model configuration.
 
-## Local microphone and privacy
+## Scribe microphone and privacy
 
-Push-to-talk requires the browser's on-device Web Speech recognition API:
-`processLocally=true` plus `SpeechRecognition.available({processLocally:true})`.
-There is **no remote recognition fallback**, STT upload endpoint or new paid
-transcription dependency. The installed Windows Edge 155 exposes these APIs, but
-an isolated headless profile reported English recognition unavailable. API
-presence alone is not proof of working recognition; actual availability is
-checked at runtime. If a local language
-pack is downloadable, a separate Download local speech language pack button
-starts that download. Downloading never starts the microphone automatically.
-Unsupported browsers and microphone denial offer a clear explanation and an
-optional Type instead form with an empty field.
+Push-to-talk uses `getUserMedia` and `MediaRecorder` only after a held-button
+press. On intentional release, all microphone tracks stop immediately and the
+completed in-memory clip is sent directly to ElevenLabs with the existing
+user-supplied ElevenLabs key. There is no browser speech service or other provider
+fallback.
 
-The [Web Speech specification](https://webaudio.github.io/web-speech-api/)
-requires local processing when `processLocally` is true. The [MDN guide](https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API/Using_the_Web_Speech_API#on-device_speech_recognition)
-explains that ordinary browser recognition can use remote services. We therefore
-never invoke that default mode. ElevenLabs [Scribe](https://elevenlabs.io/docs/api-reference/speech-to-text/convert)
-was evaluated as a possible alternative, but is not integrated: it would upload
-microphone recordings to ElevenLabs and consume transcription usage.
+The official [Scribe batch API](https://elevenlabs.io/docs/api-reference/speech-to-text/convert)
+was checked on 2026-10-21. It accepts a multipart `file` and `model_id=scribe_v2`
+at `/v1/speech-to-text`. Batch conversion fits this flow: no audio is streamed
+while the button is held. Audio-event tags, diarization, timestamps and webhook
+delivery are disabled. Transcript editing and its additional fee are not enabled.
+The returned text appears above the cards once transcription finishes. It is not
+an interim live transcript. Narrator captions still follow TTS alignment below.
 
-Release stops recognition and waits briefly for final words. Pointer cancellation,
-lost capture, focus loss, hidden tabs, page navigation, Escape, leaving the table,
-account change and unmount abort it and discard pending words. Releasing while
-availability or microphone permission is pending cannot start a late recording.
-A one-minute bound prevents indefinite listening. No recognizer auto-restarts.
-Interim text is never submitted as a final result. The app records no audio files.
+WebM/Opus is preferred, with browser-supported WebM, MP4 or Ogg/Opus alternatives
+for devices that need them. Clips shorter than 250 ms, empty clips, recordings
+exceeding 8 MB or one minute, and cancelled recordings are discarded before upload.
+Permission waits and recording duration are bounded to one minute, recorder
+finalization to five seconds, and transcription to 45 seconds. There is no auto
+retry. Failed transcription offers a new deliberate press or Type instead.
+Missing keys or unsupported recording APIs never request microphone access.
+
+Pointer cancellation, lost capture, focus loss, hidden tabs, page navigation,
+Escape, leaving the table, account change and unmount stop tracks and discard
+pending audio. Releasing while permission is pending cannot start a late
+recording; any subsequently granted stream is immediately stopped. Cancellation
+during transcription aborts the request and fences late results; it cannot retract
+a clip that already reached ElevenLabs. No recording auto-restarts. Raw clips and
+transcripts are never saved to app storage or the database.
 
 Questions, captions and conversation remain in memory and clear on exit. Only
 the recognized/typed text and revealed card context go to the selected language
-provider; ElevenLabs receives text to speak. Their retention policies apply.
-The app does not save readings in localStorage, URLs or its database.
+provider. ElevenLabs receives the intentional audio clip for transcription and
+text for narration. Provider retention policies and transcription charges apply.
+Dormant hosted mode has no user-supplied key and offers typing instead; this update
+does not introduce hosted transcription or enable hosted billing.
 
 ## Credentials and cleanup
 
@@ -118,13 +124,16 @@ npm run test:parlor
 
 Tests cover v3/voice preservation, alignment and segment completion, explicit
 advance, repeated discussion, no hidden-card context, retries, pending-permission
-release, microphone denial, local-only recognition, cancellation/teardown, key
+release, microphone denial, held-only Scribe uploads, byte/duration limits,
+short/empty clips, provider errors, cancellation/teardown, key
 masking, navigation, account changes and server page/API/private-asset guards.
-Browser screenshots cover desktop and mobile layouts. Every provider request,
+Browser interactions cover mouse release outside, Space/Enter, touch pointer
+holds, WebM/MP4 selection and desktop/mobile layouts. Every provider request,
 audio player, account and microphone in the automated interaction tests is
 synthetic. External requests outside the fixtures are blocked.
 
 **No real keys, microphone recordings or paid provider calls are used in testing.**
 Mocks do not establish actual provider CORS, account/model/voice entitlement,
-real-audio autoplay, real v3 alignment quality, or device language-pack availability.
+real-audio autoplay, real v3 alignment quality, physical-device recording support
+or live Scribe transcription quality.
 Those remain a signed-in owner acceptance test after review and an authorized rollout.

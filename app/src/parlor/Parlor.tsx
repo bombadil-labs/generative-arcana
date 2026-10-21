@@ -9,7 +9,7 @@ import { getPackArtworkAsset, type PackArtworkAsset } from "../artwork/api";
 import { useArtworkSelection, useArtworkStore } from "../artwork/context";
 import { characters, clearKeys, defaultSettings, readSettings, readySettings, saveSettings, type Settings } from "./settings";
 import { ParlorMachine } from "./machine";
-import { LocalMicrophone } from "./microphone";
+import { ScribeMicrophone } from "./microphone";
 import { readParlorCapabilities, type ParlorCapabilities } from './hosted';
 import "./parlor.css";
 
@@ -130,7 +130,7 @@ function TableSetup({ deckId, settings, hosting, start, leave, startButton }: { 
     {artwork?.status === "error" && <p role="alert">Artwork could not be checked. <button onClick={artwork.refresh}>Retry artwork</button></p>}
     <p>Questions and conversation stay in memory here and clear for the next guest. Your selected provider receives the question and deck context; ElevenLabs receives narration when enabled. Their retention policies apply. This app does not save guest readings.</p>
     {deck.cards.length < 3 && <p role="alert">Choose a deck with at least three cards.</p>}
-    <p>Hold to talk uses on-device speech recognition. Microphone audio stays in your browser; only the transcript goes to your selected reader. A local language pack may need downloading. You can type instead if your browser or microphone is unavailable.</p>
+    <p>Hold to talk records only while held. On release, that clip goes to ElevenLabs Scribe using your ElevenLabs key and incurs transcription usage. Its transcript goes to your selected reader. Provider retention policies apply. You can type instead.</p>
     <button ref={startButton} className="parlor-primary" aria-disabled={!ready} onClick={() => { if (ready) start(); }}>Start the show</button>
     <p className="parlor-show-hint">Enter, hear the greeting, then hold to talk. After each card, discuss it or choose the next card. Press Escape or Leave the table to stop and clear the reading. For reflection and entertainment.</p>
   </div>;
@@ -141,7 +141,7 @@ function Ritual({ deckId, settings, leave }: { deckId: string; settings: Setting
     await Promise.all(reading.cards.map((card) => artwork?.load(card.slug)));
   } }), [deckId, settings, artwork]);
   const state = useSyncExternalStore(machine.subscribe, machine.getSnapshot, machine.getSnapshot);
-  const microphone = useMemo(() => new LocalMicrophone(text => machine.submit(text)), [machine]);
+  const microphone = useMemo(() => new ScribeMicrophone(text => machine.submit(text), () => settings.hosted ? "" : settings.elevenKey), [machine, settings]);
   const mic = useSyncExternalStore(microphone.subscribe, microphone.getSnapshot, microphone.getSnapshot);
   const gesture = useRef<{ pointer?: number; key?: string } | null>(null);
   const [typing, setTyping] = useState(false);
@@ -170,11 +170,11 @@ function Ritual({ deckId, settings, leave }: { deckId: string; settings: Setting
     return () => abort.abort();
   }, [deckId, artwork]);
   const canTalk = state.phase === "question" || state.phase === "complete" || (state.phase === "ready" && state.segment > 0);
-  const micBusy = ["checking", "listening", "finishing", "installing"].includes(mic.phase);
+  const micBusy = ["checking", "listening", "finishing"].includes(mic.phase);
   const cancelMic = () => { if (gesture.current) { gesture.current = null; microphone.cancel(); } };
   const busy = ["drawing", "generating", "speaking", "conversation"].includes(state.phase);
   return <div ref={stage} tabIndex={-1} className="parlor-ritual" aria-label="Interactive reading">
-    <div className="parlor-user-transcript" aria-label="Your words" aria-live="polite">{mic.transcript || state.userText || "What have you brought to the table?"}</div>
+    <div className="parlor-user-transcript" aria-label="Your words" aria-live="polite">{state.userText || "What have you brought to the table?"}</div>
     {state.reading && (
       <div className="parlor-table" aria-label="Three-card reading">
         {state.reading.placements.map((placement, index) => <figure key={placement.card.slug}>
@@ -193,8 +193,8 @@ function Ritual({ deckId, settings, leave }: { deckId: string; settings: Setting
     {state.timing === "segment" && <p className="parlor-timing">Timing is unavailable for this audio. Its transcript appears after the spoken segment ends.</p>}
     {state.timing === "silent" && <p className="parlor-timing">Reading without audio.</p>}
     <div className="parlor-actions">
-      <p className="parlor-status" role="status">{mic.phase === "listening" ? "Listening on this device… release to send." : mic.phase === "checking" ? "Preparing microphone… keep holding." : mic.phase === "finishing" ? "Finishing your words…" : mic.phase === "installing" ? "Downloading local speech language pack…" : state.phase === "drawing" || state.phase === "generating" ? "The cards are gathering…" : state.phase === "conversation" ? "The reader is reflecting…" : state.phase === "speaking" ? "Listen…" : state.phase === "paused" ? "The reading is paused." : canTalk ? state.reading ? "Stay with this card, or continue when you are ready." : "Hold to talk, then release to send." : ""}</p>
-      <button className={`parlor-talk${mic.phase === "listening" ? " is-listening" : ""}`} disabled={!canTalk || ["finishing", "installing"].includes(mic.phase)} aria-pressed={mic.phase === "listening"} aria-label="Hold to talk"
+      <p className="parlor-status" role="status">{mic.phase === "listening" ? "Recording while held. Release to transcribe." : mic.phase === "checking" ? "Preparing microphone. Keep holding." : mic.phase === "finishing" ? "Transcribing with ElevenLabs Scribe." : state.phase === "drawing" || state.phase === "generating" ? "The cards are gathering…" : state.phase === "conversation" ? "The reader is reflecting…" : state.phase === "speaking" ? "Listen…" : state.phase === "paused" ? "The reading is paused." : canTalk ? state.reading ? "Stay with this card, or continue when you are ready." : "Hold to talk, then release to send." : ""}</p>
+      <button className={`parlor-talk${mic.phase === "listening" ? " is-listening" : ""}`} disabled={!canTalk || mic.phase === "finishing"} aria-pressed={mic.phase === "listening"} aria-label="Hold to talk"
         onPointerDown={event => { if (!canTalk || event.button !== 0 || !event.isPrimary || gesture.current) return; event.preventDefault(); event.currentTarget.focus(); gesture.current = { pointer: event.pointerId }; try { event.currentTarget.setPointerCapture(event.pointerId); } catch {} void microphone.press(); }}
         onPointerUp={event => { if (gesture.current?.pointer === event.pointerId) { gesture.current = null; microphone.release(); } }}
         onPointerCancel={cancelMic} onLostPointerCapture={cancelMic} onBlur={cancelMic} onContextMenu={event => event.preventDefault()}
@@ -208,7 +208,7 @@ function Ritual({ deckId, settings, leave }: { deckId: string; settings: Setting
       <button onClick={() => { microphone.cancel(); machine.cancel(); leave(); }}>Leave the table</button>
       {state.error && <p role="alert">{state.error}</p>}
       {mic.error && <p role="alert">{mic.error}</p>}
-      {mic.canInstall && <button onClick={() => void microphone.install()}>Download local speech language pack</button>}
+      {mic.phase === "finishing" && <button onClick={() => microphone.cancel()}>Cancel transcription</button>}
       {canTalk && <><button className="parlor-type-toggle" disabled={micBusy} onClick={() => setTyping(value => !value)}>{typing ? "Hide typing" : "Type instead"}</button>
         {typing && <form className="parlor-typed" onSubmit={event => { event.preventDefault(); if (!micBusy && typed.trim()) { microphone.cancel(); machine.submit(typed); setTyped(""); setTyping(false); } }}>
           <label>Your words<textarea value={typed} disabled={micBusy} onChange={event => setTyped(event.target.value)} maxLength={1200} autoFocus /></label>
