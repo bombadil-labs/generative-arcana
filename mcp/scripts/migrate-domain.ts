@@ -2,17 +2,19 @@ import { reconcilePreview, writeEvidence } from './preview-reconciliation';
 import { reconcileProduction, productionEvidence } from './production-reconciliation';
 import { catalog, run, target, MigrationSafetyError } from './domain-migrations';
 import { connectMigration, type MigrationConnection } from './migration-connection';
+import { restrictedMigrator } from './restricted-migrator';
 
 const [command = 'plan', ...args] = process.argv.slice(2);
 if (!['plan','status','apply','baseline','reconcile-preview','reconcile-production'].includes(command)) throw new Error('Expected plan, status, apply, baseline, reconcile-preview or reconcile-production');
 const flags: Record<string,string> = {};
-const allowed = ['target','expected-host','expected-database','expected-user','expected-port','through','backup-reference'];
+const allowed = ['target','expected-host','expected-database','expected-user','expected-port','through','backup-reference','restricted-role'];
 for (let i = 0; i < args.length; i += 2) {
   const key = args[i].slice(2);
   if (!args[i].startsWith('--') || !allowed.includes(key) || flags[key] || !args[i+1] || args[i+1].startsWith('--')) throw new Error('Invalid, duplicate or retired migration option');
   flags[key] = args[i+1];
 }
 const connectionString = target(process.env, flags);
+if(flags['restricted-role'] && flags['restricted-role']!=='true')throw new Error('Invalid restricted-role flag');
 const evidence = command === 'reconcile-production' ? productionEvidence(flags) : writeEvidence(command, flags);
 if (flags.through && (command !== 'baseline' || !/^[1-9][0-9]*$/.test(flags.through))) throw new Error('--through is only valid for baseline');
 if (command === 'baseline' && !flags.through) throw new Error('Baseline requires explicit --through');
@@ -23,6 +25,7 @@ try {
     client = await connectMigration(connectionString);
     const identity = (await client.query('SELECT current_database() AS db, current_user AS role')).rows[0];
     if (identity.db !== flags['expected-database'] || identity.role !== flags['expected-user']) throw new Error('Connected database identity mismatch');
+    if(flags['restricted-role'])await restrictedMigrator(client);
     const result = command === 'reconcile-preview' ? await reconcilePreview(client, entries)
       : command === 'reconcile-production' ? await reconcileProduction(client, entries) : await run(client, entries, command, Number(flags.through));
     console.log(JSON.stringify({target:flags.target, host:flags['expected-host'], database:identity.db, transport:client.transport,

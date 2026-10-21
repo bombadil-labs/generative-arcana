@@ -47,15 +47,20 @@ import { createArcanaWebCatalogRequestHandler, isArcanaWebCatalogPath } from "./
 import { ExternalIdentityBrowserPrincipalResolver } from "./browserSession";
 import { createArcanaBetterAuth, createBetterAuthConfigurationFromEnv, isBetterAuthRequestPath } from "./betterAuth";
 import { DurableRateLimiter } from "./durableRateLimiter";
+import { parlorConfig } from "./parlorConfig";
+import { PostgresParlorStore } from "./parlorStore";
+import { createParlorHandler, isParlorPath } from "./parlorApi";
 import { requestClientIp } from "./requestIp";
 import { serveArcanaWebApp } from "./webAppStatic";
+import { createParlorAccessGuard, isPrivateParlorPath, parlorPathname } from "./parlorAccess";
 import { accountDeploymentReadiness, createDeploymentDependencyMonitor, deploymentBuildIdentity } from "./deploymentReadiness";
+import { deploymentAllowedHosts } from "./deploymentHosts";
 import { createArcanaAuthoringRequestHandler, isArcanaAuthoringPath } from "./authoringApi";
 import { withArcanaHttpToolAuthorization, type ArcanaHttpOAuthOptions } from "./httpToolAuthorization";
 
 const port = envPort(process.env.PORT, 3000);
 const host = process.env.HOST?.trim() || "127.0.0.1";
-const allowedHosts = csv(process.env.MCP_ALLOWED_HOSTS) ?? deploymentAllowlist(host);
+const allowedHosts = deploymentAllowedHosts(host);
 const allowedOrigins = csv(process.env.MCP_ALLOWED_ORIGINS) ?? allowedHosts;
 const alphaToken = optionalEnv(process.env.MCP_ALPHA_TOKEN);
 const alphaPrincipalId = optionalEnv(process.env.MCP_ALPHA_PRINCIPAL_ID) ?? "alpha-user-v1";
@@ -108,6 +113,11 @@ const browserPrincipalResolver = browserAuth && identities
   : undefined;
 const browserAuthHandler = browserAuth?.nodeHandler;
 const { hosts, catalog, stateMode } = createHostStore({ databaseUrl, stateDir });
+const hostedParlorConfig = parlorConfig(process.env);
+if (hostedParlorConfig.mode === 'hosted' && (!databaseUrl || !browserPrincipalResolver || !catalog)) throw new Error('Hosted parlor requires durable catalog and browser authentication.');
+const parlorPool = hostedParlorConfig.mode === 'hosted' ? new Pool({connectionString:databaseUrl,max:3,connectionTimeoutMillis:10000,statement_timeout:10000,query_timeout:11000}) : undefined;
+const parlorAccess = createParlorAccessGuard(browserAuth?.browserAuthenticator);
+const parlorHandler = createParlorHandler({config:hostedParlorConfig,authorize:parlorAccess,store:parlorPool?new PostgresParlorStore(parlorPool):undefined,principal:browserPrincipalResolver,catalog});
 const artworkConfig = artworkStorageConfiguration();
 if (artworkConfig && (!databaseUrl || !catalog)) throw new Error("Artwork requires a durable database catalog.");
 const artworkPool = artworkConfig ? new Pool({ connectionString: databaseUrl, max: 3, connectionTimeoutMillis: 10_000 }) : undefined;
@@ -148,6 +158,10 @@ const dependencies = createDeploymentDependencyMonitor({
     await sql.query("SELECT id, owner_id, manifest FROM arcana_user_decks LIMIT 0", [], { fetchOptions: { signal } });
     await sql.query("SELECT scope_id, state FROM arcana_host_state LIMIT 0", [], { fetchOptions: { signal } });
     await sql.query("SELECT key, bucket, count FROM arcana_rate_limits LIMIT 0", [], { fetchOptions: { signal } });
+    if (parlorPool) {
+      await sql.query("SELECT principal_id,entitlement,expires_at,revoked_at FROM arcana_entitlements LIMIT 0", [], {fetchOptions:{signal}});
+      await sql.query("SELECT principal_id,operation_id,reserved_microusd,active_until FROM arcana_parlor_usage LIMIT 0", [], {fetchOptions:{signal}});
+    }
     if (manifestUploads) await sql.query("SELECT id,owner_id,raw_json,import_result,draft_version,draft_key,draft_history,draft_json FROM arcana_manifest_uploads LIMIT 0", [], { fetchOptions: { signal } });
     if (browserAuth) await browserAuth.checkSchema();
     if (artwork) {
@@ -266,13 +280,19 @@ async function handleHttpRequest(req: IncomingMessage, res: ServerResponse): Pro
     return;
   }
 
+  // This runs before the generic SPA fallback, including encoded paths and private chunks.
+  const privateParlorRequest = isPrivateParlorPath(parlorPathname(req.url ?? "/"));
+  if (privateParlorRequest) {
+    if (!validateHost(req, res) || !await parlorAccess(req, res)) return;
+  }
   const isManifestUploadRequest = isManifestUploadPath(url.pathname);
+  const isParlorRequest = isParlorPath(url.pathname);
   const isAuthoringRequest = isArcanaAuthoringPath(url.pathname);
   const isWebCatalogRequest = isArcanaWebCatalogPath(url.pathname);
   const isBrowserAuthRequest = browserAuth ? isBetterAuthRequestPath(url.pathname)
     : ["/auth/login", "/auth/session", "/auth/logout"].includes(url.pathname);
-  if (url.pathname !== "/mcp" && !isAuthoringRequest && !isWebCatalogRequest && !isBrowserAuthRequest && !isManifestUploadRequest) {
-    if (webAppDistDir && validateHost(req, res) && serveArcanaWebApp(req, res, webAppDistDir)) return;
+  if (url.pathname !== "/mcp" && !isAuthoringRequest && !isWebCatalogRequest && !isBrowserAuthRequest && !isManifestUploadRequest && !isParlorRequest) {
+    if (webAppDistDir && validateHost(req, res) && serveArcanaWebApp(req, res, webAppDistDir, privateParlorRequest)) return;
     if (res.headersSent) return;
     res.writeHead(404, { "content-type": "application/json" });
     res.end(JSON.stringify({ error: "not_found" }));
@@ -281,6 +301,7 @@ async function handleHttpRequest(req: IncomingMessage, res: ServerResponse): Pro
 
   if (!validateHost(req, res)) return;
   const requiresOrigin = isManifestUploadRequest || url.pathname === "/mcp"
+    || (isParlorRequest && req.method === 'POST')
     || isWebCatalogRequest
     || (isAuthoringRequest && req.method === "POST")
     || (isBrowserAuthRequest && url.pathname.startsWith("/auth/") && req.method === "POST");
@@ -307,6 +328,7 @@ async function handleHttpRequest(req: IncomingMessage, res: ServerResponse): Pro
     if (!manifestUploadHandler) { res.writeHead(503, { "content-type": "application/json", "cache-control": "no-store" }); res.end(JSON.stringify({ error: "manifest_staging_unavailable" })); return; }
     await manifestUploadHandler(req, res); return;
   }
+  if (isParlorRequest) { await parlorHandler(req,res); return; }
 
   if (isAuthoringRequest) {
     void authoringHandler(req, res);
@@ -366,6 +388,7 @@ async function proxyAuthorizationServerMetadata(issuer: string, res: ServerRespo
 async function shutdown(signal: string) {
   console.error(`[generative-arcana-mcp] ${signal}; shutting down`);
   void artworkPool?.end();
+  void parlorPool?.end();
   if (manifestCleanupTimer) clearInterval(manifestCleanupTimer);
   void manifestPool?.end();
   http.close(() => { void browserAuth?.close().finally(() => process.exit(0)); if (!browserAuth) process.exit(0); });
@@ -537,20 +560,6 @@ function csv(value: string | undefined): string[] | undefined {
 function optionalEnv(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
-}
-
-function deploymentAllowlist(bindHost: string): string[] {
-  const hosts = new Set<string>();
-  if (["127.0.0.1", "localhost", "::1", "[::1]"].includes(bindHost)) {
-    hosts.add("localhost");
-    hosts.add("127.0.0.1");
-    hosts.add("[::1]");
-  }
-  for (const value of [process.env.VERCEL_URL, process.env.VERCEL_PROJECT_PRODUCTION_URL, process.env.VERCEL_BRANCH_URL]) {
-    const hostname = value?.trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-    if (hostname) hosts.add(hostname);
-  }
-  return [...hosts];
 }
 
 function envPort(value: string | undefined, fallback: number): number {

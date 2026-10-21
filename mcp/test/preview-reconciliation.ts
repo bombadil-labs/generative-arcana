@@ -82,10 +82,10 @@ await fixture(async db=>{
   assert.equal((await db.query("SELECT to_regclass('public.arcana_migration_history') AS ledger")).rows[0].ledger,null);
   assert.equal((await run(db,entries,'plan')).verifiedBaselineCandidate,4);
   await run(db,entries,'baseline',4);
-  assert.deepEqual((await run(db,entries,'plan')).pending.map(e=>e.version),[5,6]);
+  assert.deepEqual((await run(db,entries,'plan')).pending.map(e=>e.version),entries.slice(4).map(e=>e.version));
   await run(db,entries,'apply');
   const history=(await db.query('SELECT version,operation,checksum FROM arcana_migration_history ORDER BY version')).rows;
-  assert.deepEqual(history.map(h=>h.operation),['baseline','baseline','baseline','baseline','apply','apply']);
+  assert.deepEqual(history.map(h=>h.operation),entries.map((_,i)=>i<4?'baseline':'apply'));
   assert.deepEqual(history.map(h=>h.checksum),entries.map(e=>e.sha256));
   await run(db,entries,'apply');
   assert.deepEqual((await db.query('SELECT version,operation,checksum FROM arcana_migration_history ORDER BY version')).rows,history);
@@ -127,4 +127,4 @@ if(process.env.ARCANA_RECONCILIATION_PG18_TEST==='1') await fixture(async db=>{
     assert.deepEqual(await schema(db),entries[3].schema);
   } finally {await second.close();}
 });
-console.log('Guarded reconciliation tests passed: exact-profile gate, noncompliance refusal without edits, rollback, empty legacy-table creation, strict004 verification/baseline, normal005+006, immutable checksums/no-op and data preservation. Disposable test fixture only.');
+console.log('Guarded reconciliation tests passed: exact-profile gate, noncompliance refusal without edits, rollback, empty legacy-table creation, strict004 verification/baseline, pending catalog migrations, immutable checksums/no-op and data preservation. Disposable test fixture only.');

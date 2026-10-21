@@ -10,6 +10,12 @@ import { publicDistribution } from "./build/publicDistribution";
 export default defineConfig({
   base: "./",
   plugins: [publicDistribution(), react()],
+  build: {
+    // Keep Parlor implementation out of the public entry bundle. The server gates this chunk.
+    rollupOptions: { output: { onlyExplicitManualChunks: true, manualChunks(id) {
+      if (id.replace(/\\/g, "/").includes("/src/parlor/")) return "parlor";
+    } } },
+  },
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
