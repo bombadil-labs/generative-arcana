@@ -19,7 +19,15 @@ function setup(overrides = {}) {
   return { machine, draws: () => draws };
 }
 async function confirm(machine) { machine.begin(); machine.captions(); await until(machine,'question'); machine.question('A private question'); machine.review(); machine.confirm(); machine.confirm(); }
-async function until(machine, phase) { for (let i=0;i<50 && machine.getSnapshot().phase !== phase;i++) await tick(); assert.equal(machine.getSnapshot().phase, phase); }
+async function until(machine, phase) {
+  if(machine.getSnapshot().phase===phase)return;
+  // Crypto/draw completion is asynchronous: a fixed count of setImmediate turns can
+  // expire before it finishes on a fast event loop. Observe the actual transition.
+  await new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>{unsubscribe();reject(new Error(`Expected ${phase}; still ${machine.getSnapshot().phase}`));},2000);
+    const unsubscribe=machine.subscribe(()=>{if(machine.getSnapshot().phase===phase){clearTimeout(timer);unsubscribe();resolve();}});
+  });
+}
 
 test('tap can begin an open reading; busy taps never queue another card',async()=>{
   const questions=[];const late=deferred();
