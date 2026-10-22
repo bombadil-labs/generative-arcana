@@ -35,6 +35,28 @@ test('tap can begin an open reading; busy taps never queue another card',async()
   try {machine.begin();machine.captions();await until(machine,'question');machine.advance();machine.advance();await until(machine,'generating');machine.advance();late.resolve();await until(machine,'ready');assert.deepEqual(questions,['']);assert.equal(machine.getSnapshot().revealed,0);assert.equal(machine.getSnapshot().userText,'');machine.advance();await until(machine,'ready');assert.equal(machine.getSnapshot().revealed,1);assert.equal(machine.getSnapshot().segment,1);}finally{machine.dispose();}
 });
 
+test('idle summon never draws; early release returns blank; release cue precedes introduction',async()=>{
+  const spoken=[];const pending=[];const {machine,draws}=setup({speak:async(_,text,s,playing)=>{spoken.push(text);playing();const d=deferred();pending.push(d);await d.promise;}});
+  try {
+    assert.equal(machine.getSnapshot().phase,'idle');machine.summon();assert.equal(machine.getSnapshot().phase,'summoning');machine.releaseSummon();assert.equal(machine.getSnapshot().phase,'idle');assert.deepEqual(spoken,[]);
+    machine.summon();machine.contact();assert.equal(machine.getSnapshot().phase,'calling');assert.match(spoken[0],/release the button/);pending[0].resolve();await until(machine,'awaiting-release');await tick();assert.equal(spoken.length,1,'no introduction while still held');assert.equal(draws(),0);
+    machine.releaseSummon();assert.equal(spoken.length,2);assert.match(spoken[1],/I am the spirit/);pending[1].resolve();await until(machine,'question');assert.equal(draws(),0);assert.deepEqual(machine.getSnapshot().turns,[]);
+  }finally{pending.forEach(p=>p.resolve());machine.dispose();}
+});
+
+test('release during cue waits for it to finish; reset and focus cancellation fence late summon audio',async()=>{
+  const spoken=[];const pending=[];const signals=[];const {machine}=setup({speak:async(_,text,s,playing,reading,caption)=>{spoken.push(text);signals.push(s);const d=deferred();pending.push({d,playing,caption});await d.promise;}});
+  try {
+    machine.summon();machine.contact();machine.releaseSummon();assert.equal(spoken.length,1);pending[0].d.resolve();await until(machine,'speaking');assert.equal(spoken.length,2);machine.reset();assert.equal(signals[1].aborted,true);pending[1].playing();pending[1].caption('stale','aligned');pending[1].d.resolve();await tick();assert.equal(machine.getSnapshot().phase,'idle');assert.equal(machine.getSnapshot().caption,'');
+    machine.summon();machine.contact();machine.cancel();assert.equal(signals[2].aborted,true);pending[2].d.resolve();await tick();assert.equal(machine.getSnapshot().phase,'idle');assert.equal(spoken.length,3);
+  }finally{pending.forEach(p=>p.d.resolve());machine.dispose();}
+});
+
+test('delivery annotations stay out of completed narration and discussion history',async()=>{
+  const histories=[];const {machine}=setup({narrate:async(_,r)=>({cards:r.cards.map(c=>({slug:c.slug,text:'[sarcastic] A perfectly ordinary existential problem.'})),synthesis:'[sighs] There is still a choice.'}),converse:async(_,r,turns)=>{histories.push(turns);return '[curious] What might you try?';}});
+  try {await confirm(machine);await until(machine,'ready');machine.next(true);await until(machine,'ready');assert.equal(machine.getSnapshot().caption,'A perfectly ordinary existential problem.');machine.submit('What do you mean?');await until(machine,'ready');assert.ok(!JSON.stringify(histories).includes('[sarcastic]'));assert.equal(machine.getSnapshot().turns.at(-1).content,'What might you try?');}finally{machine.dispose();}
+});
+
 test('reset during completed-card discussion clears history and fences late answer',async()=>{
   const late=deferred();let signal;
   const {machine}=setup({converse:async(_,r,turns,s)=>{signal=s;await late.promise;return 'Old guest answer';}});
@@ -58,7 +80,7 @@ test('reset fences a late generation response and clears every guest field', asy
   try {
     await confirm(machine); await until(machine, 'generating'); machine.reset(); assert.equal(signal.aborted, true);
     late.resolve(); await tick(); await tick();
-    assert.deepEqual(machine.getSnapshot(), { phase:'greeting', question:'', revealed:0, segment:0, caption:'', timing:'aligned', error:'', turns:[], pendingQuestion:'', userText:'' });
+    assert.deepEqual(machine.getSnapshot(), { phase:'idle', question:'', revealed:0, segment:0, caption:'', timing:'aligned', error:'', turns:[], pendingQuestion:'', userText:'' });
   } finally { machine.dispose(); }
 });
 test('cancel during asynchronous draw then retry awaits the same draw', async () => {
@@ -157,7 +179,7 @@ test('audio releases its object URL and player on abort without accepting late p
 
 test('spoken greeting invites hold-to-talk and no cards are drawn until a query is submitted',async()=>{
   const speech=deferred();let caption,spoken;const {machine,draws}=setup({speak:async(_,text,signal,playing,reading,update)=>{spoken=text;caption=update;playing();await speech.promise;}});
-  try{machine.begin();assert.match(spoken,/Hold a key/);assert.match(spoken,/Five quick taps/);assert.equal(machine.getSnapshot().question,'');assert.equal(machine.getSnapshot().caption,'');assert.equal(draws(),0);machine.submit('too early');assert.equal(draws(),0);caption('Come closer','aligned');assert.equal(machine.getSnapshot().caption,'Come closer');speech.resolve();await until(machine,'question');machine.submit('My spoken query');await until(machine,'ready');assert.equal(draws(),1);assert.equal(machine.getSnapshot().userText,'My spoken query');}finally{machine.dispose();}
+  try{machine.begin();assert.match(spoken,/Press and hold the button/);assert.match(spoken,/Five quick taps/);assert.equal(machine.getSnapshot().question,'');assert.equal(machine.getSnapshot().caption,'');assert.equal(draws(),0);machine.submit('too early');assert.equal(draws(),0);caption('Come closer','aligned');assert.equal(machine.getSnapshot().caption,'Come closer');speech.resolve();await until(machine,'question');machine.submit('My spoken query');await until(machine,'ready');assert.equal(draws(),1);assert.equal(machine.getSnapshot().userText,'My spoken query');}finally{machine.dispose();}
 });
 test('each card waits for explicit advance and permits repeated spoken discussion without drawing again',async()=>{
   const seen=[];const {machine,draws}=setup({converse:async(_,reading,turns,signal,revealed)=>{seen.push({turns,revealed});return 'A spoken answer.';},speak:async(_,text,signal,playing,reading,caption)=>{playing();caption(text,'aligned');}});

@@ -15,13 +15,14 @@ let authenticated,accountId,providerCalls,lateResolve,delayed,accessMode,hostedD
 const data=rawDeck();
 const deck={id:'parlor-deck',slug:data.slug,name:data.name,tagline:'Fixture deck',revision:1,visibility:'private',createdAt:'',updatedAt:'',manifest:{data,tagline:'Fixture deck'}};
 const flush=()=>act(async()=>{await new Promise(r=>setTimeout(r,0));});
+const realSetTimeout=global.setTimeout;
 async function settle(){for(let i=0;i<8;i++)await flush();}
 const json=(body,status=200)=>Response.json(body,{status});
 function Capture({children}) { sessionControl=useSession(); return children; }
 function button(text){return [...document.querySelectorAll('button')].find(el=>el.textContent===text);}
 async function click(text){const target=button(text);assert.ok(target,`button exists: ${text}`);await act(async()=>target.click());await settle();}
 async function input(label,value){const field=[...document.querySelectorAll('label')].find(el=>el.childNodes[0].textContent===label)?.querySelector('input,textarea,select');assert.ok(field,`input exists: ${label}`);await act(async()=>{const proto=field.tagName==='TEXTAREA'?dom.window.HTMLTextAreaElement.prototype:dom.window.HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(field,value);field.dispatchEvent(new dom.window.Event('input',{bubbles:true}));});await flush();}
-async function guest(){await click('Start the show');assert.equal(document.querySelectorAll('textarea').length,0);assert.ok(!button('Type instead'));await click('Begin an open reading');}
+async function guest(){await click('Start the show');assert.equal(document.querySelectorAll('textarea').length,0);assert.ok(!button('Type instead'));assert.equal(document.querySelector('.parlor-idle').textContent,'Press and hold the button to make contact with the beyond');await act(async()=>window.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'a',code:'KeyA',bubbles:true})));await act(async()=>{await new Promise(r=>realSetTimeout(r,20));});await settle();await act(async()=>window.dispatchEvent(new dom.window.KeyboardEvent('keyup',{key:'a',code:'KeyA',bubbles:true})));await settle();await click('Begin an open reading');}
 async function escape(){await act(async()=>window.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));await settle();}
 
 
@@ -33,6 +34,9 @@ before(async()=>{
   router=await vite.ssrLoadModule('/src/app/router.ts'); settingsApi=await vite.ssrLoadModule('/src/parlor/settings.ts');
 });
 beforeEach(async()=>{
+  // Only accelerate the summon threshold in this DOM fixture. Pure gesture tests
+  // and the real-browser test independently verify the actual seven seconds.
+  global.setTimeout=(callback,ms,...args)=>realSetTimeout(callback,ms===7000?5:ms,...args);
   authenticated=true;parlorAllowed=true;deckCalls=0;accountId='test-account';providerCalls=0;delayed=false;lateResolve=undefined;
   accessMode='byok';hostedDenied=false;hostedBodies=[];
   window.history.replaceState(null,'','/parlor');window.localStorage.clear();
@@ -68,7 +72,7 @@ async function mount(){
     await act(async()=>{await new Promise(resolve=>setTimeout(resolve,10));});
   await settle();
 }
-afterEach(async()=>{await act(async()=>root.unmount());document.getElementById('root').replaceChildren();});
+afterEach(async()=>{await act(async()=>root.unmount());document.getElementById('root').replaceChildren();global.setTimeout=realSetTimeout;});
 after(async()=>{await vite?.close();dom.window.close();global.window=original.window;global.document=original.document;global.fetch=original.fetch;global.PopStateEvent=original.PopStateEvent;if(original.navigator)Object.defineProperty(global,'navigator',original.navigator);else delete global.navigator;delete global.IS_REACT_ACT_ENVIRONMENT;});
 
 test('anonymous /parlor is gated before settings and no provider request is made',async()=>{

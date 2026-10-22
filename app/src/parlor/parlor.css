@@ -60,6 +60,15 @@
 .parlor-talk { touch-action: none; user-select: none; min-width: 170px; }
 .parlor-talk.is-listening { background: #e9c98a; color: #241c2b; border-color: #fff4df; box-shadow: 0 0 0 4px #e9c98a33; }
 .parlor-control-hint { font-size: 12px; }
+.parlor-show:has(.parlor-idle), .parlor-show:has(.parlor-summoning) { background: #09090d; }
+.parlor-idle .parlor-talk { border: 0; background: transparent; box-shadow: none; padding: 40px 20px; max-width: 680px; color: #d4c6aa; font: 24px/1.6 var(--font-display); }
+.parlor-slot { aspect-ratio: 2 / 3; border: 1px solid #927b54; border-radius: 10px; background: #17131d; box-sizing: border-box; box-shadow: inset 0 0 40px #cdaa6b0d; }
+.parlor-summoning { position: relative; isolation: isolate; }
+.parlor-summoning::before { content: ""; position: absolute; z-index: -1; inset: -3vh -2vw; pointer-events: none; background: repeating-radial-gradient(ellipse at center, transparent 0 24px, #dcbf8930 25px 26px, transparent 27px 60px); opacity: .15; animation: parlor-signal 3.5s ease-in-out infinite; }
+.parlor-summoning .parlor-spread-slots { animation: parlor-materialize 7s ease-out both; }
+@keyframes parlor-signal { 0%, 100% { opacity: .08; } 50% { opacity: .32; } }
+@keyframes parlor-materialize { from { opacity: .05; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .parlor-summoning::before, .parlor-summoning .parlor-spread-slots { animation: none; } .parlor-summoning::before { opacity: .12; } }
 .parlor-show-hint { font-size: 13px; }
 @keyframes parlor-arrive { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .parlor-show { animation: none; } }

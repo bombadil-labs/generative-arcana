@@ -5,6 +5,29 @@ export interface SpeechAlignment {
   character_end_times_seconds: number[];
 }
 export type CaptionTiming = "aligned" | "segment" | "silent";
+// Small documented v3 delivery vocabulary; never forward arbitrary stage directions.
+const DELIVERY_TAGS = new Set(["sighs", "exhales", "curious", "sarcastic", "mischievously"]);
+const tagPattern = /\[[^\]]*(?:\]|$)/g;
+export function plainSpeech(text: string): string { return text.replace(tagPattern, "").replace(/[ \t]{2,}/g, " ").trim(); }
+export function speechPayload(text: string): string {
+  const tag = [...text.matchAll(/\[([^\]]+)\]/g)].map(match => match[1].trim().toLowerCase()).find(value => DELIVERY_TAGS.has(value));
+  const plain = plainSpeech(text);
+  return tag && plain ? `[${tag}] ${plain}` : plain;
+}
+/** Remove annotation spans from the FULL alignment before revealing any prefix. Keep
+ * the provider's times for every remaining character/chunk, including normalized words. */
+export function captionAlignment(alignment: SpeechAlignment): SpeechAlignment {
+  const text = alignment.characters.join("");
+  const hidden = new Uint8Array(text.length);
+  for (const match of text.matchAll(tagPattern)) hidden.fill(1, match.index, match.index + match[0].length);
+  const result: SpeechAlignment = { characters: [], character_start_times_seconds: [], character_end_times_seconds: [] };
+  let offset = 0;
+  alignment.characters.forEach((chunk, i) => {
+    const visible = [...chunk].filter(character => { const keep = !hidden[offset]; offset += character.length; return keep; }).join("");
+    if (visible) { result.characters.push(visible); result.character_start_times_seconds.push(alignment.character_start_times_seconds[i]); result.character_end_times_seconds.push(alignment.character_end_times_seconds[i]); }
+  });
+  return result;
+}
 export function parseAlignment(value: unknown): SpeechAlignment | undefined {
   if (!value || typeof value !== "object") return;
   const a = value as SpeechAlignment;
@@ -23,7 +46,7 @@ export function spokenCaption(alignment: SpeechAlignment, seconds: number): stri
   if (!Number.isFinite(seconds) || seconds < 0) return "";
   let count = 0;
   while (count < alignment.characters.length && alignment.character_end_times_seconds[count] <= seconds) count++;
-  return alignment.characters.slice(0, count).join("");
+  return alignment.characters.slice(0, count).join("").trimStart();
 }
 
 /** Bound allocation before JSON/base64 decoding. Do not accept an unbounded provider body. */

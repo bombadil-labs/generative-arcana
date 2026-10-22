@@ -1,6 +1,6 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {TableGestures,tableKey,HOLD_MS,TAP_GAP_MS}=require('../.test-build/parlor/gestures.js');
+const {TableGestures,tableKey,HOLD_MS,TAP_GAP_MS,SUMMON_MS}=require('../.test-build/parlor/gestures.js');
 function setup(t,overrides={}) {
   t.mock.timers.enable({apis:['setTimeout']});
   const events=[];
@@ -43,4 +43,17 @@ test('ordinary keys work without a focused button; operator keys and fields rema
   for(const modifier of ['metaKey','ctrlKey','altKey','isComposing'])assert.equal(tableKey({...event,[modifier]:true},null),undefined);
   const {JSDOM}=require('jsdom');const dom=new JSDOM('<input><textarea></textarea><select></select><div contenteditable><span></span></div><button data-parlor-operator><b></b></button><section></section>');
   try {for(const selector of ['input','textarea','select','span','b'])assert.equal(tableKey(event,dom.window.document.querySelector(selector)),undefined);assert.equal(tableKey(event,dom.window.document.querySelector('section')),'key:KeyA');}finally{dom.window.close();}
+});
+
+test('summoning has a separate seven-second threshold, early release and overlapping keys',t=>{
+  const states=[];let idle=true;
+  const {controls,tick}=setup(t,{holdDelay:()=>idle?SUMMON_MS:HOLD_MS,press:()=>states.push('press'),captureHold:()=>()=>states.push('contact'),lift:()=>states.push('lift'),release:()=>states.push('released')});
+  controls.down('a');tick(6999);assert.deepEqual(states,['press']);controls.up('a');tick(1000);assert.deepEqual(states,['press','lift']);
+  states.length=0;controls.down('a');controls.down('b');tick(7000);assert.deepEqual(states,['press','contact']);controls.up('a');assert.deepEqual(states,['press','contact']);controls.up('b');assert.deepEqual(states,['press','contact','lift','released']);
+});
+
+test('reset/cancel during summoning fences the seven-second timer and the captured hold intent',t=>{
+  let contacts=0;const {controls,tap,tick,events}=setup(t,{holdDelay:()=>SUMMON_MS,captureHold:()=>()=>contacts++});
+  controls.down('a');tick(5000);controls.cancel();controls.up('a');tick(3000);assert.equal(contacts,0);
+  for(let i=0;i<5;i++){tap();tick(100);}tick(10000);assert.equal(contacts,0);assert.deepEqual(events,['cancel','reset']);
 });

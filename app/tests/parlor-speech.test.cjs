@@ -1,11 +1,25 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {speak}=require('../.test-build/parlor/providers.js');
-const {parseAlignment,spokenCaption,boundedSpeechBody}=require('../.test-build/parlor/speech.js');
+const {parseAlignment,spokenCaption,boundedSpeechBody,captionAlignment,plainSpeech,speechPayload}=require('../.test-build/parlor/speech.js');
 const {defaultSettings}=require('../.test-build/parlor/settings.js');
 const settings={...defaultSettings(),elevenKey:'synthetic-key',voiceId:'the-selected-voice'};
 const alignment={characters:['O','n','e',' ','t','w','o'],character_start_times_seconds:[0,.1,.2,.3,1,1.1,1.2],character_end_times_seconds:[.1,.2,.3,.4,1.1,1.2,1.3]};
 const tick=()=>new Promise(r=>setImmediate(r));
+
+test('v3 delivery is allowlisted, restrained and separate from visible words',()=>{
+  assert.equal(speechPayload('[sighs] Hello. [sarcastic] Still here? [explosion]'),'[sighs] Hello. Still here?');
+  assert.equal(plainSpeech('[sighs] Hello. [sarcastic] Still here?'),'Hello. Still here?');
+  assert.equal(speechPayload('[unrecognized command] Ordinary words.'),'Ordinary words.');
+  assert.equal(plainSpeech('Hello. [unfinished'),'Hello.');
+});
+
+test('full raw alignment removes tags before any prefix, retaining normalized words and original times',()=>{
+  const chars=['[si','ghs] ','Two',' ','cards','.'];const raw={characters:chars,character_start_times_seconds:[0,1,2,3,4,5],character_end_times_seconds:[1,2,3,4,5,6]};
+  const visible=captionAlignment(raw);assert.equal(spokenCaption(visible,1),'');assert.equal(spokenCaption(visible,2),'');assert.equal(spokenCaption(visible,3),'Two');assert.equal(spokenCaption(visible,4),'Two ');assert.equal(spokenCaption(visible,6),'Two cards.');
+  assert.deepEqual(visible.character_end_times_seconds,[2,3,4,5,6]);assert.deepEqual(raw.characters,chars);
+  const normalized=captionAlignment(alignment);assert.equal(spokenCaption(normalized,.3),'One');assert.deepEqual(normalized.character_end_times_seconds,alignment.character_end_times_seconds);
+});
 test('alignment validates shape and monotonic finite times; captions follow actual character ends',()=>{
   assert.ok(parseAlignment(alignment));assert.equal(spokenCaption(alignment,0),'');assert.equal(spokenCaption(alignment,.3),'One');assert.equal(spokenCaption(alignment,.8),'One ');assert.equal(spokenCaption(alignment,1.3),'One two');
   for(const value of [null,{}, {...alignment,characters:[]},{...alignment,character_end_times_seconds:[.1]}, {...alignment,character_end_times_seconds:[.1,.2,NaN,.4,1.1,1.2,1.3]}, {...alignment,character_start_times_seconds:[0,.1,.2,.3,1,.9,1.2]}])assert.equal(parseAlignment(value),undefined);
@@ -29,7 +43,7 @@ test('v3 retains selected voice and reveals no future text during delayed, pause
 });
 test('missing/invalid alignment uses truthful segment-end reveal and never fakes word timing',async()=>{
   const old={fetch:global.fetch,Audio:global.Audio};
-  try{for(const value of [null,{characters:['bad']}]){let player;const captions=[];
+  try{for(const value of [null,{characters:['bad']},{characters:['[sighs]'],character_start_times_seconds:[0],character_end_times_seconds:[1]}]){let player;const captions=[];
     global.fetch=async()=>Response.json({audio_base64:btoa('audio'),alignment:value});
     global.Audio=class{currentTime=0;constructor(){player=this;}play(){return Promise.resolve();}pause(){}removeAttribute(){}load(){}};
     const pending=speak(settings,'No reading ahead',new AbortController().signal,()=>{},undefined,(text,timing)=>captions.push({text,timing}));

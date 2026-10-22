@@ -12,7 +12,7 @@ export interface Settings {
 }
 export const defaultSettings = (): Settings => ({ provider: "anthropic", anthropicKey: "", anthropicModel: "", openaiKey: "", openaiModel: "", elevenKey: "", voiceId: "", character: "keeper" });
 export const characters = {
-  keeper: { name: "The Candlekeeper", greeting: "Come closer to the candle. What question have you brought to the table?", direction: "A warm, mysterious candlekeeper. Quiet theatrical language, welcoming and never ominous." },
+  keeper: { name: "The Spirit of the Cards", greeting: "[sighs] I am the spirit of these cards. Another interruption in the long silence. Still... you have come this far. Let us see what troubles the living.", direction: "An old Austrian male spirit caught between radio static and a séance: gloomy, existential, a little bored by eternity, with dry wit and reluctant curiosity. Original characterization, never imitate a named real person. Readings are playful and mildly antagonistic toward life's absurdities, never hostile, contemptuous or personally insulting. Tease the predicament, not the guest's identity, vulnerabilities or grief. Be perceptive, not cruel; leave the guest agency and a small possibility of hope. Use understated language and occasional pauses, not a caricatured written accent." },
   showman: { name: "The Midnight Showman", greeting: "Welcome, traveler! The midnight table awaits. What shall we explore?", direction: "A playful midnight carnival host. Witty, theatrical, kind, never mocking the guest." },
   botanist: { name: "The Moonlit Botanist", greeting: "Set your question down like a seed. Let us see what might grow.", direction: "A thoughtful moonlit botanist. Use gentle organic metaphors without replacing authored card meanings." },
 };

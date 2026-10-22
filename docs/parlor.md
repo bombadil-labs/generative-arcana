@@ -19,8 +19,15 @@ configure the existing Anthropic or OpenAI model/key. An ElevenLabs key and your
 selected voice ID enable speech. The voice ID is preserved, including remembered
 settings; browser-key speech now requests `eleven_v3`.
 
-Start the show opens with the storyteller's spoken greeting and invitation to
-hold a key. There is no setup question, prefilled text or guest typing form.
+Start the show opens a blank dark screen with exactly: **Press and hold the button to make contact with the beyond**.
+A separate **seven-second summon hold** gradually reveals three empty card spaces
+and slow radio-like light pulses. It never requests microphone access. At the threshold,
+the selected voice asks the guest to release; the introduction and invitation to speak
+follow only after release. Releasing during the cue lets it finish before the introduction.
+Early release or cancellation before the threshold returns to blank idle without a provider call.
+Cancellation after contact aborts pending speech and prevents a late introduction; it cannot
+retract a request already received by ElevenLabs.
+There is no setup question, prefilled text or guest typing form.
 The final Scribe transcript appears above the cards. The first
 card follows the query (or an explicit tap for an open reading). Each card's narration ends at a pause: talk repeatedly
 about that card, or press Next card. After card three, Hear the closing requests
@@ -37,14 +44,14 @@ failed delivery is not committed until a retry or explicit silent fallback compl
 While the encounter is open, ordinary keys work anywhere in the guest view without
 focusing a button. The on-screen Hold to talk control accepts the same pointer gestures.
 
-- Hold for **450 ms**, wait for **Listening**, speak, then release to submit. Microphone
+- After the introduction, hold for **450 ms**, wait for **Listening**, speak, then release to submit. Microphone
   permission/startup can take longer than the threshold. Short taps never request access.
 - Tap and release in less than 450 ms to continue without discussion. At the greeting's
   end this starts an open reading; at each card pause it advances once; after the third
   card it requests the closing. A tap while narration/transcription is busy is discarded.
 - **Five taps** with less than **500 ms** from each release to the next press reset the
   encounter immediately on the fifth release. This stops audio/recording, aborts pending
-  requests and clears cards, query, captions and history, then begins a fresh greeting.
+  requests and clears cards, query, captions and history, then returns to blank idle.
   Selected decks, artwork, persona, voice and saved keys remain intact.
 - A tap waits 500 ms after release before advancing, to distinguish it from reset.
   Two to four taps in the same burst coalesce into one advance. A hold breaks the burst.
@@ -58,6 +65,30 @@ Configure the PCsensor keys as ordinary keys (for example A, B and C), not macro
 system/media shortcuts. Test their key-down/key-up events, the 500 ms reset rhythm,
 microphone permission and audio output on the actual party Mac before guests arrive.
 OS-reserved shortcuts cannot be intercepted by the page. No always-listening input exists.
+The summon hold and speech hold are distinct intents captured on press: holding during
+an introduction cannot become a recording when it ends. Summon pulses take 3.5 seconds
+per cycle, at low opacity; reduced-motion mode uses a static scene with no pulse or fade.
+
+## Spirit and vocal delivery
+
+The default storyteller is an original old Austrian male spirit: gloomy, existential,
+bored by eternity and dryly playful. It gently needles life's absurdities rather than
+the guest's identity or vulnerabilities, with no hostility, threats or certainty claims.
+It uses the **existing selected voice ID**, never a named person's imitation or a new
+voice. Alternate storyteller selections, model/key overrides and remembered voice settings
+are preserved. The default `keeper` persona is updated in place.
+
+The [official ElevenLabs v3 guidance](https://elevenlabs.io/docs/overview/capabilities/text-to-speech/best-practices#prompting-eleven-v3)
+was checked on 2026-10-22. The speech payload permits at most one leading documented tag:
+`[sighs]`, `[exhales]`, `[curious]`, `[sarcastic]` or `[mischievously]`. Generated segments
+are instructed to use tags sparingly. Other bracketed directions are discarded; no accent
+override, sound-effect tag or SSML is added. Tag effectiveness depends on the selected voice.
+
+Annotations never enter visible captions or completed-narration history. They are removed
+from the complete returned alignment **before** taking a timed prefix, so partial tags
+cannot leak while playing. Remaining characters retain their provider timestamps and
+normalized wording. Silent/segment-end captions and saved in-memory assistant turns also
+strip annotations. No timing is estimated and no extra annotation-generation call is made.
 
 ## Artwork presentation
 
