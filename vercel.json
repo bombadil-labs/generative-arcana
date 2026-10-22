@@ -17,6 +17,7 @@
   ],
   "git": {
     "deploymentEnabled": {
+      "feat/parlor-table-controls": false,
       "feat/parlor-conversation": false,
       "staging": false,
       "dependabot/**": false
