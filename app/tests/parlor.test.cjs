@@ -21,6 +21,18 @@ function setup(overrides = {}) {
 async function confirm(machine) { machine.begin(); machine.captions(); await until(machine,'question'); machine.question('A private question'); machine.review(); machine.confirm(); machine.confirm(); }
 async function until(machine, phase) { for (let i=0;i<50 && machine.getSnapshot().phase !== phase;i++) await tick(); assert.equal(machine.getSnapshot().phase, phase); }
 
+test('tap can begin an open reading; busy taps never queue another card',async()=>{
+  const questions=[];const late=deferred();
+  const {machine}=setup({draw:async(_,q)=>{questions.push(q);return engine.castReading(deck.id,'three-card',q);},narrate:async(_,r)=>{await late.promise;return narration(r);}});
+  try {machine.begin();machine.captions();await until(machine,'question');machine.advance();machine.advance();await until(machine,'generating');machine.advance();late.resolve();await until(machine,'ready');assert.deepEqual(questions,['']);assert.equal(machine.getSnapshot().revealed,0);assert.equal(machine.getSnapshot().userText,'');machine.advance();await until(machine,'ready');assert.equal(machine.getSnapshot().revealed,1);assert.equal(machine.getSnapshot().segment,1);}finally{machine.dispose();}
+});
+
+test('reset during completed-card discussion clears history and fences late answer',async()=>{
+  const late=deferred();let signal;
+  const {machine}=setup({converse:async(_,r,turns,s)=>{signal=s;await late.promise;return 'Old guest answer';}});
+  try {await confirm(machine);await until(machine,'ready');machine.next(true);await until(machine,'ready');assert.ok(machine.getSnapshot().turns.length);machine.submit('Old guest follow-up');await until(machine,'conversation');machine.reset();machine.begin();machine.captions();await until(machine,'question');assert.equal(signal.aborted,true);late.resolve();await tick();await tick();assert.equal(machine.getSnapshot().reading,undefined);assert.deepEqual(machine.getSnapshot().turns,[]);assert.equal(machine.getSnapshot().userText,'');assert.equal(machine.getSnapshot().question,'');assert.ok(!machine.getSnapshot().caption.includes('Old guest'));}finally{machine.dispose();}
+});
+
 test('draw once; failed generation and repeated retry preserve exact identities and question', async () => {
   let calls = 0;
   const { machine, draws } = setup({ narrate: async (_, reading) => { if (++calls === 1) throw new ParlorError('Try again'); return narration(reading); } });
@@ -137,7 +149,7 @@ test('audio releases its object URL and player on abort without accepting late p
 
 test('spoken greeting invites hold-to-talk and no cards are drawn until a query is submitted',async()=>{
   const speech=deferred();let caption,spoken;const {machine,draws}=setup({speak:async(_,text,signal,playing,reading,update)=>{spoken=text;caption=update;playing();await speech.promise;}});
-  try{machine.begin();assert.match(spoken,/Hold the talk button/);assert.equal(machine.getSnapshot().question,'');assert.equal(machine.getSnapshot().caption,'');assert.equal(draws(),0);machine.submit('too early');assert.equal(draws(),0);caption('Come closer','aligned');assert.equal(machine.getSnapshot().caption,'Come closer');speech.resolve();await until(machine,'question');machine.submit('My spoken query');await until(machine,'ready');assert.equal(draws(),1);assert.equal(machine.getSnapshot().userText,'My spoken query');}finally{machine.dispose();}
+  try{machine.begin();assert.match(spoken,/Hold a key/);assert.match(spoken,/Five quick taps/);assert.equal(machine.getSnapshot().question,'');assert.equal(machine.getSnapshot().caption,'');assert.equal(draws(),0);machine.submit('too early');assert.equal(draws(),0);caption('Come closer','aligned');assert.equal(machine.getSnapshot().caption,'Come closer');speech.resolve();await until(machine,'question');machine.submit('My spoken query');await until(machine,'ready');assert.equal(draws(),1);assert.equal(machine.getSnapshot().userText,'My spoken query');}finally{machine.dispose();}
 });
 test('each card waits for explicit advance and permits repeated spoken discussion without drawing again',async()=>{
   const seen=[];const {machine,draws}=setup({converse:async(_,reading,turns,signal,revealed)=>{seen.push({turns,revealed});return 'A spoken answer.';},speak:async(_,text,signal,playing,reading,caption)=>{playing();caption(text,'aligned');}});

@@ -20,18 +20,57 @@ selected voice ID enable speech. The voice ID is preserved, including remembered
 settings; browser-key speech now requests `eleven_v3`.
 
 Start the show opens with the storyteller's spoken greeting and invitation to
-hold the talk button. There is no setup question or prefilled text. Hold with a
-pointer, or focus the button and hold Space or Enter; release to submit the
-recognized words. Interim and final user text appear above the cards. The first
-card follows the query. Each card's narration ends at a pause: talk repeatedly
+hold a key. There is no setup question, prefilled text or guest typing form.
+The final Scribe transcript appears above the cards. The first
+card follows the query (or an explicit tap for an open reading). Each card's narration ends at a pause: talk repeatedly
 about that card, or press Next card. After card three, Hear the closing requests
-the synthesis. Nothing advances on a timer. Discussion context contains only
+the synthesis. Every later card requires an intentional gesture or button. Discussion context contains only
 revealed card names, positions, orientations and authored meanings.
 Completed card narration joins the recent discussion history in order, so a
 question such as “What did you mean by that?” includes the interpretation just
 delivered. Advancing retains recent discussion alongside the next completed
 narration. Future narration and unspoken synthesis are excluded; interrupted or
 failed delivery is not committed until a retry or explicit silent fallback completes.
+
+## Table keyboard
+
+While the encounter is open, ordinary keys work anywhere in the guest view without
+focusing a button. The on-screen Hold to talk control accepts the same pointer gestures.
+
+- Hold for **450 ms**, wait for **Listening**, speak, then release to submit. Microphone
+  permission/startup can take longer than the threshold. Short taps never request access.
+- Tap and release in less than 450 ms to continue without discussion. At the greeting's
+  end this starts an open reading; at each card pause it advances once; after the third
+  card it requests the closing. A tap while narration/transcription is busy is discarded.
+- **Five taps** with less than **500 ms** from each release to the next press reset the
+  encounter immediately on the fifth release. This stops audio/recording, aborts pending
+  requests and clears cards, query, captions and history, then begins a fresh greeting.
+  Selected decks, artwork, persona, voice and saved keys remain intact.
+- A tap waits 500 ms after release before advancing, to distinguish it from reset.
+  Two to four taps in the same burst coalesce into one advance. A hold breaks the burst.
+  Keyboard auto-repeat is ignored. Overlapping keys count as one gesture, lasting until
+  **all** keys are released; pressing three keys together is not three reset taps.
+- Escape returns to operator setup. Tab, modifier shortcuts, editable fields and operator
+  buttons retain native behavior. Shortcuts are installed only while the encounter is open.
+  Lost focus, hidden tabs, reset, exit and logout cancel pending gestures and microphone work.
+
+Configure the PCsensor keys as ordinary keys (for example A, B and C), not macros or
+system/media shortcuts. Test their key-down/key-up events, the 500 ms reset rhythm,
+microphone permission and audio output on the actual party Mac before guests arrive.
+OS-reserved shortcuts cannot be intercepted by the page. No always-listening input exists.
+
+## Artwork presentation
+
+Parlor keeps stable 2:3 card slots and contains each complete image inside a small inset,
+preserving its aspect ratio, printed border and title, including reversed cards. This
+uses the existing CardArt fit option only in Parlor; other views and source assets are unchanged.
+
+Read-only inspection on 2026-10-22 of The Roaring Twenties' `gpt-deco-nouveau-2026` set
+found 35 cards at 945×1663, four at 958×1642, 27 at 971×1619 and 12 at 1024×1536.
+Original WebP samples inspected: The Armistice (`major-0`, 945×1663), The Afterglow
+(`atom-year-1920`, 958×1642), The Unseen Guest (`atom-host`, 971×1619), and The Borrowed
+Roof (`zeppelin-host`, 1024×1536). Their edge decoration explains the visible damage
+from filling a 2:3 box with `cover`. No image or canonical deck metadata was altered.
 
 Narration appears below the cards. ElevenLabs' [speech-with-timing endpoint](https://elevenlabs.io/docs/api-reference/text-to-speech/convert-with-timestamps)
 returns audio and character alignment. Valid returned character **end** times
@@ -70,7 +109,7 @@ for devices that need them. Clips shorter than 250 ms, empty clips, recordings
 exceeding 8 MB or one minute, and cancelled recordings are discarded before upload.
 Permission waits and recording duration are bounded to one minute, recorder
 finalization to five seconds, and transcription to 45 seconds. There is no auto
-retry. Failed transcription offers a new deliberate press or Type instead.
+retry. Failed transcription offers a new deliberate hold or a tap to continue without speech.
 Missing keys or unsupported recording APIs never request microphone access.
 
 Pointer cancellation, lost capture, focus loss, hidden tabs, page navigation,
@@ -82,10 +121,10 @@ a clip that already reached ElevenLabs. No recording auto-restarts. Raw clips an
 transcripts are never saved to app storage or the database.
 
 Questions, captions and conversation remain in memory and clear on exit. Only
-the recognized/typed text and revealed card context go to the selected language
+the recognized text and revealed card context go to the selected language
 provider. ElevenLabs receives the intentional audio clip for transcription and
 text for narration. Provider retention policies and transcription charges apply.
-Dormant hosted mode has no user-supplied key and offers typing instead; this update
+Dormant hosted mode has no user-supplied key and supports open readings without speech; this update
 does not introduce hosted transcription or enable hosted billing.
 
 ## Credentials and cleanup
@@ -128,7 +167,8 @@ release, microphone denial, held-only Scribe uploads, byte/duration limits,
 short/empty clips, provider errors, cancellation/teardown, key
 masking, navigation, account changes and server page/API/private-asset guards.
 Browser interactions cover mouse release outside, Space/Enter, touch pointer
-holds, WebM/MP4 selection and desktop/mobile layouts. Every provider request,
+holds, global keys, five-tap reset, overlapping keys, auto-repeat, late provider results,
+WebM/MP4 selection and desktop/mobile layouts with varying artwork proportions. Every provider request,
 audio player, account and microphone in the automated interaction tests is
 synthetic. External requests outside the fixtures are blocked.
 

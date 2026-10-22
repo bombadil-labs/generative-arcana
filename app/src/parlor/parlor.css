@@ -35,6 +35,7 @@
 .parlor-card.is-revealed .parlor-card-turn { transform: rotateY(180deg); }
 .parlor-card-back, .parlor-card-front { position: absolute; inset: 0; backface-visibility: hidden; border: 1px solid #a78b60; border-radius: 10px; overflow: hidden; background: #211b30; box-shadow: 0 15px 36px #0006; }
 .parlor-card-front { transform: rotateY(180deg); }
+.parlor-artwork { position: absolute; inset: 7px; }
 .parlor-card-back { padding: 7px; }
 .parlor-back-symbol { color: var(--parlor-gold); font-size: clamp(22px, 5vw, 48px); text-align: center; line-height: 1.5; }
 .parlor-table figcaption { text-align: center; margin-top: 16px; min-height: 72px; }
@@ -58,8 +59,7 @@
 .parlor-timing, .parlor-status { text-align: center; font-size: 12px; max-width: 640px; margin: 8px auto; }
 .parlor-talk { touch-action: none; user-select: none; min-width: 170px; }
 .parlor-talk.is-listening { background: #e9c98a; color: #241c2b; border-color: #fff4df; box-shadow: 0 0 0 4px #e9c98a33; }
-.parlor button.parlor-type-toggle { display: block; border: 0; background: transparent; margin: 8px auto 0; font-size: 12px; color: #c8bbc9; }
-.parlor-typed { max-width: 600px; margin: auto; }
+.parlor-control-hint { font-size: 12px; }
 .parlor-show-hint { font-size: 13px; }
 @keyframes parlor-arrive { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .parlor-show { animation: none; } }

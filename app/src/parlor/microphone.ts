@@ -89,10 +89,10 @@ export class ScribeMicrophone {
     const current = () => !this.disposed && epoch === this.epoch;
     this.set({ phase: "checking", error: "" });
     try {
-      if (!this.key()) { this.fail("Add your ElevenLabs key in setup to use Scribe, or type instead."); return; }
+      if (!this.key()) { this.fail("Add your ElevenLabs key in setup to use Scribe, or tap to continue without speech."); return; }
       const type = this.runtime.recordingType();
-      if (!type) { this.fail("Audio recording is unavailable in this browser. You can type instead."); return; }
-      this.timer = setTimeout(() => { if (current()) this.fail("Microphone permission timed out. Hold to talk again, or type instead."); }, MAX_RECORDING_MS);
+      if (!type) { this.fail("Audio recording is unavailable in this browser. Tap to continue without speech."); return; }
+      this.timer = setTimeout(() => { if (current()) this.fail("Microphone permission timed out. Hold to talk again, or tap to continue without speech."); }, MAX_RECORDING_MS);
       const stream = await this.runtime.getUserMedia();
       // A permission prompt cannot be dismissed by the app. Stop any stream granted after release.
       if (!current() || !this.held) { stopTracks(stream); return; }
@@ -106,7 +106,7 @@ export class ScribeMicrophone {
         if (this.bytes > MAX_BYTES) { this.fail("That recording is too large. Hold to talk again with a shorter thought."); return; }
         this.chunks.push(event.data);
       };
-      recorder.onerror = () => { if (current()) this.fail("Recording stopped. Check your microphone, or type instead."); };
+      recorder.onerror = () => { if (current()) this.fail("Recording stopped. Check your microphone, or tap to continue without speech."); };
       recorder.onstop = () => {
         if (!current()) return;
         if (this.held || this.state.phase !== "finishing") { this.fail("Recording stopped before release. Hold to talk again."); return; }
@@ -122,8 +122,8 @@ export class ScribeMicrophone {
       recorder.start(250);
     } catch (error) {
       if (current()) this.fail(error instanceof DOMException && (error.name === "NotAllowedError" || error.name === "SecurityError")
-        ? "Microphone access was denied. Allow the microphone in your browser, then hold to talk again, or type instead."
-        : "The microphone could not start. Check microphone access, or type instead.");
+        ? "Microphone access was denied. Allow the microphone in your browser, then hold to talk again, or tap to continue without speech."
+        : "The microphone could not start. Check microphone access, or tap to continue without speech.");
     }
   }
   release() {
@@ -143,16 +143,16 @@ export class ScribeMicrophone {
   private async finish(audio: Blob, epoch: number) {
     const current = () => !this.disposed && epoch === this.epoch;
     if (!current()) return;
-    if (!audio.size) { this.fail("No audio was captured. Hold to talk again, or type instead."); return; }
+    if (!audio.size) { this.fail("No audio was captured. Hold to talk again, or tap to continue without speech."); return; }
     clearTimeout(this.timer);
     const request = new AbortController(); this.request = request;
-    this.timer = setTimeout(() => { if (current()) this.fail("Transcription timed out. Hold to talk again, or type instead."); }, 45_000);
+    this.timer = setTimeout(() => { if (current()) this.fail("Transcription timed out. Hold to talk again, or tap to continue without speech."); }, 45_000);
     try {
       const text = await this.transcribe(audio, this.key(), request.signal);
       if (!current()) return;
-      if (!text) { this.fail("No speech was heard. Hold to talk again, or type instead."); return; }
+      if (!text) { this.fail("No speech was heard. Hold to talk again, or tap to continue without speech."); return; }
       ++this.epoch; this.cleanup(); this.set(initial()); this.submit(text);
-    } catch { if (current()) this.fail("Scribe could not transcribe that recording. Check your ElevenLabs key and transcription access, or type instead."); }
+    } catch { if (current()) this.fail("Scribe could not transcribe that recording. Check your ElevenLabs key and transcription access, or tap to continue without speech."); }
   }
   cancel() { ++this.epoch; this.held = false; this.cleanup(); this.set(initial()); }
   dispose() { this.cancel(); this.disposed = true; this.listeners.clear(); }

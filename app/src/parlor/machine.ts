@@ -51,7 +51,7 @@ export class ParlorMachine {
   }
   begin() {
     if (this.state.phase !== "greeting" || this.disposed) return;
-    this.speech = { kind: "greeting", segment: 0, text: `${characters[this.settings.character].greeting} Hold the talk button and speak your question. Release it when you are ready.` };
+    this.speech = { kind: "greeting", segment: 0, text: `${characters[this.settings.character].greeting} Hold a key until the table is listening, then speak. Release it when you are ready. A quick tap moves on without a question. Five quick taps welcome a new guest.` };
     void this.playSpeech(false);
   }
   question(value: string) { if (this.state.phase === "question") this.set({ question: value.slice(0, 1200) }); }
@@ -97,6 +97,11 @@ export class ParlorMachine {
     const segment = this.state.segment;
     this.speech = { kind: "card", segment, text: segment < 3 ? this.state.narration.cards[segment].text : this.state.narration.synthesis };
     void this.playSpeech(muted);
+  }
+  advance() {
+    if (this.state.phase === "question") { this.set({ phase: "confirm", question: "" }); this.confirm(); }
+    else if (this.state.phase === "paused" || this.state.phase === "error") this.retry();
+    else this.next();
   }
   private playSpeech(muted: boolean) {
     const speech = this.speech!;
