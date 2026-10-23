@@ -2,7 +2,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {ScribeMicrophone,transcribeScribe}=require('../.test-build/parlor/microphone.js');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
-function setup({permission='ok',type='audio/webm;codecs=opus',key='synthetic-scribe-key',transcript='An intentional question',deferred=false}={}) {
+function setup({permission='ok',type='audio/webm;codecs=opus',key='synthetic-scribe-key',transcript='An intentional question',deferred=false,owner=false}={}) {
   let recorder,grant,answer,now=0,requested=0,started=0,stopped=0;
   const submitted=[],requests=[],tracks=[{stop(){this.stops++;},stops:0},{stop(){this.stops++;},stops:0}];
   const stream={getTracks:()=>tracks};
@@ -17,7 +17,7 @@ function setup({permission='ok',type='audio/webm;codecs=opus',key='synthetic-scr
   const mic=new ScribeMicrophone(text=>submitted.push(text),()=>key,runtime,async(audio,k,signal)=>{
     requests.push({audio,key:k,signal});assert.ok(tracks.every(t=>t.stops>0),'tracks stop before transmission');
     return deferred?new Promise(r=>answer=r):transcript;
-  });
+  },()=>!!key||owner);
   return {mic,submitted,requests,tracks,advance:ms=>now+=ms,grant:()=>grant(stream),answer:text=>answer(text),
     get recorder(){return recorder;},get counts(){return {requested,started,stopped};},
     data:blob=>recorder.ondataavailable?.({data:blob??new Blob(['synthetic recording'])}),
@@ -25,8 +25,8 @@ function setup({permission='ok',type='audio/webm;codecs=opus',key='synthetic-scr
   };
 }
 
-test('records only on press and submits one bounded clip after intentional release, with every track already stopped',async()=>{
-  const s=setup();try{
+for(const owner of [false,true])test(`records only while held and submits after tracks stop with ${owner?'owner server':'browser'} key`,async()=>{
+  const s=setup({owner,...(owner?{key:''}:{})});try{
     assert.equal(s.counts.requested,0);await s.mic.press();await s.mic.press();assert.equal(s.counts.started,1);
     s.data();assert.equal(s.requests.length,0);s.advance(1000);s.mic.release();s.mic.release();
     assert.equal(s.counts.stopped,1);assert.ok(s.tracks.every(t=>t.stops===1));assert.equal(s.mic.getSnapshot().phase,'finishing');

@@ -9,6 +9,9 @@ private Parlor assets because it cannot enforce server authorization.
 
 Production uses `PARLOR_MODE=byok`. This interaction update needs no migration,
 entitlement grant, hosted key, billing configuration or security-policy change.
+An optional [owner account key fallback](parlor-owner-keys.md) can use server-held
+Anthropic and ElevenLabs keys only for the pinned verified owner, while keeping
+BYOK precedence and the page restriction. It is off until explicitly configured.
 The dormant hosted implementation remains separately controlled; see
 [Hosted parlor rollout](hosted-parlor.md).
 

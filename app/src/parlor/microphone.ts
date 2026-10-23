@@ -64,7 +64,7 @@ export class ScribeMicrophone {
   private request?: AbortController;
   private disposed = false;
   constructor(private submit: (text: string) => void, private key: () => string,
-    private runtime: RecordingRuntime = browserRuntime, private transcribe = transcribeScribe) {}
+    private runtime: RecordingRuntime = browserRuntime, private transcribe = transcribeScribe, private available = () => !!this.key()) {}
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   getSnapshot = () => this.state;
   private set(patch: Partial<MicrophoneState>) { if (!this.disposed) { this.state = { ...this.state, ...patch }; this.listeners.forEach(fn => fn()); } }
@@ -89,7 +89,7 @@ export class ScribeMicrophone {
     const current = () => !this.disposed && epoch === this.epoch;
     this.set({ phase: "checking", error: "" });
     try {
-      if (!this.key()) { this.fail("Add your ElevenLabs key in setup to use Scribe, or tap to continue without speech."); return; }
+      if (!this.available()) { this.fail("Add your ElevenLabs key in setup to use Scribe, or tap to continue without speech."); return; }
       const type = this.runtime.recordingType();
       if (!type) { this.fail("Audio recording is unavailable in this browser. Tap to continue without speech."); return; }
       this.timer = setTimeout(() => { if (current()) this.fail("Microphone permission timed out. Hold to talk again, or tap to continue without speech."); }, MAX_RECORDING_MS);

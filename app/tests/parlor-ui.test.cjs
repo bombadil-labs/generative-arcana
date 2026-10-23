@@ -11,7 +11,7 @@ Object.defineProperty(global,'navigator',{configurable:true,value:dom.window.nav
 const { createRoot } = require('react-dom/client');
 const { act } = React;
 let vite,root,App,Provider,useSession,sessionControl,router,settingsApi;
-let authenticated,accountId,providerCalls,lateResolve,delayed,accessMode,hostedDenied,hostedBodies,parlorAllowed,deckCalls;
+let authenticated,accountId,providerCalls,lateResolve,delayed,accessMode,hostedDenied,hostedBodies,parlorAllowed,deckCalls,ownerAvailable;
 const data=rawDeck();
 const deck={id:'parlor-deck',slug:data.slug,name:data.name,tagline:'Fixture deck',revision:1,visibility:'private',createdAt:'',updatedAt:'',manifest:{data,tagline:'Fixture deck'}};
 const flush=()=>act(async()=>{await new Promise(r=>setTimeout(r,0));});
@@ -38,12 +38,12 @@ beforeEach(async()=>{
   // and the real-browser test independently verify the actual seven seconds.
   global.setTimeout=(callback,ms,...args)=>realSetTimeout(callback,ms===7000?5:ms,...args);
   authenticated=true;parlorAllowed=true;deckCalls=0;accountId='test-account';providerCalls=0;delayed=false;lateResolve=undefined;
-  accessMode='byok';hostedDenied=false;hostedBodies=[];
+  accessMode='byok';hostedDenied=false;hostedBodies=[];ownerAvailable=false;
   window.history.replaceState(null,'','/parlor');window.localStorage.clear();
   settingsApi.saveSettings(window.localStorage,accountId,{...settingsApi.defaultSettings(),anthropicKey:'synthetic-ui-key',anthropicModel:'synthetic-model'},true);
   global.fetch=async(path,init={})=>{
-    if(path==='/api/parlor/capabilities')return hostedDenied?json({},403):json({mode:accessMode,models:[{provider:'anthropic',id:'server-model'}],voices:[]});
-    if(path==='/api/parlor/narrate'){
+    if(path==='/api/parlor/capabilities')return hostedDenied?json({},403):json({mode:accessMode,models:[{provider:'anthropic',id:'server-model'}],voices:[],...(ownerAvailable?{ownerKeys:{anthropicModel:'claude-test-owner',elevenlabs:false,voiceId:'env-owner-voice'}}:{})});
+    if(path==='/api/parlor/narrate'||path==='/api/parlor/owner/narrate'){
       hostedBodies.push(JSON.parse(init.body));if(hostedDenied)return json({},403);
       const token=JSON.parse(Buffer.from(hostedBodies.at(-1).token,'base64url').toString());
       const response=json({cards:token.c.map(([slug])=>({slug,text:'Hosted synthetic narration.'})),synthesis:'Hosted synthetic synthesis.'});
@@ -91,6 +91,27 @@ test('restored and pasted keys always remain password fields; clearing keys remo
   assert.ok(!document.body.textContent.includes('synthetic-pasted-key'));assert.ok(!button('Show key'));
   await click('Clear keys from this device');for(const field of document.querySelectorAll('input[type=password]'))assert.equal(field.value,'');
   assert.equal([...Array(window.localStorage.length)].map((_,i)=>window.localStorage.key(i)).filter(k=>k.startsWith('arcana:parlor:credentials')).length,0);
+});
+
+test('owner setup starts without browser keys, preserves voice, and loses fallback on another permitted account',async()=>{
+  ownerAvailable=true;window.localStorage.clear();settingsApi.saveSettings(window.localStorage,accountId,{...settingsApi.defaultSettings(),voiceId:'selected-owner-voice'},true);
+  await mount();assert.ok(button('Use account model'));assert.equal(document.querySelectorAll('input[type=password]').length,3);for(const field of document.querySelectorAll('input[type=password]'))assert.equal(field.value,'');
+  const voice=[...document.querySelectorAll('label')].find(el=>el.textContent.startsWith('ElevenLabs voice ID')).querySelector('input');assert.equal(voice.value,'selected-owner-voice');
+  await guest();assert.equal(providerCalls,0);assert.equal(hostedBodies.length,1);assert.equal(hostedBodies[0].model,'claude-test-owner');assert.equal(document.querySelectorAll('.is-revealed').length,1);
+  ownerAvailable=false;accountId='different-permitted-account';await act(async()=>sessionControl.refresh());await settle();assert.ok(!button('Use account model'));assert.equal(button('Start the show').getAttribute('aria-disabled'),'true');assert.equal(document.querySelectorAll('.parlor-card').length,0);
+});
+
+test('owner availability keeps an explicitly remembered BYOK model and key in control',async()=>{
+  ownerAvailable=true;await mount();await guest();assert.equal(providerCalls,1);assert.equal(hostedBodies.length,0);
+});
+
+test('fresh owner gets env voice/model defaults and can override or restore both without a browser key',async()=>{
+  ownerAvailable=true;window.localStorage.clear();await mount();
+  const field=name=>[...document.querySelectorAll('label')].find(el=>el.textContent.startsWith(name)).querySelector('input');
+  assert.equal(field('ElevenLabs voice ID').value,'env-owner-voice');assert.equal(field('Anthropic model ID').value,'claude-test-owner');
+  await input('ElevenLabs voice ID','ui-voice');await input('Anthropic model ID','claude-ui-choice');assert.equal(field('ElevenLabs voice ID').value,'ui-voice');assert.equal(field('Anthropic model ID').value,'claude-ui-choice');
+  await guest();assert.equal(hostedBodies.at(-1).model,'claude-ui-choice');await escape();
+  await click('Use account voice');await click('Use account model');assert.equal(field('ElevenLabs voice ID').value,'env-owner-voice');assert.equal(field('Anthropic model ID').value,'claude-test-owner');
 });
 test('confirm then reset and navigation clear guest state; no questions in URL/storage',async()=>{
   await mount();await guest();assert.equal(document.querySelectorAll('.parlor-card').length,3);assert.equal(providerCalls,1);assert.ok(button('Hold to talk'));assert.ok(button('Next card'));assert.equal(document.querySelectorAll('.is-revealed').length,1);
