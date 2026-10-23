@@ -98,9 +98,13 @@ try {
   assert.equal((await request('narrate',{provider:'openai',model:'mock-o'})).status,200);
   assert.equal((await request('converse',{turns:[{role:'user',content:'Private follow-up never persisted'}]})).status,200);
   assert.equal((await request('converse',{revealed:1,turns:[{role:'user',content:'Stay with this card'}]})).status,200);
-  assert.ok(seenBody.includes(reading.placements[0].card.name));
-  assert.ok(!seenBody.includes(reading.placements[1].card.name));
-  assert.ok(!seenBody.includes(reading.placements[2].card.name));
+  const [revealedContext,followUp]=JSON.parse(seenBody).messages[0].content.split('\n\n');
+  const first=reading.placements[0];
+  assert.deepEqual(JSON.parse(revealedContext),{
+    question:reading.question,deck:reading.deck.name,currentCard:first.card.name,
+    cards:[{name:first.card.name,position:first.position.name,reversed:first.reversed,meaning:first.meaning}],
+  });
+  assert.equal(followUp,'Stay with this card');
   assert.equal((await request('converse',{revealed:4,turns:[{role:'user',content:'Invalid count'}]})).status,400);
   assert.equal((await request('speech',{text:'Memory-only audio words',voiceId:'mock-voice'})).status,200);
   assert.equal((await request('speech',{text:'a'.repeat(4001),voiceId:'mock-voice'})).status,400);
