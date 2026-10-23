@@ -7,14 +7,14 @@ import { CardArt } from "../components/CardArt";
 import { PackAssetImage } from "../artwork/PackAssetImage";
 import { getPackArtworkAsset, type PackArtworkAsset } from "../artwork/api";
 import { useArtworkSelection, useArtworkStore } from "../artwork/context";
-import { characters, clearKeys, defaultSettings, readSettings, readySettings, saveSettings, type Settings } from "./settings";
+import { characters, clearKeys, defaultSettings, readSettings, readySettings, saveSettings, useOwnerEleven, type Settings } from "./settings";
 import { ParlorMachine } from "./machine";
-import { ScribeMicrophone } from "./microphone";
+import { ScribeMicrophone, transcribeScribe } from "./microphone";
 import { TableGestures, tableKey, HOLD_MS, SUMMON_MS } from "./gestures";
 import { RadioSignal } from "./RadioSignal";
 import { radioState } from "./radio";
 import { RadioAudio, defaultRadioPreferences, type RadioPreferences } from "./radioAudio";
-import { readParlorCapabilities, type ParlorCapabilities } from './hosted';
+import { readParlorCapabilities, ownerTranscribe, type ParlorCapabilities } from './hosted';
 import "./parlor.css";
 
 export function Parlor({ onShowChange }: { onShowChange(showing: boolean): void }) {
@@ -38,9 +38,10 @@ function Host({ accountId, onShowChange, capabilities }: { accountId: string; on
   const hosted=capabilities.mode==='hosted';
   const [restored] = useState(() => {
     if(hosted){const first=capabilities.models[0];return {settings:{...defaultSettings(),hosted:true,provider:first.provider,anthropicModel:capabilities.models.find(m=>m.provider==='anthropic')?.id??'',openaiModel:capabilities.models.find(m=>m.provider==='openai')?.id??''},remember:false};}
-    try { return readSettings(window.localStorage, accountId); } catch { return { settings: defaultSettings(), remember: false }; }
+    let saved;try { saved=readSettings(window.localStorage, accountId); } catch { saved={settings:defaultSettings(),remember:false}; }
+    return {...saved,settings:{...saved.settings,ownerKeys:capabilities.ownerKeys,anthropicModel:saved.settings.anthropicModel||capabilities.ownerKeys?.anthropicModel||''}};
   });
-  const [settings, setSettings] = useState(restored.settings);
+  const [settings, setSettings] = useState<Settings>(restored.settings);
   const [remember, setRemember] = useState(restored.remember);
   const [storageError, setStorageError] = useState(false);
   const [decks, setDecks] = useState<CatalogDeckSummary[]>([]);
@@ -98,16 +99,17 @@ function Host({ accountId, onShowChange, capabilities }: { accountId: string; on
       {hosted?<><div><h2>The reader</h2><p>Hosted parlor · access and usage limits are managed by the server.</p>
         <label>Hosted model<select aria-label="Hosted model" value={`${settings.provider}:${settings.provider==='anthropic'?settings.anthropicModel:settings.openaiModel}`} onChange={event=>{const choice=capabilities.models.find(m=>`${m.provider}:${m.id}`===event.target.value)!;update({...settings,provider:choice.provider,...(choice.provider==='anthropic'?{anthropicModel:choice.id}:{openaiModel:choice.id})});}}>{capabilities.models.map(m=><option key={`${m.provider}:${m.id}`} value={`${m.provider}:${m.id}`}>{m.provider} · {m.id}</option>)}</select></label></div>
         <div><h2>The voice</h2><label>Hosted voice<select aria-label="Hosted voice" value={settings.voiceId} onChange={event=>update({...settings,voiceId:event.target.value})}><option value="">Silent</option>{capabilities.voices.map(voice=><option key={voice} value={voice}>{voice}</option>)}</select></label><p>Hosted provider keys are never sent to this browser. Previously remembered browser-mode keys can be removed by clearing site data. Retries consume a new usage reservation, including after an interrupted request.</p></div></>:
-      <><div><h2>The reader</h2><p>Browser-key mode · your own provider credentials.</p><label>Language provider<select aria-label="Language provider" value={settings.provider} onChange={(event) => update({ ...settings, provider: event.target.value as Settings["provider"] })}><option value="anthropic">Anthropic</option><option value="openai">OpenAI</option></select></label>
+      <><div><h2>The reader</h2><p>Entered keys take precedence; account fallbacks are shown below when available.</p><label>Language provider<select aria-label="Language provider" value={settings.provider} onChange={(event) => update({ ...settings, provider: event.target.value as Settings["provider"] })}><option value="anthropic">Anthropic</option><option value="openai">OpenAI</option></select></label>
         <KeyInput label="Anthropic API key" value={settings.anthropicKey} change={(value) => update({ ...settings, anthropicKey: value })} />
+        {capabilities.ownerKeys?.anthropicModel&&<p>Your account can use {capabilities.ownerKeys.anthropicModel} with the Anthropic key left blank. <button onClick={()=>update({...settings,provider:'anthropic',anthropicModel:capabilities.ownerKeys!.anthropicModel!})}>Use account model</button></p>}
         <label>Anthropic model ID<input value={settings.anthropicModel} onChange={(event) => update({ ...settings, anthropicModel: event.target.value })} maxLength={160} placeholder="Enter a model available to your account" /></label>
         <KeyInput label="OpenAI API key" value={settings.openaiKey} change={(value) => update({ ...settings, openaiKey: value })} />
         <label>OpenAI model ID<input value={settings.openaiModel} onChange={(event) => update({ ...settings, openaiModel: event.target.value })} maxLength={160} placeholder="Enter a chat-completions compatible model" /></label>
       </div>
-      <div><h2>The voice</h2><p>Optional. Leave the voice key empty for a silent show.</p>
+      <div><h2>The voice</h2><p>{capabilities.ownerKeys?.elevenlabs?'Your account provides ElevenLabs narration and Scribe when the key below is blank. Keep your selected voice ID, or leave the voice ID blank for captions.':'Optional. Leave the voice key empty for a silent show.'}</p>
         <KeyInput label="ElevenLabs API key" value={settings.elevenKey} change={(value) => update({ ...settings, elevenKey: value })} />
         <label>ElevenLabs voice ID<input value={settings.voiceId} onChange={(event) => update({ ...settings, voiceId: event.target.value })} maxLength={160} /></label>
-        <p className="parlor-warning">Keys are masked on screen, not encrypted. This browser and same-origin scripts can read them. Anyone using this device may access remembered keys. Login does not protect localStorage. Provider calls go directly from this browser. ElevenLabs discourages browser API keys; audio may be unavailable.</p>
+        <p className="parlor-warning">Entered keys are masked on screen, not encrypted. This browser and same-origin scripts can read them. Anyone using this device may access remembered keys. Login does not protect localStorage. Entered-key calls go directly from this browser; account-provider calls go through the authenticated server. Server keys are never sent here.</p>
         <label className="parlor-check"><input type="checkbox" checked={remember} onChange={(event) => update(settings, event.target.checked)} />Remember keys on this device (plaintext)</label>
         <button onClick={() => update(clearKeys(settings), false)}>Clear keys from this device</button>
         {storageError && <p role="alert">Browser storage could not be updated. Keys work in memory, but previously saved keys may remain; clear site data in your browser.</p>}
@@ -155,7 +157,9 @@ function Ritual({ deckId, settings, leave, radioPreferences, changeRadio }: { de
     await Promise.all(reading.cards.map((card) => artwork?.load(card.slug)));
   } }), [deckId, settings, artwork]);
   const state = useSyncExternalStore(machine.subscribe, machine.getSnapshot, machine.getSnapshot);
-  const microphone = useMemo(() => new ScribeMicrophone(text => machine.submit(text), () => settings.hosted ? "" : settings.elevenKey), [machine, settings]);
+  const microphone = useMemo(() => new ScribeMicrophone(text => machine.submit(text), () => settings.hosted ? "" : settings.elevenKey, undefined,
+    (audio,key,signal)=>useOwnerEleven(settings)?ownerTranscribe(audio,signal):transcribeScribe(audio,key,signal),
+    ()=>!settings.hosted&&(!!settings.elevenKey.trim()||useOwnerEleven(settings))), [machine, settings]);
   const mic = useSyncExternalStore(microphone.subscribe, microphone.getSnapshot, microphone.getSnapshot);
   const sound = useMemo(() => new RadioAudio(), [machine]);
   const soundError = useSyncExternalStore(sound.subscribe, sound.getSnapshot, sound.getSnapshot);

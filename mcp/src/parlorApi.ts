@@ -1,11 +1,13 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createArcanaAdapter } from './hostStore';
-import type { BrowserPrincipalResolver } from './browserSession';
+import type { BrowserPrincipalResolver, BrowserSessionAuthenticator } from './browserSession';
 import type { UserDeckCatalogRepository } from './userDeckCatalog';
 import { characters } from '../../app/src/parlor/settings';
 import { conversationContext, parseNarration } from '../../app/src/parlor/providers';
 import { ParlorFault, publicParlorConfig, type ParlorConfig } from './parlorConfig';
 import type { ParlorStore, Reservation } from './parlorStore';
+import { isParlorOwner } from './parlorAccess';
+import { createOwnerParlorHandler, ownerCapabilities } from './parlorOwnerApi';
 
 export const isParlorPath=(path: string)=>path==='/api/parlor' || path.startsWith('/api/parlor/');
 const json=(res:ServerResponse,status:number,body:unknown)=>{ if (!res.destroyed&&!res.writableEnded) {res.writeHead(status,{'content-type':'application/json','cache-control':'private, no-store'});res.end(JSON.stringify(body));} };
@@ -32,8 +34,9 @@ export function rejectParlorSecrets(value:unknown,c:ParlorConfig):void {
   if(Array.isArray(value))for(const item of value)rejectParlorSecrets(item,c);
   else if(record(value))for(const item of Object.values(value))rejectParlorSecrets(item,c);
 }
-export function createParlorHandler(options:{config:ParlorConfig;authorize?:(req:IncomingMessage,res:ServerResponse)=>Promise<boolean>;store?:ParlorStore;principal?:BrowserPrincipalResolver;catalog?:UserDeckCatalogRepository;fetch?:typeof fetch}) {
+export function createParlorHandler(options:{config:ParlorConfig;authorize?:(req:IncomingMessage,res:ServerResponse)=>Promise<boolean>;authenticator?:BrowserSessionAuthenticator;ownerAllowRequest?:()=>Promise<boolean>;store?:ParlorStore;principal?:BrowserPrincipalResolver;catalog?:UserDeckCatalogRepository;fetch?:typeof fetch}) {
   const {config:c,store,principal,catalog}=options;const send=options.fetch??fetch;
+  const ownerHandler=createOwnerParlorHandler({config:c.mode==='byok'?c.ownerKeys:undefined,authenticator:options.authenticator,principal,catalog,allowRequest:options.ownerAllowRequest,fetch:options.fetch});
   return async(req:IncomingMessage,res:ServerResponse)=>{
     // Also guard direct handler use: BYOK capabilities must never bypass authorization.
     if (!options.authorize) return json(res,503,{error:'parlor_auth_unavailable'});
@@ -44,7 +47,16 @@ export function createParlorHandler(options:{config:ParlorConfig;authorize?:(req
     const timer=setTimeout(()=>{json(res,408,{error:'parlor_deadline_exceeded'});abort.abort();},c.timeoutMs||10000);
     try {
       const path=new URL(req.url??'/', 'http://localhost').pathname;
-      if (path==='/api/parlor/capabilities' && req.method==='GET' && c.mode!=='hosted') return json(res,200,publicParlorConfig(c));
+      if(path.startsWith('/api/parlor/owner/')) { clearTimeout(timer); await ownerHandler(req,res); return; }
+      const session=await options.authenticator?.authenticate(req,res);
+      const owner=isParlorOwner(session?.identity);
+      if (path==='/api/parlor/capabilities' && req.method==='GET' && c.mode!=='hosted') return json(res,200,{...publicParlorConfig(c),...(owner&&c.ownerKeys?{ownerKeys:ownerCapabilities(c.ownerKeys)}:{})});
+      // Even if page access or legacy entitlements later expand, server credentials never do.
+      if(c.mode==='hosted'&&!owner) {
+        if(!session)throw new ParlorFault(options.authenticator?401:503,options.authenticator?'sign_in_required':'parlor_auth_unavailable');
+        if(path==='/api/parlor/capabilities'&&req.method==='GET')return json(res,200,{mode:'byok',models:[],voices:[]});
+        throw new ParlorFault(403,'owner_credentials_required');
+      }
       if (c.mode!=='hosted'||!store||!principal||!catalog||Date.now()>=c.pricingExpires) throw new ParlorFault(503,'hosted_parlor_unavailable');
       const who=await principal.resolve(req,res);if(!who)throw new ParlorFault(401,'sign_in_required');
       if(!await store.entitled(who.id))throw new ParlorFault(403,'parlor_access_required');
@@ -95,7 +107,7 @@ export function createParlorHandler(options:{config:ParlorConfig;authorize?:(req
       const r:Reservation={principal:who.id,operation,kind:kind as Reservation['kind'],provider,model,cost,inputBytes,outputLimit};
       await store.reserve(r,c);reservation=r;
       // Revalidate after the reservation lock and before dispatch; no refund on uncertain outcomes.
-      if(abort.signal.aborted || (await principal.resolve(req,res))?.id!==who.id || !await store.entitled(who.id))throw new ParlorFault(403,'parlor_access_required');
+      if(abort.signal.aborted || !isParlorOwner((await options.authenticator?.authenticate(req,res))?.identity) || (await principal.resolve(req,res))?.id!==who.id || !await store.entitled(who.id))throw new ParlorFault(403,'parlor_access_required');
       const response=await send(url,{method:'POST',redirect:'error',signal:abort.signal,headers:{'content-type':'application/json',...headers},body:encoded});
       const bytes=await boundedProviderBody(response,kind==='speech'?8_000_000:100_000);
       let result:unknown;
@@ -106,7 +118,7 @@ export function createParlorHandler(options:{config:ParlorConfig;authorize?:(req
         if(typeof prose!=='string'||!prose.trim()||prose.length>(kind==='narrate'?18000:4000))throw new ParlorFault(502,'unusable_provider_response');
         result=kind==='narrate'?parseNarration(prose,reading):{text:prose};rejectParlorSecrets(result,c);
       }
-      if(abort.signal.aborted || (await principal.resolve(req,res))?.id!==who.id || !await store.entitled(who.id))throw new ParlorFault(403,'parlor_access_required');
+      if(abort.signal.aborted || !isParlorOwner((await options.authenticator?.authenticate(req,res))?.identity) || (await principal.resolve(req,res))?.id!==who.id || !await store.entitled(who.id))throw new ParlorFault(403,'parlor_access_required');
       success=true;await store.finish(who.id,operation,true);reservation=undefined;
       if(kind==='speech'){if(!res.destroyed&&!res.writableEnded){res.writeHead(200,{'content-type':'audio/mpeg','cache-control':'no-store'});res.end(bytes);}}
       else json(res,200,result);

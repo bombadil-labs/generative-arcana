@@ -117,7 +117,10 @@ const hostedParlorConfig = parlorConfig(process.env);
 if (hostedParlorConfig.mode === 'hosted' && (!databaseUrl || !browserPrincipalResolver || !catalog)) throw new Error('Hosted parlor requires durable catalog and browser authentication.');
 const parlorPool = hostedParlorConfig.mode === 'hosted' ? new Pool({connectionString:databaseUrl,max:3,connectionTimeoutMillis:10000,statement_timeout:10000,query_timeout:11000}) : undefined;
 const parlorAccess = createParlorAccessGuard(browserAuth?.browserAuthenticator);
-const parlorHandler = createParlorHandler({config:hostedParlorConfig,authorize:parlorAccess,store:parlorPool?new PostgresParlorStore(parlorPool):undefined,principal:browserPrincipalResolver,catalog});
+const ownerParlorLimiter = hostedParlorConfig.ownerKeys && databaseUrl ? new DurableRateLimiter(databaseUrl, 30) : undefined;
+const parlorHandler = createParlorHandler({config:hostedParlorConfig,authorize:parlorAccess,authenticator:browserAuth?.browserAuthenticator,
+  ownerAllowRequest:ownerParlorLimiter?async()=>(await ownerParlorLimiter.check('parlor-owner-provider')).allowed:undefined,
+  store:parlorPool?new PostgresParlorStore(parlorPool):undefined,principal:browserPrincipalResolver,catalog});
 const artworkConfig = artworkStorageConfiguration();
 if (artworkConfig && (!databaseUrl || !catalog)) throw new Error("Artwork requires a durable database catalog.");
 const artworkPool = artworkConfig ? new Pool({ connectionString: databaseUrl, max: 3, connectionTimeoutMillis: 10_000 }) : undefined;

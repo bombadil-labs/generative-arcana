@@ -24,16 +24,18 @@ test('alignment validates shape and monotonic finite times; captions follow actu
   assert.ok(parseAlignment(alignment));assert.equal(spokenCaption(alignment,0),'');assert.equal(spokenCaption(alignment,.3),'One');assert.equal(spokenCaption(alignment,.8),'One ');assert.equal(spokenCaption(alignment,1.3),'One two');
   for(const value of [null,{}, {...alignment,characters:[]},{...alignment,character_end_times_seconds:[.1]}, {...alignment,character_end_times_seconds:[.1,.2,NaN,.4,1.1,1.2,1.3]}, {...alignment,character_start_times_seconds:[0,.1,.2,.3,1,.9,1.2]}])assert.equal(parseAlignment(value),undefined);
 });
-test('v3 retains selected voice and reveals no future text during delayed, paused or stalled playback',async()=>{
+for(const owner of [false,true])test(`v3 retains selected voice and aligned playback with ${owner?'owner server':'browser'} key`,async()=>{
   const old={fetch:global.fetch,Audio:global.Audio,create:URL.createObjectURL,revoke:URL.revokeObjectURL};let player,request,revoked=0,played=0,waiting=0;const captions=[];
   try{
     global.fetch=async(url,init)=>{request={url,init};return Response.json({audio_base64:btoa('audio'),normalized_alignment:alignment});};
     URL.createObjectURL=()=> 'blob:mock';URL.revokeObjectURL=()=>revoked++;
     global.Audio=class{currentTime=0;constructor(){player=this;}play(){return Promise.resolve();}pause(){}removeAttribute(){}load(){}};
     // Provider normalization differs from the request: show the aligned words, not original digits.
-    const pending=speak(settings,'1 2',new AbortController().signal,()=>played++,undefined,(text,timing)=>captions.push({text,timing}),()=>waiting++);
+    const selected=owner?{...settings,elevenKey:'',ownerKeys:{anthropicModel:null,elevenlabs:true}}:settings;
+    const pending=speak(selected,'1 2',new AbortController().signal,()=>played++,undefined,(text,timing)=>captions.push({text,timing}),()=>waiting++);
     for(let i=0;i<30&&!player;i++)await tick();assert.ok(player);
-    assert.equal(request.url,'https://api.elevenlabs.io/v1/text-to-speech/the-selected-voice/with-timestamps');assert.equal(JSON.parse(request.init.body).model_id,'eleven_v3');assert.equal(request.init.credentials,'omit');assert.equal(request.init.redirect,'error');
+    assert.equal(request.url,owner?'/api/parlor/owner/speech':'https://api.elevenlabs.io/v1/text-to-speech/the-selected-voice/with-timestamps');
+    const body=JSON.parse(request.init.body);if(owner){assert.equal(body.voiceId,'the-selected-voice');assert.deepEqual(Object.keys(request.init.headers),['content-type']);}else assert.equal(body.model_id,'eleven_v3');assert.equal(request.init.credentials,owner?'same-origin':'omit');assert.equal(request.init.redirect,'error');
     player.currentTime=.3;player.ontimeupdate();assert.deepEqual(captions,[],'nothing before actual playing');
     player.currentTime=0;player.onplaying();assert.equal(played,1);assert.deepEqual(captions.at(-1),{text:'',timing:'aligned'});
     player.currentTime=.3;player.ontimeupdate();assert.equal(captions.at(-1).text,'One');

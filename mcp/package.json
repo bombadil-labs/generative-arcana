@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Headless MCP server for the Generative Arcana symbolic engine.",
   "scripts": {
-    "test:parlor": "node --import tsx test/parlor-access.ts && node --import tsx test/parlor-hosted.ts",
+    "test:parlor": "node --import tsx test/parlor-access.ts && node --import tsx test/parlor-hosted.ts && node --import tsx test/parlor-owner-keys.ts",
     "parlor:access": "node --import tsx scripts/parlor-access.ts",
     "dev": "tsx src/stdio.ts",
     "start": "tsx src/stdio.ts",

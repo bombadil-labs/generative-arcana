@@ -1,7 +1,9 @@
 export type ParlorMode = 'disabled' | 'byok' | 'hosted';
 export type LanguageProvider = 'anthropic' | 'openai';
 export interface HostedModel { provider: LanguageProvider; id: string; maxCostMicrousd: number }
+export interface OwnerKeysConfig { origin: string; anthropicModel: string; keys: { anthropic?: string; elevenlabs?: string } }
 export interface ParlorConfig {
+  ownerKeys?: OwnerKeysConfig;
   mode: ParlorMode; origin: string; models: HostedModel[];
   keys: { anthropic?: string; openai?: string; elevenlabs?: string };
   voices: string[]; speechModel: string; speechCostMicrousd: number;
@@ -13,13 +15,20 @@ export interface ParlorConfig {
 export class ParlorFault extends Error {
   constructor(readonly status: number, readonly code: string) { super(code); }
 }
-const fail = (): never => { throw new Error('Invalid hosted parlor configuration; check server-only allowlists, keys, pricing review and limits.'); };
+const fail = (): never => { throw new Error('Invalid Parlor server configuration; check the documented mode, provider allowlists and limits.'); };
 export function parlorConfig(env: NodeJS.ProcessEnv): ParlorConfig {
   const mode = env.PARLOR_MODE ?? 'disabled';
   if (!['disabled','byok','hosted'].includes(mode)) fail();
   const base: ParlorConfig = { mode: mode as ParlorMode, origin: '', models: [], keys: {}, voices: [], speechModel: '', speechCostMicrousd: 0,
     userDailyMicrousd: 0, globalDailyMicrousd: 0, userConcurrency: 0, globalConcurrency: 0,
     maxInputBytes: 0, maxOutputTokens: 0, maxSpeechCharacters: 0, timeoutMs: 0, pricingReview: '', pricingExpires: 0 };
+  if (mode === 'byok' && env.PARLOR_OWNER_KEYS_ENABLED === 'true') {
+    let origin: URL; try { origin = new URL(env.BETTER_AUTH_URL!); } catch { return fail(); }
+    if (origin.protocol !== 'https:' || origin.origin !== env.BETTER_AUTH_URL) fail();
+    const anthropicModel = env.PARLOR_OWNER_ANTHROPIC_MODEL ?? '';
+    if (anthropicModel && !/^claude-[A-Za-z0-9._-]{1,140}$/.test(anthropicModel)) fail();
+    base.ownerKeys = { origin: origin.origin, anthropicModel, keys: { anthropic: env.ANTHROPIC_API_KEY?.trim(), elevenlabs: env.ELEVENLABS_API_KEY?.trim() } };
+  }
   if (mode !== 'hosted') return base;
   const integer = (name: string, max: number) => { const raw=env[name]; const n=Number(raw); if (!raw || !/^[1-9][0-9]*$/.test(raw) || !Number.isSafeInteger(n) || n>max) fail(); return n; };
   let origin: URL; try { origin=new URL(env.BETTER_AUTH_URL!); } catch { return fail(); }

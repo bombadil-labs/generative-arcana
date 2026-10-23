@@ -8,6 +8,7 @@ import { parlorConfig,ParlorFault,type ParlorConfig } from '../src/parlorConfig'
 import { reserveParlor,entitled,type ParlorStore,type ParlorDb } from '../src/parlorStore';
 import { inspectEntitlement,applyEntitlement,type EntitlementPlan } from '../src/parlorEntitlement';
 import { createParlorHandler } from '../src/parlorApi';
+import { PARLOR_OWNER } from '../src/parlorAccess';
 import { createArcanaAdapter } from '../src/hostStore';
 import type { UserDeckCatalogRepository } from '../src/userDeckCatalog';
 
@@ -72,7 +73,7 @@ try {
     return Response.json({content:[{type:'text',text:content}]});
   };
   // Owner guard is exercised with real sessions in parlor-access.ts; this suite isolates budgets.
-  const handler=createParlorHandler({config,authorize:async()=>true,store,principal:{resolve:async()=>principal?{id:principal}:null},catalog:catalogFixture,fetch:providerFetch});
+  const handler=createParlorHandler({config,authorize:async()=>true,authenticator:{authenticate:async()=>principal?{identity:PARLOR_OWNER}:null},store,principal:{resolve:async()=>principal?{id:principal}:null},catalog:catalogFixture,fetch:providerFetch});
   server=createServer((req,res)=>{void handler(req,res);});await new Promise<void>(resolve=>server!.listen(0,'127.0.0.1',resolve));
   const port=(server.address() as {port:number}).port;
   const request=(kind:string,extra:Record<string,unknown>={},origin=config.origin,signal?:AbortSignal)=>fetch(`http://127.0.0.1:${port}/api/parlor/${kind}`,{method:'POST',headers:{origin,'content-type':'application/json'},signal,body:JSON.stringify({operationId:randomUUID(),deckId:'hosted-deck',token:reading.token,provider:'anthropic',model:'mock-a',character:'keeper',...extra})});

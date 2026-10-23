@@ -23,11 +23,12 @@ const guard = createParlorAccessGuard({ authenticate: async (req, res) => {
 } });
 const api = createParlorHandler({ config: parlorConfig({ PARLOR_MODE: "byok" }), authorize: guard,
   fetch: async () => { providerCalls++; throw new Error("No provider calls allowed"); } });
+let activeApi = api;
 const server = createServer((req, res) => { void (async () => {
   const path = parlorPathname(req.url ?? "/");
   const restricted = isPrivateParlorPath(path);
   if (restricted && !await guard(req, res)) return;
-  if (path.startsWith("/api/parlor")) { await api(req, res); return; }
+  if (path.startsWith("/api/parlor")) { await activeApi(req, res); return; }
   if (!serveArcanaWebApp(req, res, dir, restricted)) res.writeHead(404).end();
 })(); });
 try {
@@ -66,7 +67,7 @@ try {
     "/PARLOR", "/assets/parlor-fixture.js", "/assets/parlor-fixture.css", "/assets/%70arlor-fixture.js",
     "/other%2f..%2fassets%2fparlor-fixture.js", "/other%5c..%5cassets%5cparlor-fixture.js",
     "/api/parlor", "/api/parlor/capabilities", "/api/parlor/narrate", "/api/parlor/converse", "/api/parlor/speech",
-    "/api/parlor/future-endpoint", "/%61pi/parlor/capabilities", "//api//parlor/capabilities"];
+    "/api/parlor/future-endpoint", "/api/parlor/owner/narrate", "/api/parlor/owner/converse", "/api/parlor/owner/speech", "/api/parlor/owner/transcribe", "/%61pi/parlor/capabilities", "//api//parlor/capabilities"];
   for (const cookie of ["", "arcana-auth.session_token=forged", otherCookie]) {
     for (const path of paths) for (const method of ["GET", "HEAD", "POST"]) {
       const result = await get(path, cookie, method);
@@ -97,17 +98,26 @@ try {
   assert.equal((await session(otherCookie)).parlorAllowed, false);
   assert.equal(isParlorOwner({ ...PARLOR_OWNER, issuer: "https://staging.invalid/api/auth" }), false);
   assert.equal(isParlorOwner({ ...PARLOR_OWNER, subject: other.user.id }), false);
+  assert.equal(providerCalls,0);
+  activeApi=createParlorHandler({config:parlorConfig({PARLOR_MODE:'byok',PARLOR_OWNER_KEYS_ENABLED:'true',BETTER_AUTH_URL:origin,ELEVENLABS_API_KEY:'synthetic-signed-session-voice-key'}),authorize:guard,
+    authenticator:auth.browserAuthenticator,principal:{resolve:async()=>({id:'usr_owner'})},catalog:{} as import('../src/userDeckCatalog').UserDeckCatalogRepository,ownerAllowRequest:async()=>true,
+    fetch:async(url,init)=>{providerCalls++;assert.equal(String(url),'https://api.elevenlabs.io/v1/text-to-speech/selected-voice/with-timestamps');assert.equal(new Headers(init?.headers).get('xi-api-key'),'synthetic-signed-session-voice-key');return Response.json({audio_base64:Buffer.from([73,68,51,1,2]).toString('base64')});}});
+  const ownerSpeech=(cookie:string)=>fetch(`http://127.0.0.1:${address.port}/api/parlor/owner/speech`,{method:'POST',headers:{cookie,origin,'content-type':'application/json'},body:JSON.stringify({text:'A synthetic greeting',voiceId:'selected-voice'})});
+  assert.equal((await ownerSpeech(ownerCookie)).status,200);
+  for(const cookie of ['',otherCookie,'arcana-auth.session_token=forged'])assert.equal((await ownerSpeech(cookie)).status,cookie===otherCookie?403:401);
+  assert.equal(providerCalls,1,'only the real signed owner session dispatched the mocked voice call');
   authFails = true;
   assert.equal((await get("/parlor", ownerCookie)).status, 503);
   assert.equal((await get("/api/parlor/capabilities", ownerCookie)).status, 503);
   authFails = false;
   await h.pg.client.query('UPDATE arcana_auth_user SET "emailVerified"=false WHERE id=$1', [PARLOR_OWNER.subject]);
   assert.equal((await get("/parlor", ownerCookie)).status, 401, "unverified owner is denied");
+  assert.equal((await ownerSpeech(ownerCookie)).status,401);
   await h.pg.client.query('UPDATE arcana_auth_user SET "emailVerified"=true WHERE id=$1', [PARLOR_OWNER.subject]);
   await h.pg.client.query('DELETE FROM arcana_auth_session WHERE "userId"=$1', [PARLOR_OWNER.subject]);
   assert.equal((await get("/parlor", ownerCookie)).status, 401, "revoked owner session is denied");
-  assert.equal(providerCalls, 0);
-  console.log("Parlor: real signed sessions allow only the verified owner; anonymous, forged, other, unverified, revoked and failed auth denied; normalized pages, private assets and every API protected; ordinary app preserved; zero provider calls.");
+  assert.equal((await ownerSpeech(ownerCookie)).status,401);assert.equal(providerCalls,1);
+  console.log("Parlor: real signed sessions allow only the verified owner; anonymous, forged, other, unverified, revoked and failed auth denied; normalized pages, private assets and every API protected; ordinary app preserved; one mocked owner voice call, no live provider calls.");
 } finally {
   await new Promise<void>(resolve => server.close(() => resolve()));
   await auth.close(); await h.close(); await rm(dir, { recursive: true, force: true });

@@ -1,6 +1,8 @@
 export type Provider = "anthropic" | "openai";
 export interface Settings {
   hosted?: boolean;
+  // Server-issued availability only, never persisted or used as server authorization.
+  ownerKeys?: { anthropicModel: string | null; elevenlabs: boolean };
   provider: Provider;
   anthropicKey: string;
   anthropicModel: string;
@@ -46,6 +48,8 @@ export function saveSettings(storage: Storage, accountId: string, settings: Sett
 export function clearKeys(settings: Settings): Settings { return { ...settings, anthropicKey: "", openaiKey: "", elevenKey: "" }; }
 export function readySettings(settings: Settings): boolean {
   if(settings.hosted)return !!(settings.provider==='anthropic'?settings.anthropicModel:settings.openaiModel);
-  return !!(settings.provider === "anthropic" ? settings.anthropicKey.trim() && settings.anthropicModel.trim() : settings.openaiKey.trim() && settings.openaiModel.trim())
+  return !!(settings.provider === "anthropic" ? (settings.anthropicKey.trim() || useOwnerAnthropic(settings)) && settings.anthropicModel.trim() : settings.openaiKey.trim() && settings.openaiModel.trim())
     && (!settings.elevenKey.trim() || !!settings.voiceId.trim());
 }
+export const useOwnerAnthropic = (s: Settings) => !s.hosted && s.provider === 'anthropic' && !s.anthropicKey.trim() && !!s.ownerKeys?.anthropicModel && s.anthropicModel === s.ownerKeys.anthropicModel;
+export const useOwnerEleven = (s: Settings) => !s.hosted && !s.elevenKey.trim() && s.ownerKeys?.elevenlabs === true;

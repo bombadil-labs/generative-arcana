@@ -2,9 +2,14 @@
 
 Hosted parlor is **disabled by default**. This code does not apply live migrations, grant accounts, install secrets, select a paid model, or turn on provider calls. No Stripe/billing integration is included.
 
+For the current owner's server-key fallback, use [Owner account provider keys](parlor-owner-keys.md)
+with `PARLOR_MODE=byok`. This older hosted mode is separate. Its server credential
+access now also requires the pinned verified owner identity, independently of any
+entitlement. Permitted nonowners receive BYOK capabilities and cannot use hosted keys.
+
 ## Modes and access
 
-`PARLOR_MODE=disabled` is the default. `hosted` requires complete validated server configuration, current pricing approval, browser authentication and durable storage. `byok` explicitly preserves the separate browser-key experience; it never enables hosted API calls. The client reads `/api/parlor/capabilities`; missing configuration, missing migration, unavailable database, missing/revoked/expired entitlement or failed capability discovery never falls back to BYOK.
+`PARLOR_MODE=disabled` is the default. `hosted` requires complete validated server configuration, current pricing approval, browser authentication and durable storage. `byok` preserves the browser-key experience and can optionally enable only the separately configured owner fallback; it never enables these legacy hosted API calls. The client reads `/api/parlor/capabilities`; missing configuration, missing migration, unavailable database, missing/revoked/expired entitlement or failed capability discovery never silently falls back to another provider route.
 
 Hosted setup has only server-approved model/voice choices, no API-key fields, no credential restoration and no credential persistence. Old explicitly remembered BYOK keys are not read by hosted mode; remove them using browser site-data controls if they are no longer wanted. Hosted server secrets are never returned to the browser. The cards-only show advances automatically; Escape or browser Back exits to setup. There is no visible touch-exit control.
 

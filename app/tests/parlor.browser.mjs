@@ -6,12 +6,13 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import {preview} from 'vite';
 import ts from 'typescript';
 const root=resolve(fileURLToPath(new URL('..',import.meta.url)));
+const ownerMode=process.env.PARLOR_OWNER_BROWSER==='1';
 const {chromium}=await import(process.env.PLAYWRIGHT_MODULE?pathToFileURL(process.env.PLAYWRIGHT_MODULE).href:'playwright-core');
 const data=JSON.parse(await readFile(resolve(root,'../decks/deep-time/deck.json'),'utf8'));
 const deck={id:'parlor-fixture',slug:data.slug,name:data.name,tagline:'Synthetic browser fixture',revision:1,visibility:'private',createdAt:'',updatedAt:'',manifest:{data,tagline:'Synthetic fixture'}};
 const evidence=resolve(root,'../..','parlor-conversation-verification');
 let server,browser,context,page,authenticated=false,allowed=true,calls=0,mode='ok',release;
-const speechRequests=[],scribeRequests=[];let scribeMode='ok',scribeRelease,ttsMode='ok',ttsRelease;
+const speechRequests=[],scribeRequests=[],scribeTypes=[];let scribeMode='ok',scribeRelease,ttsMode='ok',ttsRelease;
 const artSizes=[[945,1663],[958,1642],[971,1619],[1024,1536]];let artIndex=0;const artFixtures=[];
 const json=(route,body,status=200)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
 const button=name=>page.getByRole('button',{name,exact:true});
@@ -103,31 +104,34 @@ try{
   });
   await context.route('**/*',async route=>{
     const url=new URL(route.request().url()),path=url.pathname;
-    if(url.hostname==='api.anthropic.com'||url.hostname==='api.openai.com'){
+    const ownerLanguage=path==='/api/parlor/owner/narrate'||path==='/api/parlor/owner/converse';
+    if(url.hostname==='api.anthropic.com'||url.hostname==='api.openai.com'||ownerLanguage){
+      assert.equal(ownerLanguage,ownerMode,'owner mode never sends browser requests to paid language providers');
       calls++;if(mode==='error')return json(route,{},429);
-      const request=route.request().postDataJSON(),prompt=request.messages.at(-1).content;
-      const identities=prompt.includes('CARD IDENTITIES IN ORDER\n')?JSON.parse(prompt.split('CARD IDENTITIES IN ORDER\n')[1]):null;
-      if(!identities)assert.doesNotMatch(JSON.stringify(request.messages),/\[(?:sighs|exhales|sarcastic|curious)\]/,'history has no delivery tags');
+      const request=route.request().postDataJSON(),prompt=ownerLanguage?'':request.messages.at(-1).content;
+      const identities=ownerLanguage?(path.endsWith('narrate')?JSON.parse(Buffer.from(request.token,'base64url')).c.map(([slug])=>({slug,name:slug})):null):prompt.includes('CARD IDENTITIES IN ORDER\n')?JSON.parse(prompt.split('CARD IDENTITIES IN ORDER\n')[1]):null;
+      if(!identities)assert.doesNotMatch(JSON.stringify(ownerLanguage?request.turns:request.messages),/\[(?:sighs|exhales|sarcastic|curious)\]/,'history has no delivery tags');
       const text=identities?JSON.stringify({cards:identities.map(card=>({slug:card.slug,text:`[sarcastic] ${card.name} invites you to reflect on this position. Its authored meaning opens a possibility.`})),synthesis:'The cards invite reflection and a choice that remains yours.'}):'[curious] Stay with the meaning that resonates. What possibility does it open for you?';
       if(mode==='delay')await new Promise(r=>release=r);
-      return json(route,{content:[{type:'text',text}]});
+      return json(route,ownerLanguage?(identities?JSON.parse(text):{text}):{content:[{type:'text',text}]});
     }
-    if(url.hostname==='api.elevenlabs.io'){
-      if(path==='/v1/speech-to-text'){
-        assert.equal(route.request().method(),'POST');assert.equal(route.request().headers()['xi-api-key'],'synthetic-voice-key');
-        const body=route.request().postDataBuffer().toString();assert.match(body,/name="model_id"\r\n\r\nscribe_v2/);assert.match(body,/synthetic intentional recording/);assert.match(body,/name="tag_audio_events"\r\n\r\nfalse/);scribeRequests.push(body);
+    if(url.hostname==='api.elevenlabs.io'||path==='/api/parlor/owner/speech'||path==='/api/parlor/owner/transcribe'){
+      assert.equal(path.startsWith('/api/parlor/owner/'),ownerMode,'owner mode never sends browser requests to ElevenLabs');
+      if(path==='/v1/speech-to-text'||path==='/api/parlor/owner/transcribe'){
+        assert.equal(route.request().method(),'POST');assert.equal(route.request().headers()['xi-api-key'],ownerMode?undefined:'synthetic-voice-key');
+        const body=route.request().postDataBuffer().toString();if(!ownerMode){assert.match(body,/name="model_id"\r\n\r\nscribe_v2/);assert.match(body,/name="tag_audio_events"\r\n\r\nfalse/);}assert.match(body,/synthetic intentional recording/);scribeRequests.push(body);scribeTypes.push(route.request().headers()['content-type']);
         assert.equal(await page.evaluate(()=>window.__tracks.some(t=>!t.stopped)),false,'tracks stopped before request');
         const text=await page.evaluate(()=>window.__utterance);if(scribeMode==='delay')await new Promise(r=>scribeRelease=r);
         return json(route,scribeMode==='error'?{detail:'synthetic error'}:{text:scribeMode==='silent'?'':text},scribeMode==='error'?401:200);
       }
-      assert.equal(path,'/v1/text-to-speech/synthetic-selected-voice/with-timestamps');const request=route.request().postDataJSON();assert.equal(request.model_id,'eleven_v3');speechRequests.push(request);
+      assert.equal(path,ownerMode?'/api/parlor/owner/speech':'/v1/text-to-speech/synthetic-selected-voice/with-timestamps');const request=route.request().postDataJSON();if(ownerMode)assert.equal(request.voiceId,'synthetic-selected-voice');else assert.equal(request.model_id,'eleven_v3');speechRequests.push(request);
       assert.ok((request.text.match(/\[[^\]]+\]/g)||[]).length<=1);if(ttsMode==='error')return json(route,{},503);
       if(ttsMode==='delay')await new Promise(r=>ttsRelease=r);
       const characters=[...request.text];return json(route,{audio_base64:Buffer.from('synthetic audio').toString('base64'),alignment:{characters,character_start_times_seconds:characters.map((_,i)=>i*.025),character_end_times_seconds:characters.map((_,i)=>(i+1)*.025)}});
     }
     if(url.hostname!=='127.0.0.1')return route.abort();
     if(path==='/auth/session')return json(route,authenticated?{authenticated:true,accountId:'synthetic-owner',parlorAllowed:allowed,user:{email:'fixture@example.test'}}:{authenticated:false});
-    if(path==='/api/parlor/capabilities')return json(route,{mode:'byok'});
+    if(path==='/api/parlor/capabilities')return json(route,{mode:'byok',...(ownerMode?{ownerKeys:{anthropicModel:'claude-test-owner',elevenlabs:true}}:{})});
     if(path==='/api/me/decks')return json(route,[deck]);
     if(path==='/api/decks/parlor-fixture')return json(route,deck);
     if(path.startsWith('/api/decks/parlor-fixture/artwork/assets/'))return json(route,{},404);
@@ -157,8 +161,8 @@ try{
   await page.goto('http://127.0.0.1:4187/parlor');await page.getByText('Parlor access is restricted.',{exact:true}).waitFor();assert.equal(await page.locator('input[type=password]').count(),0);
   authenticated=true;allowed=false;await page.reload();await page.getByText('Parlor access is restricted.',{exact:true}).waitFor();assert.equal(await button('Parlor').count(),0);
   allowed=true;await page.reload();
-  await page.getByLabel('Anthropic API key',{exact:true}).fill('synthetic-browser-key');await page.getByLabel('Anthropic model ID',{exact:true}).fill('synthetic-model');
-  await page.getByLabel('ElevenLabs API key',{exact:true}).fill('synthetic-voice-key');await page.getByLabel('ElevenLabs voice ID',{exact:true}).fill('synthetic-selected-voice');await page.getByLabel('Remember keys on this device (plaintext)').check();
+  await page.getByLabel('Anthropic API key',{exact:true}).fill(ownerMode?'':'synthetic-browser-key');await page.getByLabel('Anthropic model ID',{exact:true}).fill(ownerMode?'claude-test-owner':'synthetic-model');
+  await page.getByLabel('ElevenLabs API key',{exact:true}).fill(ownerMode?'':'synthetic-voice-key');await page.getByLabel('ElevenLabs voice ID',{exact:true}).fill('synthetic-selected-voice');await page.getByLabel('Remember keys on this device (plaintext)').check();
   await page.reload();assert.equal(await page.getByLabel('ElevenLabs voice ID',{exact:true}).inputValue(),'synthetic-selected-voice');assert.equal(await page.locator('textarea').count(),0);await capture('setup');
   const before=await audioCount();await button('Start the show').click();await idle();assert.equal(await audioCount(),before);assert.equal(calls,0);
   assert.equal(await page.evaluate(()=>window.__radioContexts.length),0,'no AudioContext before a deliberate summon gesture');
@@ -195,7 +199,7 @@ try{
   await page.getByLabel('Mute radio ambience',{exact:true}).uncheck();await page.waitForFunction(()=>window.__radioLevel()>0);assert.ok(await radioLevel()<=.06);await page.locator('.parlor-sound-options summary').click();
   for(const text of ['Tell me more about this card','How does that connect to my question?']){const count=await audioCount();await talk(text,true);await waitAudio(count);assert.equal(await page.locator('.is-revealed').count(),1);assert.equal(await caption().innerText(),'');await finishAudio();await button('Next card').waitFor();}
   await page.setViewportSize({width:390,height:844});await page.evaluate(()=>window.__mimeType='audio/mp4');
-  const mobile=await audioCount();await talk('A touch-controlled mobile discussion','touch');await waitAudio(mobile);await finishAudio();await button('Next card').waitFor();assert.match(scribeRequests.at(-1),/recording.m4a/);await artwork();await capture('discussion-mobile');
+  const mobile=await audioCount();await talk('A touch-controlled mobile discussion','touch');await waitAudio(mobile);await finishAudio();await button('Next card').waitFor();if(ownerMode)assert.equal(scribeTypes.at(-1),'audio/mp4');else assert.match(scribeRequests.at(-1),/recording.m4a/);await artwork();await capture('discussion-mobile');
   await page.evaluate(()=>window.__mimeType='audio/webm;codecs=opus');await page.setViewportSize({width:1280,height:960});
   for(let revealed=2;revealed<=3;revealed++){const count=await audioCount();await button('Next card').click();await waitAudio(count);assert.equal(await page.locator('.is-revealed').count(),revealed);await finishAudio();}
   await button('Hear the closing').waitFor();const closing=await audioCount();await button('Hear the closing').click();await waitAudio(closing);await finishAudio();assert.equal(await button('Next card').count(),0);
