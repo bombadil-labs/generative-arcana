@@ -244,7 +244,16 @@ test('cancelled or failed narration is not committed; completed caption retry co
 });
 test('discussion context includes only revealed meanings and current card, never hidden card identities',async()=>{
   const reading=await engine.castReading(deck.id,'three-card','Question');const original=global.fetch;let body;
-  try{global.fetch=async(_,init)=>{body=JSON.parse(init.body);return Response.json({content:[{type:'text',text:'A thoughtful answer.'}]});};await converse(settings,reading,[{role:'user',content:'Tell me more'}],new AbortController().signal,1);
-    assert.ok(body.system.includes(reading.placements[0].meaning));assert.ok(!body.system.includes(reading.placements[1].card.name));assert.ok(!body.system.includes(reading.placements[2].card.name));
+  // Random authored card names can also be ordinary words in the persona prompt.
+  // Distinct markers make hidden-context assertions deterministic and unambiguous.
+  reading.placements=reading.placements.map((p,i)=>({...p,card:{...p.card,name:`CONTEXT_CARD_${i+1}`},meaning:`CONTEXT_MEANING_${i+1}`}));
+  try{global.fetch=async(_,init)=>{body=JSON.parse(init.body);return Response.json({content:[{type:'text',text:'A thoughtful answer.'}]});};
+    for(const revealed of [0,1,2,3]){
+      await converse(settings,reading,[{role:'user',content:'Tell me more'}],new AbortController().signal,revealed);
+      const context=JSON.parse(body.system.slice(body.system.lastIndexOf('\n')+1));
+      assert.deepEqual(context.cards,reading.placements.slice(0,revealed).map(p=>({name:p.card.name,position:p.position.name,reversed:p.reversed,meaning:p.meaning})));
+      assert.equal(context.currentCard,reading.placements[revealed-1]?.card.name);
+      for(const hidden of reading.placements.slice(revealed)){assert.ok(!body.system.includes(hidden.card.name));assert.ok(!body.system.includes(hidden.meaning));}
+    }
   }finally{global.fetch=original;}
 });
