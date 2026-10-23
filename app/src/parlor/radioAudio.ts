@@ -2,7 +2,27 @@ import type { RadioMode } from "./radio";
 
 export interface RadioPreferences { muted: boolean; volume: number }
 export const defaultRadioPreferences = (): RadioPreferences => ({ muted: false, volume: .35 });
-export const MAX_RADIO_GAIN = .06;
+// The approved recording is already mastered quietly. Never amplify/normalize it.
+export const MAX_RADIO_GAIN = 1;
+export const RADIO_RECORDING = '/assets/parlor-radio-recording.mp3';
+export const RADIO_STARTS = [0, 45.4, 95.2, 145.75] as const;
+/** Session-protected same-origin asset, requested only after an intentional gesture. */
+export async function loadRadioRecording(context: AudioContext, signal: AbortSignal): Promise<AudioBuffer> {
+  const response = await fetch(RADIO_RECORDING, { credentials: 'same-origin', cache: 'no-store', redirect: 'error', signal });
+  if (!response.ok || response.headers.get('content-type')?.split(';')[0] !== 'audio/mpeg' || !response.body) { await response.body?.cancel(); throw new Error('Radio recording unavailable'); }
+  const reader = response.body.getReader(), parts: Uint8Array[] = []; let size = 0;
+  try {
+    for (;;) {
+      signal.throwIfAborted(); const { done, value } = await reader.read(); if (done) break;
+      size += value.length; if (size > 5_000_000) throw new Error('Radio recording too large'); parts.push(value);
+    }
+  } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
+  signal.throwIfAborted();
+  const bytes = new Uint8Array(size); let offset = 0; for (const part of parts) { bytes.set(part, offset); offset += part.length; }
+  const buffer = await context.decodeAudioData(bytes.buffer); signal.throwIfAborted();
+  if (buffer.numberOfChannels !== 1 || !Number.isFinite(buffer.duration) || Math.abs(buffer.duration - 180) > .1) throw new Error('Unexpected radio recording');
+  return buffer;
+}
 export function radioGain(mode: RadioMode, preferences: RadioPreferences, capture = false, held = false): number {
   if (preferences.muted || capture || held || ["quiet", "stopped", "listening"].includes(mode)) return 0;
   const volume = Number.isFinite(preferences.volume) ? Math.max(0, Math.min(1, preferences.volume)) : 0;
@@ -10,10 +30,10 @@ export function radioGain(mode: RadioMode, preferences: RadioPreferences, captur
   return MAX_RADIO_GAIN * volume * level;
 }
 type Envelope = { from: number; to: number; start: number; end: number };
-type Graph = { gain: GainNode; nodes: AudioNode[]; sources: AudioScheduledSourceNode[]; envelope: Envelope };
+type Graph = { gain: GainNode; nodes: AudioNode[]; sources: AudioScheduledSourceNode[]; envelope: Envelope; offset: number; started: number };
 const fraction = (value: number) => Math.max(0, Math.min(1, value));
 
-/** One gesture-unlocked context. Local synthesis only: no media input, assets or fetches. */
+/** One gesture-unlocked context, one private recording, no microphone or extra synthesis. */
 export class RadioAudio {
   private context?: AudioContext;
   private buffer?: AudioBuffer;
@@ -29,7 +49,13 @@ export class RadioAudio {
   private retiring = new Map<Graph, ReturnType<typeof setTimeout>>();
   private listeners = new Set<() => void>();
   private error = "";
-  constructor(private createContext = () => new AudioContext({ latencyHint: "interactive" })) {}
+  private cursor: number;
+  private loading?: { abort: AbortController; timer: ReturnType<typeof setTimeout> };
+  constructor(private createContext = () => new AudioContext({ latencyHint: "interactive" }),
+    private load = loadRadioRecording, random = Math.random) {
+    const choice = random();
+    this.cursor = RADIO_STARTS[Math.floor(fraction(Number.isFinite(choice) ? choice : 0) * (RADIO_STARTS.length - .000001))];
+  }
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   getSnapshot = () => this.error;
   private message(error: string) { if (!this.disposed && error !== this.error) { this.error = error; this.listeners.forEach(fn => fn()); } }
@@ -66,21 +92,13 @@ export class RadioAudio {
     const nodes: AudioNode[] = [], sources: AudioScheduledSourceNode[] = [];
     try {
       const gain = context.createGain(); nodes.push(gain); gain.gain.value = 0; gain.connect(context.destination);
-      const noise = context.createBufferSource(); nodes.push(noise); sources.push(noise);
-      if (!this.buffer) {
-        this.buffer = context.createBuffer(1, context.sampleRate * 2, context.sampleRate);
-        const samples = this.buffer.getChannelData(0);
-        for (let i = 0; i < samples.length; i++) samples[i] = (Math.random() * 2 - 1) * Math.min(1, i / 256, (samples.length - i - 1) / 256);
-      }
-      noise.buffer = this.buffer; noise.loop = true;
-      const high = context.createBiquadFilter(), low = context.createBiquadFilter(), hiss = context.createGain(); nodes.push(high, low, hiss);
-      high.type = "highpass"; high.frequency.value = 160; high.Q.value = .5;
-      low.type = "lowpass"; low.frequency.value = 1800; low.Q.value = .5; hiss.gain.value = .22;
-      noise.connect(high).connect(low).connect(hiss).connect(gain);
-      const hum = context.createOscillator(), warmth = context.createGain(); nodes.push(hum, warmth); sources.push(hum);
-      hum.type = "sine"; hum.frequency.value = 110; warmth.gain.value = .18; hum.connect(warmth).connect(gain);
-      noise.start(); hum.start();
-      return { gain, nodes, sources, envelope: { from: 0, to: 0, start: context.currentTime, end: context.currentTime } };
+      const source = context.createBufferSource(); nodes.push(source); sources.push(source);
+      source.buffer = this.buffer!; source.loop = true;
+      // The source's first/last 100 ms are silent, with a mastered end fade. Its
+      // natural loop needs no hard splice. Starts at quiet cues always fade in.
+      const offset = this.cursor % this.buffer!.duration, started = context.currentTime;
+      source.connect(gain); source.start(started, offset);
+      return { gain, nodes, sources, offset, started, envelope: { from: 0, to: 0, start: started, end: started } };
     } catch (error) {
       sources.forEach(source => { try { source.stop(); } catch {} });
       nodes.forEach(node => { try { node.disconnect(); } catch {} });
@@ -101,9 +119,25 @@ export class RadioAudio {
     if (!this.armed || this.disposed || !this.context || this.context.state !== "running") return;
     const target = radioGain(this.mode, this.preferences, this.capture, this.held);
     try {
-      if (!this.graph && target > 0) this.graph = this.makeGraph(this.context);
+      if (!this.graph && target > 0) {
+        if (!this.buffer) { this.prepare(); return; }
+        this.graph = this.makeGraph(this.context);
+      }
       if (this.graph) this.ramp(this.graph, target, target < this.graph.envelope.to ? .025 : .65);
     } catch { this.fail(); }
+  }
+  private prepare() {
+    if (this.loading || !this.context) return;
+    const context = this.context, abort = new AbortController();
+    const pending = { abort, timer: setTimeout(() => { if (this.loading === pending) this.fail(); }, 20000) };
+    this.loading = pending;
+    const current = () => !this.disposed && this.armed && this.loading === pending && this.context === context && !abort.signal.aborted;
+    void Promise.resolve().then(() => { abort.signal.throwIfAborted(); return this.load(context, abort.signal); }).then(buffer => {
+      if (!current()) return;
+      this.buffer = buffer; this.message(''); this.apply();
+    }).catch(() => { if (current()) this.fail(); }).finally(() => {
+      clearTimeout(pending.timer); if (this.loading === pending) this.loading = undefined;
+    });
   }
   private disconnect(graph: Graph) {
     clearTimeout(this.retiring.get(graph)); this.retiring.delete(graph);
@@ -113,8 +147,10 @@ export class RadioAudio {
   stop() {
     this.armed = false; const epoch = ++this.epoch;
     clearTimeout(this.suspendTimer);
+    if (this.loading) { clearTimeout(this.loading.timer); this.loading.abort.abort(); this.loading = undefined; }
     const context = this.context, graph = this.graph; this.graph = undefined;
     if (graph && context) {
+      this.cursor = (graph.offset + Math.max(0, context.currentTime - graph.started)) % this.buffer!.duration;
       try { this.ramp(graph, 0, .025); } catch { graph.gain.disconnect(); }
       graph.sources.forEach(source => { try { source.stop(context.currentTime + .03); } catch {} });
       this.retiring.set(graph, setTimeout(() => this.disconnect(graph), 50));

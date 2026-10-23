@@ -6,12 +6,13 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import {preview} from 'vite';
 import ts from 'typescript';
 const root=resolve(fileURLToPath(new URL('..',import.meta.url)));
+const ownerMode=process.env.PARLOR_OWNER_BROWSER==='1';
 const {chromium}=await import(process.env.PLAYWRIGHT_MODULE?pathToFileURL(process.env.PLAYWRIGHT_MODULE).href:'playwright-core');
 const data=JSON.parse(await readFile(resolve(root,'../decks/deep-time/deck.json'),'utf8'));
 const deck={id:'parlor-fixture',slug:data.slug,name:data.name,tagline:'Synthetic browser fixture',revision:1,visibility:'private',createdAt:'',updatedAt:'',manifest:{data,tagline:'Synthetic fixture'}};
 const evidence=resolve(root,'../..','parlor-conversation-verification');
 let server,browser,context,page,authenticated=false,allowed=true,calls=0,mode='ok',release;
-const speechRequests=[],scribeRequests=[];let scribeMode='ok',scribeRelease,ttsMode='ok',ttsRelease;
+const speechRequests=[],scribeRequests=[],scribeTypes=[];let scribeMode='ok',scribeRelease,ttsMode='ok',ttsRelease;
 const artSizes=[[945,1663],[958,1642],[971,1619],[1024,1536]];let artIndex=0;const artFixtures=[];
 const json=(route,body,status=200)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
 const button=name=>page.getByRole('button',{name,exact:true});
@@ -73,6 +74,7 @@ try{
       node(source=false){const owner=this;const n={gain:new Param(),frequency:new Param(),Q:new Param(),source,disconnected:false,stopped:false,master:false,connect(to){if(to===owner.destination)this.master=true;return to;},disconnect(){this.disconnected=true;},start(){},stop(){this.stopped=true;}};this.nodes.push(n);return n;}
       createGain(){return this.node();}createBiquadFilter(){return this.node();}createBufferSource(){return this.node(true);}createOscillator(){return this.node(true);}
       createBuffer(_,size){const data=new Float32Array(size);return {getChannelData:()=>data};}
+      decodeAudioData(){return Promise.resolve({duration:180,numberOfChannels:1});}
       resume(){this.state='running';return Promise.resolve();}suspend(){this.state='suspended';return Promise.resolve();}close(){this.state='closed';return Promise.resolve();}
     };
     window.__radioLevel=()=>Math.max(0,...window.__radioContexts.flatMap(c=>c.state==='running'?c.nodes.filter(n=>n.master&&!n.disconnected).map(n=>n.gain.target):[]));
@@ -103,31 +105,38 @@ try{
   });
   await context.route('**/*',async route=>{
     const url=new URL(route.request().url()),path=url.pathname;
-    if(url.hostname==='api.anthropic.com'||url.hostname==='api.openai.com'){
+    if(path==='/assets/parlor-radio-recording.mp3'){
+      assert.equal(url.origin,'http://127.0.0.1:4187');assert.equal(authenticated&&allowed,true,'private recording only requested during owner encounter');
+      return route.fulfill({contentType:'audio/mpeg',body:Buffer.from([73,68,51])});
+    }
+    const ownerLanguage=path==='/api/parlor/owner/narrate'||path==='/api/parlor/owner/converse';
+    if(url.hostname==='api.anthropic.com'||url.hostname==='api.openai.com'||ownerLanguage){
+      assert.equal(ownerLanguage,ownerMode,'owner mode never sends browser requests to paid language providers');
       calls++;if(mode==='error')return json(route,{},429);
-      const request=route.request().postDataJSON(),prompt=request.messages.at(-1).content;
-      const identities=prompt.includes('CARD IDENTITIES IN ORDER\n')?JSON.parse(prompt.split('CARD IDENTITIES IN ORDER\n')[1]):null;
-      if(!identities)assert.doesNotMatch(JSON.stringify(request.messages),/\[(?:sighs|exhales|sarcastic|curious)\]/,'history has no delivery tags');
+      const request=route.request().postDataJSON(),prompt=ownerLanguage?'':request.messages.at(-1).content;
+      const identities=ownerLanguage?(path.endsWith('narrate')?JSON.parse(Buffer.from(request.token,'base64url')).c.map(([slug])=>({slug,name:slug})):null):prompt.includes('CARD IDENTITIES IN ORDER\n')?JSON.parse(prompt.split('CARD IDENTITIES IN ORDER\n')[1]):null;
+      if(!identities)assert.doesNotMatch(JSON.stringify(ownerLanguage?request.turns:request.messages),/\[(?:sighs|exhales|sarcastic|curious)\]/,'history has no delivery tags');
       const text=identities?JSON.stringify({cards:identities.map(card=>({slug:card.slug,text:`[sarcastic] ${card.name} invites you to reflect on this position. Its authored meaning opens a possibility.`})),synthesis:'The cards invite reflection and a choice that remains yours.'}):'[curious] Stay with the meaning that resonates. What possibility does it open for you?';
       if(mode==='delay')await new Promise(r=>release=r);
-      return json(route,{content:[{type:'text',text}]});
+      return json(route,ownerLanguage?(identities?JSON.parse(text):{text}):{content:[{type:'text',text}]});
     }
-    if(url.hostname==='api.elevenlabs.io'){
-      if(path==='/v1/speech-to-text'){
-        assert.equal(route.request().method(),'POST');assert.equal(route.request().headers()['xi-api-key'],'synthetic-voice-key');
-        const body=route.request().postDataBuffer().toString();assert.match(body,/name="model_id"\r\n\r\nscribe_v2/);assert.match(body,/synthetic intentional recording/);assert.match(body,/name="tag_audio_events"\r\n\r\nfalse/);scribeRequests.push(body);
+    if(url.hostname==='api.elevenlabs.io'||path==='/api/parlor/owner/speech'||path==='/api/parlor/owner/transcribe'){
+      assert.equal(path.startsWith('/api/parlor/owner/'),ownerMode,'owner mode never sends browser requests to ElevenLabs');
+      if(path==='/v1/speech-to-text'||path==='/api/parlor/owner/transcribe'){
+        assert.equal(route.request().method(),'POST');assert.equal(route.request().headers()['xi-api-key'],ownerMode?undefined:'synthetic-voice-key');
+        const body=route.request().postDataBuffer().toString();if(!ownerMode){assert.match(body,/name="model_id"\r\n\r\nscribe_v2/);assert.match(body,/name="tag_audio_events"\r\n\r\nfalse/);}assert.match(body,/synthetic intentional recording/);scribeRequests.push(body);scribeTypes.push(route.request().headers()['content-type']);
         assert.equal(await page.evaluate(()=>window.__tracks.some(t=>!t.stopped)),false,'tracks stopped before request');
         const text=await page.evaluate(()=>window.__utterance);if(scribeMode==='delay')await new Promise(r=>scribeRelease=r);
         return json(route,scribeMode==='error'?{detail:'synthetic error'}:{text:scribeMode==='silent'?'':text},scribeMode==='error'?401:200);
       }
-      assert.equal(path,'/v1/text-to-speech/synthetic-selected-voice/with-timestamps');const request=route.request().postDataJSON();assert.equal(request.model_id,'eleven_v3');speechRequests.push(request);
+      assert.equal(path,ownerMode?'/api/parlor/owner/speech':'/v1/text-to-speech/synthetic-selected-voice/with-timestamps');const request=route.request().postDataJSON();if(ownerMode)assert.equal(request.voiceId,'synthetic-selected-voice');else assert.equal(request.model_id,'eleven_v3');speechRequests.push(request);
       assert.ok((request.text.match(/\[[^\]]+\]/g)||[]).length<=1);if(ttsMode==='error')return json(route,{},503);
       if(ttsMode==='delay')await new Promise(r=>ttsRelease=r);
       const characters=[...request.text];return json(route,{audio_base64:Buffer.from('synthetic audio').toString('base64'),alignment:{characters,character_start_times_seconds:characters.map((_,i)=>i*.025),character_end_times_seconds:characters.map((_,i)=>(i+1)*.025)}});
     }
     if(url.hostname!=='127.0.0.1')return route.abort();
     if(path==='/auth/session')return json(route,authenticated?{authenticated:true,accountId:'synthetic-owner',parlorAllowed:allowed,user:{email:'fixture@example.test'}}:{authenticated:false});
-    if(path==='/api/parlor/capabilities')return json(route,{mode:'byok'});
+    if(path==='/api/parlor/capabilities')return json(route,{mode:'byok',...(ownerMode?{ownerKeys:{anthropicModel:'claude-test-owner',elevenlabs:true}}:{})});
     if(path==='/api/me/decks')return json(route,[deck]);
     if(path==='/api/decks/parlor-fixture')return json(route,deck);
     if(path.startsWith('/api/decks/parlor-fixture/artwork/assets/'))return json(route,{},404);
@@ -137,28 +146,34 @@ try{
     return route.continue();
   });
   page=await context.newPage();await page.clock.install();
-  // Render the real synthesis code offline, never connected to speakers or a microphone.
+  // Decode the exact approved MP3, then verify the real gain envelope with a
+  // constant synthetic source offline. Nothing connects to speakers or a mic.
   const radioSource=ts.transpileModule(await readFile(resolve(root,'src/parlor/radioAudio.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
-  const offline=await page.evaluate(async source=>{
+  const radioBytes=(await readFile(resolve(root,'public/assets/parlor-radio-recording.mp3'))).toString('base64');
+  const offline=await page.evaluate(async({source,encoded})=>{
     const exports={};new Function('exports',source)(exports);
-    const rate=24000,context=new OfflineAudioContext(1,rate*3,rate);let now=0;
+    const rate=48000,context=new OfflineAudioContext(1,rate*3,rate);let now=0;
+    const decoded=await context.decodeAudioData(Uint8Array.from(atob(encoded),c=>c.charCodeAt(0)).buffer),recorded=decoded.getChannelData(0);let recordingPeak=0;for(const v of recorded)recordingPeak=Math.max(recordingPeak,Math.abs(v));
+    const recording={duration:decoded.duration,channels:decoded.numberOfChannels,sampleRate:decoded.sampleRate,peak:recordingPeak,first:recorded[0],last:recorded.at(-1)};
     const adapter={get currentTime(){return now;},state:'running',sampleRate:rate,destination:context.destination,resume:()=>Promise.resolve(),suspend:()=>Promise.resolve(),close:()=>Promise.resolve()};
     for(const method of ['createGain','createBufferSource','createBuffer','createBiquadFilter','createOscillator'])adapter[method]=context[method].bind(context);
-    const bed=new exports.RadioAudio(()=>adapter);bed.setPreferences({muted:false,volume:1});bed.setState('searching',false);
-    const random=Math.random;let seed=1729;Math.random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};try{bed.unlock();await Promise.resolve();}finally{Math.random=random;}
+    const testBuffer=context.createBuffer(1,rate*180,rate);testBuffer.getChannelData(0).fill(.05);
+    const bed=new exports.RadioAudio(()=>adapter,async()=>testBuffer,()=>0);bed.setPreferences({muted:false,volume:1});bed.setState('searching',false);
+    bed.unlock();for(let i=0;i<8;i++)await Promise.resolve();
     now=1;bed.setState('speaking',false);now=1.8;bed.setState('listening',true);
     const buffer=await context.startRendering(),samples=buffer.getChannelData(0);
     const rms=(start,end)=>{const segment=samples.slice(start*rate,end*rate);return Math.sqrt(segment.reduce((sum,n)=>sum+n*n,0)/segment.length);};
     let peak=0,ordinaryStep=0,transitionStep=0;for(let i=1;i<samples.length;i++){peak=Math.max(peak,Math.abs(samples[i]));const step=Math.abs(samples[i]-samples[i-1]);if([1,1.025,1.8,1.825].some(time=>Math.abs(i/rate-time)<.005))transitionStep=Math.max(transitionStep,step);else ordinaryStep=Math.max(ordinaryStep,step);}
-    bed.dispose();return {search:rms(.75,.95),speech:rms(1.35,1.7),silent:rms(2,2.5),peak,ordinaryStep,transitionStep};
-  },radioSource);
-  console.log('Offline procedural synthesis:',JSON.stringify(offline));assert.ok(offline.search>0&&offline.peak<.03);assert.ok(offline.speech<offline.search*.12);assert.equal(offline.silent,0);assert.ok(offline.transitionStep<offline.ordinaryStep*1.5,'fades add no discontinuity above the natural static variation');
+    bed.dispose();return {recording,search:rms(.75,.95),speech:rms(1.35,1.7),silent:rms(2,2.5),peak,ordinaryStep,transitionStep};
+  },{source:radioSource,encoded:radioBytes});
+  console.log('Approved recording decode and offline gain envelope:',JSON.stringify(offline));assert.ok(Math.abs(offline.recording.duration-180)<.01);assert.equal(offline.recording.channels,1);assert.equal(offline.recording.sampleRate,48000);assert.ok(offline.recording.peak<.19);assert.equal(offline.recording.first,0);assert.equal(offline.recording.last,0);
+  assert.ok(offline.search>.049&&offline.peak<.051);assert.ok(offline.speech<offline.search*.12);assert.equal(offline.silent,0);assert.ok(offline.transitionStep<.0001,'gain fades produce no abrupt step');
   for(const size of artSizes){const encoded=await page.evaluate(([w,h])=>{const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;const c=canvas.getContext('2d');c.fillStyle='#30283d';c.fillRect(0,0,w,h);c.strokeStyle='#e9c98a';c.lineWidth=12;c.strokeRect(6,6,w-12,h-12);c.fillStyle='#f3c282';c.font='60px serif';c.fillText(`${w} x ${h}`,50,100);c.fillRect(0,h-50,w,50);return canvas.toDataURL('image/webp').split(',')[1];},size);artFixtures.push(Buffer.from(encoded,'base64'));}
   await page.goto('http://127.0.0.1:4187/parlor');await page.getByText('Parlor access is restricted.',{exact:true}).waitFor();assert.equal(await page.locator('input[type=password]').count(),0);
   authenticated=true;allowed=false;await page.reload();await page.getByText('Parlor access is restricted.',{exact:true}).waitFor();assert.equal(await button('Parlor').count(),0);
   allowed=true;await page.reload();
-  await page.getByLabel('Anthropic API key',{exact:true}).fill('synthetic-browser-key');await page.getByLabel('Anthropic model ID',{exact:true}).fill('synthetic-model');
-  await page.getByLabel('ElevenLabs API key',{exact:true}).fill('synthetic-voice-key');await page.getByLabel('ElevenLabs voice ID',{exact:true}).fill('synthetic-selected-voice');await page.getByLabel('Remember keys on this device (plaintext)').check();
+  await page.getByLabel('Anthropic API key',{exact:true}).fill(ownerMode?'':'synthetic-browser-key');await page.getByLabel('Anthropic model ID',{exact:true}).fill(ownerMode?'claude-test-owner':'synthetic-model');
+  await page.getByLabel('ElevenLabs API key',{exact:true}).fill(ownerMode?'':'synthetic-voice-key');await page.getByLabel('ElevenLabs voice ID',{exact:true}).fill('synthetic-selected-voice');await page.getByLabel('Remember keys on this device (plaintext)').check();
   await page.reload();assert.equal(await page.getByLabel('ElevenLabs voice ID',{exact:true}).inputValue(),'synthetic-selected-voice');assert.equal(await page.locator('textarea').count(),0);await capture('setup');
   const before=await audioCount();await button('Start the show').click();await idle();assert.equal(await audioCount(),before);assert.equal(calls,0);
   assert.equal(await page.evaluate(()=>window.__radioContexts.length),0,'no AudioContext before a deliberate summon gesture');
@@ -182,7 +197,7 @@ try{
   await page.waitForTimeout(150);assert.ok(!(await caption().innerText()).includes('speak your question'));await page.keyboard.down('b');await finishAudio();await page.clock.fastForward(500);assert.equal(await page.evaluate(()=>window.__micRequests),0,'a hold started during introduction cannot turn into recording');await page.keyboard.up('b');
   const first=await audioCount();mode='delay';await talk('A synthetic spoken query');await radio('searching');await pending(()=>release);assert.equal(await caption().innerText(),'');
   await page.emulateMedia({reducedMotion:'no-preference'});assert.equal(await page.locator('.radio-needle').evaluate(el=>getComputedStyle(el).animationName),'radio-search');await capture('radio-inference-search');assert.equal(await progress(),0,'no invented inference percent');
-  const searchingLevel=await radioLevel();assert.ok(searchingLevel>0&&searchingLevel<=.06);
+  await page.waitForFunction(()=>window.__radioLevel()>0);const searchingLevel=await radioLevel();assert.ok(searchingLevel>0&&searchingLevel<=1);
   for(const viewport of [{width:1280,height:720},{width:390,height:844}]){await page.setViewportSize(viewport);await capture(`radio-search-${viewport.width}`);}await page.setViewportSize({width:1280,height:960});
   ttsMode='delay';release();release=null;mode='ok';await pending(()=>ttsRelease);await page.getByText('Finding the voice',{exact:true}).waitFor();await radio('searching');assert.equal(await page.locator('.is-revealed').count(),0);assert.equal(await caption().innerText(),'');await capture('radio-voice-search');
   assert.equal(await page.locator('.parlor-status').innerText(),'The voice is taking shape.');
@@ -192,10 +207,10 @@ try{
   await finishAudio();await button('Next card').waitFor();await page.waitForTimeout(250);assert.equal(await page.locator('.is-revealed').count(),1);await artwork();await capture('first-card-desktop');
   await page.locator('.parlor-sound-options summary').click();await page.getByLabel('Mute radio ambience',{exact:true}).check();assert.equal(await radioLevel(),0);
   const radioVolume=page.getByLabel('Radio ambience volume',{exact:true});await radioVolume.focus();await page.keyboard.press('End');assert.equal(await radioVolume.inputValue(),'100');assert.equal(await radioLevel(),0);assert.equal(await page.locator('.is-revealed').count(),1,'sound controls do not reset the reading');
-  await page.getByLabel('Mute radio ambience',{exact:true}).uncheck();await page.waitForFunction(()=>window.__radioLevel()>0);assert.ok(await radioLevel()<=.06);await page.locator('.parlor-sound-options summary').click();
+  await page.getByLabel('Mute radio ambience',{exact:true}).uncheck();await page.waitForFunction(()=>window.__radioLevel()>0);assert.ok(await radioLevel()<=1);await page.locator('.parlor-sound-options summary').click();
   for(const text of ['Tell me more about this card','How does that connect to my question?']){const count=await audioCount();await talk(text,true);await waitAudio(count);assert.equal(await page.locator('.is-revealed').count(),1);assert.equal(await caption().innerText(),'');await finishAudio();await button('Next card').waitFor();}
   await page.setViewportSize({width:390,height:844});await page.evaluate(()=>window.__mimeType='audio/mp4');
-  const mobile=await audioCount();await talk('A touch-controlled mobile discussion','touch');await waitAudio(mobile);await finishAudio();await button('Next card').waitFor();assert.match(scribeRequests.at(-1),/recording.m4a/);await artwork();await capture('discussion-mobile');
+  const mobile=await audioCount();await talk('A touch-controlled mobile discussion','touch');await waitAudio(mobile);await finishAudio();await button('Next card').waitFor();if(ownerMode)assert.equal(scribeTypes.at(-1),'audio/mp4');else assert.match(scribeRequests.at(-1),/recording.m4a/);await artwork();await capture('discussion-mobile');
   await page.evaluate(()=>window.__mimeType='audio/webm;codecs=opus');await page.setViewportSize({width:1280,height:960});
   for(let revealed=2;revealed<=3;revealed++){const count=await audioCount();await button('Next card').click();await waitAudio(count);assert.equal(await page.locator('.is-revealed').count(),revealed);await finishAudio();}
   await button('Hear the closing').waitFor();const closing=await audioCount();await button('Hear the closing').click();await waitAudio(closing);await finishAudio();assert.equal(await button('Next card').count(),0);

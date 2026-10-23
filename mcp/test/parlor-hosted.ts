@@ -8,6 +8,7 @@ import { parlorConfig,ParlorFault,type ParlorConfig } from '../src/parlorConfig'
 import { reserveParlor,entitled,type ParlorStore,type ParlorDb } from '../src/parlorStore';
 import { inspectEntitlement,applyEntitlement,type EntitlementPlan } from '../src/parlorEntitlement';
 import { createParlorHandler } from '../src/parlorApi';
+import { PARLOR_OWNER } from '../src/parlorAccess';
 import { createArcanaAdapter } from '../src/hostStore';
 import type { UserDeckCatalogRepository } from '../src/userDeckCatalog';
 
@@ -72,7 +73,7 @@ try {
     return Response.json({content:[{type:'text',text:content}]});
   };
   // Owner guard is exercised with real sessions in parlor-access.ts; this suite isolates budgets.
-  const handler=createParlorHandler({config,authorize:async()=>true,store,principal:{resolve:async()=>principal?{id:principal}:null},catalog:catalogFixture,fetch:providerFetch});
+  const handler=createParlorHandler({config,authorize:async()=>true,authenticator:{authenticate:async()=>principal?{identity:PARLOR_OWNER}:null},store,principal:{resolve:async()=>principal?{id:principal}:null},catalog:catalogFixture,fetch:providerFetch});
   server=createServer((req,res)=>{void handler(req,res);});await new Promise<void>(resolve=>server!.listen(0,'127.0.0.1',resolve));
   const port=(server.address() as {port:number}).port;
   const request=(kind:string,extra:Record<string,unknown>={},origin=config.origin,signal?:AbortSignal)=>fetch(`http://127.0.0.1:${port}/api/parlor/${kind}`,{method:'POST',headers:{origin,'content-type':'application/json'},signal,body:JSON.stringify({operationId:randomUUID(),deckId:'hosted-deck',token:reading.token,provider:'anthropic',model:'mock-a',character:'keeper',...extra})});
@@ -98,9 +99,13 @@ try {
   assert.equal((await request('narrate',{provider:'openai',model:'mock-o'})).status,200);
   assert.equal((await request('converse',{turns:[{role:'user',content:'Private follow-up never persisted'}]})).status,200);
   assert.equal((await request('converse',{revealed:1,turns:[{role:'user',content:'Stay with this card'}]})).status,200);
-  assert.ok(seenBody.includes(reading.placements[0].card.name));
-  assert.ok(!seenBody.includes(reading.placements[1].card.name));
-  assert.ok(!seenBody.includes(reading.placements[2].card.name));
+  const [revealedContext,followUp]=JSON.parse(seenBody).messages[0].content.split('\n\n');
+  const first=reading.placements[0];
+  assert.deepEqual(JSON.parse(revealedContext),{
+    question:reading.question,deck:reading.deck.name,currentCard:first.card.name,
+    cards:[{name:first.card.name,position:first.position.name,reversed:first.reversed,meaning:first.meaning}],
+  });
+  assert.equal(followUp,'Stay with this card');
   assert.equal((await request('converse',{revealed:4,turns:[{role:'user',content:'Invalid count'}]})).status,400);
   assert.equal((await request('speech',{text:'Memory-only audio words',voiceId:'mock-voice'})).status,200);
   assert.equal((await request('speech',{text:'a'.repeat(4001),voiceId:'mock-voice'})).status,400);

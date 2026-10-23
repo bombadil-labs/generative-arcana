@@ -243,10 +243,12 @@ test('cancelled or failed narration is not committed; completed caption retry co
   }finally{machine.dispose();}
 });
 test('discussion context includes only revealed meanings and current card, never hidden card identities',async()=>{
-  const reading=await engine.castReading(deck.id,'three-card','Question');const original=global.fetch;let body;
+  const draw=await engine.castReading(deck.id,'three-card','Question');const original=global.fetch;let body;
   // Random authored card names can also be ordinary words in the persona prompt.
   // Distinct markers make hidden-context assertions deterministic and unambiguous.
-  reading.placements=reading.placements.map((p,i)=>({...p,card:{...p.card,name:`CONTEXT_CARD_${i+1}`},meaning:`CONTEXT_MEANING_${i+1}`}));
+  // Engine readings are frozen. Clone rather than silently assigning to a frozen fixture.
+  const reading={...draw,placements:draw.placements.map((p,i)=>({...p,card:{...p.card,name:`CONTEXT_CARD_${i+1}`},meaning:`CONTEXT_MEANING_${i+1}`}))};
+  assert.equal(reading.placements[0].card.name,'CONTEXT_CARD_1');
   try{global.fetch=async(_,init)=>{body=JSON.parse(init.body);return Response.json({content:[{type:'text',text:'A thoughtful answer.'}]});};
     for(const revealed of [0,1,2,3]){
       await converse(settings,reading,[{role:'user',content:'Tell me more'}],new AbortController().signal,revealed);

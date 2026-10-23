@@ -1,7 +1,7 @@
 import { arcanaEngine } from "../engine/ArcanaEngine";
 import type { ArcanaReading } from "../engine/types";
 import { converse, narrate, speak, ParlorError, type Narration, type Turn } from "./providers";
-import { characters, type Settings } from "./settings";
+import { characters, useOwnerEleven, type Settings } from "./settings";
 import { plainSpeech, type CaptionTiming } from "./speech";
 
 export type Phase = "idle" | "summoning" | "calling" | "awaiting-release" | "question" | "confirm" | "drawing" | "generating" | "ready" | "speaking" | "paused" | "error" | "complete" | "conversation";
@@ -127,7 +127,7 @@ export class ParlorMachine {
       const reveal = () => { if (current() && speech.kind === "card") this.set({ revealed: Math.max(this.state.revealed, Math.min(speech.segment + 1, 3)) }); };
       const caption = (text: string, timing: CaptionTiming) => { if (current()) this.set({ caption: text, timing }); };
       // Hosted speech requires a drawn reading token. Its opening stays explicitly silent.
-      const voice = this.settings.hosted ? !!this.state.reading && !!this.settings.voiceId : !!this.settings.elevenKey.trim();
+      const voice = this.settings.hosted ? !!this.state.reading && !!this.settings.voiceId : !!this.settings.elevenKey.trim() || useOwnerEleven(this.settings) && !!this.settings.voiceId.trim();
       if (muted || !voice) {
         reveal(); caption(plainSpeech(speech.text), "silent");
         // Yield once so repeated input cannot consume more than one card in the same turn.
