@@ -66,8 +66,32 @@ system/media shortcuts. Test their key-down/key-up events, the 500 ms reset rhyt
 microphone permission and audio output on the actual party Mac before guests arrive.
 OS-reserved shortcuts cannot be intercepted by the page. No always-listening input exists.
 The summon hold and speech hold are distinct intents captured on press: holding during
-an introduction cannot become a recording when it ends. Summon pulses take 3.5 seconds
-per cycle, at low opacity; reduced-motion mode uses a static scene with no pulse or fade.
+an introduction cannot become a recording when it ends.
+
+## Radio apparatus
+
+The quiet reset invitation is unchanged. Once held, an amber tuning arc and needle
+follow the **actual seven-second gesture clock**, while radio rings around the three
+spaces strengthen. Releasing early, losing focus or resetting clears the sweep; the
+next summon starts from zero. Contact is established by the existing release-cue flow,
+not by the decoration's animation finishing.
+
+Remote work has no estimated percentage or countdown. A slowly searching needle,
+drifting carrier wave and restrained scan lines distinguish microphone preparation,
+Scribe transcription, reading generation, discussion and voice preparation. Labels
+identify the actual state. Listening uses a steady open-channel lamp and waveform;
+speaking motion starts on the audio player's `playing` event. Buffering or pausing the
+player returns to searching, without changing transcript timing. These waveforms are
+decorative state cues, **not** microphone levels, measured audio or provider progress.
+There is no added sound, audio analyser, microphone use, dependency or network request.
+
+At each card pause the apparatus rests. Errors and pauses stop all motion and show a
+static interrupted-channel cue alongside the existing recovery controls. Idle removes
+the apparatus entirely. All motion is slow continuous movement (3–6-second cycles),
+with no strobing or flashing. Reduced-motion preference uses static symbols and meaningful
+state labels, stops the summon animation clock, and responds to preference changes during
+a hold. Cards remain opaque, complete and undistorted; captions stay separate from the
+background. The layout leaves room for the dial on landscape projectors and small screens.
 
 ## Spirit and vocal delivery
 

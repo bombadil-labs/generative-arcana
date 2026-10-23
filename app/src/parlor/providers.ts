@@ -85,7 +85,7 @@ export function converse(settings: Settings, reading: ArcanaReading, turns: Turn
 }
 
 /** One bounded audio resource, released on completion, interruption, failure and unmount. */
-export async function speak(settings: Settings, text: string, signal: AbortSignal, onPlaying: () => void, reading?: ArcanaReading, onCaption: (text: string, timing: CaptionTiming) => void = () => {}): Promise<void> {
+export async function speak(settings: Settings, text: string, signal: AbortSignal, onPlaying: () => void, reading?: ArcanaReading, onCaption: (text: string, timing: CaptionTiming) => void = () => {}, onWaiting: () => void = () => {}): Promise<void> {
   let url: string | undefined;
   let audio: HTMLAudioElement | undefined;
   try {
@@ -121,9 +121,14 @@ export async function speak(settings: Settings, text: string, signal: AbortSigna
         if (caption !== lastCaption) { lastCaption = caption; onCaption(caption, "aligned"); }
       };
       const animate = () => { if (closed || signal.aborted) return; update(); if (!closed && !signal.aborted) frame = requestAnimationFrame(animate); };
-      const clean = () => { closed = true; if (frame !== undefined) cancelAnimationFrame(frame); signal.removeEventListener("abort", abort); player.onplaying = player.onended = player.onerror = player.ontimeupdate = null; };
+      const clean = () => { closed = true; if (frame !== undefined) cancelAnimationFrame(frame); signal.removeEventListener("abort", abort); player.onplaying = player.onended = player.onerror = player.ontimeupdate = player.onwaiting = player.onpause = null; };
       const abort = () => { clean(); player.pause(); reject(new Error()); };
-      player.onplaying = () => { if (!closed && !began && !signal.aborted) { began = true; onCaption("", alignment ? "aligned" : "segment"); onPlaying(); if (alignment && typeof requestAnimationFrame === "function") animate(); } };
+      player.onplaying = () => {
+        if (closed || signal.aborted) return;
+        if (!began) { began = true; onCaption("", alignment ? "aligned" : "segment"); if (alignment && typeof requestAnimationFrame === "function") animate(); }
+        onPlaying();
+      };
+      player.onwaiting = player.onpause = () => { if (!closed && !signal.aborted) onWaiting(); };
       player.ontimeupdate = update;
       player.onended = () => { clean(); if (!signal.aborted && began) onCaption(alignment ? alignment.characters.join("").trim() : plainSpeech(text), alignment ? "aligned" : "segment"); resolve(); };
       player.onerror = () => { clean(); reject(new Error()); };

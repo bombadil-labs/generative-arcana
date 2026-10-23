@@ -10,7 +10,7 @@ const data=JSON.parse(await readFile(resolve(root,'../decks/deep-time/deck.json'
 const deck={id:'parlor-fixture',slug:data.slug,name:data.name,tagline:'Synthetic browser fixture',revision:1,visibility:'private',createdAt:'',updatedAt:'',manifest:{data,tagline:'Synthetic fixture'}};
 const evidence=resolve(root,'../..','parlor-conversation-verification');
 let server,browser,context,page,authenticated=false,allowed=true,calls=0,mode='ok',release;
-const speechRequests=[],scribeRequests=[];let scribeMode='ok',scribeRelease,ttsMode='ok';
+const speechRequests=[],scribeRequests=[];let scribeMode='ok',scribeRelease,ttsMode='ok',ttsRelease;
 const artSizes=[[945,1663],[958,1642],[971,1619],[1024,1536]];let artIndex=0;const artFixtures=[];
 const json=(route,body,status=200)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
 const button=name=>page.getByRole('button',{name,exact:true});
@@ -18,8 +18,10 @@ const caption=()=>page.getByLabel('Narrator transcript',{exact:true});
 async function finishAudio(){await page.evaluate(()=>{const a=window.__audio;a.currentTime=900;a.ontimeupdate?.();a.onended?.();});}
 async function waitAudio(previous){await page.waitForFunction(n=>window.__audioCount>n,previous);}
 async function audioCount(){return page.evaluate(()=>window.__audioCount);}
+async function radio(mode){await page.locator(`.parlor-radio[data-mode="${mode}"]`).waitFor();}
+async function pending(get){const end=Date.now()+5000;while(!get()&&Date.now()<end)await new Promise(r=>setTimeout(r,20));assert.ok(get(),'fixture request arrived');}
 const idleText='Press and hold the button to make contact with the beyond';
-async function idle(){await page.locator('.parlor-idle').waitFor();assert.equal((await page.locator('.parlor-show').innerText()).trim(),idleText);assert.equal(await page.locator('.parlor-card,.parlor-slot,.parlor-caption').count(),0);}
+async function idle(){await page.locator('.parlor-idle').waitFor();assert.equal((await page.locator('.parlor-show').innerText()).trim(),idleText);assert.equal(await page.locator('.parlor-card,.parlor-slot,.parlor-caption,.parlor-radio').count(),0);}
 async function summon(finish=true){
   await idle();const n=await audioCount(),mic=await page.evaluate(()=>window.__micRequests);await page.keyboard.down('a');await page.locator('.parlor-summoning').waitFor();assert.equal(await page.locator('.parlor-slot').count(),3);
   await page.clock.fastForward(7000);await waitAudio(n);assert.match(speechRequests.at(-1).text,/release the button/);assert.equal(await page.evaluate(()=>window.__micRequests),mic);await finishAudio();await page.getByText('Release the button.',{exact:true}).waitFor();assert.equal(await audioCount(),n+1);
@@ -33,6 +35,8 @@ async function talk(text,control=false){
   if(control==='touch')await target.dispatchEvent('pointerdown',{pointerId:9,pointerType:'touch',button:0,isPrimary:true});
   else if(control){await target.focus();await page.keyboard.down(control==='enter'?'Enter':'Space');}else{await target.hover();await page.mouse.down();}
   await page.getByText('Recording while held. Release to transcribe.',{exact:true}).waitFor();
+  await radio('listening');
+  if(text==='A synthetic spoken query')await capture('radio-listening');
   const before=scribeRequests.length;await page.waitForTimeout(300);assert.equal(scribeRequests.length,before,'no upload while held');
   assert.equal(await page.getByLabel('Your words',{exact:true}).innerText(),previousWords,'batch transcript is not simulated while recording');
   if(control==='touch')await target.dispatchEvent('pointerup',{pointerId:9,pointerType:'touch',button:0,isPrimary:true});
@@ -101,6 +105,7 @@ try{
       }
       assert.equal(path,'/v1/text-to-speech/synthetic-selected-voice/with-timestamps');const request=route.request().postDataJSON();assert.equal(request.model_id,'eleven_v3');speechRequests.push(request);
       assert.ok((request.text.match(/\[[^\]]+\]/g)||[]).length<=1);if(ttsMode==='error')return json(route,{},503);
+      if(ttsMode==='delay')await new Promise(r=>ttsRelease=r);
       const characters=[...request.text];return json(route,{audio_base64:Buffer.from('synthetic audio').toString('base64'),alignment:{characters,character_start_times_seconds:characters.map((_,i)=>i*.025),character_end_times_seconds:characters.map((_,i)=>(i+1)*.025)}});
     }
     if(url.hostname!=='127.0.0.1')return route.abort();
@@ -126,18 +131,27 @@ try{
   // Early release, lost focus and pointer cancellation return to blank without voice or microphone.
   for(const cancel of ['release','blur','pointer']){
     if(cancel==='pointer')await button('Summon the spirit').dispatchEvent('pointerdown',{pointerId:9,pointerType:'touch',button:0,isPrimary:true});else await page.keyboard.down('a');
-    await page.locator('.parlor-summoning').waitFor();assert.equal(await page.locator('.parlor-slot').count(),3);assert.equal(await page.locator('.parlor-summoning').evaluate(el=>getComputedStyle(el,'::before').animationName),'none');
+    await page.locator('.parlor-summoning').waitFor();await radio('tuning');assert.equal(await page.locator('.parlor-slot').count(),3);assert.equal(await page.locator('.radio-needle').evaluate(el=>getComputedStyle(el).animationName),'none');assert.equal(await page.locator('.parlor-radio').evaluate(el=>el.style.getPropertyValue('--contact')),'0');
     if(cancel==='pointer')await button('Summon the spirit').dispatchEvent('pointercancel',{pointerId:9});else if(cancel==='blur')await page.evaluate(()=>window.dispatchEvent(new Event('blur')));
     if(cancel!=='pointer')await page.keyboard.up('a');await idle();await page.clock.fastForward(7100);assert.equal(await audioCount(),before);assert.equal(await page.evaluate(()=>window.__micRequests),0);
   }
-  await page.emulateMedia({reducedMotion:'no-preference'});await page.keyboard.down('a');await page.locator('.parlor-summoning').waitFor();assert.equal(await page.locator('.parlor-summoning').evaluate(el=>getComputedStyle(el,'::before').animationDuration),'3.5s');await page.waitForTimeout(1800);await capture('summoning-pulse');await page.keyboard.up('a');await idle();await page.emulateMedia({reducedMotion:'reduce'});
+  await page.emulateMedia({reducedMotion:'no-preference'});await page.keyboard.down('a');await radio('tuning');
+  const progress=()=>page.locator('.parlor-radio').evaluate(el=>Number(el.style.getPropertyValue('--contact')));
+  assert.ok(await progress()<.15);await page.clock.fastForward(3300);const halfway=await progress();assert.ok(halfway>.4&&halfway<.65);await capture('radio-summon-halfway');
+  await page.clock.fastForward(2900);assert.ok(await progress()>.85);assert.equal(await audioCount(),before);await capture('radio-summon-near-contact');await page.keyboard.up('a');await idle();
+  await page.keyboard.down('a');await radio('tuning');assert.ok(await progress()<.15,'new summon starts at zero');await page.emulateMedia({reducedMotion:'reduce'});await page.waitForFunction(()=>matchMedia('(prefers-reduced-motion: reduce)').matches);await page.clock.fastForward(1000);await page.waitForFunction(()=>document.querySelector('.parlor-radio').style.getPropertyValue('--contact')==='0');await capture('radio-reduced-tuning');await page.keyboard.up('a');await idle();
   const cue=await audioCount();await page.keyboard.down('a');await page.clock.fastForward(7000);await waitAudio(cue);await page.evaluate(()=>window.__oldCue=window.__audio.onended);await page.keyboard.up('a');await resetEncounter();await page.evaluate(()=>window.__oldCue?.());await idle();assert.equal(await audioCount(),cue+1,'reset cancels introduction after a late release cue');
   // Release-cue failure can be retried by a deliberate tap without enabling a microphone.
-  ttsMode='error';await page.keyboard.down('a');await page.clock.fastForward(7000);await page.getByRole('alert').filter({hasText:'Audio is unavailable'}).waitFor();await page.keyboard.up('a');ttsMode='ok';const retryCue=await audioCount();await tap();await page.clock.fastForward(500);await waitAudio(retryCue);await finishAudio();await waitAudio(retryCue+1);await finishAudio();await button('Begin an open reading').waitFor();assert.equal(await page.evaluate(()=>window.__micRequests),0);await resetEncounter();
+  ttsMode='error';await page.keyboard.down('a');await page.clock.fastForward(7000);await page.getByRole('alert').filter({hasText:'Audio is unavailable'}).waitFor();await radio('stopped');await capture('radio-error');await page.keyboard.up('a');ttsMode='ok';const retryCue=await audioCount();await tap();await page.clock.fastForward(500);await waitAudio(retryCue);await finishAudio();await waitAudio(retryCue+1);await finishAudio();await button('Begin an open reading').waitFor();assert.equal(await page.evaluate(()=>window.__micRequests),0);await resetEncounter();
   await capture('idle-contact');await summon(false);assert.equal(await page.locator('.parlor-card').count(),0);
   await page.evaluate(()=>{window.__audio.currentTime=.5;window.__audio.ontimeupdate();});assert.ok((await caption().innerText()).length>0);assert.ok(!(await caption().innerText()).includes('speak your question'));assert.ok(!(await caption().innerText()).includes('['));
   await page.waitForTimeout(150);assert.ok(!(await caption().innerText()).includes('speak your question'));await page.keyboard.down('b');await finishAudio();await page.clock.fastForward(500);assert.equal(await page.evaluate(()=>window.__micRequests),0,'a hold started during introduction cannot turn into recording');await page.keyboard.up('b');
-  const first=await audioCount();await talk('A synthetic spoken query');await waitAudio(first);assert.equal(await page.locator('.is-revealed').count(),1);assert.equal(await caption().innerText(),'');assert.equal(await button('Next card').count(),0);
+  const first=await audioCount();mode='delay';await talk('A synthetic spoken query');await radio('searching');await pending(()=>release);assert.equal(await caption().innerText(),'');
+  await page.emulateMedia({reducedMotion:'no-preference'});assert.equal(await page.locator('.radio-needle').evaluate(el=>getComputedStyle(el).animationName),'radio-search');await capture('radio-inference-search');assert.equal(await progress(),0,'no invented inference percent');
+  for(const viewport of [{width:1280,height:720},{width:390,height:844}]){await page.setViewportSize(viewport);await capture(`radio-search-${viewport.width}`);}await page.setViewportSize({width:1280,height:960});
+  ttsMode='delay';release();release=null;mode='ok';await pending(()=>ttsRelease);await page.getByText('Finding the voice',{exact:true}).waitFor();await radio('searching');assert.equal(await page.locator('.is-revealed').count(),0);assert.equal(await caption().innerText(),'');await capture('radio-voice-search');
+  await page.emulateMedia({reducedMotion:'reduce'});assert.deepEqual(await page.locator('.radio-needle,.radio-wave,.parlor-radio-halo').evaluateAll(nodes=>nodes.map(el=>getComputedStyle(el).animationName)),['none','none','none']);await capture('radio-reduced-search');ttsRelease();ttsRelease=null;ttsMode='ok';await waitAudio(first);await radio('speaking');assert.equal(await page.locator('.is-revealed').count(),1);assert.equal(await caption().innerText(),'');assert.equal(await button('Next card').count(),0);await capture('radio-speaking');
+  await page.evaluate(()=>window.__audio.onwaiting());await radio('searching');assert.equal(await caption().innerText(),'');await page.evaluate(()=>window.__audio.onplaying());await radio('speaking');
   await finishAudio();await button('Next card').waitFor();await page.waitForTimeout(250);assert.equal(await page.locator('.is-revealed').count(),1);await artwork();await capture('first-card-desktop');
   for(const text of ['Tell me more about this card','How does that connect to my question?']){const count=await audioCount();await talk(text,true);await waitAudio(count);assert.equal(await page.locator('.is-revealed').count(),1);assert.equal(await caption().innerText(),'');await finishAudio();await button('Next card').waitFor();}
   await page.setViewportSize({width:390,height:844});await page.evaluate(()=>window.__mimeType='audio/mp4');
@@ -154,7 +168,7 @@ try{
   await page.evaluate(()=>window.__micMode='empty');await talk('This clip is empty','enter');await page.getByRole('alert').filter({hasText:'No audio was captured'}).waitFor();assert.equal(scribeRequests.length,previousScribe);
   await page.evaluate(()=>window.__micMode='ok');scribeMode='silent';await talk('No speech',true);await page.getByRole('alert').filter({hasText:'No speech was heard'}).waitFor();assert.equal(calls,previousCalls);
   scribeMode='error';await talk('A transcription error',true);await page.getByRole('alert').filter({hasText:'Scribe could not transcribe'}).waitFor();assert.equal(calls,previousCalls);
-  scribeMode='delay';await talk('A cancelled transcription',true);await button('Cancel transcription').waitFor();await page.waitForFunction(()=>document.querySelector('.parlor-status').textContent.includes('Transcribing'));assert.ok(scribeRelease);await button('Cancel transcription').click();scribeRelease();scribeRelease=null;scribeMode='ok';await page.waitForTimeout(150);assert.equal(calls,previousCalls);
+  scribeMode='delay';await talk('A cancelled transcription',true);await button('Cancel transcription').waitFor();await page.waitForFunction(()=>document.querySelector('.parlor-status').textContent.includes('Transcribing'));await radio('searching');await capture('radio-transcription');assert.ok(scribeRelease);await button('Cancel transcription').click();scribeRelease();scribeRelease=null;scribeMode='ok';await radio('waiting');await page.waitForTimeout(150);assert.equal(calls,previousCalls);
   // Global table controls need no button focus. Five taps never leak an advance or recording.
   await page.getByLabel('Interactive reading',{exact:true}).focus();const requestsBefore=await page.evaluate(()=>window.__micRequests);const callsBefore=calls;
   await resetEncounter();assert.equal(calls,callsBefore);assert.equal(await page.evaluate(()=>window.__micRequests),requestsBefore);assert.equal(await page.locator('.parlor-show textarea,.parlor-show input').count(),0);await summon();
@@ -166,6 +180,7 @@ try{
   const nextAudio=await audioCount();await tap('c');await waitAudio(nextAudio);assert.equal(await page.locator('.is-revealed').count(),2);
   // Reset during audio clears cards/history; captured callbacks cannot revive that reading.
   await page.evaluate(()=>window.__oldCallbacks=[window.__audio.onended,window.__audio.ontimeupdate]);await resetEncounter();await page.evaluate(()=>window.__oldCallbacks.forEach(fn=>fn?.()));await page.waitForTimeout(600);assert.equal(await page.locator('.parlor-card').count(),0);
+  ttsMode='delay';const cancelledVoice=await audioCount();await page.keyboard.down('a');await page.clock.fastForward(7000);await pending(()=>ttsRelease);await radio('searching');await page.keyboard.up('a');await resetEncounter();ttsRelease();ttsRelease=null;ttsMode='ok';await page.waitForTimeout(150);await idle();assert.equal(await audioCount(),cancelledVoice,'late TTS response cannot revive the apparatus or player');
   await summon();scribeMode='delay';const resetCalls=calls;await talk('Old guest transcription',true);await button('Cancel transcription').waitFor();await page.getByLabel('Interactive reading',{exact:true}).focus();await resetEncounter();scribeRelease();scribeRelease=null;scribeMode='ok';await page.waitForTimeout(200);assert.equal(calls,resetCalls);assert.equal(await page.locator('.parlor-card').count(),0);
   await summon();mode='delay';await talk('Old guest reading',true);await page.waitForFunction(()=>document.querySelector('.parlor-status').textContent.includes('gathering'));await resetEncounter();release();release=null;mode='ok';await page.waitForTimeout(200);assert.equal(await page.locator('.parlor-card').count(),0);
   // Genuine decoded WebP fixtures at all four observed source sizes, desktop/projector and phone.
@@ -184,4 +199,4 @@ try{
   await begin();await button('Hold to talk').focus();await page.keyboard.down('Space');await page.getByText('Recording while held. Release to transcribe.',{exact:true}).waitFor();authenticated=false;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.getByText('Parlor access is restricted.',{exact:true}).waitFor();assert.equal(await page.locator('.parlor-show').count(),0);
   assert.equal(await page.evaluate(()=>window.__tracks.some(t=>!t.stopped)),false);await page.keyboard.up('Space');assert.ok(speechRequests.length>=8);assert.ok(scribeRequests.length>=8);console.log('PASS: global tap/hold/five-tap reset, overlapping keys and repeat, no tap microphone access, late transcription/narration/reading fences, saved choices retained, setup exclusion, four artwork proportions on desktop/mobile, v3 selected voice and aligned captions, per-card discussion, explicit advance, held-only Scribe v2, touch/MP4, denial/empty/error/cancellation, Escape/logout cleanup. Synthetic providers and microphone only.');
 }catch(error){if(page&&!page.isClosed())await page.screenshot({path:resolve(evidence,'failure.png'),fullPage:true});throw error;}
-finally{release?.();scribeRelease?.();await context?.close();await browser?.close();await new Promise(r=>server?.httpServer?server.httpServer.close(r):r());console.log('Cleanup: browser, context and local preview closed.');}
+finally{release?.();scribeRelease?.();ttsRelease?.();await context?.close();await browser?.close();await new Promise(r=>server?.httpServer?server.httpServer.close(r):r());console.log('Cleanup: browser, context and local preview closed.');}

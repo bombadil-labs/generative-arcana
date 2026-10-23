@@ -57,6 +57,16 @@ test('delivery annotations stay out of completed narration and discussion histor
   try {await confirm(machine);await until(machine,'ready');machine.next(true);await until(machine,'ready');assert.equal(machine.getSnapshot().caption,'A perfectly ordinary existential problem.');machine.submit('What do you mean?');await until(machine,'ready');assert.ok(!JSON.stringify(histories).includes('[sarcastic]'));assert.equal(machine.getSnapshot().turns.at(-1).content,'What might you try?');}finally{machine.dispose();}
 });
 
+test('voice waiting ends only on actual playback; reset/error/pause fence stale playback indicators',async()=>{
+  const pending=[];let fail=false;const {machine}=setup({speak:async(_,text,s,playing,r,c,waiting)=>{const d=deferred();pending.push({d,playing,waiting});await d.promise;if(fail)throw new Error('synthetic');}});
+  try {
+    machine.begin();assert.equal(machine.getSnapshot().audioPlaying,false);pending[0].playing();assert.equal(machine.getSnapshot().audioPlaying,true);pending[0].waiting();assert.equal(machine.getSnapshot().audioPlaying,false);pending[0].playing();assert.equal(machine.getSnapshot().audioPlaying,true);
+    machine.cancel();assert.equal(machine.getSnapshot().phase,'paused');assert.equal(machine.getSnapshot().audioPlaying,false);pending[0].playing();assert.equal(machine.getSnapshot().audioPlaying,false);pending[0].d.resolve();await tick();
+    machine.retry();assert.equal(machine.getSnapshot().audioPlaying,false);fail=true;pending[1].d.resolve();await until(machine,'error');assert.equal(machine.getSnapshot().audioPlaying,false);
+    machine.reset();pending[1].playing();assert.equal(machine.getSnapshot().phase,'idle');assert.equal(machine.getSnapshot().audioPlaying,undefined);
+  }finally{pending.forEach(p=>p.d.resolve());machine.dispose();}
+});
+
 test('reset during completed-card discussion clears history and fences late answer',async()=>{
   const late=deferred();let signal;
   const {machine}=setup({converse:async(_,r,turns,s)=>{signal=s;await late.promise;return 'Old guest answer';}});

@@ -6,7 +6,7 @@ export interface GestureActions {
   captureTap(): (() => void) | undefined;
   captureHold?(): (() => void) | undefined;
   holdDelay?(): number;
-  press?(): void;
+  press?(startedAt: number): void;
   lift?(): void;
   hold(): void;
   release(): void;
@@ -34,7 +34,7 @@ export class TableGestures {
     if (!this.taps) this.tapAction = this.actions.captureTap();
     this.holdAction = this.actions.captureHold ? this.actions.captureHold() : this.actions.hold;
     const delay = this.actions.holdDelay?.() ?? HOLD_MS;
-    this.actions.press?.();
+    this.actions.press?.(performance.now());
     const epoch = this.epoch;
     this.holdTimer = setTimeout(() => {
       if (this.disposed || epoch !== this.epoch || !this.pressed.size) return;

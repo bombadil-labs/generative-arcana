@@ -11,6 +11,8 @@ import { characters, clearKeys, defaultSettings, readSettings, readySettings, sa
 import { ParlorMachine } from "./machine";
 import { ScribeMicrophone } from "./microphone";
 import { TableGestures, tableKey, HOLD_MS, SUMMON_MS } from "./gestures";
+import { RadioSignal } from "./RadioSignal";
+import { radioState } from "./radio";
 import { readParlorCapabilities, type ParlorCapabilities } from './hosted';
 import "./parlor.css";
 
@@ -146,7 +148,7 @@ function Ritual({ deckId, settings, leave }: { deckId: string; settings: Setting
   const mic = useSyncExternalStore(microphone.subscribe, microphone.getSnapshot, microphone.getSnapshot);
   const controls = useMemo(() => new TableGestures({
     holdDelay: () => machine.getSnapshot().phase === "idle" ? SUMMON_MS : HOLD_MS,
-    press: () => machine.summon(), lift: () => machine.releaseSummon(),
+    press: startedAt => machine.summon(startedAt), lift: () => machine.releaseSummon(),
     captureTap: () => {
       const before = machine.getSnapshot(), input = microphone.getSnapshot();
       if (!["question", "ready", "paused", "error"].includes(before.phase) || ["checking", "listening", "finishing"].includes(input.phase)) return;
@@ -198,7 +200,9 @@ function Ritual({ deckId, settings, leave }: { deckId: string; settings: Setting
   const idle = state.phase === "idle";
   const summoning = state.phase === "summoning";
   const contact = summoning || state.phase === "calling" || state.phase === "awaiting-release";
+  const signal = radioState(state, mic);
   return <div ref={stage} tabIndex={-1} className={`parlor-ritual${idle ? " parlor-idle" : ""}${summoning ? " parlor-summoning" : ""}`} aria-label="Interactive reading">
+    <RadioSignal signal={signal} startedAt={state.summonStartedAt} />
     {!idle && !contact && <div className="parlor-user-transcript" aria-label="Your words" aria-live="polite">{state.userText || "What have you brought to the table?"}</div>}
     {state.reading && (
       <div className="parlor-table" aria-label="Three-card reading">
