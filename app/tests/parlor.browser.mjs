@@ -73,6 +73,7 @@ try{
       node(source=false){const owner=this;const n={gain:new Param(),frequency:new Param(),Q:new Param(),source,disconnected:false,stopped:false,master:false,connect(to){if(to===owner.destination)this.master=true;return to;},disconnect(){this.disconnected=true;},start(){},stop(){this.stopped=true;}};this.nodes.push(n);return n;}
       createGain(){return this.node();}createBiquadFilter(){return this.node();}createBufferSource(){return this.node(true);}createOscillator(){return this.node(true);}
       createBuffer(_,size){const data=new Float32Array(size);return {getChannelData:()=>data};}
+      decodeAudioData(){return Promise.resolve({duration:180,numberOfChannels:1});}
       resume(){this.state='running';return Promise.resolve();}suspend(){this.state='suspended';return Promise.resolve();}close(){this.state='closed';return Promise.resolve();}
     };
     window.__radioLevel=()=>Math.max(0,...window.__radioContexts.flatMap(c=>c.state==='running'?c.nodes.filter(n=>n.master&&!n.disconnected).map(n=>n.gain.target):[]));
@@ -103,6 +104,10 @@ try{
   });
   await context.route('**/*',async route=>{
     const url=new URL(route.request().url()),path=url.pathname;
+    if(path==='/assets/parlor-radio-recording.mp3'){
+      assert.equal(url.origin,'http://127.0.0.1:4187');assert.equal(authenticated&&allowed,true,'private recording only requested during owner encounter');
+      return route.fulfill({contentType:'audio/mpeg',body:Buffer.from([73,68,51])});
+    }
     if(url.hostname==='api.anthropic.com'||url.hostname==='api.openai.com'){
       calls++;if(mode==='error')return json(route,{},429);
       const request=route.request().postDataJSON(),prompt=request.messages.at(-1).content;
@@ -137,22 +142,28 @@ try{
     return route.continue();
   });
   page=await context.newPage();await page.clock.install();
-  // Render the real synthesis code offline, never connected to speakers or a microphone.
+  // Decode the exact approved MP3, then verify the real gain envelope with a
+  // constant synthetic source offline. Nothing connects to speakers or a mic.
   const radioSource=ts.transpileModule(await readFile(resolve(root,'src/parlor/radioAudio.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
-  const offline=await page.evaluate(async source=>{
+  const radioBytes=(await readFile(resolve(root,'public/assets/parlor-radio-recording.mp3'))).toString('base64');
+  const offline=await page.evaluate(async({source,encoded})=>{
     const exports={};new Function('exports',source)(exports);
-    const rate=24000,context=new OfflineAudioContext(1,rate*3,rate);let now=0;
+    const rate=48000,context=new OfflineAudioContext(1,rate*3,rate);let now=0;
+    const decoded=await context.decodeAudioData(Uint8Array.from(atob(encoded),c=>c.charCodeAt(0)).buffer),recorded=decoded.getChannelData(0);let recordingPeak=0;for(const v of recorded)recordingPeak=Math.max(recordingPeak,Math.abs(v));
+    const recording={duration:decoded.duration,channels:decoded.numberOfChannels,sampleRate:decoded.sampleRate,peak:recordingPeak,first:recorded[0],last:recorded.at(-1)};
     const adapter={get currentTime(){return now;},state:'running',sampleRate:rate,destination:context.destination,resume:()=>Promise.resolve(),suspend:()=>Promise.resolve(),close:()=>Promise.resolve()};
     for(const method of ['createGain','createBufferSource','createBuffer','createBiquadFilter','createOscillator'])adapter[method]=context[method].bind(context);
-    const bed=new exports.RadioAudio(()=>adapter);bed.setPreferences({muted:false,volume:1});bed.setState('searching',false);
-    const random=Math.random;let seed=1729;Math.random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};try{bed.unlock();await Promise.resolve();}finally{Math.random=random;}
+    const testBuffer=context.createBuffer(1,rate*180,rate);testBuffer.getChannelData(0).fill(.05);
+    const bed=new exports.RadioAudio(()=>adapter,async()=>testBuffer,()=>0);bed.setPreferences({muted:false,volume:1});bed.setState('searching',false);
+    bed.unlock();for(let i=0;i<8;i++)await Promise.resolve();
     now=1;bed.setState('speaking',false);now=1.8;bed.setState('listening',true);
     const buffer=await context.startRendering(),samples=buffer.getChannelData(0);
     const rms=(start,end)=>{const segment=samples.slice(start*rate,end*rate);return Math.sqrt(segment.reduce((sum,n)=>sum+n*n,0)/segment.length);};
     let peak=0,ordinaryStep=0,transitionStep=0;for(let i=1;i<samples.length;i++){peak=Math.max(peak,Math.abs(samples[i]));const step=Math.abs(samples[i]-samples[i-1]);if([1,1.025,1.8,1.825].some(time=>Math.abs(i/rate-time)<.005))transitionStep=Math.max(transitionStep,step);else ordinaryStep=Math.max(ordinaryStep,step);}
-    bed.dispose();return {search:rms(.75,.95),speech:rms(1.35,1.7),silent:rms(2,2.5),peak,ordinaryStep,transitionStep};
-  },radioSource);
-  console.log('Offline procedural synthesis:',JSON.stringify(offline));assert.ok(offline.search>0&&offline.peak<.03);assert.ok(offline.speech<offline.search*.12);assert.equal(offline.silent,0);assert.ok(offline.transitionStep<offline.ordinaryStep*1.5,'fades add no discontinuity above the natural static variation');
+    bed.dispose();return {recording,search:rms(.75,.95),speech:rms(1.35,1.7),silent:rms(2,2.5),peak,ordinaryStep,transitionStep};
+  },{source:radioSource,encoded:radioBytes});
+  console.log('Approved recording decode and offline gain envelope:',JSON.stringify(offline));assert.ok(Math.abs(offline.recording.duration-180)<.01);assert.equal(offline.recording.channels,1);assert.equal(offline.recording.sampleRate,48000);assert.ok(offline.recording.peak<.19);assert.equal(offline.recording.first,0);assert.equal(offline.recording.last,0);
+  assert.ok(offline.search>.049&&offline.peak<.051);assert.ok(offline.speech<offline.search*.12);assert.equal(offline.silent,0);assert.ok(offline.transitionStep<.0001,'gain fades produce no abrupt step');
   for(const size of artSizes){const encoded=await page.evaluate(([w,h])=>{const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;const c=canvas.getContext('2d');c.fillStyle='#30283d';c.fillRect(0,0,w,h);c.strokeStyle='#e9c98a';c.lineWidth=12;c.strokeRect(6,6,w-12,h-12);c.fillStyle='#f3c282';c.font='60px serif';c.fillText(`${w} x ${h}`,50,100);c.fillRect(0,h-50,w,50);return canvas.toDataURL('image/webp').split(',')[1];},size);artFixtures.push(Buffer.from(encoded,'base64'));}
   await page.goto('http://127.0.0.1:4187/parlor');await page.getByText('Parlor access is restricted.',{exact:true}).waitFor();assert.equal(await page.locator('input[type=password]').count(),0);
   authenticated=true;allowed=false;await page.reload();await page.getByText('Parlor access is restricted.',{exact:true}).waitFor();assert.equal(await button('Parlor').count(),0);
@@ -182,7 +193,7 @@ try{
   await page.waitForTimeout(150);assert.ok(!(await caption().innerText()).includes('speak your question'));await page.keyboard.down('b');await finishAudio();await page.clock.fastForward(500);assert.equal(await page.evaluate(()=>window.__micRequests),0,'a hold started during introduction cannot turn into recording');await page.keyboard.up('b');
   const first=await audioCount();mode='delay';await talk('A synthetic spoken query');await radio('searching');await pending(()=>release);assert.equal(await caption().innerText(),'');
   await page.emulateMedia({reducedMotion:'no-preference'});assert.equal(await page.locator('.radio-needle').evaluate(el=>getComputedStyle(el).animationName),'radio-search');await capture('radio-inference-search');assert.equal(await progress(),0,'no invented inference percent');
-  const searchingLevel=await radioLevel();assert.ok(searchingLevel>0&&searchingLevel<=.06);
+  await page.waitForFunction(()=>window.__radioLevel()>0);const searchingLevel=await radioLevel();assert.ok(searchingLevel>0&&searchingLevel<=1);
   for(const viewport of [{width:1280,height:720},{width:390,height:844}]){await page.setViewportSize(viewport);await capture(`radio-search-${viewport.width}`);}await page.setViewportSize({width:1280,height:960});
   ttsMode='delay';release();release=null;mode='ok';await pending(()=>ttsRelease);await page.getByText('Finding the voice',{exact:true}).waitFor();await radio('searching');assert.equal(await page.locator('.is-revealed').count(),0);assert.equal(await caption().innerText(),'');await capture('radio-voice-search');
   assert.equal(await page.locator('.parlor-status').innerText(),'The voice is taking shape.');
@@ -192,7 +203,7 @@ try{
   await finishAudio();await button('Next card').waitFor();await page.waitForTimeout(250);assert.equal(await page.locator('.is-revealed').count(),1);await artwork();await capture('first-card-desktop');
   await page.locator('.parlor-sound-options summary').click();await page.getByLabel('Mute radio ambience',{exact:true}).check();assert.equal(await radioLevel(),0);
   const radioVolume=page.getByLabel('Radio ambience volume',{exact:true});await radioVolume.focus();await page.keyboard.press('End');assert.equal(await radioVolume.inputValue(),'100');assert.equal(await radioLevel(),0);assert.equal(await page.locator('.is-revealed').count(),1,'sound controls do not reset the reading');
-  await page.getByLabel('Mute radio ambience',{exact:true}).uncheck();await page.waitForFunction(()=>window.__radioLevel()>0);assert.ok(await radioLevel()<=.06);await page.locator('.parlor-sound-options summary').click();
+  await page.getByLabel('Mute radio ambience',{exact:true}).uncheck();await page.waitForFunction(()=>window.__radioLevel()>0);assert.ok(await radioLevel()<=1);await page.locator('.parlor-sound-options summary').click();
   for(const text of ['Tell me more about this card','How does that connect to my question?']){const count=await audioCount();await talk(text,true);await waitAudio(count);assert.equal(await page.locator('.is-revealed').count(),1);assert.equal(await caption().innerText(),'');await finishAudio();await button('Next card').waitFor();}
   await page.setViewportSize({width:390,height:844});await page.evaluate(()=>window.__mimeType='audio/mp4');
   const mobile=await audioCount();await talk('A touch-controlled mobile discussion','touch');await waitAudio(mobile);await finishAudio();await button('Next card').waitFor();assert.match(scribeRequests.at(-1),/recording.m4a/);await artwork();await capture('discussion-mobile');

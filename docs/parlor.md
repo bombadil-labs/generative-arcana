@@ -101,10 +101,11 @@ and returns to setup; they are separate from saved provider keys and reader sett
 The default is a quiet 35% setting. This controls only the ambience, never the selected
 ElevenLabs voice. Check the actual amplifier/projector speaker volume before the party.
 
-The bed is generated locally with Web Audio: a 110 Hz sine hum and two seconds of
-looping noise, gently filtered between 160 and 1800 Hz. Noise has softened loop edges.
-There are no music samples, licensed assets, downloads, service calls or new permissions.
-The master gain is capped at 0.06 with separately attenuated sources. Searching rises
+The bed plays the owner-approved, three-minute historical radio mix through Web Audio.
+The exact MP3 is a private Parlor asset, fetched from this app only after an intentional
+gesture. No extra synth layer, remote audio service, new permission or normalization is
+added. Gain is capped at 1, preserving the quiet mastered recording at maximum volume.
+The default 35% setting attenuates it further. Searching rises
 smoothly over 650 ms; actual voice playback ducks it to 8% of the searching level over
 25 ms. Card pauses use a quieter steady bed. The waveform remains a decorative state cue.
 
@@ -112,16 +113,24 @@ No AudioContext exists on page load or blank idle. The existing intentional summ
 pointer or operator gesture [unlocks audio](https://developer.mozilla.org/en-US/docs/Web/API/AudioContext/resume).
 Talk presses begin silencing immediately, before the 450 ms microphone threshold; permission
 waits and recording stay silent. Ambience resumes only after tracks stop. Mute, error, pause,
-reset, focus loss and hidden tabs fade out and [stop the generated sources](https://developer.mozilla.org/en-US/docs/Web/API/AudioScheduledSourceNode/stop).
+reset, focus loss and hidden tabs fade out and [stop playback](https://developer.mozilla.org/en-US/docs/Web/API/AudioScheduledSourceNode/stop).
 State/provider updates cannot restart a stopped bed: another intentional gesture is required.
 One context is reused per encounter view, suspended when stopped, and closed on exit/logout/unmount.
 All fades use scheduled gain ramps; sources also receive an audio-clock stop so throttled
-background JavaScript cannot leave them playing. Late resume promises cannot revive old audio.
+background JavaScript cannot leave it playing. Late resume/download/decode promises cannot revive old audio.
 Unsupported or blocked Web Audio leaves the reading functional and reports the issue under
 Radio sound. No silent switch to a remote audio service exists.
 
-Tests use a mock output device for UI interactions and the real synthesis code in an
-OfflineAudioContext to measure signal bounds, fade continuity, voice ducking and zero output
+Playback begins at one of four quiet source cues, then continues through the complete
+recording. Ducking does not restart it; mute, blur and reset retain its cursor for the
+next intentional gesture. Natural wraps use the source's mastered silent endpoints.
+This avoids repeatedly starting the same short passage; a finite three-minute source
+can still become recognizable. Downloads are capped at 5 MB and 20 seconds; errors
+leave the reading usable without ambience. [Recording provenance and credits](parlor-radio-recording.md)
+
+Tests use a mock output device for UI interactions, decode the real MP3 offline, and
+render the real gain envelope with a constant synthetic source in an OfflineAudioContext
+to measure signal bounds, fade continuity, voice ducking and zero output
 during capture. Offline rendering never connects to speakers or microphones. Actual party
 hardware, room acoustics and live provider audio still need an owner acceptance check.
 

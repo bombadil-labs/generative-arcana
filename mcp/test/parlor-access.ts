@@ -35,6 +35,7 @@ try {
   await writeFile(join(dir, "index.html"), "<title>Arcana private table</title>");
   await writeFile(join(dir, "assets/parlor-fixture.js"), "private Parlor code");
   await writeFile(join(dir, "assets/parlor-fixture.css"), "private Parlor styles");
+  await writeFile(join(dir, "assets/parlor-radio-recording.mp3"), "private Parlor recording");
   await writeFile(join(dir, "assets/app.js"), "ordinary public app");
   // Only this isolated PGlite fixture is mutated. These IDs are not session credentials.
   const account = await h.signupVerify("owner-fixture@example.test");
@@ -63,7 +64,7 @@ try {
     }); req.on("error", reject); req.end();
   });
   const paths = ["/parlor", "/parlor/", "/%70arlor", "//parlor", "/parlor//",
-    "/PARLOR", "/assets/parlor-fixture.js", "/assets/parlor-fixture.css", "/assets/%70arlor-fixture.js",
+    "/PARLOR", "/assets/parlor-fixture.js", "/assets/parlor-fixture.css", "/assets/%70arlor-fixture.js", "/assets/parlor-radio-recording.mp3", "/assets/%70arlor-radio-recording.mp3",
     "/other%2f..%2fassets%2fparlor-fixture.js", "/other%5c..%5cassets%5cparlor-fixture.js",
     "/api/parlor", "/api/parlor/capabilities", "/api/parlor/narrate", "/api/parlor/converse", "/api/parlor/speech",
     "/api/parlor/future-endpoint", "/%61pi/parlor/capabilities", "//api//parlor/capabilities"];
@@ -75,12 +76,13 @@ try {
       assert.ok(!result.body.includes("private table") && !result.body.includes("private Parlor"));
     }
   }
-  for (const path of ["/parlor", "/parlor/", "/%70arlor", "//parlor", "/assets/parlor-fixture.js", "/assets/parlor-fixture.css"]) {
+  for (const path of ["/parlor", "/parlor/", "/%70arlor", "//parlor", "/assets/parlor-fixture.js", "/assets/parlor-fixture.css", "/assets/parlor-radio-recording.mp3"]) {
     for (const method of ["GET", "HEAD"]) {
       const result = await get(path, ownerCookie, method);
       assert.equal(result.status, 200, `${method} owner ${path}`);
       assert.equal(result.headers["cache-control"], "private, no-store");
       assert.equal(result.headers.vary, "Cookie");
+      if(path.endsWith('.mp3'))assert.equal(result.headers['content-type'],'audio/mpeg');
       if (method === "HEAD") assert.equal(result.body, "");
     }
   }

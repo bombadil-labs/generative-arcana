@@ -17,6 +17,7 @@
   ],
   "git": {
     "deploymentEnabled": {
+      "feat/parlor-radio-recording": false,
       "feat/parlor-radio-signals": false,
       "feat/parlor-table-controls": false,
       "feat/parlor-conversation": false,
