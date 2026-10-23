@@ -83,7 +83,7 @@ identify the actual state. Listening uses a steady open-channel lamp and wavefor
 speaking motion starts on the audio player's `playing` event. Buffering or pausing the
 player returns to searching, without changing transcript timing. These waveforms are
 decorative state cues, **not** microphone levels, measured audio or provider progress.
-There is no added sound, audio analyser, microphone use, dependency or network request.
+The apparatus adds no audio analyser, microphone use, dependency or network request.
 
 At each card pause the apparatus rests. Errors and pauses stop all motion and show a
 static interrupted-channel cue alongside the existing recovery controls. Idle removes
@@ -92,6 +92,38 @@ with no strobing or flashing. Reduced-motion preference uses static symbols and 
 state labels, stops the summon animation clock, and responds to preference changes during
 a hold. Cards remain opaque, complete and undistorted; captions stay separate from the
 background. The layout leaves room for the dial on landscape projectors and small screens.
+
+## Radio ambience
+
+The operator can mute the radio or change its volume in setup and under **Radio sound**
+at the table. These preferences last for the hosting session, including encounter resets
+and returns to setup; they are separate from saved provider keys and reader settings.
+The default is a quiet 35% setting. This controls only the ambience, never the selected
+ElevenLabs voice. Check the actual amplifier/projector speaker volume before the party.
+
+The bed is generated locally with Web Audio: a 110 Hz sine hum and two seconds of
+looping noise, gently filtered between 160 and 1800 Hz. Noise has softened loop edges.
+There are no music samples, licensed assets, downloads, service calls or new permissions.
+The master gain is capped at 0.06 with separately attenuated sources. Searching rises
+smoothly over 650 ms; actual voice playback ducks it to 8% of the searching level over
+25 ms. Card pauses use a quieter steady bed. The waveform remains a decorative state cue.
+
+No AudioContext exists on page load or blank idle. The existing intentional summon/key,
+pointer or operator gesture [unlocks audio](https://developer.mozilla.org/en-US/docs/Web/API/AudioContext/resume).
+Talk presses begin silencing immediately, before the 450 ms microphone threshold; permission
+waits and recording stay silent. Ambience resumes only after tracks stop. Mute, error, pause,
+reset, focus loss and hidden tabs fade out and [stop the generated sources](https://developer.mozilla.org/en-US/docs/Web/API/AudioScheduledSourceNode/stop).
+State/provider updates cannot restart a stopped bed: another intentional gesture is required.
+One context is reused per encounter view, suspended when stopped, and closed on exit/logout/unmount.
+All fades use scheduled gain ramps; sources also receive an audio-clock stop so throttled
+background JavaScript cannot leave them playing. Late resume promises cannot revive old audio.
+Unsupported or blocked Web Audio leaves the reading functional and reports the issue under
+Radio sound. No silent switch to a remote audio service exists.
+
+Tests use a mock output device for UI interactions and the real synthesis code in an
+OfflineAudioContext to measure signal bounds, fade continuity, voice ducking and zero output
+during capture. Offline rendering never connects to speakers or microphones. Actual party
+hardware, room acoustics and live provider audio still need an owner acceptance check.
 
 ## Spirit and vocal delivery
 

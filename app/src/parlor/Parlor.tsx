@@ -13,6 +13,7 @@ import { ScribeMicrophone } from "./microphone";
 import { TableGestures, tableKey, HOLD_MS, SUMMON_MS } from "./gestures";
 import { RadioSignal } from "./RadioSignal";
 import { radioState } from "./radio";
+import { RadioAudio, defaultRadioPreferences, type RadioPreferences } from "./radioAudio";
 import { readParlorCapabilities, type ParlorCapabilities } from './hosted';
 import "./parlor.css";
 
@@ -47,6 +48,7 @@ function Host({ accountId, onShowChange, capabilities }: { accountId: string; on
   const [status, setStatus] = useState("loading");
   const [attempt, setAttempt] = useState(0);
   const [hosting, setHosting] = useState(false);
+  const [radioPreferences, setRadioPreferences] = useState(defaultRadioPreferences);
   const startButton = useRef<HTMLButtonElement>(null);
   const showing = useRef(false);
   useLayoutEffect(() => {
@@ -112,18 +114,26 @@ function Host({ accountId, onShowChange, capabilities }: { accountId: string; on
       </div></>}
     </div>}
     {deckId && <RemoteDeckBoundary key={deckId} deckId={deckId} routeKey="/parlor">
-      <TableSetup deckId={deckId} settings={settings} hosting={hosting} start={() => setHosting(true)} leave={() => setHosting(false)} startButton={startButton} />
+      <TableSetup deckId={deckId} settings={settings} hosting={hosting} start={() => setHosting(true)} leave={() => setHosting(false)} startButton={startButton} radioPreferences={radioPreferences} changeRadio={setRadioPreferences} />
     </RemoteDeckBoundary>}
   </section>;
 }
 function KeyInput({ label, value, change }: { label: string; value: string; change(value: string): void }) {
   return <label>{label}<input type="password" value={value} onChange={(event) => change(event.target.value)} autoComplete="off" autoCapitalize="none" spellCheck={false} maxLength={4096} data-1p-ignore data-lpignore="true" /></label>;
 }
-function TableSetup({ deckId, settings, hosting, start, leave, startButton }: { deckId: string; settings: Settings; hosting: boolean; start(): void; leave(): void; startButton: React.RefObject<HTMLButtonElement> }) {
+type RadioOptions = { radioPreferences: RadioPreferences; changeRadio(value: RadioPreferences): void };
+function RadioControls({ radioPreferences, changeRadio }: RadioOptions) {
+  return <div className="parlor-radio-controls" data-parlor-operator>
+    <label className="parlor-check"><input type="checkbox" checked={radioPreferences.muted} onChange={event => changeRadio({ ...radioPreferences, muted: event.target.checked })} />Mute radio ambience</label>
+    <label>Radio ambience volume<input type="range" min="0" max="100" step="1" value={Math.round(radioPreferences.volume * 100)} onChange={event => changeRadio({ ...radioPreferences, volume: Number(event.target.value) / 100 })} /></label>
+    <p>Quiet hum and static. Lower beneath the spirit; silent while you speak. Changes last for this hosting session.</p>
+  </div>;
+}
+function TableSetup({ deckId, settings, hosting, start, leave, startButton, radioPreferences, changeRadio }: { deckId: string; settings: Settings; hosting: boolean; start(): void; leave(): void; startButton: React.RefObject<HTMLButtonElement> } & RadioOptions) {
   const artwork = useArtworkSelection();
   const deck = getDeck(deckId)!;
   const ready = readySettings(settings) && deck.cards.length >= 3 && (!artwork || (artwork.resolved && !!artwork.packId));
-  if (hosting) return <Ritual key={`${deckId}:${artwork?.packId ?? ""}`} deckId={deckId} settings={settings} leave={leave} />;
+  if (hosting) return <Ritual key={`${deckId}:${artwork?.packId ?? ""}`} deckId={deckId} settings={settings} leave={leave} radioPreferences={radioPreferences} changeRadio={changeRadio} />;
   return <div className="parlor-launch">
     {artwork && <label>Artwork set<select aria-label="Artwork set" value={artwork.packId} disabled={!artwork.resolved} onChange={(event) => artwork.selectPack(event.target.value)}>
       {!artwork.packId && <option value="">Choose an artwork set</option>}
@@ -134,11 +144,12 @@ function TableSetup({ deckId, settings, hosting, start, leave, startButton }: { 
     <p>Questions and conversation stay in memory here and clear for the next guest. Your selected provider receives the question and deck context; ElevenLabs receives narration when enabled. Their retention policies apply. This app does not save guest readings.</p>
     {deck.cards.length < 3 && <p role="alert">Choose a deck with at least three cards.</p>}
     <p>Hold to talk records only while held. On release, that clip goes to ElevenLabs Scribe using your ElevenLabs key and incurs transcription usage. Its transcript goes to your selected reader. Provider retention policies apply.</p>
+    <RadioControls radioPreferences={radioPreferences} changeRadio={changeRadio} />
     <button ref={startButton} className="parlor-primary" aria-disabled={!ready} onClick={() => { if (ready) start(); }}>Start the show</button>
     <p className="parlor-show-hint">The idle table waits for a seven-second hold to summon the spirit, without recording. Keep holding until the voice asks you to release. After its introduction, hold for 450 ms, wait for Listening, speak and release. A quick tap moves on after a 500 ms pause; five quick taps with less than 500 ms between them return to blank idle. Overlapping keys count once. Escape returns to setup. Tab, modifier shortcuts and operator inputs keep their usual behavior. Test the mini keyboard and microphone on the party Mac before guests arrive.</p>
   </div>;
 }
-function Ritual({ deckId, settings, leave }: { deckId: string; settings: Settings; leave(): void }) {
+function Ritual({ deckId, settings, leave, radioPreferences, changeRadio }: { deckId: string; settings: Settings; leave(): void } & RadioOptions) {
   const artwork = useArtworkStore();
   const machine = useMemo(() => new ParlorMachine(deckId, settings, { preload: async (reading) => {
     await Promise.all(reading.cards.map((card) => artwork?.load(card.slug)));
@@ -146,9 +157,19 @@ function Ritual({ deckId, settings, leave }: { deckId: string; settings: Setting
   const state = useSyncExternalStore(machine.subscribe, machine.getSnapshot, machine.getSnapshot);
   const microphone = useMemo(() => new ScribeMicrophone(text => machine.submit(text), () => settings.hosted ? "" : settings.elevenKey), [machine, settings]);
   const mic = useSyncExternalStore(microphone.subscribe, microphone.getSnapshot, microphone.getSnapshot);
+  const sound = useMemo(() => new RadioAudio(), [machine]);
+  const soundError = useSyncExternalStore(sound.subscribe, sound.getSnapshot, sound.getSnapshot);
+  useLayoutEffect(() => { sound.setPreferences(radioPreferences); }, [sound, radioPreferences]);
+  useLayoutEffect(() => {
+    // Synchronous subscriptions duck before capture/playback, independently of React paint.
+    const sync = () => { const input = microphone.getSnapshot(); sound.setState(radioState(machine.getSnapshot(), input).mode, input.phase === "checking" || input.phase === "listening"); };
+    const offMachine = machine.subscribe(sync), offMic = microphone.subscribe(sync); sync();
+    return () => { offMachine(); offMic(); };
+  }, [machine, microphone, sound]);
   const controls = useMemo(() => new TableGestures({
     holdDelay: () => machine.getSnapshot().phase === "idle" ? SUMMON_MS : HOLD_MS,
-    press: startedAt => machine.summon(startedAt), lift: () => machine.releaseSummon(),
+    press: startedAt => { sound.hold(machine.getSnapshot().phase !== "idle"); machine.summon(startedAt); sound.unlock(); },
+    lift: () => { machine.releaseSummon(); if (!["checking", "listening"].includes(microphone.getSnapshot().phase)) sound.hold(false); },
     captureTap: () => {
       const before = machine.getSnapshot(), input = microphone.getSnapshot();
       if (!["question", "ready", "paused", "error"].includes(before.phase) || ["checking", "listening", "finishing"].includes(input.phase)) return;
@@ -159,20 +180,20 @@ function Ritual({ deckId, settings, leave }: { deckId: string; settings: Setting
       if (before.phase === "idle") return () => machine.contact();
       if (before.phase === "question" || before.phase === "complete" || (before.phase === "ready" && before.segment > 0)) return () => { if (machine.getSnapshot() === before) void microphone.press(); };
     },
-    hold: () => {}, release: () => microphone.release(),
-    cancel: () => { microphone.cancel(); machine.cancelSummon(); },
-    reset: () => { microphone.cancel(); machine.reset(); },
-  }), [machine, microphone]);
+    hold: () => {}, release: () => { microphone.release(); sound.hold(false); },
+    cancel: () => { sound.stop(); microphone.cancel(); machine.cancelSummon(); sound.hold(false); },
+    reset: () => { sound.stop(); microphone.cancel(); machine.reset(); sound.hold(false); },
+  }), [machine, microphone, sound]);
   const [back, setBack] = useState<PackArtworkAsset | null>(null);
   const stage = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => { stage.current?.focus({ preventScroll: true }); return () => { controls.dispose(); microphone.dispose(); machine.dispose(); }; }, [machine, microphone, controls]);
+  useLayoutEffect(() => { stage.current?.focus({ preventScroll: true }); return () => { sound.dispose(); controls.dispose(); microphone.dispose(); machine.dispose(); }; }, [machine, microphone, controls, sound]);
   useEffect(() => { if (state.phase === "idle") stage.current?.focus({ preventScroll: true }); }, [state.phase]);
   useEffect(() => {
     // Only the first card follows the spoken query. Later cards require an explicit action.
     if (state.phase === "ready" && state.segment === 0 && state.revealed === 0) machine.next();
   }, [machine, state.phase, state.segment, state.revealed]);
   useEffect(() => {
-    const cancel = () => { controls.cancel(); machine.cancel(); };
+    const cancel = () => { sound.stop(); controls.cancel(); machine.cancel(); };
     const hidden = () => { if (document.hidden) cancel(); };
     const pointerUp = (event: PointerEvent) => controls.up(`pointer:${event.pointerId}`);
     const keyDown = (event: KeyboardEvent) => {
@@ -187,7 +208,7 @@ function Ritual({ deckId, settings, leave }: { deckId: string; settings: Setting
     window.addEventListener("keydown", keyDown, true);
     window.addEventListener("pointerup", pointerUp); window.addEventListener("keyup", keyUp);
     return () => { window.removeEventListener("blur", cancel); window.removeEventListener("pagehide", cancel); document.removeEventListener("visibilitychange", hidden); window.removeEventListener("keydown", keyDown, true); window.removeEventListener("pointerup", pointerUp); window.removeEventListener("keyup", keyUp); };
-  }, [machine, controls]);
+  }, [machine, controls, sound]);
   useEffect(() => {
     const abort = new AbortController();
     if (artwork?.packId) void getPackArtworkAsset(deckId, "cardBack", abort.signal, artwork.packId).then(asset => { if (!abort.signal.aborted) setBack(asset); }).catch(() => {});
@@ -230,14 +251,15 @@ function Ritual({ deckId, settings, leave }: { deckId: string; settings: Setting
         >
         {idle ? "Press and hold the button to make contact with the beyond" : contact ? "Hold the connection" : mic.phase === "listening" ? "Listening · release to send" : "Hold to talk"}
       </button>
-      {state.phase === "question" && <button className="parlor-primary" disabled={micBusy} onClick={() => { controls.cancel(); machine.advance(); }}>Begin an open reading</button>}
-      {state.phase === "ready" && state.segment > 0 && <button className="parlor-primary" disabled={micBusy} onClick={() => { controls.cancel(); machine.next(); }}>{state.segment < 3 ? "Next card" : "Hear the closing"}</button>}
+      {state.phase === "question" && <button className="parlor-primary" disabled={micBusy} onClick={() => { controls.cancel(); machine.advance(); sound.unlock(); }}>Begin an open reading</button>}
+      {state.phase === "ready" && state.segment > 0 && <button className="parlor-primary" disabled={micBusy} onClick={() => { controls.cancel(); machine.next(); sound.unlock(); }}>{state.segment < 3 ? "Next card" : "Hear the closing"}</button>}
       {busy && <button data-parlor-operator onClick={() => { controls.cancel(); machine.cancel(); }}>Pause reading</button>}
-      {(state.phase === "error" || state.phase === "paused") && <><button data-parlor-operator onClick={() => { microphone.cancel(); machine.retry(); }}>Retry this step</button>{machine.canReadWithoutAudio() && <button data-parlor-operator onClick={() => { microphone.cancel(); machine.captions(); }}>Read without audio</button>}</>}
+      {(state.phase === "error" || state.phase === "paused") && <><button data-parlor-operator onClick={() => { microphone.cancel(); machine.retry(); sound.unlock(); }}>Retry this step</button>{machine.canReadWithoutAudio() && <button data-parlor-operator onClick={() => { microphone.cancel(); machine.captions(); sound.unlock(); }}>Read without audio</button>}</>}
       {!idle && <button data-parlor-operator onClick={() => { controls.cancel(); machine.cancel(); leave(); }}>Leave the table</button>}
       {state.error && <p role="alert">{state.error}</p>}
       {mic.error && <p role="alert">{mic.error}</p>}
       {mic.phase === "finishing" && <button data-parlor-operator onClick={() => controls.cancel()}>Cancel transcription</button>}
+      {!idle && <details className="parlor-sound-options" data-parlor-operator><summary>Radio sound</summary><RadioControls radioPreferences={radioPreferences} changeRadio={next => { sound.setPreferences(next); changeRadio(next); if (!next.muted) sound.unlock(); }} />{soundError && <p role="status">{soundError}</p>}</details>}
       {!idle && !contact && <p className="parlor-control-hint">Hold to speak · Tap to continue · Five quick taps for a new guest</p>}
     </div>
   </div>;

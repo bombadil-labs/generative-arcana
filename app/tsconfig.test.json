@@ -9,6 +9,7 @@
   },
   "include": [
     "src/parlor/radio.ts",
+    "src/parlor/radioAudio.ts",
     "src/parlor/gestures.ts",
     "src/parlor/microphone.ts",
     "src/parlor/machine.ts",

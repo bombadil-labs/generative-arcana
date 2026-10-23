@@ -4,6 +4,7 @@ import {readFile,mkdir} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {preview} from 'vite';
+import ts from 'typescript';
 const root=resolve(fileURLToPath(new URL('..',import.meta.url)));
 const {chromium}=await import(process.env.PLAYWRIGHT_MODULE?pathToFileURL(process.env.PLAYWRIGHT_MODULE).href:'playwright-core');
 const data=JSON.parse(await readFile(resolve(root,'../decks/deep-time/deck.json'),'utf8'));
@@ -18,6 +19,7 @@ const caption=()=>page.getByLabel('Narrator transcript',{exact:true});
 async function finishAudio(){await page.evaluate(()=>{const a=window.__audio;a.currentTime=900;a.ontimeupdate?.();a.onended?.();});}
 async function waitAudio(previous){await page.waitForFunction(n=>window.__audioCount>n,previous);}
 async function audioCount(){return page.evaluate(()=>window.__audioCount);}
+async function radioLevel(){return page.evaluate(()=>window.__radioLevel());}
 async function radio(mode){await page.locator(`.parlor-radio[data-mode="${mode}"]`).waitFor();}
 async function pending(get){const end=Date.now()+5000;while(!get()&&Date.now()<end)await new Promise(r=>setTimeout(r,20));assert.ok(get(),'fixture request arrived');}
 const idleText='Press and hold the button to make contact with the beyond';
@@ -36,6 +38,7 @@ async function talk(text,control=false){
   else if(control){await target.focus();await page.keyboard.down(control==='enter'?'Enter':'Space');}else{await target.hover();await page.mouse.down();}
   await page.getByText('Recording while held. Release to transcribe.',{exact:true}).waitFor();
   await radio('listening');
+  assert.equal(await radioLevel(),0,'ambience stays silent throughout microphone capture');
   if(text==='A synthetic spoken query')await capture('radio-listening');
   const before=scribeRequests.length;await page.waitForTimeout(300);assert.equal(scribeRequests.length,before,'no upload while held');
   assert.equal(await page.getByLabel('Your words',{exact:true}).innerText(),previousWords,'batch transcript is not simulated while recording');
@@ -44,10 +47,10 @@ async function talk(text,control=false){
   assert.equal(await page.evaluate(()=>window.__tracks.some(t=>!t.stopped)),false,'release stops all tracks');
   if(scribeMode==='ok' && await page.evaluate(()=>window.__micMode!=='empty'))await page.waitForFunction(text=>document.querySelector('.parlor-user-transcript').textContent===text,text);
 }
-async function escape(){await page.keyboard.press('Escape');await button('Start the show').waitFor();assert.equal(await page.evaluate(()=>document.activeElement.textContent),'Start the show');assert.equal(await page.locator('.parlor-card').count(),0);}
+async function escape(){await page.keyboard.press('Escape');await button('Start the show').waitFor();assert.equal(await page.evaluate(()=>document.activeElement.textContent),'Start the show');assert.equal(await page.locator('.parlor-card').count(),0);await page.clock.fastForward(100);assert.equal(await page.evaluate(()=>window.__radioContexts.every(c=>c.state==='closed')),true,'exit closes every ambience context');}
 async function capture(name){await page.evaluate(()=>window.scrollTo(0,0));assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.screenshot({path:resolve(evidence,name+'.png'),fullPage:true});}
 async function tap(key='a'){await page.keyboard.press(key);}
-async function resetEncounter(){const saved=await page.evaluate(()=>JSON.stringify(localStorage));const n=await audioCount();for(let i=0;i<5;i++)await tap();await idle();assert.equal(await audioCount(),n,'reset is silent');assert.equal(await page.evaluate(()=>window.__tracks.some(t=>!t.stopped)),false);assert.equal(await page.evaluate(()=>JSON.stringify(localStorage)),saved,'reset preserves saved keys and choices');}
+async function resetEncounter(){const saved=await page.evaluate(()=>JSON.stringify(localStorage));const n=await audioCount();for(let i=0;i<5;i++)await tap();await idle();assert.equal(await radioLevel(),0,'reset fades ambience to silence');assert.equal(await audioCount(),n,'reset is silent');assert.equal(await page.evaluate(()=>window.__tracks.some(t=>!t.stopped)),false);assert.equal(await page.evaluate(()=>JSON.stringify(localStorage)),saved,'reset preserves saved keys and choices');}
 async function artwork(){
   await page.waitForFunction(()=>[...document.querySelectorAll('.parlor-artwork img')].every(img=>img.complete&&img.naturalWidth>0));
   const slots=await page.locator('.parlor-card').evaluateAll(nodes=>nodes.map(n=>{const r=n.getBoundingClientRect();return [r.width,r.height];}));
@@ -60,6 +63,19 @@ try{
   browser=await chromium.launch({headless:true,...(process.env.PARLOR_BROWSER?{executablePath:process.env.PARLOR_BROWSER}:{channel:'msedge'})});
   context=await browser.newContext({viewport:{width:1280,height:960},reducedMotion:'reduce',hasTouch:true});context.setDefaultTimeout(12000);
   await context.addInitScript(()=>{
+    // Stub the output device as well as TTS: automated UI tests emit no real sound.
+    window.__radioContexts=[];window.__radioUnavailable=false;
+    class Param {value=0;target=0;cancelScheduledValues(){}setValueAtTime(value){this.value=value;}linearRampToValueAtTime(value){this.target=value;}}
+    window.AudioContext=class {
+      state='suspended';sampleRate=8000;nodes=[];destination={};
+      constructor(){if(window.__radioUnavailable)throw Error('Synthetic unavailable Web Audio');window.__radioContexts.push(this);}
+      get currentTime(){return performance.now()/1000;}
+      node(source=false){const owner=this;const n={gain:new Param(),frequency:new Param(),Q:new Param(),source,disconnected:false,stopped:false,master:false,connect(to){if(to===owner.destination)this.master=true;return to;},disconnect(){this.disconnected=true;},start(){},stop(){this.stopped=true;}};this.nodes.push(n);return n;}
+      createGain(){return this.node();}createBiquadFilter(){return this.node();}createBufferSource(){return this.node(true);}createOscillator(){return this.node(true);}
+      createBuffer(_,size){const data=new Float32Array(size);return {getChannelData:()=>data};}
+      resume(){this.state='running';return Promise.resolve();}suspend(){this.state='suspended';return Promise.resolve();}close(){this.state='closed';return Promise.resolve();}
+    };
+    window.__radioLevel=()=>Math.max(0,...window.__radioContexts.flatMap(c=>c.state==='running'?c.nodes.filter(n=>n.master&&!n.disconnected).map(n=>n.gain.target):[]));
     window.__audioCount=0;window.__audioPaused=0;window.__audioCleared=0;window.__micStarts=0;window.__micRequests=0;window.__micMode='ok';window.__utterance='';window.__tracks=[];window.__mimeType='audio/webm;codecs=opus';
     window.Audio=class{
       currentTime=0;
@@ -70,6 +86,7 @@ try{
     };
     window.SpeechRecognition=class{constructor(){throw Error('No browser speech fallback allowed');}};
     Object.defineProperty(navigator.mediaDevices,'getUserMedia',{value:async options=>{
+      if(window.__radioLevel()!==0)throw Error('Ambience must be silent before microphone access');
       window.__micRequests++;
       if(JSON.stringify(options)!==JSON.stringify({audio:true}))throw Error('Audio only');
       if(window.__micMode==='denied')throw new DOMException('Synthetic denial','NotAllowedError');
@@ -80,8 +97,8 @@ try{
       state='inactive';
       static isTypeSupported(type){return type===window.__mimeType;}
       constructor(stream,options){window.__mic=this;this.stream=stream;this.mimeType=options.mimeType;}
-      start(){this.state='recording';window.__micStarts++;queueMicrotask(()=>this.onstart?.());}
-      stop(){this.state='inactive';queueMicrotask(()=>{this.ondataavailable?.({data:new Blob(window.__micMode==='empty'?[]:['synthetic intentional recording'],{type:this.mimeType})});this.onstop?.();});}
+      start(){if(window.__radioLevel()!==0)throw Error('Ambience during capture');this.state='recording';window.__micStarts++;queueMicrotask(()=>this.onstart?.());}
+      stop(){if(window.__radioLevel()!==0)throw Error('Ambience before tracks stopped');this.state='inactive';queueMicrotask(()=>{this.ondataavailable?.({data:new Blob(window.__micMode==='empty'?[]:['synthetic intentional recording'],{type:this.mimeType})});this.onstop?.();});}
     };
   });
   await context.route('**/*',async route=>{
@@ -120,6 +137,22 @@ try{
     return route.continue();
   });
   page=await context.newPage();await page.clock.install();
+  // Render the real synthesis code offline, never connected to speakers or a microphone.
+  const radioSource=ts.transpileModule(await readFile(resolve(root,'src/parlor/radioAudio.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+  const offline=await page.evaluate(async source=>{
+    const exports={};new Function('exports',source)(exports);
+    const rate=24000,context=new OfflineAudioContext(1,rate*3,rate);let now=0;
+    const adapter={get currentTime(){return now;},state:'running',sampleRate:rate,destination:context.destination,resume:()=>Promise.resolve(),suspend:()=>Promise.resolve(),close:()=>Promise.resolve()};
+    for(const method of ['createGain','createBufferSource','createBuffer','createBiquadFilter','createOscillator'])adapter[method]=context[method].bind(context);
+    const bed=new exports.RadioAudio(()=>adapter);bed.setPreferences({muted:false,volume:1});bed.setState('searching',false);
+    const random=Math.random;let seed=1729;Math.random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};try{bed.unlock();await Promise.resolve();}finally{Math.random=random;}
+    now=1;bed.setState('speaking',false);now=1.8;bed.setState('listening',true);
+    const buffer=await context.startRendering(),samples=buffer.getChannelData(0);
+    const rms=(start,end)=>{const segment=samples.slice(start*rate,end*rate);return Math.sqrt(segment.reduce((sum,n)=>sum+n*n,0)/segment.length);};
+    let peak=0,ordinaryStep=0,transitionStep=0;for(let i=1;i<samples.length;i++){peak=Math.max(peak,Math.abs(samples[i]));const step=Math.abs(samples[i]-samples[i-1]);if([1,1.025,1.8,1.825].some(time=>Math.abs(i/rate-time)<.005))transitionStep=Math.max(transitionStep,step);else ordinaryStep=Math.max(ordinaryStep,step);}
+    bed.dispose();return {search:rms(.75,.95),speech:rms(1.35,1.7),silent:rms(2,2.5),peak,ordinaryStep,transitionStep};
+  },radioSource);
+  console.log('Offline procedural synthesis:',JSON.stringify(offline));assert.ok(offline.search>0&&offline.peak<.03);assert.ok(offline.speech<offline.search*.12);assert.equal(offline.silent,0);assert.ok(offline.transitionStep<offline.ordinaryStep*1.5,'fades add no discontinuity above the natural static variation');
   for(const size of artSizes){const encoded=await page.evaluate(([w,h])=>{const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;const c=canvas.getContext('2d');c.fillStyle='#30283d';c.fillRect(0,0,w,h);c.strokeStyle='#e9c98a';c.lineWidth=12;c.strokeRect(6,6,w-12,h-12);c.fillStyle='#f3c282';c.font='60px serif';c.fillText(`${w} x ${h}`,50,100);c.fillRect(0,h-50,w,50);return canvas.toDataURL('image/webp').split(',')[1];},size);artFixtures.push(Buffer.from(encoded,'base64'));}
   await page.goto('http://127.0.0.1:4187/parlor');await page.getByText('Parlor access is restricted.',{exact:true}).waitFor();assert.equal(await page.locator('input[type=password]').count(),0);
   authenticated=true;allowed=false;await page.reload();await page.getByText('Parlor access is restricted.',{exact:true}).waitFor();assert.equal(await button('Parlor').count(),0);
@@ -128,6 +161,7 @@ try{
   await page.getByLabel('ElevenLabs API key',{exact:true}).fill('synthetic-voice-key');await page.getByLabel('ElevenLabs voice ID',{exact:true}).fill('synthetic-selected-voice');await page.getByLabel('Remember keys on this device (plaintext)').check();
   await page.reload();assert.equal(await page.getByLabel('ElevenLabs voice ID',{exact:true}).inputValue(),'synthetic-selected-voice');assert.equal(await page.locator('textarea').count(),0);await capture('setup');
   const before=await audioCount();await button('Start the show').click();await idle();assert.equal(await audioCount(),before);assert.equal(calls,0);
+  assert.equal(await page.evaluate(()=>window.__radioContexts.length),0,'no AudioContext before a deliberate summon gesture');
   // Early release, lost focus and pointer cancellation return to blank without voice or microphone.
   for(const cancel of ['release','blur','pointer']){
     if(cancel==='pointer')await button('Summon the spirit').dispatchEvent('pointerdown',{pointerId:9,pointerType:'touch',button:0,isPrimary:true});else await page.keyboard.down('a');
@@ -148,12 +182,17 @@ try{
   await page.waitForTimeout(150);assert.ok(!(await caption().innerText()).includes('speak your question'));await page.keyboard.down('b');await finishAudio();await page.clock.fastForward(500);assert.equal(await page.evaluate(()=>window.__micRequests),0,'a hold started during introduction cannot turn into recording');await page.keyboard.up('b');
   const first=await audioCount();mode='delay';await talk('A synthetic spoken query');await radio('searching');await pending(()=>release);assert.equal(await caption().innerText(),'');
   await page.emulateMedia({reducedMotion:'no-preference'});assert.equal(await page.locator('.radio-needle').evaluate(el=>getComputedStyle(el).animationName),'radio-search');await capture('radio-inference-search');assert.equal(await progress(),0,'no invented inference percent');
+  const searchingLevel=await radioLevel();assert.ok(searchingLevel>0&&searchingLevel<=.06);
   for(const viewport of [{width:1280,height:720},{width:390,height:844}]){await page.setViewportSize(viewport);await capture(`radio-search-${viewport.width}`);}await page.setViewportSize({width:1280,height:960});
   ttsMode='delay';release();release=null;mode='ok';await pending(()=>ttsRelease);await page.getByText('Finding the voice',{exact:true}).waitFor();await radio('searching');assert.equal(await page.locator('.is-revealed').count(),0);assert.equal(await caption().innerText(),'');await capture('radio-voice-search');
   assert.equal(await page.locator('.parlor-status').innerText(),'The voice is taking shape.');
   await page.emulateMedia({reducedMotion:'reduce'});assert.deepEqual(await page.locator('.radio-needle,.radio-wave,.parlor-radio-halo').evaluateAll(nodes=>nodes.map(el=>getComputedStyle(el).animationName)),['none','none','none']);await capture('radio-reduced-search');ttsRelease();ttsRelease=null;ttsMode='ok';await waitAudio(first);await radio('speaking');assert.equal(await page.locator('.is-revealed').count(),1);assert.equal(await caption().innerText(),'');assert.equal(await button('Next card').count(),0);await capture('radio-speaking');
   await page.evaluate(()=>window.__audio.onwaiting());await radio('searching');assert.equal(await caption().innerText(),'');await page.evaluate(()=>window.__audio.onplaying());await radio('speaking');
+  assert.ok(await radioLevel()<searchingLevel/10,'actual voice playback strongly ducks the ambience');
   await finishAudio();await button('Next card').waitFor();await page.waitForTimeout(250);assert.equal(await page.locator('.is-revealed').count(),1);await artwork();await capture('first-card-desktop');
+  await page.locator('.parlor-sound-options summary').click();await page.getByLabel('Mute radio ambience',{exact:true}).check();assert.equal(await radioLevel(),0);
+  const radioVolume=page.getByLabel('Radio ambience volume',{exact:true});await radioVolume.focus();await page.keyboard.press('End');assert.equal(await radioVolume.inputValue(),'100');assert.equal(await radioLevel(),0);assert.equal(await page.locator('.is-revealed').count(),1,'sound controls do not reset the reading');
+  await page.getByLabel('Mute radio ambience',{exact:true}).uncheck();await page.waitForFunction(()=>window.__radioLevel()>0);assert.ok(await radioLevel()<=.06);await page.locator('.parlor-sound-options summary').click();
   for(const text of ['Tell me more about this card','How does that connect to my question?']){const count=await audioCount();await talk(text,true);await waitAudio(count);assert.equal(await page.locator('.is-revealed').count(),1);assert.equal(await caption().innerText(),'');await finishAudio();await button('Next card').waitFor();}
   await page.setViewportSize({width:390,height:844});await page.evaluate(()=>window.__mimeType='audio/mp4');
   const mobile=await audioCount();await talk('A touch-controlled mobile discussion','touch');await waitAudio(mobile);await finishAudio();await button('Next card').waitFor();assert.match(scribeRequests.at(-1),/recording.m4a/);await artwork();await capture('discussion-mobile');
@@ -197,7 +236,9 @@ try{
   assert.equal(await page.evaluate(()=>JSON.stringify(localStorage).includes('synthetic spoken query')),false);
   await begin();const n=await audioCount();await talk('Pause this reading',true);await waitAudio(n);await button('Pause reading').click();await button('Retry this step').waitFor();assert.ok(await page.evaluate(()=>window.__audioCleared>0));await button('Read without audio').click();await button('Next card').waitFor();assert.equal(await page.locator('.is-revealed').count(),1);
   await button('Hold to talk').focus();await page.keyboard.down('Space');await page.getByText('Recording while held. Release to transcribe.',{exact:true}).waitFor();await escape();await page.keyboard.up('Space');assert.equal(await page.locator('.parlor-show').count(),0);
+  await page.evaluate(()=>window.__radioUnavailable=true);await begin();await page.locator('.parlor-sound-options summary').click();await page.getByText('Radio ambience is unavailable. The reading continues.',{exact:true}).waitFor();await escape();await page.evaluate(()=>window.__radioUnavailable=false);
   await begin();await button('Hold to talk').focus();await page.keyboard.down('Space');await page.getByText('Recording while held. Release to transcribe.',{exact:true}).waitFor();authenticated=false;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.getByText('Parlor access is restricted.',{exact:true}).waitFor();assert.equal(await page.locator('.parlor-show').count(),0);
+  await page.clock.fastForward(100);assert.equal(await page.evaluate(()=>window.__radioContexts.every(c=>c.state==='closed')),true,'logout closes ambience contexts');
   assert.equal(await page.evaluate(()=>window.__tracks.some(t=>!t.stopped)),false);await page.keyboard.up('Space');assert.ok(speechRequests.length>=8);assert.ok(scribeRequests.length>=8);console.log('PASS: global tap/hold/five-tap reset, overlapping keys and repeat, no tap microphone access, late transcription/narration/reading fences, saved choices retained, setup exclusion, four artwork proportions on desktop/mobile, v3 selected voice and aligned captions, per-card discussion, explicit advance, held-only Scribe v2, touch/MP4, denial/empty/error/cancellation, Escape/logout cleanup. Synthetic providers and microphone only.');
 }catch(error){if(page&&!page.isClosed())await page.screenshot({path:resolve(evidence,'failure.png'),fullPage:true});throw error;}
 finally{release?.();scribeRelease?.();ttsRelease?.();await context?.close();await browser?.close();await new Promise(r=>server?.httpServer?server.httpServer.close(r):r());console.log('Cleanup: browser, context and local preview closed.');}

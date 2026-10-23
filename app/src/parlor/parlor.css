@@ -108,3 +108,8 @@
   .parlor-radio[data-mode=searching] .radio-wave, .parlor-radio[data-mode=speaking] .radio-wave { transform: scaleY(.65); }
 }
 .parlor-show-hint { font-size: 13px; }
+.parlor-radio-controls { max-width: 420px; margin: 18px auto; text-align: left; }
+.parlor-radio-controls p { font-size: 12px; }
+.parlor-radio-controls input[type=range] { padding: 0; accent-color: var(--parlor-gold); }
+.parlor-sound-options { max-width: 420px; margin: 12px auto; font-size: 12px; }
+.parlor-sound-options summary { cursor: pointer; color: #d4c6aa; }
