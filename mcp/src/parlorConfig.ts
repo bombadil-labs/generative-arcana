@@ -1,7 +1,7 @@
 export type ParlorMode = 'disabled' | 'byok' | 'hosted';
 export type LanguageProvider = 'anthropic' | 'openai';
 export interface HostedModel { provider: LanguageProvider; id: string; maxCostMicrousd: number }
-export interface OwnerKeysConfig { origin: string; anthropicModel: string; keys: { anthropic?: string; elevenlabs?: string } }
+export interface OwnerKeysConfig { origin: string; anthropicModel: string; voiceId?: string; keys: { anthropic?: string; elevenlabs?: string } }
 export interface ParlorConfig {
   ownerKeys?: OwnerKeysConfig;
   mode: ParlorMode; origin: string; models: HostedModel[];
@@ -27,7 +27,9 @@ export function parlorConfig(env: NodeJS.ProcessEnv): ParlorConfig {
     if (origin.protocol !== 'https:' || origin.origin !== env.BETTER_AUTH_URL) fail();
     const anthropicModel = env.PARLOR_OWNER_ANTHROPIC_MODEL ?? '';
     if (anthropicModel && !/^claude-[A-Za-z0-9._-]{1,140}$/.test(anthropicModel)) fail();
-    base.ownerKeys = { origin: origin.origin, anthropicModel, keys: { anthropic: env.ANTHROPIC_API_KEY?.trim(), elevenlabs: env.ELEVENLABS_API_KEY?.trim() } };
+    const voiceId = env.PARLOR_OWNER_ELEVENLABS_VOICE_ID?.trim() ?? '';
+    if (voiceId && !/^[A-Za-z0-9_-]{1,160}$/.test(voiceId)) fail();
+    base.ownerKeys = { origin: origin.origin, anthropicModel, voiceId, keys: { anthropic: env.ANTHROPIC_API_KEY?.trim(), elevenlabs: env.ELEVENLABS_API_KEY?.trim() } };
   }
   if (mode !== 'hosted') return base;
   const integer = (name: string, max: number) => { const raw=env[name]; const n=Number(raw); if (!raw || !/^[1-9][0-9]*$/.test(raw) || !Number.isSafeInteger(n) || n>max) fail(); return n; };

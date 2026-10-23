@@ -42,7 +42,7 @@ beforeEach(async()=>{
   window.history.replaceState(null,'','/parlor');window.localStorage.clear();
   settingsApi.saveSettings(window.localStorage,accountId,{...settingsApi.defaultSettings(),anthropicKey:'synthetic-ui-key',anthropicModel:'synthetic-model'},true);
   global.fetch=async(path,init={})=>{
-    if(path==='/api/parlor/capabilities')return hostedDenied?json({},403):json({mode:accessMode,models:[{provider:'anthropic',id:'server-model'}],voices:[],...(ownerAvailable?{ownerKeys:{anthropicModel:'claude-test-owner',elevenlabs:false}}:{})});
+    if(path==='/api/parlor/capabilities')return hostedDenied?json({},403):json({mode:accessMode,models:[{provider:'anthropic',id:'server-model'}],voices:[],...(ownerAvailable?{ownerKeys:{anthropicModel:'claude-test-owner',elevenlabs:false,voiceId:'env-owner-voice'}}:{})});
     if(path==='/api/parlor/narrate'||path==='/api/parlor/owner/narrate'){
       hostedBodies.push(JSON.parse(init.body));if(hostedDenied)return json({},403);
       const token=JSON.parse(Buffer.from(hostedBodies.at(-1).token,'base64url').toString());
@@ -103,6 +103,15 @@ test('owner setup starts without browser keys, preserves voice, and loses fallba
 
 test('owner availability keeps an explicitly remembered BYOK model and key in control',async()=>{
   ownerAvailable=true;await mount();await guest();assert.equal(providerCalls,1);assert.equal(hostedBodies.length,0);
+});
+
+test('fresh owner gets env voice/model defaults and can override or restore both without a browser key',async()=>{
+  ownerAvailable=true;window.localStorage.clear();await mount();
+  const field=name=>[...document.querySelectorAll('label')].find(el=>el.textContent.startsWith(name)).querySelector('input');
+  assert.equal(field('ElevenLabs voice ID').value,'env-owner-voice');assert.equal(field('Anthropic model ID').value,'claude-test-owner');
+  await input('ElevenLabs voice ID','ui-voice');await input('Anthropic model ID','claude-ui-choice');assert.equal(field('ElevenLabs voice ID').value,'ui-voice');assert.equal(field('Anthropic model ID').value,'claude-ui-choice');
+  await guest();assert.equal(hostedBodies.at(-1).model,'claude-ui-choice');await escape();
+  await click('Use account voice');await click('Use account model');assert.equal(field('ElevenLabs voice ID').value,'env-owner-voice');assert.equal(field('Anthropic model ID').value,'claude-test-owner');
 });
 test('confirm then reset and navigation clear guest state; no questions in URL/storage',async()=>{
   await mount();await guest();assert.equal(document.querySelectorAll('.parlor-card').length,3);assert.equal(providerCalls,1);assert.ok(button('Hold to talk'));assert.ok(button('Next card'));assert.equal(document.querySelectorAll('.is-revealed').length,1);

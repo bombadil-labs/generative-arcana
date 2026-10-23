@@ -8,10 +8,11 @@ import { createArcanaAdapter } from '../src/hostStore';
 import type { UserDeckCatalogRepository } from '../src/userDeckCatalog';
 
 const origin = new URL(PARLOR_OWNER.issuer).origin;
-const env = { PARLOR_MODE:'byok', PARLOR_OWNER_KEYS_ENABLED:'true', BETTER_AUTH_URL:origin, PARLOR_OWNER_ANTHROPIC_MODEL:'claude-test-owner', ANTHROPIC_API_KEY:'synthetic-owner-anthropic-secret', ELEVENLABS_API_KEY:'synthetic-owner-eleven-secret' };
+const env = { PARLOR_MODE:'byok', PARLOR_OWNER_KEYS_ENABLED:'true', BETTER_AUTH_URL:origin, PARLOR_OWNER_ANTHROPIC_MODEL:'claude-test-owner', PARLOR_OWNER_ELEVENLABS_VOICE_ID:'env-voice', ANTHROPIC_API_KEY:'synthetic-owner-anthropic-secret', ELEVENLABS_API_KEY:'synthetic-owner-eleven-secret' };
 assert.equal(parlorConfig({...env,PARLOR_OWNER_KEYS_ENABLED:undefined}).ownerKeys,undefined);
 assert.equal(parlorConfig({...env,PARLOR_MODE:'disabled'}).ownerKeys,undefined);
 assert.throws(()=>parlorConfig({...env,PARLOR_OWNER_ANTHROPIC_MODEL:'https://attacker.invalid/model'}));
+assert.throws(()=>parlorConfig({...env,PARLOR_OWNER_ELEVENLABS_VOICE_ID:'../../voice'}));
 assert.throws(()=>parlorConfig({...env,BETTER_AUTH_URL:origin+'/path'}));
 const raw=JSON.parse(await readFile(new URL('../../decks/deep-time/deck.json',import.meta.url),'utf8'));
 const adapter=createArcanaAdapter();adapter.engine.importDeck(raw,{runtimeId:'owner-deck'});
@@ -44,7 +45,9 @@ const provider:typeof fetch=async(input,init)=>{
     const audio=responseMode==='audio-echo'?Buffer.from(env.ELEVENLABS_API_KEY):Buffer.from([73,68,51,0,1,2]);
     return Response.json({audio_base64:audio.toString('base64'),normalized_alignment:{characters:[...words],character_start_times_seconds:[...words].map((_,i)=>i/10),character_end_times_seconds:[...words].map((_,i)=>(i+1)/10)},discarded_metadata:'not returned'});
   }
-  assert.equal(url,'https://api.anthropic.com/v1/messages');assert.equal(headers.get('x-api-key'),env.ANTHROPIC_API_KEY);assert.equal(body.model,'claude-test-owner');assert.equal(body.max_tokens,2000);
+  assert.equal(url,'https://api.anthropic.com/v1/messages');assert.equal(headers.get('x-api-key'),env.ANTHROPIC_API_KEY);assert.ok(['claude-test-owner','claude-sonnet-5-5'].includes(body.model));assert.equal(body.max_tokens,2000);
+  if(body.model==='claude-sonnet-5-5'){assert.deepEqual(body.thinking,{type:'between_tools'});assert.deepEqual(body.output_config,{effort:'low'});assert.equal(body.tools,undefined);assert.equal(body.tool_choice,undefined);}
+  else {assert.equal(body.thinking,undefined);assert.equal(body.output_config,undefined);}
   return Response.json({content:[{type:'text',text:body.system.includes('Return only JSON')?JSON.stringify(narration):'A mock follow-up.'}]});
 };
 // Deliberately permissive page admission models a future allowed nonowner. The credential
@@ -56,7 +59,7 @@ async function call(kind:string,data:unknown={},extra:Record<string,string>={},s
 }
 async function denied(kind:string,data:unknown,status:number,headers:Record<string,string>={}){const before=calls;const r=await call(kind,data,headers);assert.equal(r.status,status,`${identityMode} ${kind}`);const body=await r.text();for(const key of Object.values(config.ownerKeys?.keys??{}))if(key)assert.ok(!body.includes(key));assert.equal(calls,before,'no provider dispatch');}
 try{
-  const caps=await (await fetch(local+'/api/parlor/capabilities')).json();assert.deepEqual(caps.ownerKeys,{anthropicModel:'claude-test-owner',elevenlabs:true});assert.ok(!JSON.stringify(caps).includes('secret'));
+  const caps=await (await fetch(local+'/api/parlor/capabilities')).json();assert.deepEqual(caps.ownerKeys,{anthropicModel:'claude-test-owner',elevenlabs:true,voiceId:'env-voice'});assert.ok(!JSON.stringify(caps).includes('secret'));
   for(const mode of ['other','issuer','anonymous']){identityMode=mode;const otherCaps=await (await fetch(local+'/api/parlor/capabilities')).json();assert.equal(otherCaps.mode,'byok');assert.equal(otherCaps.ownerKeys,undefined);for(const kind of ['narrate','converse','speech','transcribe'])await denied(kind,{...base,text:'Hello',voiceId:'voice'},mode==='anonymous'?401:403);}
   identityMode='owner';authFails=true;for(const kind of ['narrate','speech','transcribe'])await denied(kind,base,503);authFails=false;
   for(const kind of ['narrate','converse','speech','transcribe']){
@@ -65,7 +68,8 @@ try{
     if(kind==='speech'){assert.ok(dispatches.at(-1)!.url.endsWith('/my-selected-voice/with-timestamps'));assert.ok(result.normalized_alignment);}
     if(kind==='converse'){const body=dispatches.at(-1)!.body as {system:string};const context=JSON.parse(body.system.slice(body.system.lastIndexOf('\n')+1));assert.equal(context.cards.length,1);}
   }
-  await denied('narrate',{...base,provider:'openai'},400);await denied('narrate',{...base,model:'claude-other'},400);
+  for(const kind of ['narrate','converse']){const data={...base,model:'claude-sonnet-5-5',...(kind==='converse'?{turns:[{role:'user',content:'Follow up'}],revealed:1}:{})};assert.equal((await call(kind,data)).status,200,'owner can explicitly override default model');}
+  await denied('narrate',{...base,provider:'openai'},400);await denied('narrate',{...base,model:'https://other.invalid/model'},400);await denied('narrate',{...base,model:'gpt-other'},400);
   await denied('narrate',{...base,deckId:'someone-elses-deck'},404);await denied('narrate',{...base,owner:true},400);await denied('speech',{text:'Hello',voiceId:'../../other'},400);
   await denied('speech',{text:'Hello',voiceId:'voice'},403,{origin:'https://attacker.invalid'});await denied('speech',{text:'x'.repeat(4001),voiceId:'voice'},400);
   for(const [key,kinds] of [['ANTHROPIC_API_KEY',['narrate','converse']],['ELEVENLABS_API_KEY',['speech','transcribe']]] as const){config=parlorConfig({...env,[key]:''});for(const kind of kinds)await denied(kind,kind==='speech'?{text:'Hello',voiceId:'voice'}:base,503);}

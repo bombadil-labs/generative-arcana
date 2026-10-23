@@ -38,8 +38,9 @@ function Host({ accountId, onShowChange, capabilities }: { accountId: string; on
   const hosted=capabilities.mode==='hosted';
   const [restored] = useState(() => {
     if(hosted){const first=capabilities.models[0];return {settings:{...defaultSettings(),hosted:true,provider:first.provider,anthropicModel:capabilities.models.find(m=>m.provider==='anthropic')?.id??'',openaiModel:capabilities.models.find(m=>m.provider==='openai')?.id??''},remember:false};}
-    let saved;try { saved=readSettings(window.localStorage, accountId); } catch { saved={settings:defaultSettings(),remember:false}; }
-    return {...saved,settings:{...saved.settings,ownerKeys:capabilities.ownerKeys,anthropicModel:saved.settings.anthropicModel||capabilities.ownerKeys?.anthropicModel||''}};
+    const defaults={anthropicModel:capabilities.ownerKeys?.anthropicModel||'',voiceId:capabilities.ownerKeys?.voiceId||''};
+    let saved;try { saved=readSettings(window.localStorage, accountId,defaults); } catch { saved={settings:{...defaultSettings(),...defaults},remember:false}; }
+    return {...saved,settings:{...saved.settings,ownerKeys:capabilities.ownerKeys}};
   });
   const [settings, setSettings] = useState<Settings>(restored.settings);
   const [remember, setRemember] = useState(restored.remember);
@@ -101,7 +102,7 @@ function Host({ accountId, onShowChange, capabilities }: { accountId: string; on
         <div><h2>The voice</h2><label>Hosted voice<select aria-label="Hosted voice" value={settings.voiceId} onChange={event=>update({...settings,voiceId:event.target.value})}><option value="">Silent</option>{capabilities.voices.map(voice=><option key={voice} value={voice}>{voice}</option>)}</select></label><p>Hosted provider keys are never sent to this browser. Previously remembered browser-mode keys can be removed by clearing site data. Retries consume a new usage reservation, including after an interrupted request.</p></div></>:
       <><div><h2>The reader</h2><p>Entered keys take precedence; account fallbacks are shown below when available.</p><label>Language provider<select aria-label="Language provider" value={settings.provider} onChange={(event) => update({ ...settings, provider: event.target.value as Settings["provider"] })}><option value="anthropic">Anthropic</option><option value="openai">OpenAI</option></select></label>
         <KeyInput label="Anthropic API key" value={settings.anthropicKey} change={(value) => update({ ...settings, anthropicKey: value })} />
-        {capabilities.ownerKeys?.anthropicModel&&<p>Your account can use {capabilities.ownerKeys.anthropicModel} with the Anthropic key left blank. <button onClick={()=>update({...settings,provider:'anthropic',anthropicModel:capabilities.ownerKeys!.anthropicModel!})}>Use account model</button></p>}
+        {capabilities.ownerKeys?.anthropicModel&&<p>Your account defaults to {capabilities.ownerKeys.anthropicModel} with the Anthropic key left blank. You can select another Claude model available to the account. <button onClick={()=>update({...settings,provider:'anthropic',anthropicModel:capabilities.ownerKeys!.anthropicModel!})}>Use account model</button></p>}
         <label>Anthropic model ID<input value={settings.anthropicModel} onChange={(event) => update({ ...settings, anthropicModel: event.target.value })} maxLength={160} placeholder="Enter a model available to your account" /></label>
         <KeyInput label="OpenAI API key" value={settings.openaiKey} change={(value) => update({ ...settings, openaiKey: value })} />
         <label>OpenAI model ID<input value={settings.openaiModel} onChange={(event) => update({ ...settings, openaiModel: event.target.value })} maxLength={160} placeholder="Enter a chat-completions compatible model" /></label>
@@ -109,6 +110,7 @@ function Host({ accountId, onShowChange, capabilities }: { accountId: string; on
       <div><h2>The voice</h2><p>{capabilities.ownerKeys?.elevenlabs?'Your account provides ElevenLabs narration and Scribe when the key below is blank. Keep your selected voice ID, or leave the voice ID blank for captions.':'Optional. Leave the voice key empty for a silent show.'}</p>
         <KeyInput label="ElevenLabs API key" value={settings.elevenKey} change={(value) => update({ ...settings, elevenKey: value })} />
         <label>ElevenLabs voice ID<input value={settings.voiceId} onChange={(event) => update({ ...settings, voiceId: event.target.value })} maxLength={160} /></label>
+        {capabilities.ownerKeys?.voiceId&&<button onClick={()=>update({...settings,voiceId:capabilities.ownerKeys!.voiceId!})}>Use account voice</button>}
         <p className="parlor-warning">Entered keys are masked on screen, not encrypted. This browser and same-origin scripts can read them. Anyone using this device may access remembered keys. Login does not protect localStorage. Entered-key calls go directly from this browser; account-provider calls go through the authenticated server. Server keys are never sent here.</p>
         <label className="parlor-check"><input type="checkbox" checked={remember} onChange={(event) => update(settings, event.target.checked)} />Remember keys on this device (plaintext)</label>
         <button onClick={() => update(clearKeys(settings), false)}>Clear keys from this device</button>

@@ -5,7 +5,7 @@ import { createArcanaAdapter } from './hostStore';
 import { isParlorOwner } from './parlorAccess';
 import { ParlorFault, type OwnerKeysConfig } from './parlorConfig';
 import { defaultSettings, characters } from '../../app/src/parlor/settings';
-import { instructions, conversationContext, parseNarration } from '../../app/src/parlor/providers';
+import { instructions, conversationContext, parseNarration, anthropicReadingOptions } from '../../app/src/parlor/providers';
 import { boundedSpeechBody, parseAlignment, speechPayload } from '../../app/src/parlor/speech';
 import type { ArcanaReading } from '../../app/src/engine/types';
 
@@ -16,7 +16,7 @@ const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v ===
 const text = (v: unknown, max: number) => { if (typeof v !== 'string' || !v.trim() || v.length > max) throw new ParlorFault(400, 'invalid_parlor_request'); return v; };
 function fields(data: Record<string, unknown>, allowed: string[]) { if (Object.keys(data).some(k => !allowed.includes(k))) throw new ParlorFault(400, 'invalid_parlor_request'); }
 export function ownerCapabilities(c?: OwnerKeysConfig) {
-  return { anthropicModel: c?.keys.anthropic && c.anthropicModel ? c.anthropicModel : null, elevenlabs: !!c?.keys.elevenlabs };
+  return { anthropicModel: c?.keys.anthropic && c.anthropicModel ? c.anthropicModel : null, elevenlabs: !!c?.keys.elevenlabs, voiceId: c?.voiceId || null };
 }
 function rejectSecrets(value: unknown, c: OwnerKeysConfig): void {
   const check = (s: string) => { if (Object.values(c.keys).some(k => k && s.includes(k))) throw new ParlorFault(502, 'unusable_provider_response'); };
@@ -84,7 +84,7 @@ export function createOwnerParlorHandler(options: OwnerParlorOptions) {
         } else {
           fields(data, ['deckId', 'token', 'character', 'provider', 'model', 'turns', 'revealed']);
           if (!c.keys.anthropic || !c.anthropicModel) throw new ParlorFault(503, 'owner_provider_unavailable');
-          if (data.provider !== 'anthropic' || data.model !== c.anthropicModel) throw new ParlorFault(400, 'model_not_allowed');
+          if (data.provider !== 'anthropic' || typeof data.model !== 'string' || !/^claude-[A-Za-z0-9._-]{1,140}$/.test(data.model)) throw new ParlorFault(400, 'model_not_allowed');
           const deckId = text(data.deckId, 200), token = text(data.token, 65536);
           const deck = await catalog.get(deckId); if (!deck || deck.ownerId !== who.id) throw new ParlorFault(404, 'deck_unavailable');
           const adapter = createArcanaAdapter(); adapter.engine.importDeck(deck.manifest.data, { runtimeId: deck.id, tagline: deck.manifest.tagline, spreads: deck.manifest.spreads });
@@ -102,7 +102,7 @@ export function createOwnerParlorHandler(options: OwnerParlorOptions) {
             messages = data.turns.map((v, i) => { if (!record(v) || v.role !== (i % 2 === 0 ? 'user' : 'assistant')) throw new ParlorFault(400, 'invalid_conversation'); return { role: v.role as 'user' | 'assistant', content: text(v.content, i % 2 === 0 ? 1200 : 4000) }; });
             system += ` Discuss the current card and the guest's follow-up in 2-4 sentences. Only the revealed cards below are available. Do not invent, name or predict later cards, draw new cards, or advance the reading.\n${conversationContext(reading, Number(revealed))}`;
           }
-          payload = JSON.stringify({ model: c.anthropicModel, max_tokens: 2000, system, messages });
+          payload = JSON.stringify({ model: data.model, ...anthropicReadingOptions(data.model), max_tokens: 2000, system, messages });
           if (Buffer.byteLength(payload) > 64000) throw new ParlorFault(413, 'context_too_large');
           rejectSecrets(payload, c); url = 'https://api.anthropic.com/v1/messages'; headers = { 'x-api-key': c.keys.anthropic, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' };
         }

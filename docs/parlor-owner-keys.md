@@ -17,18 +17,27 @@ put secret values in chat, source, `VITE_*`, `NEXT_PUBLIC_*`, or PR descriptions
 | `PARLOR_OWNER_KEYS_ENABLED` | `true` | Config |
 | `ANTHROPIC_API_KEY` | Your Anthropic API key | Secret |
 | `ELEVENLABS_API_KEY` | Your ElevenLabs API key with TTS and Scribe access | Secret |
-| `PARLOR_OWNER_ANTHROPIC_MODEL` | One exact Claude API model ID available to your key; for example `claude-sonnet-5-5` | Config |
+| `PARLOR_OWNER_ANTHROPIC_MODEL` | `claude-sonnet-5-5` (reader default) | Config |
+| `PARLOR_OWNER_ELEVENLABS_VOICE_ID` | Your selected ElevenLabs voice ID (voice default) | Config |
 
 `claude-sonnet-5-5` is a currently documented model ID; this change does not query
 your account or make paid calls to establish your access. You can instead use the
-exact supported model ID you already use in Parlor. The configured ID is the
-server allowlist, not an arbitrary client override. [Anthropic model IDs](https://platform.claude.com/docs/en/models/overview)
+exact supported Claude model ID you already use in Parlor. This is a default:
+the verified owner may select another Claude model available to their server key.
+Provider origins, Anthropic-only selection, model syntax, output caps and owner
+identity are still enforced server-side. [Anthropic model IDs](https://platform.claude.com/docs/en/models/overview)
+
+For `claude-sonnet-5-5`, both owner-key and BYOK requests explicitly send
+`thinking: {"type":"between_tools"}` and `output_config: {"effort":"low"}`.
+These tool-free readings do not silently inherit high adaptive thinking. No
+`tools`, forced `tool_choice`, or thinking blocks are sent or replayed. Other
+model IDs keep their existing request behavior. [Sonnet 5.5 compatibility](https://platform.claude.com/docs/en/models/sonnet-5-5/whats-new-sonnet-5-5)
 
 No OpenAI server fallback is enabled. ElevenLabs narration remains `eleven_v3`
 with timestamps, and transcription remains `scribe_v2`. These are fixed in code;
-no extra model variables are needed. Keep the existing voice ID in Parlor setup.
-No voice ID, identity ID, role, budget or database variable needs to be added for
-this feature. Leave the existing `BETTER_AUTH_URL` and database settings unchanged.
+no extra speech model variables are needed. The new voice ID setting seeds setup
+only when no voice choice was saved. Identity ID, role, budget and database
+variables are unchanged. Leave the existing `BETTER_AUTH_URL` and database settings unchanged.
 
 For all hosted deployments select **Production and Preview** for the variables.
 Production alone covers production deployments. **Development** separately makes
@@ -50,10 +59,12 @@ such accounts equivalent.
   ElevenLabs key wins for both narration and Scribe. Invalid BYOK keys fail without
   an automatic server-key retry or provider change.
 - When the relevant browser key is blank, the verified owner can use the server
-  key advertised by authenticated capabilities. Anthropic requires the exact
-  configured model; **Use account model** selects it. An empty model field is
-  initialized with that model. Existing model/voice choices and custom personas
-  are retained. OpenAI still requires the browser's own OpenAI key.
+  key advertised by authenticated capabilities. New or previously empty models
+  use the configured model; new voice settings use the configured voice ID.
+  **Use account model** and **Use account voice** restore these defaults explicitly.
+  Existing nonblank model/voice choices and personas are retained, and an explicitly
+  saved blank voice remains silent. Both IDs can be overridden in setup. OpenAI
+  still requires the browser's own OpenAI key.
 - An empty voice ID disables narration when using the owner fallback; Scribe can
   still transcribe intentional push-to-talk clips. Microphone handling, release,
   cancellation, audio timing and radio ambience are otherwise unchanged.

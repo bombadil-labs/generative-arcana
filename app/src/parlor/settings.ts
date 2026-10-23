@@ -2,7 +2,7 @@ export type Provider = "anthropic" | "openai";
 export interface Settings {
   hosted?: boolean;
   // Server-issued availability only, never persisted or used as server authorization.
-  ownerKeys?: { anthropicModel: string | null; elevenlabs: boolean };
+  ownerKeys?: { anthropicModel: string | null; elevenlabs: boolean; voiceId?: string | null };
   provider: Provider;
   anthropicKey: string;
   anthropicModel: string;
@@ -21,8 +21,8 @@ export const characters = {
 const storageKey = (accountId: string) => `arcana:parlor:credentials:v1:${accountId}`;
 const fields = ["anthropicKey", "anthropicModel", "openaiKey", "openaiModel", "elevenKey", "voiceId"] as const;
 /** Explicit opt-in only. Storage is plaintext, not encryption or a secret vault. */
-export function readSettings(storage: Storage, accountId: string): { settings: Settings; remember: boolean } {
-  const settings = defaultSettings();
+export function readSettings(storage: Storage, accountId: string, defaults: Partial<Pick<Settings, 'anthropicModel' | 'voiceId'>> = {}): { settings: Settings; remember: boolean } {
+  const settings = { ...defaultSettings(), ...defaults };
   try {
     const raw = storage.getItem(storageKey(accountId));
     if (!raw) return { settings, remember: false };
@@ -33,7 +33,7 @@ export function readSettings(storage: Storage, accountId: string): { settings: S
     if (preferences.character === "keeper" || preferences.character === "showman" || preferences.character === "botanist") settings.character = preferences.character;
     for (const field of fields) {
       const text = (value as Record<string, unknown>)[field];
-      if (typeof text === "string" && text.length <= 4096) settings[field] = text;
+      if (typeof text === "string" && text.length <= 4096 && (field !== 'anthropicModel' || text.trim())) settings[field] = text;
     }
     return { settings, remember: true };
   } catch { return { settings, remember: false }; }
@@ -51,5 +51,5 @@ export function readySettings(settings: Settings): boolean {
   return !!(settings.provider === "anthropic" ? (settings.anthropicKey.trim() || useOwnerAnthropic(settings)) && settings.anthropicModel.trim() : settings.openaiKey.trim() && settings.openaiModel.trim())
     && (!settings.elevenKey.trim() || !!settings.voiceId.trim());
 }
-export const useOwnerAnthropic = (s: Settings) => !s.hosted && s.provider === 'anthropic' && !s.anthropicKey.trim() && !!s.ownerKeys?.anthropicModel && s.anthropicModel === s.ownerKeys.anthropicModel;
+export const useOwnerAnthropic = (s: Settings) => !s.hosted && s.provider === 'anthropic' && !s.anthropicKey.trim() && !!s.ownerKeys?.anthropicModel && /^claude-[A-Za-z0-9._-]{1,140}$/.test(s.anthropicModel);
 export const useOwnerEleven = (s: Settings) => !s.hosted && !s.elevenKey.trim() && s.ownerKeys?.elevenlabs === true;
