@@ -25,20 +25,21 @@ test('alignment validates shape and monotonic finite times; captions follow actu
   for(const value of [null,{}, {...alignment,characters:[]},{...alignment,character_end_times_seconds:[.1]}, {...alignment,character_end_times_seconds:[.1,.2,NaN,.4,1.1,1.2,1.3]}, {...alignment,character_start_times_seconds:[0,.1,.2,.3,1,.9,1.2]}])assert.equal(parseAlignment(value),undefined);
 });
 test('v3 retains selected voice and reveals no future text during delayed, paused or stalled playback',async()=>{
-  const old={fetch:global.fetch,Audio:global.Audio,create:URL.createObjectURL,revoke:URL.revokeObjectURL};let player,request,revoked=0,played=0;const captions=[];
+  const old={fetch:global.fetch,Audio:global.Audio,create:URL.createObjectURL,revoke:URL.revokeObjectURL};let player,request,revoked=0,played=0,waiting=0;const captions=[];
   try{
     global.fetch=async(url,init)=>{request={url,init};return Response.json({audio_base64:btoa('audio'),normalized_alignment:alignment});};
     URL.createObjectURL=()=> 'blob:mock';URL.revokeObjectURL=()=>revoked++;
     global.Audio=class{currentTime=0;constructor(){player=this;}play(){return Promise.resolve();}pause(){}removeAttribute(){}load(){}};
     // Provider normalization differs from the request: show the aligned words, not original digits.
-    const pending=speak(settings,'1 2',new AbortController().signal,()=>played++,undefined,(text,timing)=>captions.push({text,timing}));
+    const pending=speak(settings,'1 2',new AbortController().signal,()=>played++,undefined,(text,timing)=>captions.push({text,timing}),()=>waiting++);
     for(let i=0;i<30&&!player;i++)await tick();assert.ok(player);
     assert.equal(request.url,'https://api.elevenlabs.io/v1/text-to-speech/the-selected-voice/with-timestamps');assert.equal(JSON.parse(request.init.body).model_id,'eleven_v3');assert.equal(request.init.credentials,'omit');assert.equal(request.init.redirect,'error');
     player.currentTime=.3;player.ontimeupdate();assert.deepEqual(captions,[],'nothing before actual playing');
     player.currentTime=0;player.onplaying();assert.equal(played,1);assert.deepEqual(captions.at(-1),{text:'',timing:'aligned'});
     player.currentTime=.3;player.ontimeupdate();assert.equal(captions.at(-1).text,'One');
     await tick();player.ontimeupdate();assert.equal(captions.at(-1).text,'One','wall time cannot advance captions');
-    player.currentTime=1.3;player.ontimeupdate();player.onended();await pending;assert.equal(captions.at(-1).text,'One two');assert.equal(revoked,1);assert.equal(player.ontimeupdate,null);
+    player.onwaiting();assert.equal(waiting,1);player.onplaying();assert.equal(played,2);assert.equal(captions.at(-1).text,'One','resume does not erase captions');player.onpause();assert.equal(waiting,2);player.onplaying();assert.equal(played,3);
+    player.currentTime=1.3;player.ontimeupdate();const lateWaiting=player.onwaiting;player.onended();await pending;assert.equal(captions.at(-1).text,'One two');assert.equal(revoked,1);assert.equal(player.ontimeupdate,null);assert.equal(player.onwaiting,null);lateWaiting();assert.equal(waiting,2);
   }finally{Object.assign(global,{fetch:old.fetch,Audio:old.Audio});URL.createObjectURL=old.create;URL.revokeObjectURL=old.revoke;}
 });
 test('missing/invalid alignment uses truthful segment-end reveal and never fakes word timing',async()=>{

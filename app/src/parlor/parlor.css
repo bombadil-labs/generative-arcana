@@ -50,7 +50,7 @@
 @media (max-width: 800px) { .parlor-settings { grid-template-columns: 1fr; } .parlor { padding: 24px 16px; } .parlor-table figcaption strong { font-size: 16px; } .parlor-caption { font-size: 19px; } }
 @media (prefers-reduced-motion: reduce) { .parlor-card-turn { transition: none; } }
 
-.parlor-show { min-height: 100vh; min-height: 100dvh; box-sizing: border-box; display: grid; place-items: center; padding: clamp(16px, 3vw, 40px); animation: parlor-arrive 450ms ease-out; }
+.parlor-show { min-height: 100vh; min-height: 100dvh; box-sizing: border-box; display: grid; place-items: center; padding: clamp(16px, 3vw, 40px); }
 .parlor-show .parlor-ritual { width: 100%; max-width: 1200px; margin: auto; outline: none; }
 .parlor-show .parlor-table { width: min(100%, 95vh); width: min(100%, 95dvh); max-width: 800px; margin: 24px auto; }
 .parlor-user-transcript { max-width: 760px; margin: 0 auto 20px; text-align: center; color: #e9c98a; font: italic clamp(18px, 2.3vw, 25px)/1.5 var(--font-display); min-height: 1.5em; overflow-wrap: anywhere; }
@@ -63,12 +63,53 @@
 .parlor-show:has(.parlor-idle), .parlor-show:has(.parlor-summoning) { background: #09090d; }
 .parlor-idle .parlor-talk { border: 0; background: transparent; box-shadow: none; padding: 40px 20px; max-width: 680px; color: #d4c6aa; font: 24px/1.6 var(--font-display); }
 .parlor-slot { aspect-ratio: 2 / 3; border: 1px solid #927b54; border-radius: 10px; background: #17131d; box-sizing: border-box; box-shadow: inset 0 0 40px #cdaa6b0d; }
-.parlor-summoning { position: relative; isolation: isolate; }
-.parlor-summoning::before { content: ""; position: absolute; z-index: -1; inset: -3vh -2vw; pointer-events: none; background: repeating-radial-gradient(ellipse at center, transparent 0 24px, #dcbf8930 25px 26px, transparent 27px 60px); opacity: .15; animation: parlor-signal 3.5s ease-in-out infinite; }
-.parlor-summoning .parlor-spread-slots { animation: parlor-materialize 7s ease-out both; }
-@keyframes parlor-signal { 0%, 100% { opacity: .08; } 50% { opacity: .32; } }
-@keyframes parlor-materialize { from { opacity: .05; } to { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .parlor-summoning::before, .parlor-summoning .parlor-spread-slots { animation: none; } .parlor-summoning::before { opacity: .12; } }
+.parlor-ritual { position: relative; isolation: isolate; }
+.parlor-radio { --contact: 0; color: #f3be70; width: min(100%, 640px); margin: 0 auto 18px; pointer-events: none; }
+.parlor-radio-dial { width: 100%; height: clamp(70px, 11dvh, 116px); display: block; overflow: visible; }
+.radio-rail, .radio-ticks, .radio-carrier { stroke: #ac8046; stroke-width: 1.5; fill: none; }
+.radio-carrier { opacity: .4; }
+.radio-contact { stroke: currentColor; stroke-width: 4; fill: none; stroke-dasharray: 100; stroke-dashoffset: 100; }
+.radio-needle { fill: #ffdda2; transform-origin: 320px 280px; transform: rotate(0deg); }
+.radio-wave { fill: none; stroke: currentColor; stroke-width: 2.5; opacity: .28; transform-origin: center 101px; transform: scaleY(.25); }
+.radio-lamp { fill: currentColor; }
+.parlor .parlor-radio-label { margin: 8px 0 0; color: #ffe0a7; text-align: center; font: small-caps 500 clamp(18px, 2.2vw, 25px)/1.25 var(--font-display); letter-spacing: .09em; }
+.parlor-radio-halo { position: absolute; z-index: -1; inset: -18px -1vw; border: 1px solid #dcb07124; border-radius: 50% 50% 12px 12px / 24% 24% 12px 12px; pointer-events: none; opacity: .3; background: repeating-radial-gradient(ellipse at 50% 34%, transparent 0 78px, #e8b36c36 79px 80px, transparent 81px 114px); }
+.parlor-radio-halo::after { content: ""; position: absolute; inset: 0; opacity: .4; background: repeating-linear-gradient(0deg, transparent 0 5px, #d5ac7524 6px, transparent 7px 13px); mask-image: linear-gradient(90deg, #000, transparent 20% 80%, #000); }
+.parlor-radio[data-mode=tuning] .radio-contact { stroke-dashoffset: calc(100 - var(--contact) * 100); }
+.parlor-radio[data-mode=tuning] .radio-needle { transform: rotate(calc(-38deg + var(--contact) * 76deg)); }
+.parlor-radio[data-mode=tuning] .parlor-radio-halo { opacity: calc(.35 + var(--contact) * .6); }
+.parlor-radio[data-mode=searching] .radio-needle { animation: radio-search 5s ease-in-out infinite alternate; }
+.parlor-radio[data-mode=searching] .radio-wave { animation: radio-drift 4s ease-in-out infinite alternate; opacity: .75; }
+.parlor-radio[data-mode=searching] .parlor-radio-halo { opacity: .7; }
+.parlor-radio[data-mode=searching] .parlor-radio-halo::after { animation: radio-static 6s linear infinite alternate; }
+.parlor-radio[data-mode=listening] .radio-wave { transform: scaleY(.65); opacity: 1; }
+.parlor-radio[data-mode=listening] .radio-lamp { stroke: #ffe9ba; stroke-width: 5; }
+.parlor-radio[data-mode=speaking] .radio-wave { animation: radio-broadcast 3s ease-in-out infinite alternate; opacity: 1; }
+.parlor-radio[data-mode=contact] .radio-contact { stroke-dashoffset: 0; }
+.parlor-radio[data-mode=contact] .parlor-radio-halo { opacity: .85; }
+.parlor-radio[data-mode=waiting] .radio-needle, .parlor-radio[data-mode=stopped] .radio-needle { visibility: hidden; }
+.parlor-radio[data-mode=stopped] .radio-wave { display: none; }
+.parlor-radio[data-mode=stopped] .radio-lamp { fill: none; stroke: currentColor; stroke-width: 2; }
+.parlor-radio[data-mode=stopped] .parlor-radio-halo { opacity: .15; }
+/* Slow decorative carrier motion, not measured sound or fabricated request progress. */
+@keyframes radio-search { from { transform: rotate(-28deg); } to { transform: rotate(28deg); } }
+@keyframes radio-drift { from { transform: translateX(-24px) scaleY(.45); } to { transform: translateX(24px) scaleY(.75); } }
+@keyframes radio-broadcast { from { transform: scaleY(.5); } to { transform: scaleY(.85); } }
+@keyframes radio-static { from { transform: translateY(-3px); } to { transform: translateY(3px); } }
+/* Leave room for the apparatus and captions on a landscape projector. Artwork stays contained. */
+.parlor-show .parlor-table { width: min(100%, 78dvh); margin: 16px auto; }
+.parlor-show .parlor-caption { margin: 14px auto; min-height: 40px; }
+@media (max-width: 600px) { .parlor-radio { margin-bottom: 14px; } .parlor-radio-halo { inset-inline: 0; } .parlor-radio-label { letter-spacing: .04em; } }
+@media (prefers-reduced-motion: reduce) {
+  .parlor-radio *, .parlor-radio *::after { animation: none !important; transition: none !important; }
+  .parlor-radio[data-mode=tuning] .radio-contact { stroke-dashoffset: 50; }
+  .parlor-radio[data-mode=tuning] .radio-needle { transform: none; }
+  .parlor-radio[data-mode=tuning] .parlor-radio-halo { opacity: .6; }
+  .parlor-radio[data-mode=searching] .radio-wave, .parlor-radio[data-mode=speaking] .radio-wave { transform: scaleY(.65); }
+}
 .parlor-show-hint { font-size: 13px; }
-@keyframes parlor-arrive { from { opacity: 0; } to { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .parlor-show { animation: none; } }
+.parlor-radio-controls { max-width: 420px; margin: 18px auto; text-align: left; }
+.parlor-radio-controls p { font-size: 12px; }
+.parlor-radio-controls input[type=range] { padding: 0; accent-color: var(--parlor-gold); }
+.parlor-sound-options { max-width: 420px; margin: 12px auto; font-size: 12px; }
+.parlor-sound-options summary { cursor: pointer; color: #d4c6aa; }

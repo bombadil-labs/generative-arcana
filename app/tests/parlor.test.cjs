@@ -57,6 +57,16 @@ test('delivery annotations stay out of completed narration and discussion histor
   try {await confirm(machine);await until(machine,'ready');machine.next(true);await until(machine,'ready');assert.equal(machine.getSnapshot().caption,'A perfectly ordinary existential problem.');machine.submit('What do you mean?');await until(machine,'ready');assert.ok(!JSON.stringify(histories).includes('[sarcastic]'));assert.equal(machine.getSnapshot().turns.at(-1).content,'What might you try?');}finally{machine.dispose();}
 });
 
+test('voice waiting ends only on actual playback; reset/error/pause fence stale playback indicators',async()=>{
+  const pending=[];let fail=false;const {machine}=setup({speak:async(_,text,s,playing,r,c,waiting)=>{const d=deferred();pending.push({d,playing,waiting});await d.promise;if(fail)throw new Error('synthetic');}});
+  try {
+    machine.begin();assert.equal(machine.getSnapshot().audioPlaying,false);pending[0].playing();assert.equal(machine.getSnapshot().audioPlaying,true);pending[0].waiting();assert.equal(machine.getSnapshot().audioPlaying,false);pending[0].playing();assert.equal(machine.getSnapshot().audioPlaying,true);
+    machine.cancel();assert.equal(machine.getSnapshot().phase,'paused');assert.equal(machine.getSnapshot().audioPlaying,false);pending[0].playing();assert.equal(machine.getSnapshot().audioPlaying,false);pending[0].d.resolve();await tick();
+    machine.retry();assert.equal(machine.getSnapshot().audioPlaying,false);fail=true;pending[1].d.resolve();await until(machine,'error');assert.equal(machine.getSnapshot().audioPlaying,false);
+    machine.reset();pending[1].playing();assert.equal(machine.getSnapshot().phase,'idle');assert.equal(machine.getSnapshot().audioPlaying,undefined);
+  }finally{pending.forEach(p=>p.d.resolve());machine.dispose();}
+});
+
 test('reset during completed-card discussion clears history and fences late answer',async()=>{
   const late=deferred();let signal;
   const {machine}=setup({converse:async(_,r,turns,s)=>{signal=s;await late.promise;return 'Old guest answer';}});
@@ -234,7 +244,16 @@ test('cancelled or failed narration is not committed; completed caption retry co
 });
 test('discussion context includes only revealed meanings and current card, never hidden card identities',async()=>{
   const reading=await engine.castReading(deck.id,'three-card','Question');const original=global.fetch;let body;
-  try{global.fetch=async(_,init)=>{body=JSON.parse(init.body);return Response.json({content:[{type:'text',text:'A thoughtful answer.'}]});};await converse(settings,reading,[{role:'user',content:'Tell me more'}],new AbortController().signal,1);
-    assert.ok(body.system.includes(reading.placements[0].meaning));assert.ok(!body.system.includes(reading.placements[1].card.name));assert.ok(!body.system.includes(reading.placements[2].card.name));
+  // Random authored card names can also be ordinary words in the persona prompt.
+  // Distinct markers make hidden-context assertions deterministic and unambiguous.
+  reading.placements=reading.placements.map((p,i)=>({...p,card:{...p.card,name:`CONTEXT_CARD_${i+1}`},meaning:`CONTEXT_MEANING_${i+1}`}));
+  try{global.fetch=async(_,init)=>{body=JSON.parse(init.body);return Response.json({content:[{type:'text',text:'A thoughtful answer.'}]});};
+    for(const revealed of [0,1,2,3]){
+      await converse(settings,reading,[{role:'user',content:'Tell me more'}],new AbortController().signal,revealed);
+      const context=JSON.parse(body.system.slice(body.system.lastIndexOf('\n')+1));
+      assert.deepEqual(context.cards,reading.placements.slice(0,revealed).map(p=>({name:p.card.name,position:p.position.name,reversed:p.reversed,meaning:p.meaning})));
+      assert.equal(context.currentCard,reading.placements[revealed-1]?.card.name);
+      for(const hidden of reading.placements.slice(revealed)){assert.ok(!body.system.includes(hidden.card.name));assert.ok(!body.system.includes(hidden.meaning));}
+    }
   }finally{global.fetch=original;}
 });

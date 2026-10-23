@@ -9,6 +9,7 @@ export interface State {
   phase: Phase; question: string; reading?: ArcanaReading; narration?: Narration;
   revealed: number; segment: number; caption: string; timing: CaptionTiming;
   error: string; turns: Turn[]; pendingQuestion: string; userText: string;
+  summonStartedAt?: number; audioPlaying?: boolean;
 }
 const initial = (): State => ({ phase: "idle", question: "", revealed: 0, segment: 0, caption: "", timing: "aligned", error: "", turns: [], pendingQuestion: "", userText: "" });
 export interface Services {
@@ -43,11 +44,11 @@ export class ParlorMachine {
     const controller = new AbortController(); this.controller = controller;
     const current = () => !this.disposed && epoch === this.epoch && !controller.signal.aborted;
     const timer = setTimeout(() => {
-      if (current()) { this.invalidate(); this.set({ phase: "error", error: "This step timed out. Retry, or choose Read without audio." }); }
+      if (current()) { this.invalidate(); this.set({ phase: "error", audioPlaying: false, error: "This step timed out. Retry, or choose Read without audio." }); }
     }, 180000);
     this.timer = timer;
     try { await work(controller.signal, current); }
-    catch (error) { if (current()) this.set({ phase: "error", error: error instanceof ParlorError ? error.message : "This step could not finish. Retry or leave the table." }); }
+    catch (error) { if (current()) this.set({ phase: "error", audioPlaying: false, error: error instanceof ParlorError ? error.message : "This step could not finish. Retry or leave the table." }); }
     finally { clearTimeout(timer); if (epoch === this.epoch) { this.controller = undefined; this.timer = undefined; } }
   }
   begin() {
@@ -55,7 +56,7 @@ export class ParlorMachine {
     this.speech = { kind: "greeting", segment: 0, text: `${characters[this.settings.character].greeting} Press and hold the button until the table is listening, speak your question, then release. A quick tap moves on. Five quick taps clear the table for another visitor.` };
     void this.playSpeech(false);
   }
-  summon() { if (this.state.phase === "idle") { this.summonReleased = false; this.set({ phase: "summoning" }); } }
+  summon(startedAt = performance.now()) { if (this.state.phase === "idle") { this.summonReleased = false; this.set({ phase: "summoning", summonStartedAt: startedAt }); } }
   contact() {
     if (this.state.phase !== "summoning") return;
     this.speech = { kind: "release", segment: 0, text: this.settings.character === "keeper" ? "[exhales] Yes... the signal holds. You may release the button now." : "The signal holds. You may release the button now." };
@@ -100,7 +101,7 @@ export class ParlorMachine {
   cancel() {
     this.cancelSummon();
     if (!["drawing", "generating", "speaking", "conversation"].includes(this.state.phase)) return;
-    this.invalidate(); this.set({ phase: "paused", error: "" });
+    this.invalidate(); this.set({ phase: "paused", audioPlaying: false, error: "" });
   }
   retry(muted = false) {
     if (!["paused", "error"].includes(this.state.phase)) return;
@@ -121,7 +122,7 @@ export class ParlorMachine {
   }
   private playSpeech(muted: boolean) {
     const speech = this.speech!;
-    this.set({ phase: speech.kind === "release" ? "calling" : "speaking", caption: "", error: "", timing: "aligned" });
+    this.set({ phase: speech.kind === "release" ? "calling" : "speaking", audioPlaying: false, caption: "", error: "", timing: "aligned" });
     return this.run(async (signal, current) => {
       const reveal = () => { if (current() && speech.kind === "card") this.set({ revealed: Math.max(this.state.revealed, Math.min(speech.segment + 1, 3)) }); };
       const caption = (text: string, timing: CaptionTiming) => { if (current()) this.set({ caption: text, timing }); };
@@ -131,9 +132,10 @@ export class ParlorMachine {
         reveal(); caption(plainSpeech(speech.text), "silent");
         // Yield once so repeated input cannot consume more than one card in the same turn.
         await Promise.resolve();
-      } else await this.service.speak(this.settings, speech.text, signal, reveal, this.state.reading, caption);
+      } else await this.service.speak(this.settings, speech.text, signal, () => { if (current()) { this.set({ audioPlaying: true }); reveal(); } }, this.state.reading, caption, () => { if (current()) this.set({ audioPlaying: false }); });
       if (!current()) return;
       this.speech = undefined;
+      this.set({ audioPlaying: false });
       if (speech.kind === "release") { this.set({ phase: "awaiting-release" }); if (this.summonReleased) this.begin(); }
       else if (speech.kind === "greeting") this.set({ phase: "question" });
       else if (speech.kind === "card") {
