@@ -1,15 +1,11 @@
 # Approved radio recording
 
-**Delivery blocked:** this repository is public. The MP3 was removed from the
-current branch after discovering that committing it exposes a GitHub download
-outside the app's owner gate. Earlier Git history still contains it; no history
-rewrite or repository-permission change was performed. Do not merge or deploy
-this branch until a private packaging source is approved, or the owner explicitly
-accepts public source distribution. The checksum test intentionally requires the
-approved asset and cannot pass with it absent. The implementation below was
-validated with the approved recording before its removal from the current tree.
+The owner explicitly approved public source distribution of this mix. The MP3 is
+available from this public GitHub repository; the deployed application's audio URL
+retains the existing owner-only Parlor access guard. No repository permissions or
+Git history were changed.
 
-The intended build asset `app/public/assets/parlor-radio-recording.mp3` is the exact approved Library file
+The build asset `app/public/assets/parlor-radio-recording.mp3` is the exact approved Library file
 `libfile_5cabcf8f32388191bcc6c36f9f87a5c0`, version 0, originally named
 `parlor-radio-subtle-180s.mp3`. It is 4,321,442 bytes, 192 kbps, 48 kHz mono,
 180 seconds. SHA-256:
