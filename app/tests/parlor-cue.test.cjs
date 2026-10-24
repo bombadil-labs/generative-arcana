@@ -4,6 +4,12 @@ const {guestCue,IDLE_INVITATION}=require('../.test-build/parlor/cue.js');
 const cue=(phase,segment=0,mic='idle',audioPlaying=false)=>guestCue({phase,segment,audioPlaying},{phase:mic,error:''});
 const text=c=>[c.title,c.instruction].filter(Boolean).join(' ');
 
+test('silent pages invite reading rather than speech or advance, and keep the summon release gate',()=>{
+  const state={phase:'speaking',segment:1,audioPlaying:false,timing:'silent'},mic={phase:'idle',error:''};
+  assert.equal(text(guestCue(state,mic)),'Read along. The pages turn automatically.');
+  assert.match(text(guestCue({...state,phase:'calling'},mic)),/Keep holding/);
+});
+
 test('reset is blank except its invitation; summon never offers a microphone before release',()=>{
   assert.deepEqual(cue('idle',3,'error'),{title:IDLE_INVITATION});
   for(const phase of ['summoning','calling'])assert.match(text(cue(phase)),/holding/);

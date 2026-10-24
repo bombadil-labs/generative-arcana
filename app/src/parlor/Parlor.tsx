@@ -12,6 +12,8 @@ import { ParlorMachine } from "./machine";
 import { ScribeMicrophone, transcribeScribe } from "./microphone";
 import { TableGestures, tableInput, tableKey, HOLD_MS, SUMMON_MS } from "./gestures";
 import { RadioSignal } from "./RadioSignal";
+import { Transcript } from "./Transcript";
+import { readSilently } from "./silentReading";
 import { radioState } from "./radio";
 import { guestCue } from "./cue";
 import { RadioAudio, defaultRadioPreferences, type RadioPreferences } from "./radioAudio";
@@ -160,9 +162,10 @@ function TableSetup({ deckId, settings, hosting, start, leave, startButton, radi
 }
 function Ritual({ deckId, settings, leave, radioPreferences, changeRadio, operatorControls }: { deckId: string; settings: Settings; leave(): void; operatorControls: boolean } & RadioOptions) {
   const artwork = useArtworkStore();
+  const captionWindow = useRef<HTMLDivElement>(null);
   const machine = useMemo(() => new ParlorMachine(deckId, settings, { preload: async (reading) => {
     await Promise.all(reading.cards.map((card) => artwork?.load(card.slug)));
-  } }), [deckId, settings, artwork]);
+  }, readSilently: (text, signal, show) => readSilently(text, signal, show, captionWindow.current) }), [deckId, settings, artwork]);
   const state = useSyncExternalStore(machine.subscribe, machine.getSnapshot, machine.getSnapshot);
   const speechInputAvailable = !settings.hosted && (!!settings.elevenKey.trim() || useOwnerEleven(settings));
   const microphone = useMemo(() => new ScribeMicrophone(text => machine.submit(text), () => settings.hosted ? "" : settings.elevenKey, undefined,
@@ -239,7 +242,7 @@ function Ritual({ deckId, settings, leave, radioPreferences, changeRadio, operat
     onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) controls.cancel(); }}>
     <div className="parlor-scene">
     <RadioSignal signal={signal} startedAt={state.summonStartedAt} showLabel={false} />
-    {!idle && !contact && <div className="parlor-user-transcript" aria-label="Your words" aria-live="polite">{state.userText}</div>}
+    {!idle && <Transcript kind="user" text={contact ? "" : state.userText} />}
     {state.reading && (
       <div className="parlor-table" aria-label="Three-card reading">
         {state.reading.placements.map((placement, index) => <figure key={placement.card.slug}>
@@ -254,7 +257,7 @@ function Ritual({ deckId, settings, leave, radioPreferences, changeRadio, operat
       </div>
     )}
     {!state.reading && !idle && <div className="parlor-table parlor-spread-slots" aria-label="Three empty card spaces">{[0, 1, 2].map(index => <div key={index} className="parlor-slot" aria-hidden="true" />)}</div>}
-    {!idle && <div className="parlor-caption" aria-label="Narrator transcript" aria-live="off">{state.caption}</div>}
+    {!idle && <Transcript kind="narrator" text={state.caption} silent={state.timing === "silent"} windowRef={captionWindow} />}
     </div>
     <aside id="parlor-guest-cue" className="parlor-cue" aria-label="Table instructions" aria-description={cue.attention ? state.error || mic.error : undefined} role={cue.attention ? "alert" : "status"} aria-atomic="true">
       <p className="parlor-cue-title">{cue.title}</p>{cue.instruction && <p className="parlor-cue-detail">{cue.instruction}</p>}
