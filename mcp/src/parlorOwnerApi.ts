@@ -4,7 +4,8 @@ import type { UserDeckCatalogRepository } from './userDeckCatalog';
 import { createArcanaAdapter } from './hostStore';
 import { isParlorOwner } from './parlorAccess';
 import { ParlorFault, type OwnerKeysConfig } from './parlorConfig';
-import { defaultSettings, characters, visionFrames } from '../../app/src/parlor/settings';
+import { defaultSettings, characters } from '../../app/src/parlor/settings';
+import { narrationContext, READER_INPUT_BYTES } from '../../app/src/parlor/context';
 import { narrationInstructions, discussionInstructions, conversationContext, parseNarration, anthropicReadingOptions } from '../../app/src/parlor/providers';
 import { boundedSpeechBody, parseAlignment, speechPayload } from '../../app/src/parlor/speech';
 import type { ArcanaReading } from '../../app/src/engine/types';
@@ -97,7 +98,7 @@ export function createOwnerParlorHandler(options: OwnerParlorOptions) {
           let messages: { role: 'user' | 'assistant'; content: string }[];
           if (kind === 'narrate') {
             system = narrationInstructions(persona);
-            messages = [{ role: 'user', content: adapter.engine.buildInterpretationContext(reading) + '\nCARD IDENTITIES IN ORDER\n' + JSON.stringify(reading.placements.map((p, index) => ({ slug: p.card.slug, name: p.card.name, position: p.position.name, reversed: p.reversed, narrativeFrame: visionFrames[index] }))) }];
+            messages = [{ role: 'user', content: narrationContext(reading) }];
           } else {
             const revealed = data.revealed;
             if (!Number.isInteger(revealed) || Number(revealed) < 1 || Number(revealed) > 3 || !Array.isArray(data.turns) || !data.turns.length || data.turns.length > 21 || data.turns.length % 2 !== 1) throw new ParlorFault(400, 'invalid_conversation');
@@ -105,7 +106,7 @@ export function createOwnerParlorHandler(options: OwnerParlorOptions) {
             system = `${discussionInstructions(persona)}\n${conversationContext(reading, Number(revealed))}`;
           }
           payload = JSON.stringify({ model: data.model, ...anthropicReadingOptions(data.model), max_tokens: 2000, system, messages });
-          if (Buffer.byteLength(payload) > 64000) throw new ParlorFault(413, 'context_too_large');
+          if (Buffer.byteLength(payload) > READER_INPUT_BYTES) throw new ParlorFault(413, 'context_too_large');
           rejectSecrets(payload, c); url = 'https://api.anthropic.com/v1/messages'; headers = { 'x-api-key': c.keys.anthropic, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' };
         }
       }

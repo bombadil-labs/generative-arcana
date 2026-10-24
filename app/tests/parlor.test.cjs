@@ -7,7 +7,8 @@ const { focusedCard } = require('../.test-build/parlor/cardFocus.js');
 const { defaultSettings, saveSettings, readSettings } = require('../.test-build/parlor/settings.js');
 const { narrate, speak, converse, parseNarration, ParlorError } = require('../.test-build/parlor/providers.js');
 const { safeAccountReturnTo } = require('../.test-build/auth/api.js');
-const { rawDeck } = require('./fixtures.cjs');
+const {rawDeck}=require('./fixtures.cjs');
+const {resolveCardRenderSpec}=require('../.test-build/decks/renderSpec.js');
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const deferred = () => { let resolve; const promise = new Promise(r => resolve = r); return { promise, resolve }; };
 const engine = new ArcanaEngine(new DeckRegistry());
@@ -318,7 +319,7 @@ test('discussion context includes only revealed meanings and current card, never
     for(const revealed of [0,1,2,3]){
       await converse(settings,reading,[{role:'user',content:'Tell me more'}],new AbortController().signal,revealed);
       const context=JSON.parse(body.system.slice(body.system.lastIndexOf('\n')+1));
-      assert.deepEqual(context.cards,reading.placements.slice(0,revealed).map((p,index)=>({name:p.card.name,position:p.position.name,reversed:p.reversed,meaning:p.meaning,narrativeFrame:['Past','Present','Future'][index]})));
+      assert.deepEqual(context.cards,reading.placements.slice(0,revealed).map((p,index)=>({name:p.card.name,position:p.position.name,reversed:p.reversed,meaning:p.meaning,narrativeFrame:['Past','Present','Future'][index],positionContext:p.position,visualGrounding:'authored_scene',card:p.card,renderSpec:resolveCardRenderSpec(reading.deck,p.card)})));
       assert.equal(context.currentCard,reading.placements[revealed-1]?.card.name);
       for(const hidden of reading.placements.slice(revealed)){assert.ok(!body.system.includes(hidden.card.name));assert.ok(!body.system.includes(hidden.meaning));}
     }

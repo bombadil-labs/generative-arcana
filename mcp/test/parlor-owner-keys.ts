@@ -6,6 +6,8 @@ import { createParlorHandler } from '../src/parlorApi';
 import { PARLOR_OWNER } from '../src/parlorAccess';
 import { createArcanaAdapter } from '../src/hostStore';
 import { defaultSettings } from '../../app/src/parlor/settings';
+import { encodeReading } from '../../app/src/reading/encode';
+import { resolveCardRenderSpec } from '../../app/src/decks/renderSpec';
 import { narrationInstructions, discussionInstructions } from '../../app/src/parlor/providers';
 import type { UserDeckCatalogRepository } from '../src/userDeckCatalog';
 
@@ -16,9 +18,12 @@ assert.equal(parlorConfig({...env,PARLOR_MODE:'disabled'}).ownerKeys,undefined);
 assert.throws(()=>parlorConfig({...env,PARLOR_OWNER_ANTHROPIC_MODEL:'https://attacker.invalid/model'}));
 assert.throws(()=>parlorConfig({...env,PARLOR_OWNER_ELEVENLABS_VOICE_ID:'../../voice'}));
 assert.throws(()=>parlorConfig({...env,BETTER_AUTH_URL:origin+'/path'}));
-const raw=JSON.parse(await readFile(new URL('../../decks/deep-time/deck.json',import.meta.url),'utf8'));
-const adapter=createArcanaAdapter();adapter.engine.importDeck(raw,{runtimeId:'owner-deck'});
-const reading=await adapter.engine.castReading('owner-deck','three-card','A private question');
+// Optional local manifest exercises exact private scenes without publishing them.
+const fixture=JSON.parse(await readFile(process.env.PARLOR_CONTEXT_FIXTURE??new URL('../../decks/deep-time/deck.json',import.meta.url),'utf8'));
+const raw=fixture.data??fixture;
+const adapter=createArcanaAdapter(),deck=adapter.engine.importDeck(raw,{runtimeId:'owner-deck'});
+const chosen=raw.cards['zeppelin-host']&&raw.cards['major-13']?['zeppelin-host','major-13',deck.cards.find(c=>!['zeppelin-host','major-13'].includes(c.slug))!.slug]:deck.cards.slice(0,3).map(c=>c.slug);
+const reading=await adapter.engine.resolveReading(await encodeReading(deck,'three-card','A private question',chosen.map((slug,i)=>({slug,reversed:i===1}))),deck.id);
 const narration={cards:reading.placements.map(p=>({slug:p.card.slug,text:'A mock interpretation.'})),synthesis:'A mock synthesis.'};
 const base={deckId:'owner-deck',token:reading.token,character:'keeper',provider:'anthropic',model:'claude-test-owner'};
 const catalog={get:async(id:string)=>id==='owner-deck'?{id,ownerId:'usr_owner',manifest:{data:raw}}:null} as unknown as UserDeckCatalogRepository;
@@ -54,6 +59,14 @@ const provider:typeof fetch=async(input,init)=>{
   assert.equal(url,'https://api.anthropic.com/v1/messages');assert.equal(headers.get('x-api-key'),env.ANTHROPIC_API_KEY);assert.ok(['claude-test-owner','claude-sonnet-5-5'].includes(body.model));assert.equal(body.max_tokens,2000);
   assert.ok(body.system.startsWith(body.system.includes('Return only JSON')?narrationInstructions(defaultSettings()):discussionInstructions(defaultSettings())),'owner uses the same ether/control-free prompt as BYOK');
   if(body.system.includes('Return only JSON'))assert.deepEqual(JSON.parse(body.messages[0].content.split('CARD IDENTITIES IN ORDER\n')[1]).map((p:{narrativeFrame:string})=>p.narrativeFrame),['Past','Present','Future']);
+  const context=body.system.includes('Return only JSON')?JSON.parse(body.messages[0].content.split('AUTHORED VISION SOURCES\n')[1].split('\n\nCARD IDENTITIES')[0]):JSON.parse(body.system.slice(body.system.lastIndexOf('\n')+1));
+  for(const [i,source] of context.cards.entries()){
+    assert.deepEqual(source.card,reading.placements[i].card,'owner gets full authored card, not a title/meaning summary');
+    assert.deepEqual(source.renderSpec,resolveCardRenderSpec(reading.deck,reading.placements[i].card));
+    assert.equal(source.renderSpec.render.scene.description,reading.placements[i].card.visuals.detailed_description);
+  }
+  for(const hidden of reading.placements.slice(context.cards.length))assert.ok(!JSON.stringify(context).includes(hidden.card.visuals.detailed_description),'owner discussion cannot see a future scene');
+  assert.ok(body.messages.every((m:{content:unknown})=>typeof m.content==='string'),'no image blocks');
   if(body.model==='claude-sonnet-5-5'){assert.deepEqual(body.thinking,{type:'between_tools'});assert.deepEqual(body.output_config,{effort:'low'});assert.equal(body.tools,undefined);assert.equal(body.tool_choice,undefined);}
   else {assert.equal(body.thinking,undefined);assert.equal(body.output_config,undefined);}
   return Response.json({content:[{type:'text',text:body.system.includes('Return only JSON')?JSON.stringify(narration):'A mock follow-up.'}]});
@@ -78,6 +91,8 @@ try{
     if(kind==='converse'){const body=dispatches.at(-1)!.body as {system:string};const context=JSON.parse(body.system.slice(body.system.lastIndexOf('\n')+1));assert.equal(context.cards.length,1);}
   }
   for(const kind of ['narrate','converse']){const data={...base,model:'claude-sonnet-5-5',...(kind==='converse'?{turns:[{role:'user',content:'Follow up'}],revealed:1}:{})};assert.equal((await call(kind,data)).status,200,'owner can explicitly override default model');}
+  for(const revealed of [2,3])assert.equal((await call('converse',{...base,turns:[{role:'user',content:'Continue from the completed vision'}],revealed})).status,200,'all and only revealed scenes reach later discussion');
+  {const before=calls;const response=await call('converse',{...base,revealed:1,turns:Array.from({length:21},(_,i)=>({role:i%2?'assistant':'user',content:i%2?'界'.repeat(2000):'x'.repeat(1200)}))});assert.equal(response.status,413);assert.deepEqual(await response.json(),{error:'context_too_large'});assert.equal(calls,before,'oversize context is rejected before provider dispatch');}
   await denied('narrate',{...base,provider:'openai'},400);await denied('narrate',{...base,model:'https://other.invalid/model'},400);await denied('narrate',{...base,model:'gpt-other'},400);
   await denied('narrate',{...base,deckId:'someone-elses-deck'},404);await denied('narrate',{...base,owner:true},400);await denied('speech',{text:'Hello',voiceId:'../../other'},400);
   await denied('narrate',{...base,token:'malformed-token'},400);
