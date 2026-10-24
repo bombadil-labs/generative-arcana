@@ -9,6 +9,7 @@ import { getPackArtworkAsset, type PackArtworkAsset } from "../artwork/api";
 import { useArtworkSelection, useArtworkStore } from "../artwork/context";
 import { characters, visionFrames, clearKeys, defaultSettings, readSettings, readySettings, saveSettings, useOwnerEleven, type Settings } from "./settings";
 import { ParlorMachine } from "./machine";
+import { ArtworkVision } from './artworkVision';
 import { ScribeMicrophone, transcribeScribe } from "./microphone";
 import { TableGestures, tableInput, tableKey, HOLD_MS, SUMMON_MS } from "./gestures";
 import { RadioSignal } from "./RadioSignal";
@@ -164,9 +165,13 @@ function TableSetup({ deckId, settings, hosting, start, leave, startButton, radi
 function Ritual({ deckId, settings, leave, radioPreferences, changeRadio, operatorControls }: { deckId: string; settings: Settings; leave(): void; operatorControls: boolean } & RadioOptions) {
   const artwork = useArtworkStore();
   const captionWindow = useRef<HTMLDivElement>(null);
-  const machine = useMemo(() => new ParlorMachine(deckId, settings, { preload: async (reading) => {
-    await Promise.all(reading.cards.map((card) => artwork?.load(card.slug)));
-  }, readSilently: (text, signal, show) => readSilently(text, signal, show, captionWindow.current) }), [deckId, settings, artwork]);
+  const machine = useMemo(() => {
+    const vision = new ArtworkVision(artwork);
+    return new ParlorMachine(deckId, settings, { preload: async (reading, segment) => {
+      if (segment < 3) await artwork?.load(reading.placements[segment].card.slug);
+    }, vision: vision.load.bind(vision), clearVision: vision.clear,
+    readSilently: (text, signal, show) => readSilently(text, signal, show, captionWindow.current) });
+  }, [deckId, settings, artwork]);
   const state = useSyncExternalStore(machine.subscribe, machine.getSnapshot, machine.getSnapshot);
   const speechInputAvailable = !settings.hosted && (!!settings.elevenKey.trim() || useOwnerEleven(settings));
   const microphone = useMemo(() => new ScribeMicrophone(text => machine.submit(text), () => settings.hosted ? "" : settings.elevenKey, undefined,

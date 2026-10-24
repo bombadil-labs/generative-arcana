@@ -11,7 +11,7 @@ import { createParlorHandler } from '../src/parlorApi';
 import { PARLOR_OWNER } from '../src/parlorAccess';
 import { createArcanaAdapter } from '../src/hostStore';
 import { defaultSettings } from '../../app/src/parlor/settings';
-import { narrationInstructions, discussionInstructions } from '../../app/src/parlor/providers';
+import { narrationInstructions, discussionInstructions, stepInstructions } from '../../app/src/parlor/providers';
 import type { UserDeckCatalogRepository } from '../src/userDeckCatalog';
 
 const env:NodeJS.ProcessEnv={PARLOR_MODE:'hosted',BETTER_AUTH_URL:'https://parlor.example.test',ANTHROPIC_API_KEY:'synthetic-server-anthropic',OPENAI_API_KEY:'synthetic-server-openai',ELEVENLABS_API_KEY:'synthetic-server-voice',
@@ -70,9 +70,10 @@ try {
     if(providerMode==='revoke')await db.query("UPDATE arcana_entitlements SET revoked_at=now() WHERE principal_id='usr_host'");
     if(url.includes('elevenlabs'))return new Response(new Uint8Array([1,2,3]),{headers:{'content-type':'audio/mpeg'}});
     const prompt=JSON.parse(seenBody);const isNarration=seenBody.includes('CARD IDENTITIES IN ORDER');
-    assert.equal(prompt.system??prompt.messages[0].content,isNarration?narrationInstructions(defaultSettings()):discussionInstructions(defaultSettings()),'hosted prompts retain the shared ether persona and visual-only control guidance');
+    const system=prompt.system??prompt.messages[0].content,step=system.includes('"text":"spoken vision"');
+    assert.ok(step?[0,1,2,3].some(i=>system===stepInstructions(defaultSettings(),i)):system===(isNarration?narrationInstructions(defaultSettings()):discussionInstructions(defaultSettings())),'hosted prompts retain the shared ether persona and visual-only control guidance');
     if(isNarration)assert.deepEqual(JSON.parse(prompt.messages.at(-1).content.split('CARD IDENTITIES IN ORDER\n')[1]).map((p:{narrativeFrame:string})=>p.narrativeFrame),['Past','Present','Future']);
-    const content=providerMode==='echo'?JSON.stringify({...narration,synthesis:'synthetic-server-anthropic'}):isNarration?JSON.stringify(narration):'Synthetic follow-up.';
+    const content=providerMode==='echo'?JSON.stringify({...narration,synthesis:'synthetic-server-anthropic'}):step?'{"text":"Synthetic vision."}':isNarration?JSON.stringify(narration):'Synthetic follow-up.';
     if(url.includes('openai')){assert.equal(prompt.store,false);return Response.json({choices:[{message:{content}}]});}
     return Response.json({content:[{type:'text',text:content}]});
   };
@@ -107,10 +108,13 @@ try {
   const first=reading.placements[0];
   assert.deepEqual(JSON.parse(revealedContext),{
     question:reading.question,deck:reading.deck.name,currentCard:first.card.name,
-    cards:[{name:first.card.name,position:first.position.name,reversed:first.reversed,meaning:first.meaning,narrativeFrame:'Past'}],
+    cards:[{slug:first.card.slug,name:first.card.name,position:first.position.name,reversed:first.reversed,meaning:first.meaning,narrativeFrame:'Past'}],
   });
   assert.equal(followUp,'Stay with this card');
   assert.equal((await request('converse',{revealed:4,turns:[{role:'user',content:'Invalid count'}]})).status,400);
+  for(const segment of [0,3]){assert.equal((await request('narrate',{segment,turns:[]})).status,200);const content=JSON.parse(seenBody).messages.at(-1).content;assert.equal(typeof content,'string','dormant metered mode retains its existing text-only budget');assert.deepEqual(JSON.parse(content).cards.map((c:{slug:string})=>c.slug),segment===0?[reading.placements[0].card.slug]:reading.placements.map(p=>p.card.slug));}
+  assert.equal((await request('narrate',{segment:4,turns:[]})).status,400);
+  assert.equal((await request('narrate',{segment:0,turns:[],artwork:[]})).status,400,'images cannot silently expand hosted billing');
   assert.equal((await request('speech',{text:'Memory-only audio words',voiceId:'mock-voice'})).status,200);
   assert.equal((await request('speech',{text:'a'.repeat(4001),voiceId:'mock-voice'})).status,400);
   assert.equal((await request('speech',{text:'Hello',voiceId:'unknown'})).status,400);

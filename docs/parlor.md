@@ -44,6 +44,53 @@ delivered. Advancing retains recent discussion alongside the next completed
 narration. Future narration and unspoken synthesis are excluded; interrupted or
 failed delivery is not committed until a retry or explicit silent fallback completes.
 
+## Visual grounding
+
+The selected saved artwork front accompanies its interpretation on supported
+image-input models. The current known model aliases are listed explicitly in
+`app/src/parlor/vision.ts`, including `claude-sonnet-5-5` and `gpt-4.1`.
+Unknown/custom model IDs, unavailable artwork, and the dormant metered hosted
+mode use text-only interpretation. All prompt paths explicitly prohibit guessing
+gender or visual traits from titles or symbolic roles. Images improve grounding;
+they do not eliminate mistaken descriptions or establish someone's gender.
+
+Narration now generates one vision on demand, rather than generating the entire
+reading before the first card. The first request includes only the intended first
+card; each deliberate advance requests the next card's text and image. Discussion
+includes only already revealed cards, and the explicit closing request includes
+the three revealed cards and recent completed conversation. No future image is
+prefetched or sent to a model. Failed generation retries the same card without
+another draw; failed speech reuses the generated text. Reset/cancellation fences
+late preparation, generation and playback callbacks.
+
+This changes a complete reading from one narration request to four (three visions
+and the closing). Images also consume provider input tokens. Later advances can
+therefore include an inference wait, shown by the existing radio/search cues.
+There are no automatic provider retries, extra billing modes or credential changes.
+
+Browser BYOK reuses the same in-memory WebP blob as the selected front. Owner-key
+requests send only deck/card/pack/version references: the server verifies deck
+ownership and reads that exact version through the existing private artwork
+service, never a client URL. Missing or changed versions fall back to text, without
+substituting another pack, card back or cover. Original artwork and metadata remain
+unchanged. Temporary copies preserve aspect ratio and display orientation, use a
+maximum 1024-pixel edge and 512 KB per image, and contain no source metadata.
+At most three images are sent once per request, not repeated in each history turn.
+Prepared browser bytes are cached only within the encounter and cleared on reset
+or exit; server copies live only for the request. There are no Files API uploads,
+new public URLs, server URL fetches, image logging or persistent image copies.
+Optional image preparation has an eight-second deadline per preparation stage;
+the existing private storage read also has its own bounded download deadline.
+
+Formats were checked against the official
+[Claude vision guide](https://platform.claude.com/docs/en/build-with-claude/vision),
+[Claude model catalog](https://platform.claude.com/docs/en/models/overview), and
+[OpenAI image guide](https://developers.openai.com/api/docs/guides/images-vision).
+Claude Messages uses inline base64 `image` source blocks; OpenAI Chat Completions
+uses `image_url` blocks containing inline data URLs with `detail: high`.
+Only fixed provider API origins are used. Actual visual accuracy, model access and
+browser CORS still require a later authorized live acceptance test.
+
 ## Table keyboard
 
 While the encounter is open, ordinary keys work anywhere in the guest view without

@@ -6,7 +6,9 @@ import { createParlorHandler } from '../src/parlorApi';
 import { PARLOR_OWNER } from '../src/parlorAccess';
 import { createArcanaAdapter } from '../src/hostStore';
 import { defaultSettings } from '../../app/src/parlor/settings';
-import { narrationInstructions, discussionInstructions } from '../../app/src/parlor/providers';
+import { narrationInstructions, discussionInstructions, stepInstructions } from '../../app/src/parlor/providers';
+import sharp from 'sharp';
+import type { ParlorArtwork } from '../src/parlorVision';
 import type { UserDeckCatalogRepository } from '../src/userDeckCatalog';
 
 const origin = new URL(PARLOR_OWNER.issuer).origin;
@@ -27,6 +29,7 @@ let upstreamStatus=200;
 let dispatches:{url:string;headers:Headers;body:unknown}[]=[];
 let pending:Promise<void>|undefined, release:()=>void=()=>{}, started:()=>void=()=>{};
 let limitGate:Promise<void>|undefined, limitStarted:()=>void=()=>{}, lastSignal:AbortSignal|null|undefined;
+let artwork:ParlorArtwork|undefined;
 const authenticator={authenticate:async()=>{
   if(authFails)throw new Error(env.ANTHROPIC_API_KEY);
   if(identityMode==='anonymous'||revoked)return null;
@@ -52,15 +55,16 @@ const provider:typeof fetch=async(input,init)=>{
     return Response.json({audio_base64:audio.toString('base64'),normalized_alignment:{characters:[...words],character_start_times_seconds:[...words].map((_,i)=>i/10),character_end_times_seconds:[...words].map((_,i)=>(i+1)/10)},discarded_metadata:'not returned'});
   }
   assert.equal(url,'https://api.anthropic.com/v1/messages');assert.equal(headers.get('x-api-key'),env.ANTHROPIC_API_KEY);assert.ok(['claude-test-owner','claude-sonnet-5-5'].includes(body.model));assert.equal(body.max_tokens,2000);
-  assert.ok(body.system.startsWith(body.system.includes('Return only JSON')?narrationInstructions(defaultSettings()):discussionInstructions(defaultSettings())),'owner uses the same ether/control-free prompt as BYOK');
-  if(body.system.includes('Return only JSON'))assert.deepEqual(JSON.parse(body.messages[0].content.split('CARD IDENTITIES IN ORDER\n')[1]).map((p:{narrativeFrame:string})=>p.narrativeFrame),['Past','Present','Future']);
+  const step=body.system.includes('"text":"spoken vision"');
+  assert.ok(step?[0,1,2,3].some(i=>body.system===stepInstructions(defaultSettings(),i)):body.system.startsWith(body.system.includes('Return only JSON')?narrationInstructions(defaultSettings()):discussionInstructions(defaultSettings())),'owner uses the same ether/control-free prompt as BYOK');
+  if(body.system.includes('Return only JSON')&&!step)assert.deepEqual(JSON.parse(body.messages[0].content.split('CARD IDENTITIES IN ORDER\n')[1]).map((p:{narrativeFrame:string})=>p.narrativeFrame),['Past','Present','Future']);
   if(body.model==='claude-sonnet-5-5'){assert.deepEqual(body.thinking,{type:'between_tools'});assert.deepEqual(body.output_config,{effort:'low'});assert.equal(body.tools,undefined);assert.equal(body.tool_choice,undefined);}
   else {assert.equal(body.thinking,undefined);assert.equal(body.output_config,undefined);}
-  return Response.json({content:[{type:'text',text:body.system.includes('Return only JSON')?JSON.stringify(narration):'A mock follow-up.'}]});
+  return Response.json({content:[{type:'text',text:step?'{"text":"A visible figure."}':body.system.includes('Return only JSON')?JSON.stringify(narration):'A mock follow-up.'}]});
 };
 // Deliberately permissive page admission models a future allowed nonowner. The credential
 // boundary must still independently reject them. Real signed-session admission is in parlor-access.ts.
-const server=createServer((req,res)=>{void createParlorHandler({config,authorize:async()=>true,authenticator,principal:{resolve:async()=>revoked?null:{id:'usr_owner'}},catalog,ownerAllowRequest:async()=>{limitStarted();await limitGate;if(limitFails)throw new Error(env.ELEVENLABS_API_KEY);return !limited;},fetch:provider})(req,res);});
+const server=createServer((req,res)=>{void createParlorHandler({config,authorize:async()=>true,authenticator,principal:{resolve:async()=>revoked?null:{id:'usr_owner'}},catalog,ownerAllowRequest:async()=>{limitStarted();await limitGate;if(limitFails)throw new Error(env.ELEVENLABS_API_KEY);return !limited;},fetch:provider,artwork:()=>artwork})(req,res);});
 await new Promise<void>(r=>server.listen(0,'127.0.0.1',r));const address=server.address();assert.ok(address&&typeof address!=='string');const local=`http://127.0.0.1:${address.port}`;
 async function call(kind:string,data:unknown={},extra:Record<string,string>={},signal?:AbortSignal){
   const speech=kind==='transcribe';return fetch(local+'/api/parlor/owner/'+kind,{method:'POST',headers:{origin,'content-type':speech?'audio/webm':'application/json','x-owner-id':PARLOR_OWNER.subject,'x-user-email':'mbilokonsky@gmail.com',...extra},body:speech?new Uint8Array([1,2,3]):JSON.stringify(data),signal});
@@ -78,6 +82,38 @@ try{
     if(kind==='converse'){const body=dispatches.at(-1)!.body as {system:string};const context=JSON.parse(body.system.slice(body.system.lastIndexOf('\n')+1));assert.equal(context.cards.length,1);}
   }
   for(const kind of ['narrate','converse']){const data={...base,model:'claude-sonnet-5-5',...(kind==='converse'?{turns:[{role:'user',content:'Follow up'}],revealed:1}:{})};assert.equal((await call(kind,data)).status,200,'owner can explicitly override default model');}
+  // Exact selected private artwork, never arbitrary URLs or future card images.
+  const top=await sharp({create:{width:945,height:831,channels:3,background:'#ff0000'}}).png().toBuffer();
+  const image=await sharp({create:{width:945,height:1663,channels:3,background:'#0000ff'}}).composite([{input:top,top:0,left:0}]).webp().toBuffer();
+  const refs=reading.placements.map((p,i)=>({slug:p.card.slug,packId:'chosen.art-pack',version:`00000000-0000-4000-8000-${String(i+1).padStart(12,'0')}`,deckRevision:1}));
+  const imageReads:string[]=[];let broken=false,wrongVersion=false;
+  artwork={image:async(owner,deckId,slug,version,packId)=>{assert.equal(owner,'usr_owner');assert.equal(deckId,'owner-deck');assert.equal(packId,'chosen.art-pack');imageReads.push(slug);if(broken)throw Error('private storage unavailable');return {metadata:{id:wrongVersion?'wrong':version!,deckId,cardSlug:slug,packId:packId!,deckRevision:1,width:945,height:1663,mediaType:'image/webp',byteLength:image.length} as never,bytes:image};}};
+  const stepBody={...base,model:'claude-sonnet-5-5',segment:0,turns:[],artwork:[refs[0]]};
+  for(const mode of ['other','anonymous','issuer']){identityMode=mode;const before=imageReads.length;await denied('narrate',stepBody,mode==='anonymous'?401:403);assert.equal(imageReads.length,before);}identityMode='owner';
+  for(const invalid of [[refs[1]],[refs[0],refs[0]],[{...refs[0],url:'http://169.254.169.254/'}],[{...refs[0],packId:'../other'}],[{...refs[0],version:'https://elsewhere.invalid/'}]])await denied('narrate',{...stepBody,artwork:invalid},400);
+  assert.equal(imageReads.length,0,'invalid/future references rejected before private storage');
+  assert.equal((await call('narrate',stepBody)).status,200);assert.deepEqual(imageReads,[refs[0].slug]);
+  let request=dispatches.at(-1)!.body as any,content=request.messages.at(-1).content;
+  assert.equal(content.filter((p:any)=>p.type==='image').length,1);assert.deepEqual(JSON.parse(content.at(-1).text).cards.map((p:any)=>p.slug),[refs[0].slug]);
+  const encoded=content.find((p:any)=>p.type==='image').source;assert.equal(encoded.type,'base64');const info=await sharp(Buffer.from(encoded.data,'base64')).metadata();assert.equal(info.height,1024);assert.ok(info.width!<1024);assert.equal(info.exif,undefined);
+  const pixel=await sharp(Buffer.from(encoded.data,'base64')).extract({left:10,top:10,width:1,height:1}).raw().toBuffer();assert.equal(pixel[2]>pixel[0],reading.placements[0].reversed,'image orientation matches the displayed reversed/upright front');
+  for(const segment of [1,2,3]){assert.equal((await call('narrate',{...stepBody,segment,artwork:segment===3?refs:[refs[segment]]})).status,200);request=dispatches.at(-1)!.body as any;assert.equal(request.messages.at(-1).content.filter((p:any)=>p.type==='image').length,segment===3?3:1);}
+  const follow={...base,model:'claude-sonnet-5-5',revealed:1,turns:[{role:'user',content:'Previous vision.'},{role:'assistant',content:'A visible figure.'},{role:'user',content:'What did you mean?'}],artwork:[refs[0]]};
+  assert.equal((await call('converse',follow)).status,200);request=dispatches.at(-1)!.body as any;assert.equal(request.messages[1].content,'A visible figure.');assert.equal(request.messages.at(-1).content.filter((p:any)=>p.type==='image').length,1);await denied('converse',{...follow,artwork:[refs[1]]},400);
+  for(const fallback of ['missing','broken','version','unsupported']){
+    broken=fallback==='broken';wrongVersion=fallback==='version';const saved:ParlorArtwork|undefined=artwork;if(fallback==='missing')artwork=undefined;
+    const before:number=imageReads.length;assert.equal((await call('narrate',{...stepBody,model:fallback==='unsupported'?'claude-test-owner':'claude-sonnet-5-5'})).status,200);
+    request=dispatches.at(-1)!.body as any;assert.equal(typeof request.messages.at(-1).content,'string');assert.match(request.system,/do not invent visual traits, clothing or gender/);if(fallback==='unsupported')assert.equal(imageReads.length,before);
+    artwork=saved;broken=wrongVersion=false;
+  }
+  const goodArtwork=artwork;let finishImage:()=>void=()=>{},imageStarted:()=>void=()=>{};
+  const imageGate=new Promise<void>(r=>finishImage=r),atImage=new Promise<void>(r=>imageStarted=r);
+  artwork={image:async(...args)=>{imageStarted();await imageGate;return goodArtwork!.image(...args);}};
+  const beforeImageCancel=calls,abortImage=new AbortController();
+  const closedImage=new Promise<void>(r=>server.once('request',(_req,res)=>res.once('close',()=>r())));
+  const cancelledImage=call('narrate',stepBody,{},abortImage.signal);await atImage;abortImage.abort();await assert.rejects(cancelledImage);await closedImage;finishImage();await new Promise(r=>setTimeout(r,20));assert.equal(calls,beforeImageCancel,'late private image after disconnect cannot dispatch provider');
+  artwork={image:async(...args)=>{const value=await goodArtwork!.image(...args);revoked=true;return value;}};
+  const beforeRevocation=calls;assert.equal((await call('narrate',stepBody)).status,401);assert.equal(calls,beforeRevocation,'owner rechecked after image preparation');revoked=false;artwork=undefined;
   await denied('narrate',{...base,provider:'openai'},400);await denied('narrate',{...base,model:'https://other.invalid/model'},400);await denied('narrate',{...base,model:'gpt-other'},400);
   await denied('narrate',{...base,deckId:'someone-elses-deck'},404);await denied('narrate',{...base,owner:true},400);await denied('speech',{text:'Hello',voiceId:'../../other'},400);
   await denied('narrate',{...base,token:'malformed-token'},400);

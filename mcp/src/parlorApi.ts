@@ -3,7 +3,8 @@ import { createArcanaAdapter } from './hostStore';
 import type { BrowserPrincipalResolver, BrowserSessionAuthenticator } from './browserSession';
 import type { UserDeckCatalogRepository } from './userDeckCatalog';
 import { characters, defaultSettings, visionFrames } from '../../app/src/parlor/settings';
-import { narrationInstructions, discussionInstructions, conversationContext, parseNarration } from '../../app/src/parlor/providers';
+import { narrationInstructions, discussionInstructions, conversationContext, parseNarration, stepInstructions, stepContext, parseStep } from '../../app/src/parlor/providers';
+import type { ParlorArtwork } from './parlorVision';
 import { ParlorFault, publicParlorConfig, type ParlorConfig } from './parlorConfig';
 import type { ParlorStore, Reservation } from './parlorStore';
 import { isParlorOwner } from './parlorAccess';
@@ -34,9 +35,9 @@ export function rejectParlorSecrets(value:unknown,c:ParlorConfig):void {
   if(Array.isArray(value))for(const item of value)rejectParlorSecrets(item,c);
   else if(record(value))for(const item of Object.values(value))rejectParlorSecrets(item,c);
 }
-export function createParlorHandler(options:{config:ParlorConfig;authorize?:(req:IncomingMessage,res:ServerResponse)=>Promise<boolean>;authenticator?:BrowserSessionAuthenticator;ownerAllowRequest?:()=>Promise<boolean>;store?:ParlorStore;principal?:BrowserPrincipalResolver;catalog?:UserDeckCatalogRepository;fetch?:typeof fetch}) {
+export function createParlorHandler(options:{config:ParlorConfig;authorize?:(req:IncomingMessage,res:ServerResponse)=>Promise<boolean>;authenticator?:BrowserSessionAuthenticator;ownerAllowRequest?:()=>Promise<boolean>;store?:ParlorStore;principal?:BrowserPrincipalResolver;catalog?:UserDeckCatalogRepository;fetch?:typeof fetch;artwork?:()=>ParlorArtwork|undefined}) {
   const {config:c,store,principal,catalog}=options;const send=options.fetch??fetch;
-  const ownerHandler=createOwnerParlorHandler({config:c.mode==='byok'?c.ownerKeys:undefined,authenticator:options.authenticator,principal,catalog,allowRequest:options.ownerAllowRequest,fetch:options.fetch});
+  const ownerHandler=createOwnerParlorHandler({config:c.mode==='byok'?c.ownerKeys:undefined,authenticator:options.authenticator,principal,catalog,allowRequest:options.ownerAllowRequest,fetch:options.fetch,artwork:options.artwork});
   return async(req:IncomingMessage,res:ServerResponse)=>{
     // Also guard direct handler use: BYOK capabilities must never bypass authorization.
     if (!options.authorize) return json(res,503,{error:'parlor_auth_unavailable'});
@@ -66,7 +67,9 @@ export function createParlorHandler(options:{config:ParlorConfig;authorize?:(req
       if(req.method!=='POST')throw new ParlorFault(405,'post_required');
       if(req.headers.origin!==c.origin)throw new ParlorFault(403,'origin_not_allowed');
       const data=await readBody(req,abort.signal);
-      if(Object.keys(data).some(key=>!['operationId','deckId','token','provider','model','character','turns','text','voiceId','revealed'].includes(key)))throw new ParlorFault(400,'invalid_parlor_request');
+      if(Object.keys(data).some(key=>!['operationId','deckId','token','provider','model','character','turns','text','voiceId','revealed','segment'].includes(key)))throw new ParlorFault(400,'invalid_parlor_request');
+      const segment=data.segment;
+      if(segment!==undefined&&(kind!=='narrate'||!Number.isInteger(segment)||Number(segment)<0||Number(segment)>3))throw new ParlorFault(400,'invalid_parlor_request');
       const operation=text(data.operationId,36);if(!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(operation))throw new ParlorFault(400,'invalid_operation_id');
       const deckId=text(data.deckId,200),token=text(data.token,65536);
       const deck=await catalog.get(deckId);if(!deck||deck.ownerId!==who.id)throw new ParlorFault(404,'deck_unavailable');
@@ -86,12 +89,17 @@ export function createParlorHandler(options:{config:ParlorConfig;authorize?:(req
         const choice=c.models.find(m=>m.provider===data.provider&&m.id===data.model);if(!choice)throw new ParlorFault(400,'model_not_allowed');
         provider=choice.provider;model=choice.id;cost=choice.maxCostMicrousd;outputLimit=c.maxOutputTokens;
         const persona={...defaultSettings(),character:character as keyof typeof characters};
-        const system=kind==='narrate'?narrationInstructions(persona):discussionInstructions(persona);
+        const system=kind==='narrate'?(segment===undefined?narrationInstructions(persona):stepInstructions(persona,Number(segment))):discussionInstructions(persona);
         const revealed=data.revealed??3;
         if(kind==='converse'&&(!Number.isInteger(revealed)||Number(revealed)<1||Number(revealed)>3))throw new ParlorFault(400,'invalid_conversation');
         const context=kind==='converse'?conversationContext(reading,Number(revealed)):adapter.engine.buildInterpretationContext(reading);
         let messages:{role:'user'|'assistant';content:string}[];
-        if(kind==='narrate')messages=[{role:'user',content:context+'\nCARD IDENTITIES IN ORDER\n'+JSON.stringify(reading.placements.map((p,index)=>({slug:p.card.slug,name:p.card.name,position:p.position.name,reversed:p.reversed,narrativeFrame:visionFrames[index]})))}];
+        if(kind==='narrate'&&segment!==undefined){
+          if(!Array.isArray(data.turns)||data.turns.length>18||data.turns.length%2!==0)throw new ParlorFault(400,'invalid_conversation');
+          messages=data.turns.map((turn:unknown,i:number)=>{if(!record(turn)||turn.role!==(i%2===0?'user':'assistant'))throw new ParlorFault(400,'invalid_conversation');return {role:turn.role as 'user'|'assistant',content:text(turn.content,i%2===0?1200:4000)};});
+          messages.push({role:'user',content:stepContext(reading,Number(segment))});
+        }
+        else if(kind==='narrate')messages=[{role:'user',content:context+'\nCARD IDENTITIES IN ORDER\n'+JSON.stringify(reading.placements.map((p,index)=>({slug:p.card.slug,name:p.card.name,position:p.position.name,reversed:p.reversed,narrativeFrame:visionFrames[index]})))}];
         else {
           if(!Array.isArray(data.turns)||!data.turns.length||data.turns.length>21||data.turns.length%2!==1)throw new ParlorFault(400,'invalid_conversation');
           messages=data.turns.map((turn:unknown,i:number)=>{if(!record(turn)||turn.role!==(i%2===0?'user':'assistant'))throw new ParlorFault(400,'invalid_conversation');return {role:turn.role as 'user'|'assistant',content:text(turn.content,i%2===0?1200:4000)};});
@@ -116,7 +124,7 @@ export function createParlorHandler(options:{config:ParlorConfig;authorize?:(req
         const value=JSON.parse(new TextDecoder().decode(bytes));
         const prose=provider==='anthropic'?value.content?.filter((p:{type:string})=>p.type==='text').map((p:{text:string})=>p.text).join('\n'):value.choices?.[0]?.message?.content;
         if(typeof prose!=='string'||!prose.trim()||prose.length>(kind==='narrate'?18000:4000))throw new ParlorFault(502,'unusable_provider_response');
-        result=kind==='narrate'?parseNarration(prose,reading):{text:prose};rejectParlorSecrets(result,c);
+        result=kind==='narrate'?(segment===undefined?parseNarration(prose,reading):parseStep(prose)):{text:prose};rejectParlorSecrets(result,c);
       }
       if(abort.signal.aborted || !isParlorOwner((await options.authenticator?.authenticate(req,res))?.identity) || (await principal.resolve(req,res))?.id!==who.id || !await store.entitled(who.id))throw new ParlorFault(403,'parlor_access_required');
       success=true;await store.finish(who.id,operation,true);reservation=undefined;

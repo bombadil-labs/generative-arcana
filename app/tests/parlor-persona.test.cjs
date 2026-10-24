@@ -56,7 +56,7 @@ test('both BYOK providers receive vision prompts with exact private identities a
       const follow=requests.at(-1),system=follow.system??follow.messages[0].content;
       assert.ok(system.startsWith(discussionInstructions(settings)));
       const context=JSON.parse(system.slice(system.lastIndexOf('\n')+1));
-      assert.deepEqual(context.cards,[{name:reading.placements[0].card.name,position:reading.placements[0].position.name,reversed:reading.placements[0].reversed,meaning:reading.placements[0].meaning,narrativeFrame:'Past'}]);
+      assert.deepEqual(context.cards,[{slug:reading.placements[0].card.slug,name:reading.placements[0].card.name,position:reading.placements[0].position.name,reversed:reading.placements[0].reversed,meaning:reading.placements[0].meaning,narrativeFrame:'Past'}]);
       assert.deepEqual(follow.messages.slice(provider==='openai'?1:0),turns,'guest question is preserved as data, not elevated into instructions');
     }
   }finally{global.fetch=original;}

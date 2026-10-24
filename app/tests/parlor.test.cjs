@@ -38,7 +38,7 @@ test('visual card focus follows existing reveal and discussion state, with no ex
     await confirm(machine);await until(machine,'ready');assert.equal(focus(),null);
     machine.advance();assert.equal(focus(),null);const first=audio.at(-1);first.playing();assert.equal(focus(),0);first.done.resolve();await until(machine,'ready');assert.equal(focus(),0);
     machine.submit('A discussion');assert.equal(focus(),0);response.resolve('A response');await until(machine,'speaking');assert.equal(focus(),0);const answer=audio.at(-1);answer.playing();answer.done.resolve();await until(machine,'ready');assert.equal(focus(),0);
-    machine.advance();assert.equal(focus(),null);assert.equal(machine.getSnapshot().revealed,1);const second=audio.at(-1);second.playing();assert.equal(focus(),1);machine.cancel();assert.equal(focus(),1);
+    machine.advance();assert.equal(focus(),null);assert.equal(machine.getSnapshot().revealed,1);await until(machine,'speaking');const second=audio.at(-1);second.playing();assert.equal(focus(),1);machine.cancel();assert.equal(focus(),1);
     machine.reset();assert.equal(focus(),null);second.playing();second.done.resolve();await tick();assert.equal(focus(),null);assert.equal(machine.getSnapshot().reading,undefined);assert.equal(draws(),1);
   }finally{audio.forEach(a=>a.done.resolve());machine.dispose();}
 });
@@ -54,7 +54,7 @@ test('silent presentation gates advance and discussion until the ending is read;
       first.show(text);machine.advance();machine.submit('Too early');assert.equal(machine.getSnapshot().phase,'speaking');assert.equal(machine.getSnapshot().segment,0);assert.equal(machine.getSnapshot().caption,text);assert.deepEqual(machine.getSnapshot().turns,[]);
     }
     first.done.resolve();await until(machine,'ready');assert.equal(machine.getSnapshot().turns.at(-1).content,first.text);assert.equal(machine.getSnapshot().segment,1);
-    machine.next(true);const cancelled=pages[1];cancelled.show('Before pause');machine.cancel();assert.equal(cancelled.signal.aborted,true);cancelled.show('Late page');assert.equal(machine.getSnapshot().caption,'Before pause');
+    machine.next(true);await until(machine,'speaking');const cancelled=pages[1];cancelled.show('Before pause');machine.cancel();assert.equal(cancelled.signal.aborted,true);cancelled.show('Late page');assert.equal(machine.getSnapshot().caption,'Before pause');
     const spoken=speechCalls;machine.retry();assert.equal(pages.length,3);assert.equal(speechCalls,spoken,'silent retry stays silent');machine.reset();pages[2].show('After reset');pages[2].done.resolve();cancelled.done.resolve();await tick();assert.equal(machine.getSnapshot().phase,'idle');assert.equal(machine.getSnapshot().caption,'');assert.deepEqual(machine.getSnapshot().turns,[]);
   }finally{pages.forEach(p=>p.done.resolve());machine.dispose();}
 });
@@ -142,7 +142,7 @@ test('reset fences a late generation response and clears every guest field', asy
   const late = deferred(); let signal;
   const { machine } = setup({ narrate: async (_, reading, s) => { signal = s; await late.promise; return narration(reading); } });
   try {
-    await confirm(machine); await until(machine, 'generating'); machine.reset(); assert.equal(signal.aborted, true);
+    await confirm(machine); await until(machine, 'generating'); await tick(); machine.reset(); assert.equal(signal.aborted, true);
     late.resolve(); await tick(); await tick();
     assert.deepEqual(machine.getSnapshot(), { phase:'idle', question:'', revealed:0, segment:0, caption:'', timing:'aligned', error:'', turns:[], pendingQuestion:'', userText:'' });
   } finally { machine.dispose(); }
@@ -186,7 +186,7 @@ test('conversation retry does not duplicate turns and reset ignores its late res
     await confirm(machine); await until(machine,'ready');
     for (let i=0;i<4;i++) { machine.next(false); await until(machine,i===3?'complete':'ready'); }
     machine.ask('Follow up'); machine.ask('Duplicate'); await until(machine,'error');
-    machine.retry(false); machine.retry(false); machine.reset(); late.resolve(); await tick();
+    machine.retry(false); machine.retry(false); await tick(); machine.reset(); late.resolve(); await tick();
     assert.equal(attempts,2); assert.equal(draws(),1); assert.deepEqual(machine.getSnapshot().turns,[]);
   } finally { machine.dispose(); }
 });
@@ -318,7 +318,7 @@ test('discussion context includes only revealed meanings and current card, never
     for(const revealed of [0,1,2,3]){
       await converse(settings,reading,[{role:'user',content:'Tell me more'}],new AbortController().signal,revealed);
       const context=JSON.parse(body.system.slice(body.system.lastIndexOf('\n')+1));
-      assert.deepEqual(context.cards,reading.placements.slice(0,revealed).map((p,index)=>({name:p.card.name,position:p.position.name,reversed:p.reversed,meaning:p.meaning,narrativeFrame:['Past','Present','Future'][index]})));
+      assert.deepEqual(context.cards,reading.placements.slice(0,revealed).map((p,index)=>({slug:p.card.slug,name:p.card.name,position:p.position.name,reversed:p.reversed,meaning:p.meaning,narrativeFrame:['Past','Present','Future'][index]})));
       assert.equal(context.currentCard,reading.placements[revealed-1]?.card.name);
       for(const hidden of reading.placements.slice(revealed)){assert.ok(!body.system.includes(hidden.card.name));assert.ok(!body.system.includes(hidden.meaning));}
     }
