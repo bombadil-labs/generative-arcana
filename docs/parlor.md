@@ -37,7 +37,26 @@ The final Scribe transcript appears above the cards. The first
 card follows the query (or an explicit tap for an open reading). Each card's narration ends at a pause: talk repeatedly
 about that card, or tap once to draw the next card. After card three, a tap requests
 the closing synthesis. Every later card requires an intentional gesture. Discussion context contains only
-revealed card names, positions, orientations and authored meanings.
+revealed cards' full authored payloads, positions, orientations and resolved visual
+specifications. This includes the complete `visuals.detailed_description`, overrides,
+factorization and inherited family/suit/rank/station/material directives. The reader
+describes that scene as a mind's-eye vision, preserving depicted people and actions;
+its imagination connects the scene to the question rather than replacing the scene.
+Card-specific descriptions take precedence over generic motifs. Missing scene text
+is explicitly marked so the reader can stay with meanings instead of guessing visual
+traits or gender from a title. This is text grounding, not image inspection or a
+guarantee against model mistakes: no artwork is fetched or sent to the language model.
+
+The existing single generation still prepares all three visions and their closing;
+only the intended segment is spoken, and discussion receives only revealed sources.
+Descriptions are never shortened to fit a request. Browser BYOK and owner requests
+reject complete UTF-8 payloads above 64,000 bytes before provider dispatch; legacy
+hosted mode retains its configured input ceiling. The error explains that nothing
+was sent. Larger authored sources use more text tokens within these existing bounds.
+The keeper's brief introduction has no mandatory sigh. Shared prompts encourage
+responsive, curious dry humor without habitual openings, repeated introductions or
+re-speaking previous answers; v3 delivery tags remain optional and sparse.
+
 Completed card narration joins the recent discussion history in order, so a
 question such as “What did you mean by that?” includes the interpretation just
 delivered. Advancing retains recent discussion alongside the next completed
@@ -81,6 +100,14 @@ discussion or the next card; the third pause offers the closing, and the complet
 reading offers follow-up or five-tap reset. Pending work never invites a new action.
 The blank reset invitation is preserved. The radio decoration has no duplicate label,
 and user text above the cards contains only the guest's actual transcript.
+
+Past/Present/Future sit 6px below the occupied artwork edge: the slots when settled,
+or the enlarged foreground card while it is in focus so labels cannot cover it.
+Unused space below the artwork goes to the caption window rather than a fixed tall
+spread band. The enlarged card retains its center and sizing formula. Its footprint
+remains reserved during the settling animation, then captions reclaim that space;
+reduced motion settles immediately. Silent pages remeasure the actual caption area
+after viewport and layout changes, without skipping unread text.
 
 Escape returns to setup, including radio mute/volume and the optional **Show operator
 controls while testing** checkbox. It is off by default and is not persisted across
@@ -322,6 +349,26 @@ remaining caption window before displaying each complete page. Labels, captions
 and the side cue remain separate at projection and small-screen sizes.
 
 ## Verification
+
+### Optional projected deck notes
+
+Escape to setup and enable **Show card details beside the current card** to place
+the current revealed card left of a compact authored-information panel. It is off
+by default; that setting preserves the centered focus. The preference is stored
+per account on this browser independently of the opt-in for remembering keys.
+
+Notes show the authored name, suit/Major designation, available rank and
+transversal/station, the first complete scene sentence and the first complete
+meaning sentence (or a short authored meaning phrase) for the actual orientation. Missing fields, rendering-only
+instructions, incomplete sentences and sentences longer than 340 characters are
+omitted rather than guessed or cut mid-sentence. These are deck notes, not the
+spirit's generated response. Spoken captions retain their existing timing.
+
+The notes use the real available area and font to paginate automatically when
+needed, with reading time before each page changes. They cycle while this card
+remains in focus, without advancing the encounter. Resize remeasures the current
+page; advance, reset, Escape and logout dispose its presentation. No extra model
+request, image dispatch, guest control or saved conversation is introduced.
 
 Use Node 24 and an existing installed Edge browser; the browser test does not
 download browsers or use a real browser profile:

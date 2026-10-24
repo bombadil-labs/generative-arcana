@@ -84,13 +84,18 @@ async function escape(){await page.keyboard.press('Escape');await button('Start 
 async function capture(name){if(await page.locator('.parlor-show').count()){assert.equal(await page.locator('.parlor-show button,.parlor-show input,.parlor-show summary').count(),0,'guest projection has no controls');assert.equal(await page.locator('.parlor-cue').count(),1);assert.equal(await page.locator('.parlor-radio-label,.parlor-status,.parlor-control-hint').count(),0);if((await page.viewportSize()).width>=900 && !(await page.locator('.parlor-idle').count())){const scene=await page.locator('.parlor-scene').boundingBox(),hint=await cue().boundingBox(),stageBox=await stage().boundingBox();assert.ok(hint.x>=scene.x+scene.width+20,'side cue cannot overlap cards or captions');assert.ok(stageBox.y>=0 && stageBox.y+stageBox.height<=(await page.viewportSize()).height+1,'projected scene fits vertically');}}await page.evaluate(()=>window.scrollTo(0,0));assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.screenshot({path:resolve(evidence,name+'.png'),fullPage:true});}
 async function tap(key='a'){await page.keyboard.press(key);}
 async function frameLabels(){
+  // Compare settled geometry; the prior footprint remains reserved while its
+  // transform is in flight so returning captions cannot cover a settling card.
+  await page.waitForFunction(()=>{const focused=document.querySelector('figure.is-focused'),stage=document.querySelector('.parlor-spread-stage');return focused?Math.abs(new DOMMatrix(getComputedStyle(focused).transform).a-1.6)<.00001:!stage.classList.contains('reserves-focus');});
   assert.deepEqual(await page.locator('.parlor-slot-labels span').allTextContents(),['Past','Present','Future']);
   const geometry=await page.locator('.parlor-slot-labels').evaluate(el=>{
     const rect=n=>n.getBoundingClientRect().toJSON(),table=document.querySelector('.parlor-table');
-    return {row:rect(el),labels:[...el.children].map(n=>({box:rect(n),text:n.textContent,font:parseFloat(getComputedStyle(n).fontSize),scroll:n.scrollWidth})),table:rect(table),stage:rect(table.closest('.parlor-spread-stage')),caption:rect(document.querySelector('.parlor-caption')),focus:document.querySelector('figure.is-focused')&&rect(document.querySelector('figure.is-focused')),width:innerWidth,height:innerHeight};
+    return {row:rect(el),labels:[...el.children].map(n=>({box:rect(n),text:n.textContent,font:parseFloat(getComputedStyle(n).fontSize),scroll:n.scrollWidth})),table:rect(table),stage:rect(table.closest('.parlor-card-area')),caption:rect(document.querySelector('.parlor-caption')),focus:document.querySelector('figure.is-focused')&&rect(document.querySelector('figure.is-focused')),width:innerWidth,height:innerHeight};
   });
   assert.ok(Math.abs(geometry.table.y+geometry.table.height/2-(geometry.stage.y+geometry.stage.height/2))<1,'small spread is vertically centered behind the focused artwork');
-  assert.ok(geometry.row.y>=geometry.stage.bottom && geometry.row.bottom<=geometry.caption.y+1,'labels have a reserved row between artwork and spoken captions');
+  const edge=Math.max(geometry.table.bottom,geometry.focus?.bottom??0),gap=geometry.row.y-edge;
+  assert.ok(gap>=5&&gap<=7,'labels follow the actual occupied artwork edge by 6px, not a tall viewport band: '+JSON.stringify({gap,geometry}));
+  assert.ok(geometry.row.bottom<=geometry.caption.y+1,'labels cannot overlap spoken captions');
   if(geometry.focus)assert.ok(geometry.row.y>=geometry.focus.bottom-1,'labels never overlap the enlarged card');
   for(const {box,font,scroll} of geometry.labels){assert.ok(font>=16);assert.ok(box.x>=0&&box.right<=geometry.width+1&&box.y>=0&&box.bottom<=geometry.height+1);assert.ok(scroll<=box.width+1,'frame names stay readable without horizontal overflow');}
 }
@@ -104,14 +109,14 @@ async function focused(index){
   await page.waitForFunction(()=>{const el=document.querySelector('figure.is-focused');return el&&el.getBoundingClientRect().height/el.offsetHeight>1.59&&getComputedStyle(el.closest('.parlor-spread-stage'),'::before').opacity==='1';});
   const info=await active.evaluate(el=>{
     const rect=n=>{const r=n.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom};};
-    return {card:rect(el),stage:rect(el.closest('.parlor-spread-stage')),cue:rect(document.querySelector('.parlor-cue')),user:rect(document.querySelector('.parlor-user-transcript')),caption:rect(document.querySelector('.parlor-caption')),dim:getComputedStyle(el.closest('.parlor-spread-stage'),'::before').opacity,transition:getComputedStyle(el).transitionDuration,reduced:matchMedia('(prefers-reduced-motion: reduce)').matches};
+    return {card:rect(el),stage:rect(el.closest('.parlor-card-area')),cue:rect(document.querySelector('.parlor-cue')),user:rect(document.querySelector('.parlor-user-transcript')),caption:rect(document.querySelector('.parlor-caption')),dim:getComputedStyle(el.closest('.parlor-spread-stage'),'::before').opacity,transition:getComputedStyle(el).transitionDuration,reduced:matchMedia('(prefers-reduced-motion: reduce)').matches};
   });
   assert.ok(info.card.x>=info.stage.x-1 && info.card.right<=info.stage.right+1 && info.card.y>=info.stage.y-1 && info.card.bottom<=info.stage.bottom+1,'enlarged artwork stays inside its reserved row');
   assert.ok(info.user.bottom<=info.card.y+1 && info.card.bottom<=info.caption.y+1,'focus cannot obscure either transcript');
   assert.ok(Math.abs(info.card.x+info.card.width/2-(info.stage.x+info.stage.width/2))<1,'every current card occupies the same centered focus position');
   assert.ok(Math.abs(info.card.y+info.card.height/2-(info.stage.y+info.stage.height/2))<1,'focused card retains its released vertical center');
   const baseline=await active.evaluate(el=>{
-    const stage=el.closest('.parlor-spread-stage'),height=parseFloat(getComputedStyle(stage).height),gap=Math.min(36,Math.max(12,innerWidth*.03));
+    const stage=el.closest('.parlor-spread-stage'),scene=stage.closest('.parlor-scene'),style=getComputedStyle(scene),rows=style.gridTemplateRows.split(' ').map(parseFloat),height=scene.clientHeight-rows[0]-rows[1]-parseFloat(getComputedStyle(document.querySelector('.parlor-caption')).fontSize)*1.5*(innerHeight<=600?2:innerWidth<=800?3:4)-3*parseFloat(style.rowGap),gap=Math.min(36,Math.max(12,innerWidth*.03));
     const tableWidth=Math.min(stage.clientWidth,800,1.2*height+2*gap),width=(tableWidth-2*gap)/3;
     return {width:1.6*width,height:1.6*width*1.5};
   });
@@ -347,7 +352,7 @@ try{
     if(expectClipped)assert.ok(info.first.bottom<info.top,'old lines have left the visible window');
     assert.equal(info.animation,'none','caption updates never simulate speech with animation');
   }
-  for(const viewport of [{width:1920,height:1080},{width:1280,height:720},{width:768,height:1024},{width:390,height:844},{width:390,height:640},{width:390,height:360},{width:844,height:390}]){
+  for(const viewport of [{width:1920,height:1080},{width:2560,height:1440},{width:2560,height:720},{width:1024,height:768},{width:1280,height:600},{width:1280,height:720},{width:768,height:1024},{width:600,height:1200},{width:390,height:844},{width:390,height:640},{width:390,height:360},{width:844,height:390}]){
     await page.setViewportSize(viewport);await boundedTranscript(caption(),true);await boundedTranscript(page.getByLabel('Your words',{exact:true}),true);await focused(0);
     const layout=await page.evaluate(()=>{
       const rect=s=>{const r=document.querySelector(s).getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,bottom:r.bottom,right:r.right};};
@@ -357,6 +362,11 @@ try{
     assert.ok(Math.abs(layout.stage.x+layout.stage.width/2-viewport.width/2)<1 && Math.abs(layout.stage.y+layout.stage.height/2-viewport.height/2)<1,'composition remains centered');
     assert.ok(layout.user.bottom<=layout.cards.y+1 && layout.cards.bottom<=layout.caption.y+1,'cards and text occupy reserved nonoverlapping rows');
     assert.ok(layout.cue.y>=0 && layout.cue.bottom<=viewport.height && layout.caption.bottom<=viewport.height,'cue and latest narration stay onscreen');
+    const capacity=await caption().evaluate(el=>({height:el.clientHeight,line:parseFloat(getComputedStyle(el).lineHeight),bottom:el.getBoundingClientRect().bottom,sceneBottom:el.closest('.parlor-scene').getBoundingClientRect().bottom}));
+    assert.ok(Math.abs(capacity.bottom-capacity.sceneBottom)<1,'captions use the remaining scene height');
+    assert.ok(capacity.height>=capacity.line*(viewport.height<=600?1:2),'caption keeps readable lines on short viewports');
+    if(viewport.width===2560&&viewport.height===1440)assert.ok(capacity.height>300,'wide projector recovers the unused band for more than four caption lines');
+    console.log('Measured projection layout',JSON.stringify({viewport,caption:capacity.height,lines:capacity.height/capacity.line}));
     await capture(`rolling-captions-${viewport.width}x${viewport.height}`);
   }
   await page.emulateMedia({reducedMotion:'no-preference'});await boundedTranscript(caption(),true);await focused(0);assert.ok(parseFloat(await page.locator('figure.is-focused').evaluate(el=>getComputedStyle(el).transitionDuration))>.1);await page.emulateMedia({reducedMotion:'reduce'});
@@ -420,8 +430,32 @@ try{
   // Explicit silent setup covers summon/greeting and a reset during paged delivery.
   await page.getByLabel('Read without audio',{exact:true}).check();const beforeSilent=await audioCount();await button('Start the show').click();await page.keyboard.down('a');await page.clock.fastForward(7000);await finishSilent();await phase('awaiting-release').waitFor();await page.keyboard.up('a');await finishSilent();await phase('question').waitFor();assert.equal(await audioCount(),beforeSilent);
   await advance();await page.locator('.parlor-caption.is-silent').waitFor();await page.waitForFunction(()=>document.querySelector('.parlor-ritual').dataset.phase==='speaking');await resetEncounter();assert.equal(await page.locator('[data-silent-measure]').count(),0);await page.clock.fastForward(60000);await idle();assert.equal(await audioCount(),beforeSilent);await escape();await page.getByLabel('Read without audio',{exact:true}).uncheck();
+  // Optional authored deck notes never enter provider payloads or reveal future cards.
+  const detailsToggle=page.getByLabel('Show card details beside the current card',{exact:true});assert.equal(await detailsToggle.isChecked(),false);
+  await detailsToggle.check();await page.reload();assert.equal(await detailsToggle.isChecked(),true);
+  await begin();assert.equal(await page.locator('.parlor-card-details').count(),0);let detailsAudio=await audioCount();await advance();await waitAudio(detailsAudio);await finishAudio();await phase('ready').waitFor();
+  const details=page.getByLabel('Current card deck notes',{exact:true}),notes=page.locator('.parlor-details-text');await details.waitFor();
+  const firstSlug=await details.getAttribute('data-card');assert.equal(await page.locator('.is-revealed').count(),1);
+  for(const viewport of [{width:1920,height:1080},{width:2560,height:1440},{width:1280,height:600},{width:1024,height:768},{width:768,height:1024},{width:600,height:1200},{width:390,height:844},{width:390,height:640},{width:390,height:360},{width:844,height:390}]){
+    await page.setViewportSize(viewport);await page.waitForTimeout(100);
+    const g=await notes.evaluate(el=>{const r=n=>n.getBoundingClientRect().toJSON(),card=document.querySelector('figure.is-focused'),cap=document.querySelector('.parlor-caption');return {notes:r(el),card:r(card),panel:r(el.parentElement),caption:r(cap),font:parseFloat(getComputedStyle(el).fontSize),height:document.documentElement.scrollHeight,width:document.documentElement.scrollWidth,scroll:el.scrollHeight,text:el.textContent};});
+    assert.ok(g.card.right<=g.panel.x+1&&g.card.x>=0,'focused art is left of deck notes: '+JSON.stringify(g));
+    assert.ok(g.panel.bottom<=g.caption.y+1&&g.notes.height>=24&&g.font>=17,'details stay readable above captions: '+JSON.stringify(g));
+    assert.ok(g.scroll<=g.notes.height+1&&g.height<=viewport.height+1&&g.width<=viewport.width+1,'notes fit without clipping or page scrolling: '+JSON.stringify(g));
+    assert.equal(await details.getAttribute('data-card'),firstSlug);assert.equal(await page.locator('.is-revealed').count(),1);await capture(`card-details-${viewport.width}x${viewport.height}`);
+  }
+  await page.setViewportSize({width:390,height:640});await page.waitForTimeout(100);
+  const pages=[];for(let i=0;i<30;i++){const text=await notes.textContent();pages.push(text);await page.clock.fastForward(silentExports.silentPageMs(text)+100);await page.waitForTimeout(10);if(i>0&&(await notes.textContent())===pages[0])break;}
+  assert.ok(pages.length>1);assert.match(pages.join(' '),/Scene:/);assert.match(pages.join(' '),/Meaning:/);assert.equal(await page.locator('.is-revealed').count(),1,'deck-note pages do not advance the reading');
+  detailsAudio=await audioCount();ttsMode='delay';await advance();await pending(()=>ttsRelease);assert.equal(await details.count(),0);ttsRelease();ttsRelease=null;ttsMode='ok';await waitAudio(detailsAudio);await finishAudio();assert.notEqual(await details.getAttribute('data-card'),firstSlug);
+  await resetEncounter();assert.equal(await details.count(),0);assert.equal(await page.locator('[data-silent-measure]').count(),0);await page.clock.fastForward(60000);await idle();await escape();assert.equal(await detailsToggle.isChecked(),true);
+  // Pathological authored names page at the same readable size rather than overflowing.
+  for(const card of Object.values(data.cards))card.name+=' — '+ 'A long authored name '.repeat(10).trim();
+  await page.reload();await begin();detailsAudio=await audioCount();await advance();await waitAudio(detailsAudio);await finishAudio();await phase('ready').waitFor();await notes.waitFor();await page.waitForTimeout(100);
+  const longPages=[];for(let i=0;i<20;i++){const text=await notes.textContent();longPages.push(text);assert.equal(await notes.evaluate(el=>el.scrollHeight<=el.clientHeight+1),true);await page.clock.fastForward(silentExports.silentPageMs(text)+100);await page.waitForTimeout(10);if(longPages.join(' ').includes('Scene:'))break;}
+  assert.match(longPages.join(' '),/A long authored name/);assert.match(longPages.join(' '),/Scene:/);await resetEncounter();await escape();await detailsToggle.uncheck();await page.reload();assert.equal(await detailsToggle.isChecked(),false);await page.setViewportSize({width:1280,height:960});
   await begin();await stage().focus();await page.keyboard.down('Space');await cue().getByText('Speak now.',{exact:true}).waitFor();authenticated=false;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.getByText('Parlor access is restricted.',{exact:true}).waitFor();assert.equal(await page.locator('.parlor-show').count(),0);
   await page.clock.fastForward(100);assert.equal(await page.evaluate(()=>window.__radioContexts.every(c=>c.state==='closed')),true,'logout closes ambience contexts');
-  assert.equal(await page.evaluate(()=>window.__tracks.some(t=>!t.stopped)),false);await page.keyboard.up('Space');assert.ok(speechRequests.length>=8);assert.ok(scribeRequests.length>=8);console.log('PASS: global tap/hold/five-tap reset, overlapping keys and repeat, no tap microphone access, late transcription/narration/reading fences, saved choices retained, setup exclusion, four artwork proportions on desktop/mobile, v3 selected voice and aligned captions, per-card discussion, explicit advance, held-only Scribe v2, centered rolling captions and long questions across seven viewport sizes, no read-ahead or page scrolling, full conversation retained, complete measured silent pages with reading time and reset-safe advance guards, touch drags without encounter input, explicit operator touch and cancellation, busy keyboard/pointer lock with five-tap reset and no replay, MP4, denial/empty/error/cancellation, Escape/logout cleanup. Synthetic providers and microphone only.');
+  assert.equal(await page.evaluate(()=>window.__tracks.some(t=>!t.stopped)),false);await page.keyboard.up('Space');assert.ok(speechRequests.length>=8);assert.ok(scribeRequests.length>=8);console.log('PASS: global tap/hold/five-tap reset, overlapping keys and repeat, no tap microphone access, late transcription/narration/reading fences, saved choices retained, setup exclusion, four artwork proportions on desktop/mobile, v3 selected voice and aligned captions, per-card discussion, explicit advance, held-only Scribe v2, centered rolling captions and long questions across twelve viewport sizes, no read-ahead or page scrolling, full conversation retained, complete measured silent pages with reading time and reset-safe advance guards, touch drags without encounter input, explicit operator touch and cancellation, busy keyboard/pointer lock with five-tap reset and no replay, optional account-persisted deck notes with measured pages across ten viewports and current-only metadata, MP4, denial/empty/error/cancellation, Escape/logout cleanup. Synthetic providers and microphone only.');
 }catch(error){if(page&&!page.isClosed())await page.screenshot({path:resolve(evidence,'failure.png'),fullPage:true});throw error;}
 finally{release?.();scribeRelease?.();ttsRelease?.();await context?.close();await browser?.close();await new Promise(r=>server?.httpServer?server.httpServer.close(r):r());console.log('Cleanup: browser, context and local preview closed.');}

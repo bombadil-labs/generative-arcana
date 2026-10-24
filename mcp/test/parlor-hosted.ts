@@ -11,6 +11,8 @@ import { createParlorHandler } from '../src/parlorApi';
 import { PARLOR_OWNER } from '../src/parlorAccess';
 import { createArcanaAdapter } from '../src/hostStore';
 import { defaultSettings } from '../../app/src/parlor/settings';
+import { encodeReading } from '../../app/src/reading/encode';
+import { resolveCardRenderSpec } from '../../app/src/decks/renderSpec';
 import { narrationInstructions, discussionInstructions } from '../../app/src/parlor/providers';
 import type { UserDeckCatalogRepository } from '../src/userDeckCatalog';
 
@@ -56,8 +58,12 @@ try {
   assert.equal(new Date((await db.query<{created_at:Date}>('SELECT created_at FROM arcana_parlor_usage')).rows[0].created_at).toISOString(),future);
   await assert.rejects(db.transaction(tx=>reserveParlor(atMidnight(tx as ParlorDb),r(),midnightConfig)),(e:unknown)=>e instanceof ParlorFault&&e.status===429);
   await db.exec('DELETE FROM arcana_parlor_usage');
-  const raw=JSON.parse(await readFile(new URL('../../decks/deep-time/deck.json',import.meta.url),'utf8'));
-  const adapter=createArcanaAdapter();adapter.engine.importDeck(raw,{runtimeId:'hosted-deck'});const reading=await adapter.engine.castReading('hosted-deck','three-card','Private question never persisted');
+  // Optional local manifest exercises exact private scenes without publishing them.
+  const fixture=JSON.parse(await readFile(process.env.PARLOR_CONTEXT_FIXTURE??new URL('../../decks/deep-time/deck.json',import.meta.url),'utf8'));
+  const raw=fixture.data??fixture;
+  const adapter=createArcanaAdapter(),deck=adapter.engine.importDeck(raw,{runtimeId:'hosted-deck'});
+  const chosen=raw.cards['zeppelin-host']&&raw.cards['major-13']?['zeppelin-host','major-13',deck.cards.find(c=>!['zeppelin-host','major-13'].includes(c.slug))!.slug]:deck.cards.slice(0,3).map(c=>c.slug);
+  const reading=await adapter.engine.resolveReading(await encodeReading(deck,'three-card','Private question never persisted',chosen.map((slug,i)=>({slug,reversed:i===1}))),deck.id);
   const narration={cards:reading.placements.map(p=>({slug:p.card.slug,text:'Synthetic narration.'})),synthesis:'Synthetic synthesis.'};
   const catalogFixture={get:async(id:string)=>id==='hosted-deck'?{id,ownerId:'usr_host',slug:raw.slug,manifest:{data:raw},visibility:'private',revision:1}:null} as unknown as UserDeckCatalogRepository;
   const providerFetch:typeof fetch=async(input,init)=>{
@@ -72,6 +78,13 @@ try {
     const prompt=JSON.parse(seenBody);const isNarration=seenBody.includes('CARD IDENTITIES IN ORDER');
     assert.equal(prompt.system??prompt.messages[0].content,isNarration?narrationInstructions(defaultSettings()):discussionInstructions(defaultSettings()),'hosted prompts retain the shared ether persona and visual-only control guidance');
     if(isNarration)assert.deepEqual(JSON.parse(prompt.messages.at(-1).content.split('CARD IDENTITIES IN ORDER\n')[1]).map((p:{narrativeFrame:string})=>p.narrativeFrame),['Past','Present','Future']);
+    const context=JSON.parse(isNarration?prompt.messages.at(-1).content.split('AUTHORED VISION SOURCES\n')[1].split('\n\nCARD IDENTITIES')[0]:prompt.messages.find((m:{role:string})=>m.role==='user').content.split('\n\n')[0]);
+    for(const [i,source] of context.cards.entries()){
+      assert.deepEqual(source.card,reading.placements[i].card,'hosted providers get complete authored card text');
+      assert.deepEqual(source.renderSpec,resolveCardRenderSpec(reading.deck,reading.placements[i].card));
+    }
+    for(const hidden of reading.placements.slice(context.cards.length))assert.ok(!JSON.stringify(context).includes(hidden.card.visuals.detailed_description),'hosted discussion has no future scene');
+    assert.ok(prompt.messages.every((m:{content:unknown})=>typeof m.content==='string'),'no image blocks');
     const content=providerMode==='echo'?JSON.stringify({...narration,synthesis:'synthetic-server-anthropic'}):isNarration?JSON.stringify(narration):'Synthetic follow-up.';
     if(url.includes('openai')){assert.equal(prompt.store,false);return Response.json({choices:[{message:{content}}]});}
     return Response.json({content:[{type:'text',text:content}]});
@@ -107,7 +120,7 @@ try {
   const first=reading.placements[0];
   assert.deepEqual(JSON.parse(revealedContext),{
     question:reading.question,deck:reading.deck.name,currentCard:first.card.name,
-    cards:[{name:first.card.name,position:first.position.name,reversed:first.reversed,meaning:first.meaning,narrativeFrame:'Past'}],
+    cards:[{name:first.card.name,position:first.position.name,reversed:first.reversed,meaning:first.meaning,narrativeFrame:'Past',positionContext:first.position,visualGrounding:'authored_scene',card:first.card,renderSpec:resolveCardRenderSpec(reading.deck,first.card)}],
   });
   assert.equal(followUp,'Stay with this card');
   assert.equal((await request('converse',{revealed:4,turns:[{role:'user',content:'Invalid count'}]})).status,400);

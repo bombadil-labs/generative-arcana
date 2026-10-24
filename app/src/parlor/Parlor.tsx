@@ -14,6 +14,8 @@ import { TableGestures, tableInput, tableKey, HOLD_MS, SUMMON_MS } from "./gestu
 import { RadioSignal } from "./RadioSignal";
 import { Transcript } from "./Transcript";
 import { focusedCard } from "./cardFocus";
+import { CardDetails } from "./DeckNotes";
+import { currentCardDetails, readDetailsPreference, saveDetailsPreference } from "./cardDetails";
 import { readSilently } from "./silentReading";
 import { radioState } from "./radio";
 import { guestCue } from "./cue";
@@ -47,6 +49,9 @@ function Host({ accountId, onShowChange, capabilities }: { accountId: string; on
     return {...saved,settings:{...saved.settings,ownerKeys:capabilities.ownerKeys}};
   });
   const [settings, setSettings] = useState<Settings>(restored.settings);
+  const [showDetails, setShowDetails] = useState(() => { try { return readDetailsPreference(window.localStorage, accountId); } catch { return false; } });
+  const [detailsStorageError, setDetailsStorageError] = useState(false);
+  const changeDetails = (enabled: boolean) => { setShowDetails(enabled); try { setDetailsStorageError(!saveDetailsPreference(window.localStorage, accountId, enabled)); } catch { setDetailsStorageError(true); } };
   const [remember, setRemember] = useState(restored.remember);
   const [storageError, setStorageError] = useState(false);
   const [decks, setDecks] = useState<CatalogDeckSummary[]>([]);
@@ -124,7 +129,7 @@ function Host({ accountId, onShowChange, capabilities }: { accountId: string; on
       </div></>}
     </div>}
     {deckId && <RemoteDeckBoundary key={deckId} deckId={deckId} routeKey="/parlor">
-      <TableSetup deckId={deckId} settings={settings} hosting={hosting} start={() => setHosting(true)} leave={() => setHosting(false)} startButton={startButton} radioPreferences={radioPreferences} changeRadio={setRadioPreferences} />
+      <TableSetup showDetails={showDetails} changeDetails={changeDetails} detailsStorageError={detailsStorageError} deckId={deckId} settings={settings} hosting={hosting} start={() => setHosting(true)} leave={() => setHosting(false)} startButton={startButton} radioPreferences={radioPreferences} changeRadio={setRadioPreferences} />
     </RemoteDeckBoundary>}
   </section>;
 }
@@ -139,12 +144,13 @@ function RadioControls({ radioPreferences, changeRadio }: RadioOptions) {
     <p>Quiet hum and static. Lower beneath the spirit; silent while you speak. Changes last for this hosting session.</p>
   </div>;
 }
-function TableSetup({ deckId, settings, hosting, start, leave, startButton, radioPreferences, changeRadio }: { deckId: string; settings: Settings; hosting: boolean; start(): void; leave(): void; startButton: React.RefObject<HTMLButtonElement> } & RadioOptions) {
+type DetailsOptions = { showDetails: boolean; changeDetails(enabled: boolean): void; detailsStorageError: boolean };
+function TableSetup({ showDetails, changeDetails, detailsStorageError, deckId, settings, hosting, start, leave, startButton, radioPreferences, changeRadio }: { deckId: string; settings: Settings; hosting: boolean; start(): void; leave(): void; startButton: React.RefObject<HTMLButtonElement> } & RadioOptions & DetailsOptions) {
   const [operatorControls, setOperatorControls] = useState(false);
   const artwork = useArtworkSelection();
   const deck = getDeck(deckId)!;
   const ready = readySettings(settings) && deck.cards.length >= 3 && (!artwork || (artwork.resolved && !!artwork.packId));
-  if (hosting) return <Ritual key={`${deckId}:${artwork?.packId ?? ""}`} deckId={deckId} settings={settings} leave={leave} radioPreferences={radioPreferences} changeRadio={changeRadio} operatorControls={operatorControls} />;
+  if (hosting) return <Ritual showDetails={showDetails} key={`${deckId}:${artwork?.packId ?? ""}`} deckId={deckId} settings={settings} leave={leave} radioPreferences={radioPreferences} changeRadio={changeRadio} operatorControls={operatorControls} />;
   return <div className="parlor-launch">
     {artwork && <label>Artwork set<select aria-label="Artwork set" value={artwork.packId} disabled={!artwork.resolved} onChange={(event) => artwork.selectPack(event.target.value)}>
       {!artwork.packId && <option value="">Choose an artwork set</option>}
@@ -156,12 +162,15 @@ function TableSetup({ deckId, settings, hosting, start, leave, startButton, radi
     {deck.cards.length < 3 && <p role="alert">Choose a deck with at least three cards.</p>}
     <p>Hold to talk records only while held. On release, that clip goes to ElevenLabs Scribe using your ElevenLabs key and incurs transcription usage. Its transcript goes to your selected reader. Provider retention policies apply.</p>
     <RadioControls radioPreferences={radioPreferences} changeRadio={changeRadio} />
+    <label className="parlor-check"><input type="checkbox" checked={showDetails} onChange={event => changeDetails(event.target.checked)} />Show card details beside the current card</label>
+    <p>Authored deck notes, separate from the spoken reading. Smaller displays cycle readable pages automatically. This preference is remembered for your account on this browser without saving keys.</p>
+    {detailsStorageError && <p role="alert">The display preference could not be saved; it applies for this session.</p>}
     <label className="parlor-check"><input type="checkbox" checked={operatorControls} onChange={event => setOperatorControls(event.target.checked)} />Show operator controls while testing</label>
     <button ref={startButton} className="parlor-primary" aria-disabled={!ready} onClick={() => { if (ready) start(); }}>Start the show</button>
     <p className="parlor-show-hint">The idle table waits for a seven-second hold to summon the spirit, without recording. Keep holding until the visual cue says Release the button. After its introduction, hold for 450 ms, wait for Speak now, speak and release. A quick tap moves on after a 500 ms pause; five quick taps with less than 500 ms between them return to blank idle. Overlapping keys count once. Escape returns to setup. Tab, modifier shortcuts and operator inputs keep their usual behavior. Test the mini keyboard and microphone on the party Mac before guests arrive.</p>
   </div>;
 }
-function Ritual({ deckId, settings, leave, radioPreferences, changeRadio, operatorControls }: { deckId: string; settings: Settings; leave(): void; operatorControls: boolean } & RadioOptions) {
+function Ritual({ showDetails, deckId, settings, leave, radioPreferences, changeRadio, operatorControls }: { deckId: string; settings: Settings; leave(): void; operatorControls: boolean; showDetails: boolean } & RadioOptions) {
   const artwork = useArtworkStore();
   const captionWindow = useRef<HTMLDivElement>(null);
   const machine = useMemo(() => new ParlorMachine(deckId, settings, { preload: async (reading) => {
@@ -240,12 +249,24 @@ function Ritual({ deckId, settings, leave, radioPreferences, changeRadio, operat
   const signal = radioState(state, mic);
   const cue = guestCue(state, mic, speechInputAvailable);
   const focus = focusedCard(state);
-  return <div ref={stage} tabIndex={-1} className={`parlor-ritual${idle ? " parlor-idle" : ""}${summoning ? " parlor-summoning" : ""}`} aria-label="Interactive reading" aria-describedby="parlor-guest-cue" data-phase={state.phase}
+  const details = useMemo(() => showDetails ? currentCardDetails(state) : null,
+    [showDetails, state.reading, state.phase, state.revealed, state.segment, state.pendingQuestion]);
+  const [focusSpace, setFocusSpace] = useState(false);
+  useLayoutEffect(() => {
+    if (focus !== null) { setFocusSpace(true); return; }
+    if (idle || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { setFocusSpace(false); return; }
+    // Let the card settle before reclaiming its footprint. Reset/unmount/new
+    // focus clears this timer; it never drives encounter or provider state.
+    const timer = setTimeout(() => setFocusSpace(false), 650);
+    return () => clearTimeout(timer);
+  }, [focus, idle]);
+  return <div ref={stage} tabIndex={-1} className={`parlor-ritual${idle ? " parlor-idle" : ""}${summoning ? " parlor-summoning" : ""}${showDetails && (focus !== null || focusSpace) ? " parlor-with-details" : ""}`} aria-label="Interactive reading" aria-describedby="parlor-guest-cue" data-phase={state.phase}
     onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) controls.cancel(); }}>
     <div className="parlor-scene">
     <RadioSignal signal={signal} startedAt={state.summonStartedAt} showLabel={false} />
     {!idle && <Transcript kind="user" text={contact ? "" : state.userText} />}
-    {!idle && <div className={`parlor-spread-stage${focus !== null ? " has-focus" : ""}`}>
+    {!idle && <div className={`parlor-spread-stage${focus !== null ? " has-focus" : ""}${focus !== null || focusSpace ? " reserves-focus" : ""}`}>
+    <div className="parlor-card-area">
     {state.reading && (
       <div className="parlor-table" aria-label="Three-card reading">
         {state.reading.placements.map((placement, index) => <figure key={placement.card.slug} className={index === focus ? "is-focused" : undefined}>
@@ -260,9 +281,11 @@ function Ritual({ deckId, settings, leave, radioPreferences, changeRadio, operat
       </div>
     )}
     {!state.reading && !idle && <div className="parlor-table parlor-spread-slots" aria-label="Three empty card spaces">{[0, 1, 2].map(index => <div key={index} className="parlor-slot" aria-hidden="true" />)}</div>}
+    {details && <CardDetails key={details.slug} details={details} />}
+    </div>
+    <div className="parlor-slot-labels" aria-label="Vision frames">{visionFrames.map(frame => <span key={frame}>{frame}</span>)}</div>
     </div>}
     {!idle && <div className="parlor-narration-area">
-      <div className="parlor-slot-labels" aria-label="Vision frames">{visionFrames.map(frame => <span key={frame}>{frame}</span>)}</div>
       <Transcript kind="narrator" text={state.caption} silent={state.timing === "silent"} windowRef={captionWindow} />
     </div>}
     </div>
