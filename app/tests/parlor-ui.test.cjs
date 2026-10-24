@@ -48,7 +48,9 @@ before(async()=>{
 beforeEach(async()=>{
   // Only accelerate the summon threshold in this DOM fixture. Pure gesture tests
   // and the real-browser test independently verify the actual seven seconds.
-  global.setTimeout=(callback,ms,...args)=>realSetTimeout(callback,callback.name==='advanceSilentPage'?0:ms===7000||ms===500||ms===300?5:ms,...args);
+  // Keep the two hold stages in separate React commits so the caption ref mounts
+  // before contact starts. Exact 300/7000ms boundaries live in fake-timer tests.
+  global.setTimeout=(callback,ms,...args)=>realSetTimeout(callback,callback.name==='advanceSilentPage'?0:ms===7000?100:ms===500||ms===300?5:ms,...args);
   authenticated=true;parlorAllowed=true;deckCalls=0;accountId='test-account';providerCalls=0;delayed=false;lateResolve=undefined;
   accessMode='byok';hostedDenied=false;hostedBodies=[];ownerAvailable=false;
   ownerEleven=false;ownerVoice='env-owner-voice';ttsRequests=[];
@@ -144,7 +146,7 @@ test('legacy blank owner voice inherits default; failed summoning POST remains r
   await mount();const voice=[...document.querySelectorAll('label')].find(el=>el.textContent.startsWith('ElevenLabs voice ID')).querySelector('input');assert.equal(voice.value,'env-owner-voice');
   await click('Start the show');
   await act(async()=>window.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'a',code:'KeyA',bubbles:true})));
-  await act(async()=>{await new Promise(r=>realSetTimeout(r,20));});await settle();
+  await untilPhase('error');
   assert.equal(ttsRequests.length,1);assert.equal(ttsRequests[0].method,'POST');assert.equal(ttsRequests[0].voiceId,'env-owner-voice');assert.equal(document.querySelector('.parlor-ritual').dataset.phase,'error');assert.equal(document.querySelector('.parlor-caption').textContent,'');
   await act(async()=>{for(let i=0;i<2;i++)window.dispatchEvent(new dom.window.KeyboardEvent('keyup',{key:'a',code:'KeyA',bubbles:true}));});await settle();
   assert.equal(document.querySelector('.parlor-ritual').dataset.phase,'error');assert.equal(hostedBodies.length,0);assert.equal(document.querySelectorAll('.parlor-card').length,0);assert.equal(ttsRequests.length,1);assert.ok(!document.body.textContent.includes('private upstream response'));
@@ -156,7 +158,7 @@ test('intentional silent summoning consumes release and requires a new deliberat
   ownerAvailable=true;ownerEleven=true;window.localStorage.clear();settingsApi.saveSettings(window.localStorage,accountId,{...settingsApi.defaultSettings(),silent:true},true);
   await mount();await click('Start the show');
   await act(async()=>window.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:' ',code:'Space',bubbles:true})));
-  await act(async()=>{await new Promise(r=>realSetTimeout(r,20));});await settle();assert.equal(document.querySelector('.parlor-ritual').dataset.phase,'awaiting-release');assert.equal(hostedBodies.length,0);
+  await untilPhase('awaiting-release');assert.equal(hostedBodies.length,0);
   await act(async()=>{window.dispatchEvent(new dom.window.KeyboardEvent('keyup',{key:' ',code:'Space',bubbles:true}));});await settle();
   assert.equal(document.querySelector('.parlor-ritual').dataset.phase,'question');assert.equal(hostedBodies.length,0);assert.equal(ttsRequests.length,0);assert.equal(document.querySelectorAll('.parlor-card').length,0);
   await tap();assert.equal(hostedBodies.length,1);assert.equal(document.querySelectorAll('.is-revealed').length,1);
