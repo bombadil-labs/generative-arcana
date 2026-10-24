@@ -33,8 +33,8 @@ retract a request already received by ElevenLabs.
 There is no setup question, prefilled text or guest typing form.
 The final Scribe transcript appears above the cards. The first
 card follows the query (or an explicit tap for an open reading). Each card's narration ends at a pause: talk repeatedly
-about that card, or press Next card. After card three, Hear the closing requests
-the synthesis. Every later card requires an intentional gesture or button. Discussion context contains only
+about that card, or tap once to draw the next card. After card three, a tap requests
+the closing synthesis. Every later card requires an intentional gesture. Discussion context contains only
 revealed card names, positions, orientations and authored meanings.
 Completed card narration joins the recent discussion history in order, so a
 question such as “What did you mean by that?” includes the interpretation just
@@ -45,9 +45,10 @@ failed delivery is not committed until a retry or explicit silent fallback compl
 ## Table keyboard
 
 While the encounter is open, ordinary keys work anywhere in the guest view without
-focusing a button. The on-screen Hold to talk control accepts the same pointer gestures.
+focusing a button. There are no visible guest buttons, inputs or menus. The scene
+itself accepts the same pointer gestures for setup testing and touch devices.
 
-- After the introduction, hold for **450 ms**, wait for **Listening**, speak, then release to submit. Microphone
+- After the introduction, hold for **450 ms**, wait for **Speak now**, speak, then release to submit. Microphone
   permission/startup can take longer than the threshold. Short taps never request access.
 - Tap and release in less than 450 ms to continue without discussion. At the greeting's
   end this starts an open reading; at each card pause it advances once; after the third
@@ -63,6 +64,22 @@ focusing a button. The on-screen Hold to talk control accepts the same pointer g
 - Escape returns to operator setup. Tab, modifier shortcuts, editable fields and operator
   buttons retain native behavior. Shortcuts are installed only while the encounter is open.
   Lost focus, hidden tabs, reset, exit and logout cancel pending gestures and microphone work.
+
+One high-contrast cue sits beside the spread on desktop/projector screens and below
+it on narrow screens. It distinguishes summoning, release, microphone preparation,
+recording, transcription, inference and actual speech. Only a card pause invites
+discussion or the next card; the third pause offers the closing, and the completed
+reading offers follow-up or five-tap reset. Pending work never invites a new action.
+The blank reset invitation is preserved. The radio decoration has no duplicate label,
+and user text above the cards contains only the guest's actual transcript.
+
+Escape returns to setup, including radio mute/volume and the optional **Show operator
+controls while testing** checkbox. It is off by default and is not persisted across
+reloads. When enabled, the host can pause/retry, read without audio, cancel transcription,
+inspect detailed errors and adjust Radio sound during the test encounter. Leave it
+unchecked for guests. Error details also remain available to assistive technology;
+the projected cue gives concise recovery instructions. A single tap retries paused
+or failed narration, while five taps always clear the encounter.
 
 Configure the PCsensor keys as ordinary keys (for example A, B and C), not macros or
 system/media shortcuts. Test their key-down/key-up events, the 500 ms reset rhythm,
@@ -89,7 +106,7 @@ decorative state cues, **not** microphone levels, measured audio or provider pro
 The apparatus adds no audio analyser, microphone use, dependency or network request.
 
 At each card pause the apparatus rests. Errors and pauses stop all motion and show a
-static interrupted-channel cue alongside the existing recovery controls. Idle removes
+static interrupted-channel cue with the appropriate tap-to-recover instruction. Idle removes
 the apparatus entirely. All motion is slow continuous movement (3–6-second cycles),
 with no strobing or flashing. Reduced-motion preference uses static symbols and meaningful
 state labels, stops the summon animation clock, and responds to preference changes during
@@ -99,7 +116,7 @@ background. The layout leaves room for the dial on landscape projectors and smal
 ## Radio ambience
 
 The operator can mute the radio or change its volume in setup and under **Radio sound**
-at the table. These preferences last for the hosting session, including encounter resets
+when operator testing controls are enabled. These preferences last for the hosting session, including encounter resets
 and returns to setup; they are separate from saved provider keys and reader settings.
 The default is a quiet 35% setting. This controls only the ambience, never the selected
 ElevenLabs voice. Check the actual amplifier/projector speaker volume before the party.
@@ -175,13 +192,13 @@ Narration appears below the cards. ElevenLabs' [speech-with-timing endpoint](htt
 returns audio and character alignment. Valid returned character **end** times
 are compared with the audio element's `currentTime`; wall-clock time and estimated
 reading speed are never used. Pauses, buffering and playback delays cannot reveal
-future text. If timing is missing or invalid, the UI identifies the fallback and
+future text. If timing is missing or invalid, the operator controls identify the fallback and
 reveals the complete segment only after that audio segment ends. This is
 segment-level completion, not word synchronization. A failed request is never
 automatically retried or silently switched to another model.
 
 Without a voice key, or after explicitly choosing Read without audio, captions
-are shown immediately and labelled as a silent reading. The dormant hosted
+are shown immediately and labelled as a silent reading in operator controls. The dormant hosted
 speech route still uses its configured model and returns audio without timing;
 its captions therefore use segment completion. Its opening is silent because
 hosted speech requires a drawn-reading token. This PR does not activate hosted
@@ -239,7 +256,7 @@ discourages exposing API keys in browsers; the existing BYOK tradeoff is retaine
 Escape or Leave the table aborts requests/audio, releases the player/object URL,
 clears the guest state, restores setup and returns focus to Start the show.
 Backgrounding pauses in-flight narration and cancels microphone input; resuming
-requires an explicit retry. A failed step stays at the table with retry controls.
+requires an explicit retry. A failed step stays at the table with a tap-to-retry cue.
 Retries preserve the original draw. Retrying discussion audio reuses the generated
 answer rather than charging for another language-model response. Conversation
 history is bounded to ten narration/discussion pairs while allowing further discussion.

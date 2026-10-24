@@ -8,7 +8,7 @@ const ticks = Array.from({ length: 29 }, (_, i) => {
 });
 
 /** Decorative apparatus; no audio analyser, recording or provider request. */
-export function RadioSignal({ signal, startedAt }: { signal: RadioState; startedAt?: number }) {
+export function RadioSignal({ signal, startedAt, showLabel = true }: { signal: RadioState; startedAt?: number; showLabel?: boolean }) {
   const receiver = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const node = receiver.current;
@@ -45,6 +45,6 @@ export function RadioSignal({ signal, startedAt }: { signal: RadioState; started
       <g className="radio-wave"><path d="M 30 101 H 140 Q 155 101 164 91 Q 180 71 196 101 Q 210 131 224 101 Q 240 51 256 101 Q 272 145 288 101 Q 304 37 320 101 Q 336 145 352 101 Q 368 51 384 101 Q 400 131 416 101 Q 432 71 448 101 H 610" /></g>
       <circle className="radio-lamp" cx="320" cy="76" r="4" />
     </svg>
-    <p className="parlor-radio-label" role="status">{signal.label}</p>
+    {showLabel && <p className="parlor-radio-label" role="status">{signal.label}</p>}
   </div>;
 }
