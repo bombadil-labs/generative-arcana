@@ -8,6 +8,8 @@ import ts from 'typescript';
 const root=resolve(fileURLToPath(new URL('..',import.meta.url)));
 const silentExports={};new Function('exports',ts.transpileModule(await readFile(resolve(root,'src/parlor/silentReading.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(silentExports);
 const ownerMode=process.env.PARLOR_OWNER_BROWSER==='1';
+const transcriptMode=process.env.PARLOR_TRANSCRIPT_BROWSER==='1';
+const transcriptRequests=[];let transcriptStarts=0;
 const {chromium}=await import(process.env.PLAYWRIGHT_MODULE?pathToFileURL(process.env.PLAYWRIGHT_MODULE).href:'playwright-core');
 const data=JSON.parse(await readFile(resolve(root,'../decks/deep-time/deck.json'),'utf8'));
 const deck={id:'parlor-fixture',slug:data.slug,name:data.name,tagline:'Synthetic browser fixture',revision:1,visibility:'private',createdAt:'',updatedAt:'',manifest:{data,tagline:'Synthetic fixture'}};
@@ -49,7 +51,7 @@ async function pending(get){const end=Date.now()+5000;while(!get()&&Date.now()<e
 const idleText='Press and hold the button to make contact with the beyond';
 async function idle(){await page.locator('.parlor-idle').waitFor();assert.equal((await page.locator('.parlor-show').innerText()).trim(),idleText+'\n\nThree button presses to learn about the deck, five to reset the reading');assert.equal(await page.locator('.parlor-card,.parlor-slot,.parlor-caption,.parlor-radio').count(),0);}
 async function summon(finish=true){
-  await idle();const n=await audioCount(),mic=await page.evaluate(()=>window.__micRequests);await page.keyboard.down('a');await page.locator('.parlor-summoning').waitFor();assert.equal(await page.locator('.parlor-slot').count(),3);
+  await idle();const n=await audioCount(),mic=await page.evaluate(()=>window.__micRequests);await pressA();await page.locator('.parlor-summoning').waitFor();assert.equal(await page.locator('.parlor-slot').count(),3);
   await page.clock.fastForward(7000);await waitAudio(n);assert.match(speechRequests.at(-1).text,/signal holds/);assert.doesNotMatch(speechRequests.at(-1).text,/button|release|press|tap|click|reset|advance/i);assert.equal(await page.evaluate(()=>window.__micRequests),mic);await cue().getByText('Keep holding.',{exact:true}).waitFor();await finishAudio();await page.getByText('Release the button.',{exact:true}).waitFor();assert.equal(await audioCount(),n+1);
   await page.keyboard.up('a');await waitAudio(n+1);assert.match(speechRequests.at(-1).text,/I am the spirit of the ether/);assert.doesNotMatch(speechRequests.at(-1).text,/button|press|hold|release|tap|click|reset|advance|cards|deck|spread/i);assert.equal(await page.evaluate(()=>window.__micRequests),mic);assert.equal(await caption().innerText(),'');
   if(finish){await finishAudio();await phase('question').waitFor();}
@@ -82,6 +84,7 @@ async function ignoredBusy(pointer=false){
 }
 async function escape(){await page.keyboard.press('Escape');await button('Start the show').waitFor();assert.equal(await page.evaluate(()=>document.activeElement.textContent),'Start the show');assert.equal(await page.locator('.parlor-card').count(),0);await page.clock.fastForward(100);assert.equal(await page.evaluate(()=>window.__radioContexts.every(c=>c.state==='closed')),true,'exit closes every ambience context');}
 async function capture(name){if(await page.locator('.parlor-show').count()){assert.equal(await page.locator('.parlor-show button,.parlor-show input,.parlor-show summary').count(),0,'guest projection has no controls');assert.equal(await page.locator('.parlor-cue').count(),1);assert.equal(await page.locator('.parlor-radio-label,.parlor-status,.parlor-control-hint').count(),0);if((await page.viewportSize()).width>=900 && !(await page.locator('.parlor-idle').count())){const scene=await page.locator('.parlor-scene').boundingBox(),hint=await cue().boundingBox(),stageBox=await stage().boundingBox();assert.ok(hint.x>=scene.x+scene.width+20,'side cue cannot overlap cards or captions');assert.ok(stageBox.y>=0 && stageBox.y+stageBox.height<=(await page.viewportSize()).height+1,'projected scene fits vertically');}}await page.evaluate(()=>window.scrollTo(0,0));assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.screenshot({path:resolve(evidence,name+'.png'),fullPage:true});}
+async function pressA(){await page.keyboard.down('a');if(await page.locator('.parlor-idle').count())await page.clock.fastForward(300);}
 async function tap(key='a'){await page.keyboard.press(key);}
 async function openGuide(){for(let i=0;i<3;i++)await tap();await page.clock.fastForward(500);await page.getByRole('dialog').waitFor();await page.waitForFunction(()=>document.querySelector('.parlor-introduction-text')?.textContent.trim());}
 async function closeGuide(){await tap();await page.clock.fastForward(500);await page.getByRole('dialog').waitFor({state:'detached'});}
@@ -142,6 +145,7 @@ async function artwork(){
   const images=await page.locator('.parlor-artwork img').evaluateAll(nodes=>nodes.map(img=>{const r=img.getBoundingClientRect(),card=img.closest('.parlor-card').getBoundingClientRect(),style=getComputedStyle(img);return {natural:[img.naturalWidth,img.naturalHeight],fit:style.objectFit,opacity:style.opacity,inset:Math.min(r.left-card.left,r.top-card.top,card.right-r.right,card.bottom-r.bottom),width:r.width,height:r.height};}));
   assert.ok(images.length);for(const img of images){assert.deepEqual(img.natural,artSizes[artIndex]);assert.equal(img.fit,'contain');assert.equal(img.opacity,'1');assert.ok(img.inset>=6,'full artwork stays inside rounded frame');const scale=Math.min(img.width/img.natural[0],img.height/img.natural[1]);assert.ok(img.natural[0]*scale<=img.width+.1&&img.natural[1]*scale<=img.height+.1);}
 }
+async function run(){
 try{
   await mkdir(evidence,{recursive:true});server=await preview({root,preview:{host:'127.0.0.1',port:4187,strictPort:true}});
   browser=await chromium.launch({headless:true,...(process.env.PARLOR_BROWSER?{executablePath:process.env.PARLOR_BROWSER}:{channel:'msedge'})});
@@ -219,7 +223,12 @@ try{
     }
     if(url.hostname!=='127.0.0.1')return route.abort();
     if(path==='/auth/session')return json(route,authenticated?{authenticated:true,accountId:'synthetic-owner',parlorAllowed:allowed,user:{email:'fixture@example.test'}}:{authenticated:false});
-    if(path==='/api/parlor/capabilities')return json(route,{mode:'byok',...(ownerMode?{ownerKeys:{anthropicModel:'claude-test-owner',elevenlabs:true}}:{})});
+    if(path==='/api/parlor/transcript'){
+      assert.equal(transcriptMode,true);assert.equal(route.request().method(),'POST');const body=route.request().postDataJSON();transcriptRequests.push(body);
+      assert.ok(Buffer.byteLength(JSON.stringify(body))<=16384);assert.doesNotMatch(JSON.stringify(body),/synthetic-browser-key|synthetic-voice-key|raw_audio|authorization|xi-api-key/);
+      return json(route,body.start?{token:'synthetic-receipt-'+(++transcriptStarts)}:{accepted:body.events.length});
+    }
+    if(path==='/api/parlor/capabilities')return json(route,{mode:'byok',transcriptLogging:transcriptMode,...(ownerMode?{ownerKeys:{anthropicModel:'claude-test-owner',elevenlabs:true}}:{})});
     if(path==='/api/me/decks')return json(route,[deck]);
     if(path==='/api/decks/parlor-fixture')return json(route,deck);
     if(path.startsWith('/api/decks/parlor-fixture/artwork/assets/'))return json(route,{},404);
@@ -260,6 +269,24 @@ try{
   await page.reload();assert.equal(await page.getByLabel('ElevenLabs voice ID',{exact:true}).inputValue(),'synthetic-selected-voice');assert.equal(await page.locator('textarea').count(),0);await capture('setup');
   const before=await audioCount();await button('Start the show').click();await idle();assert.equal(await audioCount(),before);assert.equal(calls,0);
   assert.equal(await page.evaluate(()=>window.__radioContexts.length),0,'no AudioContext before a deliberate summon gesture');
+  for(const viewport of [{width:1920,height:1080},{width:1366,height:768},{width:1024,height:768},{width:768,height:1024},{width:390,height:640},{width:320,height:568}]){
+    await page.setViewportSize(viewport);await page.waitForTimeout(40);
+    for(const selector of ['.parlor-idle .parlor-cue-title','.parlor-shortcut-note']){
+      const lines=await page.locator(selector).evaluate(el=>{const node=el.firstChild,range=document.createRange(),lines=[];for(const match of node.textContent.matchAll(/\S+/g)){range.setStart(node,match.index);range.setEnd(node,match.index+match[0].length);const box=range.getBoundingClientRect();let line=lines.find(l=>Math.abs(l.y-box.y)<2);if(!line){line={y:box.y,words:[]};lines.push(line);}line.words.push(match[0]);}return lines.map(l=>l.words);});
+      assert.ok(lines.length<2||lines.at(-1).length>=2,'no lone final word: '+JSON.stringify({viewport,selector,lines}));
+    }
+    await capture('idle-balanced-'+viewport.width+'x'+viewport.height);
+  }
+  await page.setViewportSize({width:1280,height:960});
+  await page.evaluate(()=>{window.__summonFlashes=0;new MutationObserver(records=>{for(const r of records)for(const n of r.addedNodes)if(n.nodeType===1&&(n.matches?.('.parlor-radio')||n.querySelector?.('.parlor-radio')))window.__summonFlashes++;}).observe(document.body,{childList:true,subtree:true});});
+  await openGuide();await closeGuide();await resetEncounter();await page.clock.fastForward(1000);await idle();
+  assert.equal(await page.evaluate(()=>window.__summonFlashes),0,'triple and five taps do not flash summoning');
+  assert.equal(await page.evaluate(()=>window.__radioContexts.length),0,'tap bursts never unlock ambience');assert.equal(await page.evaluate(()=>window.__micRequests),0);assert.equal(calls,0);assert.equal(await audioCount(),before);
+  if(process.env.PARLOR_INITIAL_ONLY==='1'){
+    await page.keyboard.down('a');await page.keyboard.up('a');await page.clock.fastForward(8000);await idle();assert.equal(await page.evaluate(()=>window.__radioContexts.length),0);
+    await pressA();await radio('tuning');await page.clock.fastForward(6500);assert.equal(await audioCount(),before);await page.clock.fastForward(500);await waitAudio(before);await page.keyboard.up('a');await resetEncounter();await idle();
+    console.log('PASS initial summon intent: silent tap bursts, three/five/close, 300ms threshold plus seven seconds, no late release effects, balanced idle/footer text at six viewport sizes. Synthetic providers/microphone only.');return;
+  }
   // Touching/dragging the blank scene never starts a summon, recording or ambience.
   await stage().dispatchEvent('pointerdown',{pointerId:9,pointerType:'touch',button:0,isPrimary:true});await page.clock.fastForward(7100);await stage().dispatchEvent('pointermove',{pointerId:9,clientY:100});await stage().dispatchEvent('pointercancel',{pointerId:9});await idle();assert.equal(await audioCount(),before);assert.equal(await page.evaluate(()=>window.__micRequests),0);assert.equal(await page.evaluate(()=>window.__radioContexts.length),0);
   // Five taps never flash the introduction, including on the initial screen.
@@ -274,19 +301,19 @@ try{
   await page.setViewportSize({width:1280,height:960});await openGuide();await resetEncounter();assert.equal(await page.getByRole('dialog').count(),0);await page.clock.fastForward(200000);await idle();
   // Early physical-key release and lost focus return to blank without voice or microphone.
   for(const cancel of ['release','blur']){
-    await page.keyboard.down('a');
+    await pressA();
     await page.locator('.parlor-summoning').waitFor();await radio('tuning');assert.equal(await page.locator('.parlor-slot').count(),3);assert.equal(await page.locator('.radio-needle').evaluate(el=>getComputedStyle(el).animationName),'none');assert.equal(await page.locator('.parlor-radio').evaluate(el=>el.style.getPropertyValue('--contact')),'0');
     if(cancel==='blur')await page.evaluate(()=>window.dispatchEvent(new Event('blur')));
     await page.keyboard.up('a');await idle();await page.clock.fastForward(7100);assert.equal(await audioCount(),before);assert.equal(await page.evaluate(()=>window.__micRequests),0);
   }
-  await page.emulateMedia({reducedMotion:'no-preference'});await page.keyboard.down('a');await radio('tuning');
+  await page.emulateMedia({reducedMotion:'no-preference'});await pressA();await radio('tuning');
   const progress=()=>page.locator('.parlor-radio').evaluate(el=>Number(el.style.getPropertyValue('--contact')));
   assert.ok(await progress()<.15);await page.clock.fastForward(3300);const halfway=await progress();assert.ok(halfway>.4&&halfway<.65);await capture('radio-summon-halfway');
   await page.clock.fastForward(2900);assert.ok(await progress()>.85);assert.equal(await audioCount(),before);await capture('radio-summon-near-contact');await page.keyboard.up('a');await idle();
-  await page.keyboard.down('a');await radio('tuning');assert.ok(await progress()<.15,'new summon starts at zero');await page.emulateMedia({reducedMotion:'reduce'});await page.waitForFunction(()=>matchMedia('(prefers-reduced-motion: reduce)').matches);await page.clock.fastForward(1000);await page.waitForFunction(()=>document.querySelector('.parlor-radio').style.getPropertyValue('--contact')==='0');await capture('radio-reduced-tuning');await page.keyboard.up('a');await idle();
-  const cueAudio=await audioCount();await page.keyboard.down('a');await page.clock.fastForward(7000);await waitAudio(cueAudio);await page.evaluate(()=>window.__oldCue=window.__audio.onended);await page.keyboard.up('a');await resetEncounter();await page.evaluate(()=>window.__oldCue?.());await idle();assert.equal(await audioCount(),cueAudio+1,'reset cancels introduction after a late release cue');
+  await pressA();await radio('tuning');assert.ok(await progress()<.15,'new summon starts at zero');await page.emulateMedia({reducedMotion:'reduce'});await page.waitForFunction(()=>matchMedia('(prefers-reduced-motion: reduce)').matches);await page.clock.fastForward(1000);await page.waitForFunction(()=>document.querySelector('.parlor-radio').style.getPropertyValue('--contact')==='0');await capture('radio-reduced-tuning');await page.keyboard.up('a');await idle();
+  const cueAudio=await audioCount();await pressA();await page.clock.fastForward(7000);await waitAudio(cueAudio);await page.evaluate(()=>window.__oldCue=window.__audio.onended);await page.keyboard.up('a');await resetEncounter();await page.evaluate(()=>window.__oldCue?.());await idle();assert.equal(await audioCount(),cueAudio+1,'reset cancels introduction after a late release cue');
   // Release-cue failure can be retried by a deliberate tap without enabling a microphone.
-  ttsMode='error';await page.keyboard.down('a');await page.clock.fastForward(7000);await page.locator(`.parlor-cue[role="alert"][aria-description*="${ownerMode?'account provider refused access':'Audio is unavailable'}"]`).waitFor();await radio('stopped');assert.equal(await caption().innerText(),'');await capture('radio-error');await page.keyboard.up('a');await page.clock.fastForward(700);assert.equal(calls,0,'failed summon release never starts narration');assert.equal(await page.locator('.parlor-card').count(),0);await phase('error').waitFor();ttsMode='ok';const retryCue=await audioCount();await tap();await page.clock.fastForward(500);await waitAudio(retryCue);await finishAudio();await waitAudio(retryCue+1);await finishAudio();await phase('question').waitFor();assert.equal(calls,0,'recovered intro still waits for a query or new tap');assert.equal(await page.evaluate(()=>window.__micRequests),0);await resetEncounter();
+  ttsMode='error';await pressA();await page.clock.fastForward(7000);await page.locator(`.parlor-cue[role="alert"][aria-description*="${ownerMode?'account provider refused access':'Audio is unavailable'}"]`).waitFor();await radio('stopped');assert.equal(await caption().innerText(),'');await capture('radio-error');await page.keyboard.up('a');await page.clock.fastForward(700);assert.equal(calls,0,'failed summon release never starts narration');assert.equal(await page.locator('.parlor-card').count(),0);await phase('error').waitFor();ttsMode='ok';const retryCue=await audioCount();await tap();await page.clock.fastForward(500);await waitAudio(retryCue);await finishAudio();await waitAudio(retryCue+1);await finishAudio();await phase('question').waitFor();assert.equal(calls,0,'recovered intro still waits for a query or new tap');assert.equal(await page.evaluate(()=>window.__micRequests),0);await resetEncounter();
   await capture('idle-contact');await summon(false);assert.equal(await page.locator('.parlor-card').count(),0);
   await page.evaluate(()=>{window.__audio.currentTime=.5;window.__audio.ontimeupdate();});assert.ok((await caption().innerText()).length>0);assert.ok(!(await caption().innerText()).includes('speak your question'));assert.ok(!(await caption().innerText()).includes('['));
   await page.waitForTimeout(150);assert.ok(!(await caption().innerText()).includes('speak your question'));await page.keyboard.down('b');await finishAudio();await page.clock.fastForward(500);assert.equal(await page.evaluate(()=>window.__micRequests),0,'a hold started during introduction cannot turn into recording');await page.keyboard.up('b');
@@ -334,11 +361,11 @@ try{
   // A busy tap cannot execute later just because speech completed inside its timeout.
   await tap();await finishAudio();await page.waitForTimeout(600);assert.equal(await page.locator('.is-revealed').count(),1);
   const heldStarts=await page.evaluate(()=>window.__micStarts);await page.evaluate(()=>window.__utterance='Overlapping keyboard discussion');
-  await page.keyboard.down('a');await page.keyboard.down('b');await page.keyboard.down('a');await cue().getByText('Speak now.',{exact:true}).waitFor();await page.waitForTimeout(300);await page.keyboard.up('a');assert.equal(await page.evaluate(()=>window.__tracks.some(t=>!t.stopped)),true,'second key keeps intentional gesture held');await page.keyboard.up('b');await page.waitForFunction(()=>document.querySelector('.parlor-user-transcript').textContent==='Overlapping keyboard discussion');assert.equal(await page.evaluate(()=>window.__micStarts),heldStarts+1);await cue().getByText('Listen.',{exact:true}).waitFor();await finishAudio();
+  await pressA();await page.keyboard.down('b');await pressA();await cue().getByText('Speak now.',{exact:true}).waitFor();await page.waitForTimeout(300);await page.keyboard.up('a');assert.equal(await page.evaluate(()=>window.__tracks.some(t=>!t.stopped)),true,'second key keeps intentional gesture held');await page.keyboard.up('b');await page.waitForFunction(()=>document.querySelector('.parlor-user-transcript').textContent==='Overlapping keyboard discussion');assert.equal(await page.evaluate(()=>window.__micStarts),heldStarts+1);await cue().getByText('Listen.',{exact:true}).waitFor();await finishAudio();
   const nextAudio=await audioCount();await tap('c');await waitAudio(nextAudio);assert.equal(await page.locator('.is-revealed').count(),2);
   // Reset during audio clears cards/history; captured callbacks cannot revive that reading.
   await page.evaluate(()=>window.__oldCallbacks=[window.__audio.onended,window.__audio.ontimeupdate]);await resetEncounter();await page.evaluate(()=>window.__oldCallbacks.forEach(fn=>fn?.()));await page.waitForTimeout(600);assert.equal(await page.locator('.parlor-card').count(),0);
-  ttsMode='delay';const cancelledVoice=await audioCount();await page.keyboard.down('a');await page.clock.fastForward(7000);await pending(()=>ttsRelease);await radio('searching');await page.keyboard.up('a');await resetEncounter();ttsRelease();ttsRelease=null;ttsMode='ok';await page.waitForTimeout(150);await idle();assert.equal(await audioCount(),cancelledVoice,'late TTS response cannot revive the apparatus or player');
+  ttsMode='delay';const cancelledVoice=await audioCount();await pressA();await page.clock.fastForward(7000);await pending(()=>ttsRelease);await radio('searching');await page.keyboard.up('a');await resetEncounter();ttsRelease();ttsRelease=null;ttsMode='ok';await page.waitForTimeout(150);await idle();assert.equal(await audioCount(),cancelledVoice,'late TTS response cannot revive the apparatus or player');
   await summon();scribeMode='delay';const resetCalls=calls;await talk('Old guest transcription',true);await cue().getByText('Please wait a moment, dialing in the etheric connection',{exact:true}).waitFor();await page.getByLabel('Interactive reading',{exact:true}).focus();await resetEncounter();scribeRelease();scribeRelease=null;scribeMode='ok';await page.waitForTimeout(200);assert.equal(calls,resetCalls);assert.equal(await page.locator('.parlor-card').count(),0);
   await summon();mode='delay';await talk('Old guest reading',true);await page.waitForFunction(()=>document.querySelector('.parlor-cue-title').textContent.includes('etheric connection'));await resetEncounter();release();release=null;mode='ok';await page.waitForTimeout(200);assert.equal(await page.locator('.parlor-card').count(),0);
   // Genuine decoded WebP fixtures at all four observed source sizes, desktop/projector and phone.
@@ -452,7 +479,7 @@ try{
   }
   await page.getByLabel('Show operator controls while testing',{exact:true}).uncheck();
   // Explicit silent setup covers summon/greeting and a reset during paged delivery.
-  await page.getByLabel('Read without audio',{exact:true}).check();const beforeSilent=await audioCount();await button('Start the show').click();await page.keyboard.down('a');await page.clock.fastForward(7000);await finishSilent();await phase('awaiting-release').waitFor();await page.keyboard.up('a');await finishSilent();await phase('question').waitFor();assert.equal(await audioCount(),beforeSilent);
+  await page.getByLabel('Read without audio',{exact:true}).check();const beforeSilent=await audioCount();await button('Start the show').click();await pressA();await page.clock.fastForward(7000);await finishSilent();await phase('awaiting-release').waitFor();await page.keyboard.up('a');await finishSilent();await phase('question').waitFor();assert.equal(await audioCount(),beforeSilent);
   await advance();await page.locator('.parlor-caption.is-silent').waitFor();await page.waitForFunction(()=>document.querySelector('.parlor-ritual').dataset.phase==='speaking');await resetEncounter();assert.equal(await page.locator('[data-silent-measure]').count(),0);await page.clock.fastForward(60000);await idle();assert.equal(await audioCount(),beforeSilent);await escape();await page.getByLabel('Read without audio',{exact:true}).uncheck();
   // Optional authored deck notes never enter provider payloads or reveal future cards.
   const detailsToggle=page.getByLabel('Show card details beside the current card',{exact:true});assert.equal(await detailsToggle.isChecked(),false);
@@ -478,8 +505,18 @@ try{
   await page.reload();await begin();detailsAudio=await audioCount();await advance();await waitAudio(detailsAudio);await finishAudio();await phase('ready').waitFor();await notes.waitFor();await page.waitForTimeout(100);
   const longPages=[];for(let i=0;i<20;i++){const text=await notes.textContent();longPages.push(text);assert.equal(await notes.evaluate(el=>el.scrollHeight<=el.clientHeight+1),true);await page.clock.fastForward(silentExports.silentPageMs(text)+100);await page.waitForTimeout(10);if(longPages.join(' ').includes('Scene:'))break;}
   assert.match(longPages.join(' '),/A long authored name/);assert.match(longPages.join(' '),/Scene:/);await resetEncounter();await escape();await detailsToggle.uncheck();await page.reload();assert.equal(await detailsToggle.isChecked(),false);await page.setViewportSize({width:1280,height:960});
+  if(transcriptMode){
+    await page.getByText(/Text questions, generated responses and presentation diagnostics are sent to temporary Vercel runtime logs/).waitFor();
+    const events=transcriptRequests.flatMap(b=>b.events??[]);for(const kind of ['user_input','assistant_generated','presentation_progress','presentation_completed','presentation_interrupted','encounter_closed'])assert.ok(events.some(e=>e.kind===kind),'browser emits '+kind);
+    assert.ok(transcriptStarts>2,'reset obtains fresh encounter receipts');assert.ok(events.some(e=>e.timing==='silent')&&events.some(e=>e.timing==='aligned'));
+    assert.equal(await page.evaluate(()=>Object.entries(localStorage).some(([k,v])=>/transcript|eventId|presentation_progress/.test(k+' '+v))),false,'no transcript archive in browser storage');
+  }
   await begin();await stage().focus();await page.keyboard.down('Space');await cue().getByText('Speak now.',{exact:true}).waitFor();authenticated=false;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.getByText('Parlor access is restricted.',{exact:true}).waitFor();assert.equal(await page.locator('.parlor-show').count(),0);
+  const transcriptCount=transcriptRequests.length;await page.clock.fastForward(5000);await page.waitForTimeout(50);assert.equal(transcriptRequests.length,transcriptCount,'logout stops queued logging');
   await page.clock.fastForward(100);assert.equal(await page.evaluate(()=>window.__radioContexts.every(c=>c.state==='closed')),true,'logout closes ambience contexts');
   assert.equal(await page.evaluate(()=>window.__tracks.some(t=>!t.stopped)),false);await page.keyboard.up('Space');assert.ok(speechRequests.length>=8);assert.ok(scribeRequests.length>=8);console.log('PASS: global tap/hold/five-tap reset, overlapping keys and repeat, no tap microphone access, late transcription/narration/reading fences, saved choices retained, setup exclusion, four artwork proportions on desktop/mobile, v3 selected voice and aligned captions, per-card discussion, explicit advance, held-only Scribe v2, centered rolling captions and long questions across twelve viewport sizes, no read-ahead or page scrolling, full conversation retained, complete measured silent pages with reading time and reset-safe advance guards, touch drags without encounter input, explicit operator touch and cancellation, busy keyboard/pointer lock with five-tap reset and no replay, optional account-persisted deck notes with measured pages across ten viewports and current-only metadata, MP4, denial/empty/error/cancellation, Escape/logout cleanup. Synthetic providers and microphone only.');
 }catch(error){if(page&&!page.isClosed())await page.screenshot({path:resolve(evidence,'failure.png'),fullPage:true});throw error;}
 finally{release?.();scribeRelease?.();ttsRelease?.();await context?.close();await browser?.close();await new Promise(r=>server?.httpServer?server.httpServer.close(r):r());console.log('Cleanup: browser, context and local preview closed.');}
+
+}
+await run();

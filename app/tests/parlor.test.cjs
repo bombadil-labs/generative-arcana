@@ -32,6 +32,36 @@ async function until(machine, phase) {
   });
 }
 
+for (const source of ['byok','owner']) test(`runtime transcript ${source}: generated is separate from presentation, reset fences late callbacks and new context`,async()=>{
+  const events=[];let encounter=1,disposed=false;const audio=[],generated=deferred();
+  const configured=source==='owner'?{...settings,anthropicKey:'',elevenKey:'',ownerKeys:{anthropicModel:'claude-test',elevenlabs:true}}:settings;
+  const machine=new ParlorMachine(deck.id,configured,{transcript:{event:value=>{if(!disposed)events.push({encounter,...value});},reset:()=>encounter++,dispose:()=>{disposed=true;}},
+    draw:async(_,q)=>engine.castReading(deck.id,'three-card',q),narrate:async(_,r)=>{await generated.promise;return {cards:r.placements.map((p,i)=>({slug:p.card.slug,text:`Generated vision ${i}`})),synthesis:'Generated closing'};},
+    speak:async(_,text,signal,playing,reading,caption)=>{const done=deferred();audio.push({done,caption,playing,signal});await done.promise;},readSilently:immediateSilent});
+  try {
+    await confirm(machine);await until(machine,'generating');generated.resolve();await until(machine,'ready');
+    assert.equal(events.filter(e=>e.kind==='assistant_generated'&&e.stage==='card').length,3);
+    assert.equal(events.filter(e=>e.kind==='presentation_completed'&&e.stage==='card').length,0,'generated future prose is not delivered');
+    machine.next();const first=audio.at(-1);first.playing();first.caption('Observed normalized prefix','aligned');machine.openGuide();first.caption('UNOBSERVED_WHILE_PAUSED','aligned');machine.closeGuide();machine.reset();
+    const interrupted=events.find(e=>e.kind==='presentation_interrupted'&&e.stage==='card');assert.equal(interrupted.text,'Observed normalized prefix');assert.equal(interrupted.reason,'reset');assert.equal(interrupted.encounter,1);
+    const count=events.length;first.caption('OLD_LATE_CAPTION','aligned');first.done.resolve();await tick();assert.equal(events.length,count);
+    machine.begin();const second=audio.at(-1);second.done.resolve();await until(machine,'question');machine.submit('NEW_GUEST_ONLY');await until(machine,'ready');
+    const fresh=events.filter(e=>e.encounter===2);assert.doesNotMatch(JSON.stringify(fresh),/A private question|Observed normalized prefix|OLD_LATE_CAPTION|UNOBSERVED/);
+    assert.match(JSON.stringify(fresh),/NEW_GUEST_ONLY/);assert.equal(machine.getSnapshot().question,'NEW_GUEST_ONLY');
+  } finally {audio.forEach(a=>a.done.resolve());machine.dispose();}
+});
+
+test('runtime transcript records missing delivery as unknown and silent pages individually, never substitutes unread script',async()=>{
+  const events=[];let fail=false;const {machine}=setup({transcript:{event:e=>events.push(e),reset:()=>{},dispose:()=>{}},
+    speak:async()=>{if(fail)throw new Error('RAW_SECRET_ERROR');},
+    readSilently:async(text,signal,show)=>{for(const page of ['Beginning page','Middle page','Ending page'])show(page);}});
+  try {
+    machine.begin();await until(machine,'question');const complete=events.find(e=>e.kind==='presentation_completed');assert.equal(complete.timing,'unknown');assert.equal(complete.text,undefined);
+    machine.reset();machine.begin();machine.captions();await until(machine,'question');assert.deepEqual(events.filter(e=>e.kind==='presentation_progress'&&e.timing==='silent').map(e=>e.text),['Beginning page','Middle page','Ending page']);
+    fail=true;machine.reset();machine.begin();await until(machine,'error');const failed=events.filter(e=>e.kind==='presentation_interrupted').at(-1);assert.equal(failed.timing,'unknown');assert.equal(failed.text,undefined);assert.equal(failed.reason,'failed');assert.doesNotMatch(JSON.stringify(events),/RAW_SECRET_ERROR/);
+  }finally{machine.dispose();}
+});
+
 test('deck guide pauses inference and speech completion without retries, context changes or duplicate history',async()=>{
   const generated=deferred(),audio=[];let requests=0;
   const {machine,draws}=setup({narrate:async(_,reading)=>{requests++;await generated.promise;return narration(reading);},speak:async(_,text,signal,playing,reading,caption,waiting,pause)=>{const done=deferred();audio.push({done,playing,caption,signal,pause});await done.promise;}});

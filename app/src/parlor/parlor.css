@@ -118,7 +118,7 @@
 .parlor-show .parlor-idle { display: block; max-width: 680px; }
 .parlor-idle .parlor-scene { display: none; }
 .parlor-idle .parlor-cue { text-align: center; border: 0; padding: 40px 20px; }
-.parlor-idle .parlor-cue-title { color: #d4c6aa; font-size: clamp(23px, 2.2vw, 32px); }
+.parlor-idle .parlor-cue-title { color: #d4c6aa; font-size: clamp(23px, 2.2vw, 32px); text-wrap: balance; }
 .parlor-operator-controls { grid-column: 1 / -1; text-align: center; touch-action: auto; user-select: text; border-top: 1px solid #635369; padding-top: 12px; }
 .parlor-operator-controls p { font-size: 13px; }
 @media (max-width: 800px) {
@@ -239,7 +239,7 @@
 
 .parlor-show { position: relative; --footer-space: 0px; --note-space: 80px; --stage-height: calc(100dvh - 2 * var(--stage-pad) - var(--footer-space)); padding-bottom: calc(var(--stage-pad) + var(--footer-space)); }
 /* On wide displays the note occupies the existing cue column, not caption height. */
-.parlor .parlor-shortcut-note { position: absolute; z-index: 90; bottom: 8px; right: max(var(--stage-pad), calc((100% - 1480px) / 2)); width: 240px; margin: 0; color: #d4c8b5; text-align: right; font: 400 clamp(14px, 1vw, 18px)/1.35 var(--font-body); }
+.parlor .parlor-shortcut-note { position: absolute; z-index: 90; bottom: 8px; right: max(var(--stage-pad), calc((100% - 1480px) / 2)); width: 240px; margin: 0; color: #d4c8b5; text-align: right; text-wrap: balance; font: 400 clamp(14px, 1vw, 18px)/1.35 var(--font-body); }
 .parlor-deck-introduction { position: fixed; z-index: 80; inset: clamp(12px, 3vw, 40px) clamp(12px, 6vw, 100px) calc(var(--note-space) + 12px); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: clamp(10px, 2dvh, 24px); padding: clamp(16px, 3vw, 44px); background: #15101d; border: 1px solid #af8d56; box-shadow: 0 0 0 100vmax #08070ad9; border-radius: 8px; outline: none; }
 .parlor-deck-introduction h2 { margin: 0; font-size: clamp(24px, 3vw, 42px); color: var(--parlor-gold); }
 .parlor-introduction-text { min-height: 0; overflow: clip; white-space: pre-wrap; overflow-wrap: anywhere; font: 400 clamp(19px, 1.8vw, 28px)/1.4 var(--font-display); }

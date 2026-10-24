@@ -1,5 +1,10 @@
 # The parlor
 
+Optional [temporary Vercel transcript logging](parlor-runtime-transcripts.md) is off
+by default. It requires explicit deployment configuration and adds no transcript
+database or guest archive. Reset clears the next guest's conversation, not records
+already received by Vercel or the selected providers.
+
 The production Parlor is restricted to the verified auth issuer/subject in
 `mcp/src/parlorAccess.ts`. The server checks the current verified browser session
 before serving `/parlor`, its private JavaScript/CSS, and every `/api/parlor`
@@ -23,7 +28,10 @@ selected voice ID enable speech. The voice ID is preserved, including remembered
 settings; browser-key speech now requests `eleven_v3`.
 
 Start the show opens a blank dark screen with exactly: **Press and hold the button to make contact with the beyond**.
-A separate **seven-second summon hold** gradually reveals three empty card spaces
+A continuous **300 ms intent hold** is required before idle summoning shows visuals,
+unlocks ambience or starts work. Quick taps remain silent and count toward the
+three-press guide or five-press reset. The **seven-second summon sequence** then
+gradually reveals three empty card spaces (7.3 seconds total from initial key-down)
 and slow radio-like light pulses. It never requests microphone access. At the threshold,
 the selected voice acknowledges contact without giving control instructions. The visual
 cue changes from **Keep holding. Contact is forming.** to **Release the button.** when

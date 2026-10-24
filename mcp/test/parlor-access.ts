@@ -9,6 +9,7 @@ import { createParlorAccessGuard, isParlorOwner, isPrivateParlorPath, parlorPath
 import { createParlorHandler } from "../src/parlorApi";
 import { parlorConfig } from "../src/parlorConfig";
 import { serveArcanaWebApp } from "../src/webAppStatic";
+import { createParlorTranscriptHandler } from "../src/parlorTranscript";
 
 const h = await createBetterAuthHarness();
 const origin = new URL(PARLOR_OWNER.issuer).origin;
@@ -24,10 +25,13 @@ const guard = createParlorAccessGuard({ authenticate: async (req, res) => {
 const api = createParlorHandler({ config: parlorConfig({ PARLOR_MODE: "byok" }), authorize: guard,
   fetch: async () => { providerCalls++; throw new Error("No provider calls allowed"); } });
 let activeApi = api;
+const transcriptLines:string[]=[];
+const transcriptApi=createParlorTranscriptHandler({enabled:true,origin,authenticator:auth.browserAuthenticator,signingSecrets:['synthetic-transcript-signing-secret'],redactSecrets:[],emit:line=>transcriptLines.push(line)});
 const server = createServer((req, res) => { void (async () => {
   const path = parlorPathname(req.url ?? "/");
   const restricted = isPrivateParlorPath(path);
   if (restricted && !await guard(req, res)) return;
+  if (path==='/api/parlor/transcript') { await transcriptApi(req,res); return; }
   if (path.startsWith("/api/parlor")) { await activeApi(req, res); return; }
   if (!serveArcanaWebApp(req, res, dir, restricted)) res.writeHead(404).end();
 })(); });
@@ -67,7 +71,7 @@ try {
   const paths = ["/parlor", "/parlor/", "/%70arlor", "//parlor", "/parlor//",
     "/PARLOR", "/assets/parlor-fixture.js", "/assets/parlor-fixture.css", "/assets/%70arlor-fixture.js", "/assets/parlor-radio-recording.mp3", "/assets/%70arlor-radio-recording.mp3",
     "/other%2f..%2fassets%2fparlor-fixture.js", "/other%5c..%5cassets%5cparlor-fixture.js",
-    "/api/parlor", "/api/parlor/capabilities", "/api/parlor/narrate", "/api/parlor/converse", "/api/parlor/speech",
+    "/api/parlor", "/api/parlor/capabilities", "/api/parlor/narrate", "/api/parlor/converse", "/api/parlor/speech", "/api/parlor/transcript",
     "/api/parlor/future-endpoint", "/api/parlor/owner/narrate", "/api/parlor/owner/converse", "/api/parlor/owner/speech", "/api/parlor/owner/transcribe", "/%61pi/parlor/capabilities", "//api//parlor/capabilities"];
   for (const cookie of ["", "arcana-auth.session_token=forged", otherCookie]) {
     for (const path of paths) for (const method of ["GET", "HEAD", "POST"]) {
@@ -108,6 +112,11 @@ try {
   assert.equal((await ownerSpeech(ownerCookie)).status,200);
   for(const cookie of ['',otherCookie,'arcana-auth.session_token=forged'])assert.equal((await ownerSpeech(cookie)).status,cookie===otherCookie?403:401);
   assert.equal(providerCalls,1,'only the real signed owner session dispatched the mocked voice call');
+  const transcript=(body:unknown,cookie=ownerCookie)=>fetch(`http://127.0.0.1:${address.port}/api/parlor/transcript`,{method:'POST',headers:{cookie,origin,'content-type':'application/json'},body:JSON.stringify(body)});
+  const receipt=await transcript({start:true});assert.equal(receipt.status,200);const {token:transcriptToken}=await receipt.json();
+  const transcriptBody={token:transcriptToken,events:[{kind:'user_input',text:'Synthetic fixture only',eventId:'10000000-0000-4000-8000-000000000001',seq:1,at:Date.now(),part:0,parts:1}]};
+  assert.equal((await transcript(transcriptBody)).status,200);assert.equal(transcriptLines.length,1);
+  for(const cookie of ['',otherCookie,'arcana-auth.session_token=forged'])assert.equal((await transcript(transcriptBody,cookie)).status,cookie===otherCookie?403:401);
   authFails = true;
   assert.equal((await get("/parlor", ownerCookie)).status, 503);
   assert.equal((await get("/api/parlor/capabilities", ownerCookie)).status, 503);
@@ -119,6 +128,7 @@ try {
   await h.pg.client.query('DELETE FROM arcana_auth_session WHERE "userId"=$1', [PARLOR_OWNER.subject]);
   assert.equal((await get("/parlor", ownerCookie)).status, 401, "revoked owner session is denied");
   assert.equal((await ownerSpeech(ownerCookie)).status,401);assert.equal(providerCalls,1);
+  assert.equal((await transcript(transcriptBody)).status,401);assert.equal(transcriptLines.length,1,'revoked session cannot append logs');
   console.log("Parlor: real signed sessions allow only the verified owner; anonymous, forged, other, unverified, revoked and failed auth denied; normalized pages, private assets and every API protected; ordinary app preserved; one mocked owner voice call, no live provider calls.");
 } finally {
   await new Promise<void>(resolve => server.close(() => resolve()));

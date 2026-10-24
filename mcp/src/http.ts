@@ -53,6 +53,7 @@ import { createParlorHandler, isParlorPath } from "./parlorApi";
 import { requestClientIp } from "./requestIp";
 import { serveArcanaWebApp } from "./webAppStatic";
 import { createParlorAccessGuard, isPrivateParlorPath, parlorPathname } from "./parlorAccess";
+import { createParlorTranscriptHandler } from "./parlorTranscript";
 import { accountDeploymentReadiness, createDeploymentDependencyMonitor, deploymentBuildIdentity } from "./deploymentReadiness";
 import { deploymentAllowedHosts } from "./deploymentHosts";
 import { createArcanaAuthoringRequestHandler, isArcanaAuthoringPath } from "./authoringApi";
@@ -68,7 +69,8 @@ const stateDir = optionalEnv(process.env.MCP_STATE_DIR);
 const databaseUrl = optionalEnv(process.env.DATABASE_URL);
 const webAppDistDir = optionalEnv(process.env.ARCANA_WEB_DIST_DIR);
 const betterAuthEnabled = [process.env.BETTER_AUTH_URL, process.env.BETTER_AUTH_SECRET, process.env.BETTER_AUTH_SECRETS, process.env.BETTER_AUTH_DATABASE_URL].some(Boolean);
-const browserAuth = betterAuthEnabled ? createArcanaBetterAuth(createBetterAuthConfigurationFromEnv()) : undefined;
+const browserAuthConfiguration = betterAuthEnabled ? createBetterAuthConfigurationFromEnv() : undefined;
+const browserAuth = browserAuthConfiguration ? createArcanaBetterAuth(browserAuthConfiguration) : undefined;
 if (browserAuth && process.env.MCP_OAUTH_ISSUER && process.env.MCP_OAUTH_ISSUER !== browserAuth.issuer) {
   throw new Error("MCP_OAUTH_ISSUER must match the local Better Auth issuer when Better Auth is enabled.");
 }
@@ -118,7 +120,14 @@ if (hostedParlorConfig.mode === 'hosted' && (!databaseUrl || !browserPrincipalRe
 const parlorPool = hostedParlorConfig.mode === 'hosted' ? new Pool({connectionString:databaseUrl,max:3,connectionTimeoutMillis:10000,statement_timeout:10000,query_timeout:11000}) : undefined;
 const parlorAccess = createParlorAccessGuard(browserAuth?.browserAuthenticator);
 const ownerParlorLimiter = hostedParlorConfig.ownerKeys && databaseUrl ? new DurableRateLimiter(databaseUrl, 30) : undefined;
+// Explicit opt-in; no transcript content is stored in the database or client storage.
+const transcriptLogging = process.env.PARLOR_TRANSCRIPT_LOGS === 'vercel' && process.env.VERCEL === '1' && !!browserAuth;
+const transcriptHandler = createParlorTranscriptHandler({ enabled:transcriptLogging, origin:browserAuthConfiguration?.baseURL,
+  authenticator:browserAuth?.browserAuthenticator,
+  signingSecrets:browserAuthConfiguration?.secrets?.map(s=>s.value) ?? [browserAuthConfiguration?.secret ?? ''],
+  redactSecrets:[...Object.values(hostedParlorConfig.keys),...Object.values(hostedParlorConfig.ownerKeys?.keys??{})].filter((v):v is string=>!!v) });
 const parlorHandler = createParlorHandler({config:hostedParlorConfig,authorize:parlorAccess,authenticator:browserAuth?.browserAuthenticator,
+  transcriptLogging,
   ownerAllowRequest:ownerParlorLimiter?async()=>(await ownerParlorLimiter.check('parlor-owner-provider')).allowed:undefined,
   store:parlorPool?new PostgresParlorStore(parlorPool):undefined,principal:browserPrincipalResolver,catalog});
 const artworkConfig = artworkStorageConfiguration();
@@ -331,7 +340,7 @@ async function handleHttpRequest(req: IncomingMessage, res: ServerResponse): Pro
     if (!manifestUploadHandler) { res.writeHead(503, { "content-type": "application/json", "cache-control": "no-store" }); res.end(JSON.stringify({ error: "manifest_staging_unavailable" })); return; }
     await manifestUploadHandler(req, res); return;
   }
-  if (isParlorRequest) { await parlorHandler(req,res); return; }
+  if (isParlorRequest) { if(url.pathname==='/api/parlor/transcript') await transcriptHandler(req,res); else await parlorHandler(req,res); return; }
 
   if (isAuthoringRequest) {
     void authoringHandler(req, res);
