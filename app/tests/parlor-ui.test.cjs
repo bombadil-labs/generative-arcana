@@ -32,7 +32,8 @@ function button(text){return [...document.querySelectorAll('button')].find(el=>e
 async function click(text){const target=button(text);assert.ok(target,`button exists: ${text}`);await act(async()=>target.click());await settle();}
 async function input(label,value){const field=[...document.querySelectorAll('label')].find(el=>el.childNodes[0].textContent===label)?.querySelector('input,textarea,select');assert.ok(field,`input exists: ${label}`);await act(async()=>{const proto=field.tagName==='TEXTAREA'?dom.window.HTMLTextAreaElement.prototype:dom.window.HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(field,value);field.dispatchEvent(new dom.window.Event('input',{bubbles:true}));});await flush();}
 async function tap(){await act(async()=>{window.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'a',code:'KeyA',bubbles:true}));window.dispatchEvent(new dom.window.KeyboardEvent('keyup',{key:'a',code:'KeyA',bubbles:true}));});await act(async()=>{await new Promise(r=>realSetTimeout(r,20));});await settle();}
-async function guest(){await click('Start the show');assert.equal(document.querySelectorAll('textarea').length,0);assert.ok(!button('Type instead'));assert.equal(document.querySelector('.parlor-idle').textContent,'Press and hold the button to make contact with the beyond');await act(async()=>window.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'a',code:'KeyA',bubbles:true})));await act(async()=>{await new Promise(r=>realSetTimeout(r,20));});await settle();await act(async()=>window.dispatchEvent(new dom.window.KeyboardEvent('keyup',{key:'a',code:'KeyA',bubbles:true})));await settle();await tap();}
+async function untilPhase(...phases){for(let i=0;i<100;i++){if(phases.includes(document.querySelector('.parlor-ritual')?.dataset.phase))return;await act(async()=>{await new Promise(r=>realSetTimeout(r,10));});}assert.fail('Expected phase '+phases.join('/')+'; got '+document.querySelector('.parlor-ritual')?.dataset.phase);}
+async function guest(){await click('Start the show');assert.equal(document.querySelectorAll('textarea').length,0);assert.ok(!button('Type instead'));assert.equal(document.querySelector('.parlor-idle').textContent,'Press and hold the button to make contact with the beyond');await act(async()=>window.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'a',code:'KeyA',bubbles:true})));await untilPhase('awaiting-release');await act(async()=>window.dispatchEvent(new dom.window.KeyboardEvent('keyup',{key:'a',code:'KeyA',bubbles:true})));await untilPhase('question');await tap();if(!delayed)await untilPhase('ready','error');}
 async function escape(){await act(async()=>window.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));await settle();}
 
 
@@ -47,7 +48,7 @@ before(async()=>{
 beforeEach(async()=>{
   // Only accelerate the summon threshold in this DOM fixture. Pure gesture tests
   // and the real-browser test independently verify the actual seven seconds.
-  global.setTimeout=(callback,ms,...args)=>realSetTimeout(callback,callback.name==='advanceSilentPage'?0:ms===7000||ms===500?5:ms,...args);
+  global.setTimeout=(callback,ms,...args)=>realSetTimeout(callback,callback.name==='advanceSilentPage'?0:ms===7000||ms===500||ms===300?5:ms,...args);
   authenticated=true;parlorAllowed=true;deckCalls=0;accountId='test-account';providerCalls=0;delayed=false;lateResolve=undefined;
   accessMode='byok';hostedDenied=false;hostedBodies=[];ownerAvailable=false;
   ownerEleven=false;ownerVoice='env-owner-voice';ttsRequests=[];

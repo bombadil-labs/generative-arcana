@@ -10,7 +10,7 @@ import { useArtworkSelection, useArtworkStore } from "../artwork/context";
 import { characters, visionFrames, clearKeys, defaultSettings, readSettings, readySettings, saveSettings, useOwnerEleven, type Settings } from "./settings";
 import { ParlorMachine } from "./machine";
 import { ScribeMicrophone, transcribeScribe } from "./microphone";
-import { TableGestures, tableInput, tableKey, HOLD_MS, SUMMON_MS } from "./gestures";
+import { TableGestures, tableInput, tableKey, HOLD_MS, SUMMON_MS, SUMMON_INTENT_MS } from "./gestures";
 import { RadioSignal } from "./RadioSignal";
 import { Transcript } from "./Transcript";
 import { focusedCard } from "./cardFocus";
@@ -195,6 +195,7 @@ function Ritual({ showDetails, deckId, settings, leave, radioPreferences, change
     return () => { offMachine(); offMic(); };
   }, [machine, microphone, sound]);
   const controls = useMemo(() => new TableGestures({
+    pressDelay: () => !machine.getSnapshot().guideOpen && machine.getSnapshot().phase === "idle" ? SUMMON_INTENT_MS : 0,
     holdDelay: () => !machine.getSnapshot().guideOpen && machine.getSnapshot().phase === "idle" ? SUMMON_MS : HOLD_MS,
     press: startedAt => { if (machine.getSnapshot().guideOpen) return; sound.hold(machine.getSnapshot().phase !== "idle"); machine.summon(startedAt); sound.unlock(); },
     lift: () => { if (machine.getSnapshot().guideOpen) return; machine.releaseSummon(); if (!["checking", "listening"].includes(microphone.getSnapshot().phase)) sound.hold(false); },
