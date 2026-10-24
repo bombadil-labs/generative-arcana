@@ -21,6 +21,9 @@ export function silentPage(text: string, start: number, fits: (text: string) => 
 }
 
 export interface SilentLayout {
+  /** A browser resize can briefly collapse the viewport. Wait for observation
+   * rather than treating that intermediate geometry as a failed reading. */
+  available?(): boolean;
   fits(text: string): boolean;
   observe(resize: () => void): () => void;
 }
@@ -45,6 +48,7 @@ export function presentSilentPages(text: string, signal: AbortSignal, show: (pag
       needsLayout = true;
       if (pause?.paused) return;
       try {
+        if (layout.available && !layout.available()) return;
         const page = silentPage(text, start, layout.fits); show(page.text);
         if (stopped) return;
         needsLayout = false; remaining = silentPageMs(page.text);
@@ -75,6 +79,10 @@ export async function readSilently(text: string, signal: AbortSignal, show: (pag
   document.body.append(probe);
   try {
     await presentSilentPages(text, signal, show, {
+      available() {
+        const box = window.getBoundingClientRect();
+        return box.width > 0 && box.height > 0;
+      },
       fits(candidate) {
         const box = window.getBoundingClientRect(), style = view.getComputedStyle(window);
         if (box.width <= 0 || box.height <= 0) return false;

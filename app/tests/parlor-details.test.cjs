@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { authoredSentence, currentCardDetails, readDetailsPreference, saveDetailsPreference } = require('../.test-build/parlor/cardDetails.js');
+const { authoredSentence, currentCardDetails, readDetailsPreference, saveDetailsPreference, detailExcerpt, detailSummary } = require('../.test-build/parlor/cardDetails.js');
 const { ArcanaEngine } = require('../.test-build/engine/ArcanaEngine.js');
 const { DeckRegistry } = require('../.test-build/decks/registry.js');
 const { rawDeck } = require('./fixtures.cjs');
@@ -18,22 +18,39 @@ test('deck notes use actual authored scene, taxonomy and orientation without fut
   state.reading.placements[1].card.name = 'FORBIDDEN FUTURE';
   const notes = currentCardDetails(state);
   assert.equal(notes.name, placement.card.name); assert.equal(notes.scene, 'One woman holds a sealed envelope at a cafe table.');
-  assert.equal(notes.meaning, 'Trust the patient message.'); assert.equal(notes.orientation, 'Upright');
-  assert.ok(notes.station); assert.doesNotMatch(notes.text, /FORBIDDEN FUTURE|A crowd/);
-  placement.reversed = true; assert.equal(currentCardDetails(state).meaning, 'A delayed message needs care.');
+  assert.equal(notes.upright, 'Trust the patient message. Another meaning.'); assert.equal(notes.orientation, 'Upright');
+  assert.equal(notes.inverted,'A delayed message needs care. Another meaning.');
+  assert.ok(notes.station); assert.doesNotMatch(JSON.stringify(detailSummary(notes,0)), /FORBIDDEN FUTURE|A crowd/);
+  placement.reversed = true; assert.equal(currentCardDetails(state).inverted, 'A delayed message needs care. Another meaning.');
   assert.equal(currentCardDetails(state).orientation, 'Reversed');
   placement.card.arcana = 'major'; assert.equal(currentCardDetails(state).family, 'Major Arcana');
+});
+
+test('single-screen summaries use labelled authored excerpts while full meanings remain intact',async()=>{
+  const state=await fixture(),card=state.reading.placements[0].card;state.reading.placements[0].reversed=true;
+  const repeated='A shared phrase 🌙. '.repeat(60);card.meaning.upright='UPRIGHT_BEGIN '+repeated+'UPRIGHT_END';card.meaning.inverted='REVERSED_BEGIN '+repeated+'REVERSED_END';
+  const notes=currentCardDetails(state);
+  for(let level=0;level<4;level++){const summary=detailSummary(notes,level);assert.match(summary.upright,/^UPRIGHT_BEGIN/);assert.match(summary.inverted,/^REVERSED_BEGIN/);assert.ok(summary.upright.length<=140);assert.ok(summary.inverted.length<=140);}
+  assert.equal(notes.upright,card.meaning.upright);assert.equal(notes.inverted,card.meaning.inverted);
+  assert.equal(detailExcerpt('One complete sentence. Another sentence.',25),'One complete sentence.');
+  assert.equal(detailExcerpt(undefined,80),undefined);assert.ok(detailExcerpt('A long unfinished thought '.repeat(10),48).endsWith('…'));
+  assert.equal(state.reading.placements[0].card.meaning.upright,'UPRIGHT_BEGIN '+repeated+'UPRIGHT_END','presentation never mutates source');
+});
+
+test('a missing meaning is omitted without fabricating an alternative or changing drawn orientation',async()=>{
+  const state=await fixture(),card=state.reading.placements[0].card;state.reading.placements[0].reversed=true;card.meaning.inverted=undefined;
+  const notes=currentCardDetails(state);assert.equal(notes.orientation,'Reversed');assert.equal(notes.inverted,undefined);assert.equal(detailSummary(notes,0).inverted,undefined);assert.equal(notes.reversed,true);assert.ok(notes.upright);
 });
 test('notes omit missing or unsuitable fields rather than inventing facts or slicing sentences', async () => {
   const state = await fixture(), card = state.reading.placements[0].card;
   delete card.suit_slug; delete card.rank_slug; card.arcana = 'minor'; card.station_slug = 'missing';
   card.visuals.detailed_description = 'Render this as a textured painting.'; card.meaning.upright = card.meaning.inverted = '';
-  const notes = currentCardDetails(state); assert.equal(notes.family, undefined); assert.equal(notes.rank, undefined); assert.equal(notes.station, undefined); assert.equal(notes.scene, undefined); assert.equal(notes.meaning, undefined);
+  const notes = currentCardDetails(state); assert.equal(notes.family, undefined); assert.equal(notes.rank, undefined); assert.equal(notes.station, undefined); assert.equal(notes.scene, undefined); assert.equal(notes.upright, undefined);
   assert.equal(authoredSentence('A sentence '+ 'long '.repeat(100)+'.'), undefined);
   assert.equal(authoredSentence('An unfinished scene'), undefined);
   assert.equal(authoredSentence('Dr. Brown holds a cup. The next sentence.'), 'Dr. Brown holds a cup.');
   card.meaning.upright = card.meaning.inverted = 'Patience, shelter, companionship';
-  assert.equal(currentCardDetails(state).meaning, 'Patience, shelter, companionship');
+  assert.equal(currentCardDetails(state).upright, 'Patience, shelter, companionship');
 });
 test('notes disappear on reset, preparation, synthesis and unrevealed states, and follow deliberate advance', async () => {
   const state = await fixture();

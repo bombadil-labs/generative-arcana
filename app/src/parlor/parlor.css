@@ -214,27 +214,35 @@
   .parlor-spread-stage figure, .parlor-spread-stage::before { transition: none; }
 }
 
-/* Opt-in deck information shares the existing art row. Defaults retain exactly
-   the centered focus above. Measured pages keep small displays readable. */
-.parlor-with-details .parlor-spread-stage {
-  --art-height: max(90px, min(calc(1.6 * var(--card-height)), 64cqw));
+.parlor-meaning-drawn { color: #f6efe0; }
+/* Optional lightbox: use the scene's available area, retain independent caption
+   and cue rows, and leave the normal centered card unchanged when disabled. */
+.parlor-with-details { --user-height: calc(var(--user-font) * 1.4); }
+.parlor-show .parlor-with-details .parlor-scene { position: relative; grid-template-rows: var(--user-height) minmax(0, 1fr) clamp(60px, 16dvh, 150px); }
+.parlor-with-details .parlor-radio { position: absolute; inset: 0; width: 100%; opacity: .2; pointer-events: none; }
+.parlor-with-details .parlor-spread-stage { padding-top: 0; height: 100%; grid-template-rows: minmax(0, 1fr) 24px; }
+.parlor-with-details .parlor-spread-stage .parlor-table { opacity: .22; }
+.parlor-with-details .parlor-spread-stage figure.is-focused { opacity: 0; }
+.parlor-details-lightbox { position: absolute; inset: 0; z-index: 4; display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1fr); gap: clamp(12px, 2vw, 28px); padding: 10px; background: #15101de8; border-radius: 8px; }
+.parlor-lightbox-art { position: relative; min-width: 0; min-height: 0; }
+.parlor-details-lightbox .parlor-card-details { position: static; min-width: 0; min-height: 0; padding: 0; border: 0; background: none; display: flex; flex-direction: column; gap: 10px; font: 400 clamp(18px, 1.7vw, 25px)/1.3 var(--font-display); }
+.parlor-details-name { font: 500 clamp(20px, 2vw, 30px)/1.2 var(--font-display); color: #e9c98a; overflow-wrap: anywhere; }
+.parlor .parlor-details-lightbox p { font: inherit; color: inherit; margin: 0; overflow-wrap: anywhere; }
+.parlor-details-axes { color: #d4c8b5 !important; }
+.parlor-details-meanings { display: grid; gap: 12px; }
+.parlor-details-lightbox h3 { margin: 0 0 3px; color: inherit; font: 600 16px/1.25 var(--font-body); }
+.parlor-meaning-secondary { color: #b9b3bb; }
+@media (max-height: 600px) {
+  .parlor-details-lightbox .parlor-card-details { gap: 4px; line-height: 1.2; }
+  .parlor-details-meanings { gap: 6px; }
 }
-.parlor-with-details .parlor-spread-stage figure.is-focused {
-  transform: translateX(calc(var(--focus-x) - 27cqw)) scale(1.6);
+@media (max-width: 600px) {
+  .parlor-details-lightbox { grid-template-columns: 1fr; grid-template-rows: minmax(70px, 1fr) auto; gap: 8px; padding: 4px; }
+  .parlor-details-lightbox .parlor-card-details { gap: 4px; font-size: 18px; line-height: 1.2; }
+  .parlor-details-name { font-size: 20px; }
+  .parlor-details-meanings { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+  .parlor-details-lightbox h3 { font-size: 14px; }
 }
-.parlor-with-details .parlor-spread-stage .parlor-table {
-  --detail-card-height: min(var(--art-height), 64cqw);
-  width: calc(var(--detail-card-height) * 1.25 + 2 * var(--card-gap));
-}
-.parlor-with-details .parlor-slot-labels { width: min(100%, max(216px, calc(min(var(--art-height), 64cqw) * 1.25 + 2 * var(--card-gap)))); }
-.parlor-card-details {
-  position: absolute; z-index: 3; inset: 0 0 0 48%;
-  display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 8px;
-  padding: 0 0 0 clamp(8px, 1.5vw, 20px); border-left: 1px solid #ae8e5e;
-  color: #f6efe0; background: linear-gradient(90deg, #15101de8, #15101db3);
-}
-.parlor-details-heading { font: 500 clamp(14px, 1vw, 18px)/1.3 var(--font-body); color: var(--parlor-gold); }
-.parlor-details-text { min-height: 0; overflow: clip; white-space: pre-wrap; overflow-wrap: anywhere; font: 400 clamp(17px, 1.5vw, 24px)/1.4 var(--font-display); }
 @media (max-width: 800px) { .parlor-card-details { gap: 4px; } }
 
 .parlor-show { position: relative; --footer-space: 0px; --note-space: 80px; --stage-height: calc(100dvh - 2 * var(--stage-pad) - var(--footer-space)); padding-bottom: calc(var(--stage-pad) + var(--footer-space)); }
