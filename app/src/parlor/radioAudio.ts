@@ -6,6 +6,9 @@ export const defaultRadioPreferences = (): RadioPreferences => ({ muted: false, 
 export const MAX_RADIO_GAIN = 1;
 export const RADIO_RECORDING = '/assets/parlor-radio-recording.mp3';
 export const RADIO_STARTS = [0, 45.4, 95.2, 145.75] as const;
+// Brief band-limited accents, far below full-scale voice; never normalize the bed.
+export const MAX_SIGNAL_GAIN = .012;
+export const SIGNAL_SECONDS = { lock: .075, loss: .11 } as const;
 /** Session-protected same-origin asset, requested only after an intentional gesture. */
 export async function loadRadioRecording(context: AudioContext, signal: AbortSignal): Promise<AudioBuffer> {
   const response = await fetch(RADIO_RECORDING, { credentials: 'same-origin', cache: 'no-store', redirect: 'error', signal });
@@ -31,9 +34,10 @@ export function radioGain(mode: RadioMode, preferences: RadioPreferences, captur
 }
 type Envelope = { from: number; to: number; start: number; end: number };
 type Graph = { gain: GainNode; nodes: AudioNode[]; sources: AudioScheduledSourceNode[]; envelope: Envelope; offset: number; started: number };
+type Accent = { source: AudioBufferSourceNode; gain: GainNode; nodes: AudioNode[]; start: number; duration: number; peak: number; cancelling?: boolean; timer?: ReturnType<typeof setTimeout> };
 const fraction = (value: number) => Math.max(0, Math.min(1, value));
 
-/** One gesture-unlocked context, one private recording, no microphone or extra synthesis. */
+/** One gesture-unlocked context and recording, plus bounded optional static accents. */
 export class RadioAudio {
   private context?: AudioContext;
   private buffer?: AudioBuffer;
@@ -51,6 +55,8 @@ export class RadioAudio {
   private error = "";
   private cursor: number;
   private loading?: { abort: AbortController; timer: ReturnType<typeof setTimeout> };
+  private noise?: AudioBuffer;
+  private accents = new Set<Accent>();
   constructor(private createContext = () => new AudioContext({ latencyHint: "interactive" }),
     private load = loadRadioRecording, random = Math.random) {
     const choice = random();
@@ -60,14 +66,70 @@ export class RadioAudio {
   getSnapshot = () => this.error;
   private message(error: string) { if (!this.disposed && error !== this.error) { this.error = error; this.listeners.forEach(fn => fn()); } }
   setPreferences(preferences: RadioPreferences) {
+    this.clearAccents();
     this.preferences = { ...preferences };
     if (preferences.muted || preferences.volume <= 0) this.stop(); else this.apply();
   }
   setState(mode: RadioMode, capture: boolean) {
     this.mode = mode; this.capture = capture;
+    if (capture || mode === 'listening') this.clearAccents(true);
     if (mode === "quiet" || mode === "stopped") this.stop(); else this.apply();
   }
-  hold(held: boolean) { this.held = held; this.apply(); }
+  hold(held: boolean) { this.held = held; if (held) this.clearAccents(); this.apply(); }
+  /** Actual vocalization edges only. Never unlock, queue or delay an accent. */
+  signal(edge: 'lock' | 'loss') {
+    const context = this.context, volume = this.preferences.volume;
+    if (!this.armed || this.disposed || !context || context.state !== 'running' || this.preferences.muted || !Number.isFinite(volume) || volume <= 0 || this.capture || this.held || ['quiet','stopped','listening'].includes(this.mode)) return;
+    this.clearAccents();
+    // At most one short retiring accent and one new accent, even with bad callers.
+    while (this.accents.size > 1) this.finishAccent(this.accents.values().next().value!);
+    const nodes: AudioNode[] = [];
+    let source: AudioBufferSourceNode | undefined;
+    let accent: Accent | undefined;
+    try {
+      if (!this.noise) {
+        this.noise = context.createBuffer(1, Math.ceil(context.sampleRate * SIGNAL_SECONDS.loss), context.sampleRate);
+        const samples = this.noise.getChannelData(0);
+        // Local repeatable noise: no external audio/service, no random loud spikes.
+        let seed = 0x41524341;
+        for (let i=0;i<samples.length;i++) { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5; samples[i] = (seed >>> 0) / 0xffffffff * 2 - 1; }
+      }
+      source = context.createBufferSource(); nodes.push(source); source.buffer = this.noise;
+      const filter = context.createBiquadFilter(); nodes.push(filter); filter.type = 'bandpass'; filter.frequency.value = 1200; filter.Q.value = .6;
+      const gain = context.createGain(); nodes.push(gain); gain.gain.value = 0;
+      source.connect(filter); filter.connect(gain); gain.connect(context.destination);
+      const now = context.currentTime, duration = SIGNAL_SECONDS[edge];
+      const peak = MAX_SIGNAL_GAIN * Math.min(1, volume) * (edge === 'loss' ? .8 : 1);
+      gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(peak, now + .012); gain.gain.linearRampToValueAtTime(0, now + duration);
+      const active: Accent = accent = { source, gain, nodes, start: now, duration, peak }; this.accents.add(active);
+      source.onended = () => this.finishAccent(active);
+      source.start(now); source.stop(now + duration);
+      active.timer = setTimeout(() => this.finishAccent(active), duration * 1000 + 50);
+    } catch {
+      try { source?.stop(); } catch {}
+      if (accent) this.finishAccent(accent);
+      nodes.forEach(node => { try { node.disconnect(); } catch {} });
+      // Cosmetic failure does not stop narration or the recording bed.
+    }
+  }
+  private finishAccent(accent: Accent) {
+    clearTimeout(accent.timer); this.accents.delete(accent); accent.source.onended = null;
+    accent.nodes.forEach(node => { try { node.disconnect(); } catch {} });
+  }
+  private clearAccents(immediate = false) {
+    for (const accent of this.accents) {
+      if (immediate) { try { accent.source.stop(); } catch {} this.finishAccent(accent); continue; }
+      if (accent.cancelling) continue;
+      accent.cancelling = true; clearTimeout(accent.timer);
+      const now = this.context?.currentTime ?? 0, elapsed = Math.max(0, now - accent.start);
+      const value = accent.peak * fraction(elapsed < .012 ? elapsed / .012 : (accent.duration - elapsed) / (accent.duration - .012));
+      try {
+        accent.gain.gain.cancelScheduledValues(now); accent.gain.gain.setValueAtTime(value, now); accent.gain.gain.linearRampToValueAtTime(0, now + .005);
+        accent.source.stop(now + .006); // Audio-clock stop survives throttled background timers.
+        accent.timer = setTimeout(() => this.finishAccent(accent), 12);
+      } catch { this.finishAccent(accent); }
+    }
+  }
   /** Call synchronously from an intentional key/pointer/operator gesture only. */
   unlock() {
     if (this.disposed || this.preferences.muted || !Number.isFinite(this.preferences.volume) || this.preferences.volume <= 0) return;
@@ -145,6 +207,7 @@ export class RadioAudio {
   }
   /** Silence on blur/reset/mute; later state changes cannot resume without another gesture. */
   stop() {
+    this.clearAccents();
     this.armed = false; const epoch = ++this.epoch;
     clearTimeout(this.suspendTimer);
     if (this.loading) { clearTimeout(this.loading.timer); this.loading.abort.abort(); this.loading = undefined; }
@@ -162,7 +225,7 @@ export class RadioAudio {
   dispose() {
     if (this.disposed) return;
     this.stop(); this.disposed = true; clearTimeout(this.suspendTimer); this.listeners.clear();
-    const context = this.context; this.context = undefined; this.buffer = undefined;
+    const context = this.context; this.context = undefined; this.buffer = undefined; this.noise = undefined;
     // Sources have a bounded audio-clock stop even if background JS timers are throttled.
     setTimeout(() => {
       for (const graph of this.retiring.keys()) this.disconnect(graph);

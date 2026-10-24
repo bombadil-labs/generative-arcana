@@ -3,6 +3,17 @@ const assert=require('node:assert/strict');
 const {silentPage,silentPageMs,presentSilentPages}=require('../.test-build/parlor/silentReading.js');
 const {PresentationPause}=require('../.test-build/parlor/pause.js');
 
+test('transient collapsed layout waits without skipping, completing or leaking callbacks',async t=>{
+  t.mock.timers.enable({apis:['setTimeout']});let available=false,resize,cleanups=0,finished=false;const pages=[],abort=new AbortController();
+  const work=presentSilentPages('Beginning. Middle. Ending.',abort.signal,p=>pages.push(p),{available:()=>available,fits:s=>s.length<=12,observe:fn=>{resize=fn;return()=>cleanups++;}}).then(()=>finished=true);
+  const rejected=assert.rejects(work,{name:'AbortError'});t.mock.timers.tick(100000);assert.deepEqual(pages,[]);assert.equal(finished,false);
+  available=true;resize();const first=pages[0];assert.match(first,/^Beginning/);
+  t.mock.timers.tick(1000);available=false;resize();t.mock.timers.tick(100000);assert.deepEqual(pages,[first]);assert.equal(finished,false);
+  available=true;resize();assert.deepEqual(pages,[first,first],'same page is remeasured with its full reading time');
+  t.mock.timers.tick(silentPageMs(first));assert.match(pages.at(-1),/^Middle/);
+  available=false;resize();abort.abort();await rejected;available=true;resize();t.mock.timers.tick(100000);assert.equal(pages.length,3);assert.equal(cleanups,1);
+});
+
 test('guide pauses silent page reading time, resumes the same page, and abort discards pending work',async t=>{
   t.mock.timers.enable({apis:['setTimeout']});let now=0,resize,cleanups=0; t.mock.method(performance,'now',()=>now);
   const pause=new PresentationPause(),abort=new AbortController(),pages=[];

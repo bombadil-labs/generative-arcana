@@ -94,8 +94,14 @@ speech button follows the same busy lock and five-tap reset exception.
   summoning. The same 500 ms gap resolves the gesture only after a five-tap reset is
   ruled out. The overview uses authored major-story, suit and rank data; the Roaring
   Twenties year/court explanation appears only for that matching authored structure.
-  Readable pages turn automatically and repeat, with no scrolling. Press once to
-  return; that gesture is consumed and cannot advance, record or summon.
+  There are exactly three manual pages: the deck's introduction, its major themes
+  with one fixed artwork example, then suits and ranks. Press once per page; the
+  next press after page three returns to the paused reading. No page rotates on
+  a timer. Page turns and closing are consumed and cannot deal, record or summon.
+  The example resolves in the selected artwork set through the existing private
+  asset loader; it is labelled as a deck example, never selected from the reading.
+  Missing artwork has a text fallback. The Roaring Twenties example is The
+  Emancipation; the guide's short suit/court summaries reflect its authored axes.
 - **Five taps** with less than **500 ms** from each release to the next press reset the
   encounter immediately on the fifth release. This stops audio/recording, aborts pending
   requests and clears cards, query, captions and history, then returns to blank idle.
@@ -378,23 +384,24 @@ and the side cue remain separate at projection and small-screen sizes.
 
 ### Optional projected deck notes
 
-Escape to setup and enable **Show card details beside the current card** to place
-the current revealed card left of a compact authored-information panel. It is off
-by default; that setting preserves the centered focus. The preference is stored
-per account on this browser independently of the opt-in for remembering keys.
+Escape to setup and enable **Show card details beside the current card** for a
+roomier lightbox with the current revealed artwork and a single-screen authored
+summary. It defaults off and persists per account. The drawn meaning is prominent;
+the other is softly greyed, with explicit upright/reversed and drawn/not-drawn
+labels. Both remain readable. Normal centered focus is unchanged when disabled.
 
-Notes show the authored name, suit/Major designation, available rank and
-transversal/station, the first complete scene sentence and the first complete
-meaning sentence (or a short authored meaning phrase) for the actual orientation. Missing fields, rendering-only
-instructions, incomplete sentences and sentences longer than 340 characters are
-omitted rather than guessed or cut mid-sentence. These are deck notes, not the
-spirit's generated response. Spoken captions retain their existing timing.
+The panel prefers a complete authored sentence for scene and meanings. Long
+meanings use visibly ellipsized word-boundary excerpts; smaller displays omit
+secondary scene/taxonomy first and shorten excerpts. Missing meanings say "Not
+authored." No generated paraphrases or additional model calls are used. The full
+card payload still reaches the reader independently of this optional summary.
+The summary has no automatic pages or extra dismissal step. Captions remain
+separate and synchronized. Reset, advance, Escape and logout remove it.
 
-The notes use the real available area and font to paginate automatically when
-needed, with reading time before each page changes. They cycle while this card
-remains in focus, without advancing the encounter. Resize remeasures the current
-page; advance, reset, Escape and logout dispose its presentation. No extra model
-request, image dispatch, guest control or saved conversation is introduced.
+Artwork uses the selected pack's full saved version through the existing private
+asset cache, laid out directly at display size with `object-fit: contain`. There
+is no thumbnail request, image regeneration, crop, stretch, or image dispatch to
+the language model. Actual source pixels and display density still limit detail.
 
 Use Node 24 and an existing installed Edge browser; the browser test does not
 download browsers or use a real browser profile:

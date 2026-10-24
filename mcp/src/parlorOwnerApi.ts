@@ -9,6 +9,7 @@ import { narrationContext, READER_INPUT_BYTES } from '../../app/src/parlor/conte
 import { narrationInstructions, discussionInstructions, conversationContext, parseNarration, anthropicReadingOptions } from '../../app/src/parlor/providers';
 import { boundedSpeechBody, parseAlignment, speechPayload } from '../../app/src/parlor/speech';
 import type { ArcanaReading } from '../../app/src/engine/types';
+import { openingHistory, openingInstructions, parseOpening } from '../../app/src/parlor/opening';
 
 const json = (res: ServerResponse, status: number, value: unknown) => {
   if (!res.destroyed && !res.writableEnded) { res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'private, no-store', vary: 'Cookie' }); res.end(JSON.stringify(value)); }
@@ -54,7 +55,7 @@ export function createOwnerParlorHandler(options: OwnerParlorOptions) {
       if (!c || !principal || !catalog || !allowRequest) throw new ParlorFault(503, 'owner_provider_unavailable');
       const path = new URL(req.url ?? '/', 'http://localhost').pathname;
       const kind = path.slice('/api/parlor/owner/'.length);
-      if (!['narrate', 'converse', 'speech', 'transcribe'].includes(kind)) throw new ParlorFault(404, 'not_found');
+      if (!['narrate', 'converse', 'speech', 'transcribe', 'introduce'].includes(kind)) throw new ParlorFault(404, 'not_found');
       if (req.method !== 'POST') throw new ParlorFault(405, 'post_required');
       if (req.headers.origin !== c.origin) throw new ParlorFault(403, 'origin_not_allowed');
       const who = await principal.resolve(req, res); if (!who) throw new ParlorFault(401, 'sign_in_required');
@@ -83,27 +84,35 @@ export function createOwnerParlorHandler(options: OwnerParlorOptions) {
           url = `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}/with-timestamps`;
           headers = { 'xi-api-key': c.keys.elevenlabs, 'content-type': 'application/json', accept: 'application/json' }; payload = JSON.stringify({ text: prose, model_id: 'eleven_v3' });
         } else {
-          fields(data, ['deckId', 'token', 'character', 'provider', 'model', 'turns', 'revealed']);
+          fields(data, kind === 'introduce' ? ['deckId', 'text', 'character', 'provider', 'model'] : ['deckId', 'token', 'character', 'provider', 'model', 'turns', 'revealed', 'opening']);
           if (!c.keys.anthropic || !c.anthropicModel) throw new ParlorFault(503, 'owner_provider_unavailable');
           if (data.provider !== 'anthropic' || typeof data.model !== 'string' || !/^claude-[A-Za-z0-9._-]{1,140}$/.test(data.model)) throw new ParlorFault(400, 'model_not_allowed');
-          const deckId = text(data.deckId, 200), token = text(data.token, 65536);
+          const deckId = text(data.deckId, 200);
           const deck = await catalog.get(deckId); if (!deck || deck.ownerId !== who.id) throw new ParlorFault(404, 'deck_unavailable');
-          const adapter = createArcanaAdapter(); adapter.engine.importDeck(deck.manifest.data, { runtimeId: deck.id, tagline: deck.manifest.tagline, spreads: deck.manifest.spreads });
-          try { reading = await adapter.engine.resolveReading(token, deckId); }
-          catch { throw new ParlorFault(400, 'invalid_reading'); }
-          if (reading.legacy || reading.placements.length !== 3 || reading.question.length > 1200) throw new ParlorFault(400, 'invalid_reading');
+          if (kind !== 'introduce') {
+            const token = text(data.token, 65536);
+            const adapter = createArcanaAdapter(); adapter.engine.importDeck(deck.manifest.data, { runtimeId: deck.id, tagline: deck.manifest.tagline, spreads: deck.manifest.spreads });
+            try { reading = await adapter.engine.resolveReading(token, deckId); }
+            catch { throw new ParlorFault(400, 'invalid_reading'); }
+            if (reading.legacy || reading.placements.length !== 3 || reading.question.length > 1200) throw new ParlorFault(400, 'invalid_reading');
+          }
           const character = text(data.character, 20); if (!Object.hasOwn(characters, character)) throw new ParlorFault(400, 'invalid_character');
           const persona = { ...defaultSettings(), character: character as keyof typeof characters };
           let system: string;
           let messages: { role: 'user' | 'assistant'; content: string }[];
-          if (kind === 'narrate') {
+          if (kind === 'introduce') {
+            system = openingInstructions(persona);
+            messages = [{role:'user',content:text(data.text,1200)}];
+          } else if (kind === 'narrate') {
             system = narrationInstructions(persona);
-            messages = [{ role: 'user', content: narrationContext(reading) }];
+            try { messages = [...openingHistory(data.opening), { role: 'user', content: narrationContext(reading!) }]; }
+            catch { throw new ParlorFault(400, 'invalid_conversation'); }
           } else {
+            if (data.opening !== undefined) throw new ParlorFault(400, 'invalid_conversation');
             const revealed = data.revealed;
             if (!Number.isInteger(revealed) || Number(revealed) < 1 || Number(revealed) > 3 || !Array.isArray(data.turns) || !data.turns.length || data.turns.length > 21 || data.turns.length % 2 !== 1) throw new ParlorFault(400, 'invalid_conversation');
             messages = data.turns.map((v, i) => { if (!record(v) || v.role !== (i % 2 === 0 ? 'user' : 'assistant')) throw new ParlorFault(400, 'invalid_conversation'); return { role: v.role as 'user' | 'assistant', content: text(v.content, i % 2 === 0 ? 1200 : 4000) }; });
-            system = `${discussionInstructions(persona)}\n${conversationContext(reading, Number(revealed))}`;
+            system = `${discussionInstructions(persona)}\n${conversationContext(reading!, Number(revealed))}`;
           }
           payload = JSON.stringify({ model: data.model, ...anthropicReadingOptions(data.model), max_tokens: 2000, system, messages });
           if (Buffer.byteLength(payload) > READER_INPUT_BYTES) throw new ParlorFault(413, 'context_too_large');
@@ -143,7 +152,7 @@ export function createOwnerParlorHandler(options: OwnerParlorOptions) {
         if (parts.some(p => typeof p.text !== 'string')) throw new ParlorFault(502, 'unusable_provider_response');
         const prose = parts.map(p => p.text).join('\n');
         if (!prose.trim() || prose.length > (kind === 'narrate' ? 18000 : 4000)) throw new ParlorFault(502, 'unusable_provider_response');
-        try { result = kind === 'narrate' ? parseNarration(prose, reading!) : { text: prose }; }
+        try { result = kind === 'narrate' ? parseNarration(prose, reading!) : kind === 'introduce' ? parseOpening(JSON.parse(prose)) : { text: prose }; }
         catch { throw new ParlorFault(502, 'unusable_provider_response'); }
       }
       rejectSecrets(result, c); await verify(); if ((await principal.resolve(req, res))?.id !== who.id) throw new ParlorFault(403, 'owner_credentials_required');

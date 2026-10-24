@@ -52,6 +52,15 @@ function setup(t,overrides={}) {
   const tap=(id='a')=>{controls.down(id);t.mock.timers.tick(60);controls.up(id);};
   return {controls,events,tap,tick:ms=>t.mock.timers.tick(ms)};
 }
+
+test('manual guide pages resolve after the tap gap; five reset wins without flashing intermediate pages',t=>{
+  let page=0;const events=[];
+  const {controls,tap,tick}=setup(t,{captureTap:()=>()=>{page++;events.push('page');},captureHold:()=>undefined,introduction:()=>{},reset:()=>{page=0;events.push('reset');}});
+  tap();tick(499);assert.equal(page,0);tick(1);assert.equal(page,1);
+  for(let i=0;i<5;i++){controls.down('a');controls.down('a',true);controls.down('b');controls.up('a');controls.up('b');tick(80);}
+  assert.deepEqual(events,['page','reset']);tick(10000);assert.equal(page,0);
+  tap();controls.cancel();tick(1000);assert.equal(page,0,'blur discards pending page turn');
+});
 test('a quick tap waits for reset disambiguation and never starts a microphone',t=>{
   const {tap,tick,events}=setup(t);tap();tick(TAP_GAP_MS-1);assert.deepEqual(events,[]);tick(1);assert.deepEqual(events,['advance']);
 });

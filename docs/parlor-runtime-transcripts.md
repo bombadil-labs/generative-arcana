@@ -16,7 +16,7 @@ The server issues a random encounter ID inside a two-hour receipt, authenticated
 
 The same client lifecycle observes BYOK and owner-key paths:
 
-- `user_input`: accepted question or discussion transcription.
+- `user_input`: accepted optional introduction, question or discussion transcription; volunteered names are included as text, not a separate identity record.
 - `assistant_generated`: completed generated text, including prepared future segments, explicitly separate from delivery. Bounded card slugs/model identifiers, not full decks/images.
 - `presentation_started`: a delivery attempt, possibly still waiting for speech preparation.
 - `presentation_progress`: an observed caption checkpoint, at most once per five seconds for aligned speech or each silent page.
@@ -50,3 +50,5 @@ vercel logs --scope mbilokonsky-2750s-projects --project generative-arcana --env
 Save JSONL to a private local destination you choose. Its final summary includes `pagination.hasMore`, `pagination.next` and `excludedIntervals`. Continue every page with `vercel logs --next <cursor> --json`; do not repeat project/query/time flags with the cursor. Inspect exclusions and part gaps; the default first 100 records are not a full archive. Docs verified; no real guest export was performed in development. [CLI reference](https://vercel.com/docs/cli/logs).
 
 Platform runtime output is capped at 256 lines, 1 MB total/request and 256 KB/line. App limits are lower, but concurrent container requests may receive duplicate broadcast output and truncation remains possible. For indefinite retention, export before expiry. No log drain/external archive is part of this change.
+
+For Vercel Container Services, stdout/stderr is broadcast to every in-flight request. One emitted transcript event can therefore appear under its transcript POST and concurrent speech or artwork requests. Filter the Logs request path to `/api/parlor/transcript` when reviewing these events, then still deduplicate by `(encounterId,eventId,part)` before export analysis. Identical events attributed to concurrent routes are not evidence that narration or playback ran twice. [Container observability](https://vercel.com/docs/functions/runtimes/container#observability).

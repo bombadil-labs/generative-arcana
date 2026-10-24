@@ -162,8 +162,8 @@ function TableSetup({ transcriptLogging, showDetails, changeDetails, detailsStor
       {artwork.visiblePacks.map((pack) => <option key={pack.id} value={pack.id}>{pack.label}</option>)}
     </select></label>}
     {artwork?.status === "error" && <p role="alert">Artwork could not be checked. <button onClick={artwork.refresh}>Retry artwork</button></p>}
-    <p>Reset clears this encounter from the next guest's conversation. Your selected provider receives the question and deck context; ElevenLabs receives narration when enabled. Their retention policies apply.</p>
-    <p>{transcriptLogging ? 'Text questions, generated responses and presentation diagnostics are sent to temporary Vercel runtime logs. People with project log access can review them; retention depends on the Vercel plan. Delivery records are best-effort and do not prove what anyone heard. No raw microphone audio is saved in these logs. Tell guests before starting.' : 'Vercel transcript logging is disabled on this deployment. This app does not save guest readings.'}</p>
+    <p>Reset clears this encounter from the next guest's conversation. Names and aliases are optional and stay in this encounter conversation. Your selected provider receives the introduction, question and deck context; ElevenLabs receives narration when enabled. Their retention policies apply.</p>
+    <p>{transcriptLogging ? 'Text introductions (including any volunteered names), questions, generated responses and presentation diagnostics are sent to temporary Vercel runtime logs. People with project log access can review them; retention depends on the Vercel plan. Delivery records are best-effort and do not prove what anyone heard. No raw microphone audio is saved in these logs. Tell guests before starting.' : 'Vercel transcript logging is disabled on this deployment. This app does not save guest readings.'}</p>
     {deck.cards.length < 3 && <p role="alert">Choose a deck with at least three cards.</p>}
     <p>Hold to talk records only while held. On release, that clip goes to ElevenLabs Scribe using your ElevenLabs key and incurs transcription usage. Its transcript goes to your selected reader. Provider retention policies apply.</p>
     <RadioControls radioPreferences={radioPreferences} changeRadio={changeRadio} />
@@ -172,22 +172,22 @@ function TableSetup({ transcriptLogging, showDetails, changeDetails, detailsStor
     {detailsStorageError && <p role="alert">The display preference could not be saved; it applies for this session.</p>}
     <label className="parlor-check"><input type="checkbox" checked={operatorControls} onChange={event => setOperatorControls(event.target.checked)} />Show operator controls while testing</label>
     <button ref={startButton} className="parlor-primary" aria-disabled={!ready} onClick={() => { if (ready) start(); }}>Start the show</button>
-    <p className="parlor-show-hint">The idle table waits for a 300 ms hold before starting the seven-second summon, without recording. Keep holding until the visual cue says Release the button. After its introduction, hold for 450 ms, wait for Speak now, speak and release. A quick tap moves on after a 500 ms pause; three quick taps pause for the deck introduction (press once to return), and five quick taps with less than 500 ms between them return to blank idle. Overlapping keys count once. Escape returns to setup. Tab, modifier shortcuts and operator inputs keep their usual behavior. Test the mini keyboard and microphone on the party Mac before guests arrive.</p>
+    <p className="parlor-show-hint">The idle table waits for a 300 ms hold before starting the seven-second summon, without recording. Keep holding until the visual cue says Release the button. After its introduction, hold for 450 ms, wait for Speak now, speak and release. A quick tap moves on after a 500 ms pause; three quick taps pause for the deck introduction (press once per page, then once to return), and five quick taps with less than 500 ms between them return to blank idle. Overlapping keys count once. Escape returns to setup. Tab, modifier shortcuts and operator inputs keep their usual behavior. Test the mini keyboard and microphone on the party Mac before guests arrive.</p>
   </div>;
 }
 function Ritual({ transcriptLogging, showDetails, deckId, settings, leave, radioPreferences, changeRadio, operatorControls }: { transcriptLogging: boolean; deckId: string; settings: Settings; leave(): void; operatorControls: boolean; showDetails: boolean } & RadioOptions) {
   const artwork = useArtworkStore();
   const captionWindow = useRef<HTMLDivElement>(null);
-  const machine = useMemo(() => new ParlorMachine(deckId, settings, { transcript: transcriptLogging ? new RuntimeTranscript([settings.anthropicKey,settings.openaiKey,settings.elevenKey]) : undefined, preload: async (reading) => {
+  const sound = useMemo(() => new RadioAudio(), [deckId, settings, artwork, transcriptLogging]);
+  const machine = useMemo(() => new ParlorMachine(deckId, settings, { vocalization: edge => sound.signal(edge), transcript: transcriptLogging ? new RuntimeTranscript([settings.anthropicKey,settings.openaiKey,settings.elevenKey]) : undefined, preload: async (reading) => {
     await Promise.all(reading.cards.map((card) => artwork?.load(card.slug)));
-  }, readSilently: (text, signal, show, pause) => readSilently(text, signal, show, captionWindow.current, pause) }), [deckId, settings, artwork, transcriptLogging]);
+  }, readSilently: (text, signal, show, pause) => readSilently(text, signal, show, captionWindow.current, pause) }), [deckId, settings, artwork, transcriptLogging, sound]);
   const state = useSyncExternalStore(machine.subscribe, machine.getSnapshot, machine.getSnapshot);
   const speechInputAvailable = !settings.hosted && (!!settings.elevenKey.trim() || useOwnerEleven(settings));
   const microphone = useMemo(() => new ScribeMicrophone(text => machine.submit(text), () => settings.hosted ? "" : settings.elevenKey, undefined,
     (audio,key,signal)=>useOwnerEleven(settings)?ownerTranscribe(audio,signal):transcribeScribe(audio,key,signal),
     ()=>!settings.hosted&&(!!settings.elevenKey.trim()||useOwnerEleven(settings))), [machine, settings]);
   const mic = useSyncExternalStore(microphone.subscribe, microphone.getSnapshot, microphone.getSnapshot);
-  const sound = useMemo(() => new RadioAudio(), [machine]);
   const soundError = useSyncExternalStore(sound.subscribe, sound.getSnapshot, sound.getSnapshot);
   useLayoutEffect(() => { sound.setPreferences(radioPreferences); }, [sound, radioPreferences]);
   useLayoutEffect(() => {
@@ -203,7 +203,7 @@ function Ritual({ transcriptLogging, showDetails, deckId, settings, leave, radio
     lift: () => { if (machine.getSnapshot().guideOpen) return; machine.releaseSummon(); if (!["checking", "listening"].includes(microphone.getSnapshot().phase)) sound.hold(false); },
     captureTap: () => {
       const before = machine.getSnapshot(), input = microphone.getSnapshot();
-      if (before.guideOpen) return () => { if (machine.getSnapshot().guideOpen) { if (machine.getSnapshot().phase !== "idle") sound.unlock(); machine.closeGuide(); } };
+      if (before.guideOpen) return () => { if (machine.getSnapshot().guideOpen) { if (machine.getSnapshot().guidePage === 2 && machine.getSnapshot().phase !== "idle") sound.unlock(); machine.advanceGuide(); } };
       if (!tableInput(before, input, speechInputAvailable).tap) return;
       return () => { if (machine.getSnapshot() === before && microphone.getSnapshot() === input) machine.advance(); };
     },
@@ -284,7 +284,7 @@ function Ritual({ transcriptLogging, showDetails, deckId, settings, leave, radio
     <div className="parlor-card-area">
     {state.reading && (
       <div className="parlor-table" aria-label="Three-card reading">
-        {state.reading.placements.map((placement, index) => <figure key={placement.card.slug} className={index === focus ? "is-focused" : undefined}>
+        {state.reading.placements.map((placement, index) => <figure key={placement.card.slug} className={index === focus ? "is-focused" : undefined} aria-hidden={details && index === focus ? true : undefined}>
           <div className={`parlor-card ${index < state.revealed ? "is-revealed" : ""}`} aria-label={index < state.revealed ? `${placement.card.name}, ${placement.reversed ? "reversed" : "upright"}` : `Card ${index + 1}, face down`}>
             <div className="parlor-card-turn">
               <div className="parlor-card-back" aria-hidden={index < state.revealed}><PackAssetImage asset={back} scope={artwork} alt="Selected artwork set card back" fallback={<span className="parlor-back-symbol" aria-hidden>✦<br />☾<br />✦</span>} /></div>
@@ -307,7 +307,7 @@ function Ritual({ transcriptLogging, showDetails, deckId, settings, leave, radio
     <aside id="parlor-guest-cue" className="parlor-cue" aria-label="Table instructions" aria-description={cue.attention ? state.error || mic.error : undefined} role={cue.attention ? "alert" : "status"} aria-atomic="true">
       <p className="parlor-cue-title">{cue.title}</p>{cue.instruction && <p className="parlor-cue-detail">{cue.instruction}</p>}
     </aside>
-    {state.guideOpen && <DeckIntroduction deck={getDeck(deckId)!} />}
+    {state.guideOpen && <DeckIntroduction deck={getDeck(deckId)!} page={state.guidePage ?? 0} />}
     {operatorControls && !idle && <div className="parlor-operator-controls" data-parlor-operator aria-label="Operator controls">
       {/* Ordinary input is disabled while busy, but five taps must still reset.
           Keep focus on release: native disabled would blur and cancel transcription. */}

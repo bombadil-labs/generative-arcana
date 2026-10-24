@@ -6,7 +6,7 @@ export const IDLE_INVITATION = "Press and hold the button to make contact with t
 export const LOADING_CUE = "Please wait a moment, dialing in the etheric connection";
 
 /** Describe the current gesture gate, never a hoped-for next state or provider ETA. */
-export function guestCue(state: Pick<State, "phase" | "segment" | "audioPlaying"> & Partial<Pick<State, "timing">>, mic: MicrophoneState, speechAvailable = true): GuestCue {
+export function guestCue(state: Pick<State, "phase" | "segment" | "audioPlaying"> & Partial<Pick<State, "timing" | "opening" | "question">>, mic: MicrophoneState, speechAvailable = true): GuestCue {
   if (state.phase === "idle") return { title: IDLE_INVITATION };
   if (state.phase === "summoning") return { title: "Keep holding.", instruction: "The signal is gathering." };
   if (state.phase === "calling") return { title: "Keep holding.", instruction: state.audioPlaying ? "Contact is forming." : LOADING_CUE };
@@ -19,6 +19,10 @@ export function guestCue(state: Pick<State, "phase" | "segment" | "audioPlaying"
   if (state.phase === "drawing" || state.phase === "generating" || state.phase === "confirm" || (state.phase === "ready" && state.segment === 0)) return { title: LOADING_CUE };
   if (state.phase === "conversation") return { title: LOADING_CUE };
   if (state.phase === "speaking") return state.timing === "silent" ? { title: "Read along.", instruction: "The pages turn automatically." } : { title: state.audioPlaying ? "Listen." : LOADING_CUE };
+  const openingCue = state.phase !== 'question' ? '' : state.opening
+    ? speechAvailable ? 'Hold to share a name, alias, or your question. Press once to skip introductions.' : 'Press once to skip introductions.'
+    : state.question ? speechAvailable ? 'Press once to explore that question. Hold to ask something different.' : 'Press once to explore that question.' : '';
+  if (openingCue) return mic.phase === 'error' ? {title:'Your voice did not reach us.',instruction:`${openingCue} Escape opens setup.`,attention:true} : {title:openingCue};
   const spoken = !speechAvailable ? "" : state.phase === "question" ? "Press and hold to speak your query. "
     : state.phase === "complete" ? "Hold to ask about the reading. " : "Hold to ask more about this card. ";
   const instruction = spoken + (state.phase === "question" ? "Press once for an open reading."

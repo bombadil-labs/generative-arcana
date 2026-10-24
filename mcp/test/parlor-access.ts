@@ -72,7 +72,7 @@ try {
     "/PARLOR", "/assets/parlor-fixture.js", "/assets/parlor-fixture.css", "/assets/%70arlor-fixture.js", "/assets/parlor-radio-recording.mp3", "/assets/%70arlor-radio-recording.mp3",
     "/other%2f..%2fassets%2fparlor-fixture.js", "/other%5c..%5cassets%5cparlor-fixture.js",
     "/api/parlor", "/api/parlor/capabilities", "/api/parlor/narrate", "/api/parlor/converse", "/api/parlor/speech", "/api/parlor/transcript",
-    "/api/parlor/future-endpoint", "/api/parlor/owner/narrate", "/api/parlor/owner/converse", "/api/parlor/owner/speech", "/api/parlor/owner/transcribe", "/%61pi/parlor/capabilities", "//api//parlor/capabilities"];
+    "/api/parlor/future-endpoint", "/api/parlor/owner/narrate", "/api/parlor/owner/converse", "/api/parlor/owner/speech", "/api/parlor/owner/transcribe", "/api/parlor/owner/introduce", "/%61pi/parlor/capabilities", "//api//parlor/capabilities"];
   for (const cookie of ["", "arcana-auth.session_token=forged", otherCookie]) {
     for (const path of paths) for (const method of ["GET", "HEAD", "POST"]) {
       const result = await get(path, cookie, method);

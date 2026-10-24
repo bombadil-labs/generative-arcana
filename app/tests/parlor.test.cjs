@@ -32,6 +32,16 @@ async function until(machine, phase) {
   });
 }
 
+test('vocalization accents are fenced by reset/pause and absent from silent delivery',async()=>{
+  const edges=[],audio=[];
+  const {machine}=setup({vocalization:e=>edges.push(e),speak:async(_,text,signal,playing,r,caption,waiting,pause,accent)=>{const d=deferred();audio.push({d,accent});playing();accent('lock');await d.promise;}});
+  try {
+    machine.begin();assert.deepEqual(edges,['lock']);machine.openGuide();audio[0].accent('loss');assert.deepEqual(edges,['lock']);machine.closeGuide();assert.deepEqual(edges,['lock']);
+    machine.reset();audio[0].accent('loss');audio[0].d.resolve();await tick();assert.deepEqual(edges,['lock']);
+    machine.begin();machine.captions();const count=edges.length;await until(machine,'question');audio[1].accent('loss');audio[1].d.resolve();await tick();assert.equal(edges.length,count,'cancelled audio cannot accent silent presentation');
+  } finally {audio.forEach(a=>a.d.resolve());machine.dispose();}
+});
+
 for (const source of ['byok','owner']) test(`runtime transcript ${source}: generated is separate from presentation, reset fences late callbacks and new context`,async()=>{
   const events=[];let encounter=1,disposed=false;const audio=[],generated=deferred();
   const configured=source==='owner'?{...settings,anthropicKey:'',elevenKey:'',ownerKeys:{anthropicModel:'claude-test',elevenlabs:true}}:settings;
@@ -45,7 +55,7 @@ for (const source of ['byok','owner']) test(`runtime transcript ${source}: gener
     machine.next();const first=audio.at(-1);first.playing();first.caption('Observed normalized prefix','aligned');machine.openGuide();first.caption('UNOBSERVED_WHILE_PAUSED','aligned');machine.closeGuide();machine.reset();
     const interrupted=events.find(e=>e.kind==='presentation_interrupted'&&e.stage==='card');assert.equal(interrupted.text,'Observed normalized prefix');assert.equal(interrupted.reason,'reset');assert.equal(interrupted.encounter,1);
     const count=events.length;first.caption('OLD_LATE_CAPTION','aligned');first.done.resolve();await tick();assert.equal(events.length,count);
-    machine.begin();const second=audio.at(-1);second.done.resolve();await until(machine,'question');machine.submit('NEW_GUEST_ONLY');await until(machine,'ready');
+    machine.begin();const second=audio.at(-1);second.done.resolve();await until(machine,'question');machine.advance();machine.captions();await until(machine,'question');machine.submit('NEW_GUEST_ONLY');await until(machine,'ready');
     const fresh=events.filter(e=>e.encounter===2);assert.doesNotMatch(JSON.stringify(fresh),/A private question|Observed normalized prefix|OLD_LATE_CAPTION|UNOBSERVED/);
     assert.match(JSON.stringify(fresh),/NEW_GUEST_ONLY/);assert.equal(machine.getSnapshot().question,'NEW_GUEST_ONLY');
   } finally {audio.forEach(a=>a.done.resolve());machine.dispose();}
@@ -60,6 +70,18 @@ test('runtime transcript records missing delivery as unknown and silent pages in
     machine.reset();machine.begin();machine.captions();await until(machine,'question');assert.deepEqual(events.filter(e=>e.kind==='presentation_progress'&&e.timing==='silent').map(e=>e.text),['Beginning page','Middle page','Ending page']);
     fail=true;machine.reset();machine.begin();await until(machine,'error');const failed=events.filter(e=>e.kind==='presentation_interrupted').at(-1);assert.equal(failed.timing,'unknown');assert.equal(failed.text,undefined);assert.equal(failed.reason,'failed');assert.doesNotMatch(JSON.stringify(events),/RAW_SECRET_ERROR/);
   }finally{machine.dispose();}
+});
+
+test('three guide pages keep the reading paused until the final tap and reset discards the page',async()=>{
+  const {machine}=setup();
+  try {
+    machine.openGuide();assert.equal(machine.getSnapshot().guidePage,0);assert.equal(machine.presentationPause.paused,true);
+    machine.advanceGuide();assert.equal(machine.getSnapshot().guidePage,1);assert.equal(machine.presentationPause.paused,true);
+    machine.openGuide();assert.equal(machine.getSnapshot().guidePage,1,'repeat triple does not restart a page');
+    machine.advanceGuide();assert.equal(machine.getSnapshot().guidePage,2);assert.equal(machine.presentationPause.paused,true);
+    machine.advanceGuide();assert.equal(machine.getSnapshot().guideOpen,false);assert.equal(machine.getSnapshot().guidePage,undefined);assert.equal(machine.presentationPause.paused,false);assert.equal(machine.getSnapshot().phase,'idle');
+    machine.openGuide();machine.advanceGuide();machine.reset();machine.advanceGuide();assert.equal(machine.getSnapshot().guidePage,undefined);assert.equal(machine.getSnapshot().phase,'idle');
+  } finally {machine.dispose();}
 });
 
 test('deck guide pauses inference and speech completion without retries, context changes or duplicate history',async()=>{
@@ -81,7 +103,7 @@ test('reset starts a new provider context without the previous guest query, disc
   try{
     await confirm(machine);await until(machine,'ready');machine.next();await until(machine,'ready');machine.ask('PRIVATE_OLD_FOLLOWUP');await until(machine,'ready');assert.match(JSON.stringify(machine.getSnapshot().turns),/PRIVATE_OLD/);
     machine.openGuide();machine.reset();assert.deepEqual(machine.getSnapshot().turns,[]);assert.equal(machine.getSnapshot().reading,undefined);assert.equal(machine.getSnapshot().userText,'');
-    machine.begin();await until(machine,'question');machine.submit('NEW_GUEST_QUERY');await until(machine,'ready');machine.next();await until(machine,'ready');machine.ask('NEW_GUEST_FOLLOWUP');await until(machine,'ready');
+    machine.begin();await until(machine,'question');machine.advance();machine.captions();await until(machine,'question');machine.submit('NEW_GUEST_QUERY');await until(machine,'ready');machine.next();await until(machine,'ready');machine.ask('NEW_GUEST_FOLLOWUP');await until(machine,'ready');
     const fresh=requests.slice(2);assert.equal(fresh.length,2);assert.doesNotMatch(JSON.stringify(fresh),/PRIVATE_OLD|A private question/);assert.match(JSON.stringify(fresh),/NEW_GUEST_QUERY/);assert.match(JSON.stringify(fresh),/NEW_DELIVERED/);
   }finally{machine.dispose();}
 });
@@ -117,7 +139,7 @@ test('silent presentation gates advance and discussion until the ending is read;
 test('tap can begin an open reading; busy taps never queue another card',async()=>{
   const questions=[];const late=deferred();
   const {machine}=setup({draw:async(_,q)=>{questions.push(q);return engine.castReading(deck.id,'three-card',q);},narrate:async(_,r)=>{await late.promise;return narration(r);}});
-  try {machine.begin();machine.captions();await until(machine,'question');machine.advance();machine.advance();await until(machine,'generating');machine.advance();late.resolve();await until(machine,'ready');assert.deepEqual(questions,['']);assert.equal(machine.getSnapshot().revealed,0);assert.equal(machine.getSnapshot().userText,'');machine.advance();await until(machine,'ready');assert.equal(machine.getSnapshot().revealed,1);assert.equal(machine.getSnapshot().segment,1);}finally{machine.dispose();}
+  try {machine.begin();machine.captions();await until(machine,'question');machine.advance();machine.captions();await until(machine,'question');machine.advance();machine.advance();await until(machine,'generating');machine.advance();late.resolve();await until(machine,'ready');assert.deepEqual(questions,['']);assert.equal(machine.getSnapshot().revealed,0);assert.equal(machine.getSnapshot().userText,'');machine.advance();await until(machine,'ready');assert.equal(machine.getSnapshot().revealed,1);assert.equal(machine.getSnapshot().segment,1);}finally{machine.dispose();}
 });
 
 test('idle summon never draws; early release returns blank; release cue precedes introduction',async()=>{
@@ -298,7 +320,7 @@ test('audio releases its object URL and player on abort without accepting late p
 
 test('ether greeting omits control instructions and no cards are drawn until a query is submitted',async()=>{
   const speech=deferred();let caption,spoken;const {machine,draws}=setup({speak:async(_,text,signal,playing,reading,update)=>{spoken=text;caption=update;playing();await speech.promise;}});
-  try{machine.begin();assert.match(spoken,/spirit of the ether/);assert.doesNotMatch(spoken,/button|press|hold|release|tap|click|reset|advance|cards|deck|spread/i);assert.equal(machine.getSnapshot().question,'');assert.equal(machine.getSnapshot().caption,'');assert.equal(draws(),0);machine.submit('too early');assert.equal(draws(),0);caption('Come closer','aligned');assert.equal(machine.getSnapshot().caption,'Come closer');speech.resolve();await until(machine,'question');machine.submit('My spoken query');await until(machine,'ready');assert.equal(draws(),1);assert.equal(machine.getSnapshot().userText,'My spoken query');}finally{machine.dispose();}
+  try{machine.begin();assert.match(spoken,/spirit of the ether/);assert.doesNotMatch(spoken,/button|press|hold|release|tap|click|reset|advance|cards|deck|spread/i);assert.equal(machine.getSnapshot().question,'');assert.equal(machine.getSnapshot().caption,'');assert.equal(draws(),0);machine.submit('too early');assert.equal(draws(),0);caption('Come closer','aligned');assert.equal(machine.getSnapshot().caption,'Come closer');speech.resolve();await until(machine,'question');machine.advance();machine.captions();await until(machine,'question');machine.submit('My spoken query');await until(machine,'ready');assert.equal(draws(),1);assert.equal(machine.getSnapshot().userText,'My spoken query');}finally{machine.dispose();}
 });
 
 test('audio ended without playing cannot reveal the unspoken transcript or count as completion',async()=>{

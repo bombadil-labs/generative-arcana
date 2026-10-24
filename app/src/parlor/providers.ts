@@ -1,5 +1,6 @@
 import type { ArcanaReading } from "../engine/types";
 import type { PresentationPause } from "./pause";
+import { openingHistory, openingInstructions, parseOpening, type OpeningReply } from './opening';
 import { characters, useOwnerAnthropic, useOwnerEleven, type Settings } from "./settings";
 import { conversationContext, narrationContext, READER_INPUT_BYTES, CONTEXT_TOO_LARGE } from './context';
 export { conversationContext, narrationContext } from './context';
@@ -77,11 +78,24 @@ async function generate(settings: Settings, system: string, turns: Turn[], signa
     throw new ParlorError("Could not reach the provider. Check your connection and browser access, then retry.");
   }
 }
-export async function narrate(settings: Settings, reading: ArcanaReading, signal: AbortSignal): Promise<Narration> {
-  if(useOwnerAnthropic(settings)){const result=parseNarration(JSON.stringify(await (await ownerRequest('narrate',{deckId:reading.deck.id,token:reading.token,character:settings.character,provider:settings.provider,model:settings.anthropicModel},signal)).json()),reading);for(const card of result.cards)rejectKeyEcho(settings,card.text);rejectKeyEcho(settings,result.synthesis);return result;}
+export async function introduce(settings: Settings, deckId: string, text: string, signal: AbortSignal): Promise<OpeningReply> {
+  if (!text.trim() || text.length > 1200 || settings.hosted) throw new ParlorError('The introduction is unavailable. Skip it to continue.');
+  try {
+    const value = useOwnerAnthropic(settings)
+      ? await (await ownerRequest('introduce', { deckId, text, character: settings.character, provider: settings.provider, model: settings.anthropicModel }, signal)).json()
+      : JSON.parse(await generate(settings, openingInstructions(settings), [{ role: 'user', content: text }], signal));
+    const result = parseOpening(value); rejectKeyEcho(settings, result.text); return result;
+  } catch (error) {
+    if (signal.aborted || error instanceof OwnerRequestError || error instanceof ParlorError) throw error;
+    throw new ParlorError('The introduction could not finish. Retry, or return to setup.');
+  }
+}
+export async function narrate(settings: Settings, reading: ArcanaReading, signal: AbortSignal, introduction: Turn[] = []): Promise<Narration> {
+  const opening = openingHistory(introduction);
+  if(useOwnerAnthropic(settings)){const result=parseNarration(JSON.stringify(await (await ownerRequest('narrate',{deckId:reading.deck.id,token:reading.token,character:settings.character,provider:settings.provider,model:settings.anthropicModel,...(opening.length?{opening}:{})},signal)).json()),reading);for(const card of result.cards)rejectKeyEcho(settings,card.text);rejectKeyEcho(settings,result.synthesis);return result;}
   if(settings.hosted){try{return parseNarration(JSON.stringify(await (await hostedRequest('narrate',settings,reading,signal)).json()),reading);}catch(error){if(signal.aborted)throw error;throw new ParlorError(error instanceof Error?error.message:'Hosted narration unavailable.');}}
   const system = narrationInstructions(settings);
-  const result = parseNarration(await generate(settings, system, [{ role: "user", content: narrationContext(reading) }], signal), reading);
+  const result = parseNarration(await generate(settings, system, [...opening, { role: "user", content: narrationContext(reading) }], signal), reading);
   // JSON escapes can conceal a credential from the raw-text check. Check decoded captions too,
   // before either rendering them or sending them to the speech provider.
   for (const card of result.cards) rejectKeyEcho(settings, card.text);
@@ -98,7 +112,7 @@ export function converse(settings: Settings, reading: ArcanaReading, turns: Turn
 }
 
 /** One bounded audio resource, released on completion, interruption, failure and unmount. */
-export async function speak(settings: Settings, text: string, signal: AbortSignal, onPlaying: () => void, reading?: ArcanaReading, onCaption: (text: string, timing: CaptionTiming) => void = () => {}, onWaiting: () => void = () => {}, pause?: PresentationPause): Promise<void> {
+export async function speak(settings: Settings, text: string, signal: AbortSignal, onPlaying: () => void, reading?: ArcanaReading, onCaption: (text: string, timing: CaptionTiming) => void = () => {}, onWaiting: () => void = () => {}, pause?: PresentationPause, onVocalization: (edge: 'lock' | 'loss') => void = () => {}): Promise<void> {
   let url: string | undefined;
   let audio: HTMLAudioElement | undefined;
   try {
@@ -129,6 +143,7 @@ export async function speak(settings: Settings, text: string, signal: AbortSigna
     const player = audio;
     await new Promise<void>((resolve, reject) => {
       let began = false, closed = false, ended = false, playAttempt = 0, frame: number | undefined, lastCaption = "";
+      const accent = (edge: 'lock' | 'loss') => { try { onVocalization(edge); } catch { /* Optional sound never interrupts speech. */ } };
       let unsubscribe = () => {};
       const update = () => {
         if (closed || !began || signal.aborted || pause?.paused || !alignment) return;
@@ -141,14 +156,16 @@ export async function speak(settings: Settings, text: string, signal: AbortSigna
       player.onplaying = () => {
         if (closed || signal.aborted) return;
         if (pause?.paused) { player.pause(); return; }
-        if (!began) { began = true; onCaption("", alignment ? "aligned" : "segment"); }
+        const first = !began;
+        if (first) { began = true; onCaption("", alignment ? "aligned" : "segment"); }
         if (alignment && frame === undefined && typeof requestAnimationFrame === "function") animate();
         onPlaying();
+        if (first) accent('lock');
       };
       player.onwaiting = player.onpause = () => { if (!closed && !signal.aborted) onWaiting(); };
       player.ontimeupdate = update;
       const finish = () => { clean(); if (signal.aborted || !began) { reject(new Error()); return; } onCaption(alignment ? alignment.characters.join("").trim() : plainSpeech(text), alignment ? "aligned" : "segment"); resolve(); };
-      player.onended = () => { if (closed) return; ended = true; if (!pause?.paused) finish(); };
+      player.onended = () => { if (closed || ended) return; ended = true; if (!pause?.paused) { if (began) accent('loss'); finish(); } };
       player.onerror = () => { clean(); reject(new Error()); };
       signal.addEventListener("abort", abort, { once: true });
       if (signal.aborted) { abort(); return; }
