@@ -80,7 +80,7 @@ host that supports skills, or have the model read `get_deck_authoring_guide` thr
 A custom skill package alone does not create an OAuth connection or save to an account.
 No OpenAI-specific field belongs in `DeckManifest`.
 
-When artwork is requested, the canonical bundle also guides separate cover and card-back authoring: cover 1536 × 1024 (3:2), fronts/backs 1024 × 1536 (2:3), all width × height recommendations. Hosts should distribute this guidance from the canonical skill rather than inventing their own dimensions or semantic fields.
+When artwork is requested, distribute the canonical skill's canvas and verification workflow. Each pack declares exact pixel width/height and aspect ratio: one canvas for every front and its matching back, with the cover specified separately. The new-pack recommendations (1024 x 1536 fronts/back; 1536 x 1024 cover) do not override an existing pack's agreed target. Every one-card generation uses the full authored/resolved specification, and actual decoded dimensions and composition must be verified before upload. Unsupported sizes require a disclosed, agreed alternative or authorized finishing workflow, not a silently different ratio. These are artwork delivery requirements, not additional semantic fields.
 
 ## Reading the authoring guide
 
