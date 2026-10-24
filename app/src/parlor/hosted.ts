@@ -1,7 +1,7 @@
 import type { Settings } from './settings';
 import type { ArcanaReading } from '../engine/types';
 import { CONTEXT_TOO_LARGE } from './context';
-export interface ParlorCapabilities {mode:'byok'|'hosted';models:{provider:'anthropic'|'openai';id:string}[];voices:string[];ownerKeys?:Settings['ownerKeys']}
+export interface ParlorCapabilities {mode:'byok'|'hosted';models:{provider:'anthropic'|'openai';id:string}[];voices:string[];ownerKeys?:Settings['ownerKeys'];transcriptLogging?:boolean}
 const ownerErrors: Record<string,string> = {
   context_too_large: CONTEXT_TOO_LARGE,
   provider_access_refused: 'The account provider refused access. Check its key permissions and model or voice access in setup.',
@@ -22,7 +22,7 @@ export async function readParlorCapabilities(signal:AbortSignal):Promise<ParlorC
     const keys=body.ownerKeys;
     if(keys?.voiceId!==undefined&&keys.voiceId!==null&&(typeof keys.voiceId!=='string'||!/^[A-Za-z0-9_-]{1,160}$/.test(keys.voiceId)))throw new Error('Parlor is unavailable on this deployment.');
     if(keys!==undefined&&(!keys||typeof keys!=='object'||typeof keys.elevenlabs!=='boolean'||!(keys.anthropicModel===null||typeof keys.anthropicModel==='string'&&/^claude-[A-Za-z0-9._-]{1,140}$/.test(keys.anthropicModel))))throw new Error('Parlor is unavailable on this deployment.');
-    return {mode:'byok',models:[],voices:[],...(keys?{ownerKeys:{anthropicModel:keys.anthropicModel,elevenlabs:keys.elevenlabs,...(keys.voiceId!==undefined?{voiceId:keys.voiceId}:{})}}:{})};
+    return {mode:'byok',models:[],voices:[],transcriptLogging:body.transcriptLogging===true,...(keys?{ownerKeys:{anthropicModel:keys.anthropicModel,elevenlabs:keys.elevenlabs,...(keys.voiceId!==undefined?{voiceId:keys.voiceId}:{})}}:{})};
   }
   if(body.mode!=='hosted'||!Array.isArray(body.models)||!body.models.length||body.models.some((m:{provider:string;id:string})=>!m||!['anthropic','openai'].includes(m.provider)||typeof m.id!=='string')||!Array.isArray(body.voices)||body.voices.some((v:unknown)=>typeof v!=='string'))throw new Error('Parlor is unavailable on this deployment.');
   return body as ParlorCapabilities;

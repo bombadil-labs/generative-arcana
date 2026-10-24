@@ -5,6 +5,7 @@ import { characters, useOwnerEleven, type Settings } from "./settings";
 import { plainSpeech, type CaptionTiming } from "./speech";
 import { OwnerRequestError } from "./hosted";
 import { PresentationPause } from "./pause";
+import type { TranscriptInput, TranscriptSink } from "./runtimeTranscript";
 
 export type Phase = "idle" | "summoning" | "calling" | "awaiting-release" | "question" | "confirm" | "drawing" | "generating" | "ready" | "speaking" | "paused" | "error" | "complete" | "conversation";
 export interface State {
@@ -16,13 +17,14 @@ export interface State {
 }
 const initial = (): State => ({ phase: "idle", question: "", revealed: 0, segment: 0, caption: "", timing: "aligned", error: "", turns: [], pendingQuestion: "", userText: "" });
 export interface Services {
+  transcript?: TranscriptSink;
   draw(deckId: string, question: string): Promise<ArcanaReading>;
   narrate: typeof narrate; converse: typeof converse; speak: typeof speak;
   preload(reading: ArcanaReading): Promise<void>;
   readSilently(text: string, signal: AbortSignal, show: (page: string) => void, pause?: PresentationPause): Promise<void>;
 }
 const services: Services = { draw: (id, question) => arcanaEngine.castReading(id, "three-card", question), narrate, converse, speak, preload: async () => {}, readSilently: async () => { throw new ParlorError("Silent reading is unavailable. Return to setup and retry."); } };
-type Speech = { kind: "release" | "greeting" | "card" | "answer"; text: string; segment: number; turns?: Turn[]; silent?: boolean };
+type Speech = { kind: "release" | "greeting" | "card" | "answer"; text: string; segment: number; turns?: Turn[]; silent?: boolean; messageId?: string };
 
 /** A synchronous transition gate plus an epoch fence: even late responses after abort are inert. */
 export class ParlorMachine {
@@ -36,6 +38,8 @@ export class ParlorMachine {
   private summonReleased = false;
   private disposed = false;
   private service: Services;
+  private narrationIds: string[] = [];
+  private presentation?: { messageId: string; attemptId: string; stage: TranscriptInput['stage']; text?: string; timing: TranscriptInput['timing']; checkpoint: number };
   readonly presentationPause = new PresentationPause();
   constructor(private deckId: string, private settings: Settings, overrides: Partial<Services> = {}) { this.service = { ...services, ...overrides }; }
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
@@ -44,7 +48,17 @@ export class ParlorMachine {
   openGuide() { if (!this.disposed && !this.state.guideOpen) { this.presentationPause.set(true); this.set({ guideOpen: true, audioPlaying: false }); } }
   closeGuide() { if (this.state.guideOpen) { this.set({ guideOpen: false }); this.presentationPause.set(false); } }
   private set(patch: Partial<State>) { if (!this.disposed) { this.state = { ...this.state, ...patch }; this.listeners.forEach(listener => listener()); } }
-  private invalidate() { ++this.epoch; clearTimeout(this.timer); this.timer = undefined; this.controller?.abort(); this.controller = undefined; }
+  private log(value: TranscriptInput) { try { this.service.transcript?.event(value); } catch { /* Diagnostics never alter the encounter. */ } }
+  private generated(text: string, stage: TranscriptInput['stage'], card?: string, scripted = false) {
+    const messageId = crypto.randomUUID();
+    this.log({ kind:'assistant_generated', text:plainSpeech(text), messageId, stage, ...(card?{card}:{}), provider:scripted?'script':this.settings.provider, ...(scripted?{}:{model:this.settings.provider==='anthropic'?this.settings.anthropicModel:this.settings.openaiModel}) });
+    return messageId;
+  }
+  private finishPresentation(kind: 'presentation_completed' | 'presentation_interrupted', reason?: TranscriptInput['reason']) {
+    const active = this.presentation; this.presentation = undefined;
+    if (active) { const {checkpoint:_,...record}=active; this.log({kind,...record,...(reason?{reason}:{})}); }
+  }
+  private invalidate(reason: TranscriptInput['reason'] = 'cancelled') { this.finishPresentation('presentation_interrupted',reason); ++this.epoch; clearTimeout(this.timer); this.timer = undefined; this.controller?.abort(); this.controller = undefined; }
   private async run(work: (signal: AbortSignal, current: () => boolean) => Promise<void>) {
     this.invalidate();
     const epoch = this.epoch;
@@ -52,7 +66,7 @@ export class ParlorMachine {
     const current = () => !this.disposed && epoch === this.epoch && !controller.signal.aborted;
     let remaining = 180000, started = performance.now();
     const timeout = () => {
-      if (current()) { this.invalidate(); this.set({ phase: "error", audioPlaying: false, error: "This step timed out. Retry, or choose Read without audio." }); }
+      if (current()) { this.invalidate('timeout'); this.log({kind:'error',reason:'timeout'}); this.set({ phase: "error", audioPlaying: false, error: "This step timed out. Retry, or choose Read without audio." }); }
     };
     const arm = () => { started = performance.now(); this.timer = setTimeout(timeout, remaining); };
     if (!this.presentationPause.paused) arm();
@@ -62,7 +76,7 @@ export class ParlorMachine {
       else arm();
     });
     try { if (this.presentationPause.paused) await this.presentationPause.wait(controller.signal); if (current()) await work(controller.signal, current); }
-    catch (error) { await this.presentationPause.wait(controller.signal).catch(() => {}); if (current()) { this.invalidate(); this.set({ phase: "error", audioPlaying: false, error: error instanceof ParlorError || error instanceof OwnerRequestError ? error.message : "This step could not finish. Retry or leave the table." }); } }
+    catch (error) { await this.presentationPause.wait(controller.signal).catch(() => {}); if (current()) { this.invalidate('failed'); this.log({kind:'error',reason:'failed'}); this.set({ phase: "error", audioPlaying: false, error: error instanceof ParlorError || error instanceof OwnerRequestError ? error.message : "This step could not finish. Retry or leave the table." }); } }
     finally { unsubscribe(); if (epoch === this.epoch) { clearTimeout(this.timer); this.controller = undefined; this.timer = undefined; } }
   }
   begin() {
@@ -101,6 +115,7 @@ export class ParlorMachine {
     if (this.state.phase !== "confirm") return;
     this.set({ phase: "drawing", userText: this.state.question, caption: "" });
     const question = this.state.question;
+    if (question) this.log({kind:'user_input',text:question,stage:'reading'});
     this.drawPromise = Promise.resolve().then(() => this.service.draw(this.deckId, question));
     void this.prepare();
   }
@@ -112,6 +127,9 @@ export class ParlorMachine {
       if (!current()) return;
       this.set({ reading, phase: "generating" });
       const narration = await this.service.narrate(this.settings, reading, signal);
+      if (!current()) return;
+      this.narrationIds = narration.cards.map((card,i)=>this.generated(card.text,'card',reading.placements[i]?.card.slug));
+      this.narrationIds.push(this.generated(narration.synthesis,'synthesis'));
       await this.presentationPause.wait(signal);
       if (!current()) return;
       await this.service.preload(reading);
@@ -135,7 +153,7 @@ export class ParlorMachine {
     if (this.state.guideOpen) return;
     if (this.state.phase !== "ready" || !this.state.narration || this.state.segment > 3) return;
     const segment = this.state.segment;
-    this.speech = { kind: "card", segment, text: segment < 3 ? this.state.narration.cards[segment].text : this.state.narration.synthesis };
+    this.speech = { kind: "card", segment, text: segment < 3 ? this.state.narration.cards[segment].text : this.state.narration.synthesis, messageId:this.narrationIds[segment] };
     void this.playSpeech(muted);
   }
   advance() {
@@ -148,8 +166,18 @@ export class ParlorMachine {
     const speech = this.speech!;
     this.set({ phase: speech.kind === "release" ? "calling" : "speaking", audioPlaying: false, caption: "", error: "", timing: "aligned" });
     return this.run(async (signal, current) => {
+      const stage = speech.kind==='card' ? speech.segment===3?'synthesis':'card' : speech.kind;
+      speech.messageId ??= this.generated(speech.text,stage,undefined,true);
+      this.presentation = {messageId:speech.messageId,attemptId:crypto.randomUUID(),stage,timing:'unknown',checkpoint:0};
+      this.log({kind:'presentation_started',messageId:speech.messageId,attemptId:this.presentation.attemptId,stage,timing:'unknown'});
       const reveal = () => { if (current() && !this.presentationPause.paused && speech.kind === "card") this.set({ revealed: Math.max(this.state.revealed, Math.min(speech.segment + 1, 3)) }); };
-      const caption = (text: string, timing: CaptionTiming) => { if (current() && !this.presentationPause.paused) this.set({ caption: text, timing }); };
+      const caption = (text: string, timing: CaptionTiming) => { if (current() && !this.presentationPause.paused) {
+        this.set({ caption: text, timing });
+        const active=this.presentation;
+        if(active) { const changed=active.text!==text; active.text=text; active.timing=timing;
+          if(changed && text && (timing==='silent'||Date.now()-active.checkpoint>=5000)) { active.checkpoint=Date.now(); const {checkpoint:_,...record}=active; this.log({kind:'presentation_progress',...record}); }
+        }
+      } };
       // Hosted speech requires a drawn reading token. Its opening stays explicitly silent.
       const voice = this.settings.hosted ? !!this.state.reading && !!this.settings.voiceId : !!this.settings.elevenKey.trim() || useOwnerEleven(this.settings) && !!this.settings.voiceId.trim();
       if (!muted && !speech.silent && !this.settings.silent && !voice && useOwnerEleven(this.settings)) {
@@ -164,6 +192,7 @@ export class ParlorMachine {
       } else await this.service.speak(this.settings, speech.text, signal, () => { if (current() && !this.presentationPause.paused) { this.set({ audioPlaying: true }); reveal(); } }, this.state.reading, caption, () => { if (current()) this.set({ audioPlaying: false }); }, this.presentationPause);
       await this.presentationPause.wait(signal);
       if (!current()) return;
+      this.finishPresentation('presentation_completed');
       this.speech = undefined;
       this.set({ audioPlaying: false });
       if (speech.kind === "release") { this.set({ phase: "awaiting-release" }); if (this.summonReleased) this.begin(); }
@@ -183,6 +212,7 @@ export class ParlorMachine {
   ask(question: string) {
     if (this.state.guideOpen) return;
     if (!(this.state.phase === "complete" || (this.state.phase === "ready" && this.state.segment > 0)) || !question.trim() || question.length > 1200) return;
+    this.log({kind:'user_input',text:question.trim(),stage:'answer'});
     this.set({ pendingQuestion: question.trim(), userText: question.trim(), caption: "" }); void this.answer();
   }
   private answer() {
@@ -191,13 +221,15 @@ export class ParlorMachine {
     this.set({ phase: "conversation", error: "" });
     return this.run(async (signal, current) => {
       const content = await this.service.converse(this.settings, this.state.reading!, turns, signal, this.state.revealed);
+      if (!current()) return;
+      const messageId=this.generated(content,'answer');
       await this.presentationPause.wait(signal);
       if (!current()) return;
-      this.speech = { kind: "answer", segment: this.state.segment, text: content, turns: [...turns, { role: "assistant", content: plainSpeech(content) }] };
+      this.speech = { kind: "answer", segment: this.state.segment, text: content, messageId, turns: [...turns, { role: "assistant", content: plainSpeech(content) }] };
       // Keep the generated answer for audio retry without another model call.
       void this.playSpeech(false);
     });
   }
-  reset() { this.invalidate(); this.presentationPause.set(false); this.drawPromise = undefined; this.speech = undefined; this.summonReleased = false; this.state = initial(); this.listeners.forEach(listener => listener()); }
-  dispose() { this.reset(); this.disposed = true; this.settings = { ...this.settings, anthropicKey: "", openaiKey: "", elevenKey: "" }; this.listeners.clear(); }
+  reset() { this.invalidate('reset'); try { this.service.transcript?.reset(); } catch { /* Reset must remain unconditional. */ } this.narrationIds=[]; this.presentationPause.set(false); this.drawPromise = undefined; this.speech = undefined; this.summonReleased = false; this.state = initial(); this.listeners.forEach(listener => listener()); }
+  dispose() { try { this.service.transcript?.dispose(); } catch { /* Teardown must remain unconditional. */ } this.reset(); this.disposed = true; this.settings = { ...this.settings, anthropicKey: "", openaiKey: "", elevenKey: "" }; this.listeners.clear(); }
 }

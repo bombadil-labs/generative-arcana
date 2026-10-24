@@ -17,6 +17,7 @@ import { focusedCard } from "./cardFocus";
 import { CardDetails } from "./DeckNotes";
 import { DeckIntroduction } from "./DeckGuide";
 import { DECK_SHORTCUT_NOTE } from "./deckIntroduction";
+import { RuntimeTranscript } from "./runtimeTranscript";
 import { currentCardDetails, readDetailsPreference, saveDetailsPreference } from "./cardDetails";
 import { readSilently } from "./silentReading";
 import { radioState } from "./radio";
@@ -131,7 +132,7 @@ function Host({ accountId, onShowChange, capabilities }: { accountId: string; on
       </div></>}
     </div>}
     {deckId && <RemoteDeckBoundary key={deckId} deckId={deckId} routeKey="/parlor">
-      <TableSetup showDetails={showDetails} changeDetails={changeDetails} detailsStorageError={detailsStorageError} deckId={deckId} settings={settings} hosting={hosting} start={() => setHosting(true)} leave={() => setHosting(false)} startButton={startButton} radioPreferences={radioPreferences} changeRadio={setRadioPreferences} />
+      <TableSetup transcriptLogging={capabilities.transcriptLogging===true} showDetails={showDetails} changeDetails={changeDetails} detailsStorageError={detailsStorageError} deckId={deckId} settings={settings} hosting={hosting} start={() => setHosting(true)} leave={() => setHosting(false)} startButton={startButton} radioPreferences={radioPreferences} changeRadio={setRadioPreferences} />
     </RemoteDeckBoundary>}
     {hosting && <p className="parlor-shortcut-note">{DECK_SHORTCUT_NOTE}</p>}
   </section>;
@@ -148,12 +149,12 @@ function RadioControls({ radioPreferences, changeRadio }: RadioOptions) {
   </div>;
 }
 type DetailsOptions = { showDetails: boolean; changeDetails(enabled: boolean): void; detailsStorageError: boolean };
-function TableSetup({ showDetails, changeDetails, detailsStorageError, deckId, settings, hosting, start, leave, startButton, radioPreferences, changeRadio }: { deckId: string; settings: Settings; hosting: boolean; start(): void; leave(): void; startButton: React.RefObject<HTMLButtonElement> } & RadioOptions & DetailsOptions) {
+function TableSetup({ transcriptLogging, showDetails, changeDetails, detailsStorageError, deckId, settings, hosting, start, leave, startButton, radioPreferences, changeRadio }: { transcriptLogging: boolean; deckId: string; settings: Settings; hosting: boolean; start(): void; leave(): void; startButton: React.RefObject<HTMLButtonElement> } & RadioOptions & DetailsOptions) {
   const [operatorControls, setOperatorControls] = useState(false);
   const artwork = useArtworkSelection();
   const deck = getDeck(deckId)!;
   const ready = readySettings(settings) && deck.cards.length >= 3 && (!artwork || (artwork.resolved && !!artwork.packId));
-  if (hosting) return <Ritual showDetails={showDetails} key={`${deckId}:${artwork?.packId ?? ""}`} deckId={deckId} settings={settings} leave={leave} radioPreferences={radioPreferences} changeRadio={changeRadio} operatorControls={operatorControls} />;
+  if (hosting) return <Ritual transcriptLogging={transcriptLogging} showDetails={showDetails} key={`${deckId}:${artwork?.packId ?? ""}`} deckId={deckId} settings={settings} leave={leave} radioPreferences={radioPreferences} changeRadio={changeRadio} operatorControls={operatorControls} />;
   return <div className="parlor-launch">
     {artwork && <label>Artwork set<select aria-label="Artwork set" value={artwork.packId} disabled={!artwork.resolved} onChange={(event) => artwork.selectPack(event.target.value)}>
       {!artwork.packId && <option value="">Choose an artwork set</option>}
@@ -161,7 +162,8 @@ function TableSetup({ showDetails, changeDetails, detailsStorageError, deckId, s
       {artwork.visiblePacks.map((pack) => <option key={pack.id} value={pack.id}>{pack.label}</option>)}
     </select></label>}
     {artwork?.status === "error" && <p role="alert">Artwork could not be checked. <button onClick={artwork.refresh}>Retry artwork</button></p>}
-    <p>Questions and conversation stay in memory here and clear for the next guest. Your selected provider receives the question and deck context; ElevenLabs receives narration when enabled. Their retention policies apply. This app does not save guest readings.</p>
+    <p>Reset clears this encounter from the next guest's conversation. Your selected provider receives the question and deck context; ElevenLabs receives narration when enabled. Their retention policies apply.</p>
+    <p>{transcriptLogging ? 'Text questions, generated responses and presentation diagnostics are sent to temporary Vercel runtime logs. People with project log access can review them; retention depends on the Vercel plan. Delivery records are best-effort and do not prove what anyone heard. No raw microphone audio is saved in these logs. Tell guests before starting.' : 'Vercel transcript logging is disabled on this deployment. This app does not save guest readings.'}</p>
     {deck.cards.length < 3 && <p role="alert">Choose a deck with at least three cards.</p>}
     <p>Hold to talk records only while held. On release, that clip goes to ElevenLabs Scribe using your ElevenLabs key and incurs transcription usage. Its transcript goes to your selected reader. Provider retention policies apply.</p>
     <RadioControls radioPreferences={radioPreferences} changeRadio={changeRadio} />
@@ -173,12 +175,12 @@ function TableSetup({ showDetails, changeDetails, detailsStorageError, deckId, s
     <p className="parlor-show-hint">The idle table waits for a seven-second hold to summon the spirit, without recording. Keep holding until the visual cue says Release the button. After its introduction, hold for 450 ms, wait for Speak now, speak and release. A quick tap moves on after a 500 ms pause; three quick taps pause for the deck introduction (press once to return), and five quick taps with less than 500 ms between them return to blank idle. Overlapping keys count once. Escape returns to setup. Tab, modifier shortcuts and operator inputs keep their usual behavior. Test the mini keyboard and microphone on the party Mac before guests arrive.</p>
   </div>;
 }
-function Ritual({ showDetails, deckId, settings, leave, radioPreferences, changeRadio, operatorControls }: { deckId: string; settings: Settings; leave(): void; operatorControls: boolean; showDetails: boolean } & RadioOptions) {
+function Ritual({ transcriptLogging, showDetails, deckId, settings, leave, radioPreferences, changeRadio, operatorControls }: { transcriptLogging: boolean; deckId: string; settings: Settings; leave(): void; operatorControls: boolean; showDetails: boolean } & RadioOptions) {
   const artwork = useArtworkStore();
   const captionWindow = useRef<HTMLDivElement>(null);
-  const machine = useMemo(() => new ParlorMachine(deckId, settings, { preload: async (reading) => {
+  const machine = useMemo(() => new ParlorMachine(deckId, settings, { transcript: transcriptLogging ? new RuntimeTranscript([settings.anthropicKey,settings.openaiKey,settings.elevenKey]) : undefined, preload: async (reading) => {
     await Promise.all(reading.cards.map((card) => artwork?.load(card.slug)));
-  }, readSilently: (text, signal, show, pause) => readSilently(text, signal, show, captionWindow.current, pause) }), [deckId, settings, artwork]);
+  }, readSilently: (text, signal, show, pause) => readSilently(text, signal, show, captionWindow.current, pause) }), [deckId, settings, artwork, transcriptLogging]);
   const state = useSyncExternalStore(machine.subscribe, machine.getSnapshot, machine.getSnapshot);
   const speechInputAvailable = !settings.hosted && (!!settings.elevenKey.trim() || useOwnerEleven(settings));
   const microphone = useMemo(() => new ScribeMicrophone(text => machine.submit(text), () => settings.hosted ? "" : settings.elevenKey, undefined,

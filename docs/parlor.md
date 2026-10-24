@@ -1,5 +1,10 @@
 # The parlor
 
+Optional [temporary Vercel transcript logging](parlor-runtime-transcripts.md) is off
+by default. It requires explicit deployment configuration and adds no transcript
+database or guest archive. Reset clears the next guest's conversation, not records
+already received by Vercel or the selected providers.
+
 The production Parlor is restricted to the verified auth issuer/subject in
 `mcp/src/parlorAccess.ts`. The server checks the current verified browser session
 before serving `/parlor`, its private JavaScript/CSS, and every `/api/parlor`

@@ -35,7 +35,7 @@ export function rejectParlorSecrets(value:unknown,c:ParlorConfig):void {
   if(Array.isArray(value))for(const item of value)rejectParlorSecrets(item,c);
   else if(record(value))for(const item of Object.values(value))rejectParlorSecrets(item,c);
 }
-export function createParlorHandler(options:{config:ParlorConfig;authorize?:(req:IncomingMessage,res:ServerResponse)=>Promise<boolean>;authenticator?:BrowserSessionAuthenticator;ownerAllowRequest?:()=>Promise<boolean>;store?:ParlorStore;principal?:BrowserPrincipalResolver;catalog?:UserDeckCatalogRepository;fetch?:typeof fetch}) {
+export function createParlorHandler(options:{config:ParlorConfig;transcriptLogging?:boolean;authorize?:(req:IncomingMessage,res:ServerResponse)=>Promise<boolean>;authenticator?:BrowserSessionAuthenticator;ownerAllowRequest?:()=>Promise<boolean>;store?:ParlorStore;principal?:BrowserPrincipalResolver;catalog?:UserDeckCatalogRepository;fetch?:typeof fetch}) {
   const {config:c,store,principal,catalog}=options;const send=options.fetch??fetch;
   const ownerHandler=createOwnerParlorHandler({config:c.mode==='byok'?c.ownerKeys:undefined,authenticator:options.authenticator,principal,catalog,allowRequest:options.ownerAllowRequest,fetch:options.fetch});
   return async(req:IncomingMessage,res:ServerResponse)=>{
@@ -51,7 +51,7 @@ export function createParlorHandler(options:{config:ParlorConfig;authorize?:(req
       if(path.startsWith('/api/parlor/owner/')) { clearTimeout(timer); await ownerHandler(req,res); return; }
       const session=await options.authenticator?.authenticate(req,res);
       const owner=isParlorOwner(session?.identity);
-      if (path==='/api/parlor/capabilities' && req.method==='GET' && c.mode!=='hosted') return json(res,200,{...publicParlorConfig(c),...(owner&&c.ownerKeys?{ownerKeys:ownerCapabilities(c.ownerKeys)}:{})});
+      if (path==='/api/parlor/capabilities' && req.method==='GET' && c.mode!=='hosted') return json(res,200,{...publicParlorConfig(c),transcriptLogging:owner&&options.transcriptLogging===true,...(owner&&c.ownerKeys?{ownerKeys:ownerCapabilities(c.ownerKeys)}:{})});
       // Even if page access or legacy entitlements later expand, server credentials never do.
       if(c.mode==='hosted'&&!owner) {
         if(!session)throw new ParlorFault(options.authenticator?401:503,options.authenticator?'sign_in_required':'parlor_auth_unavailable');
@@ -61,7 +61,7 @@ export function createParlorHandler(options:{config:ParlorConfig;authorize?:(req
       if (c.mode!=='hosted'||!store||!principal||!catalog||Date.now()>=c.pricingExpires) throw new ParlorFault(503,'hosted_parlor_unavailable');
       const who=await principal.resolve(req,res);if(!who)throw new ParlorFault(401,'sign_in_required');
       if(!await store.entitled(who.id))throw new ParlorFault(403,'parlor_access_required');
-      if(path==='/api/parlor/capabilities'&&req.method==='GET')return json(res,200,publicParlorConfig(c));
+      if(path==='/api/parlor/capabilities'&&req.method==='GET')return json(res,200,{...publicParlorConfig(c),transcriptLogging:owner&&options.transcriptLogging===true});
       const kind=path.slice('/api/parlor/'.length);
       if(!['narrate','converse','speech'].includes(kind))throw new ParlorFault(404,'not_found');
       if(req.method!=='POST')throw new ParlorFault(405,'post_required');

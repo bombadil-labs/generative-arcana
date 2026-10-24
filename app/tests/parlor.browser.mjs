@@ -8,6 +8,8 @@ import ts from 'typescript';
 const root=resolve(fileURLToPath(new URL('..',import.meta.url)));
 const silentExports={};new Function('exports',ts.transpileModule(await readFile(resolve(root,'src/parlor/silentReading.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(silentExports);
 const ownerMode=process.env.PARLOR_OWNER_BROWSER==='1';
+const transcriptMode=process.env.PARLOR_TRANSCRIPT_BROWSER==='1';
+const transcriptRequests=[];let transcriptStarts=0;
 const {chromium}=await import(process.env.PLAYWRIGHT_MODULE?pathToFileURL(process.env.PLAYWRIGHT_MODULE).href:'playwright-core');
 const data=JSON.parse(await readFile(resolve(root,'../decks/deep-time/deck.json'),'utf8'));
 const deck={id:'parlor-fixture',slug:data.slug,name:data.name,tagline:'Synthetic browser fixture',revision:1,visibility:'private',createdAt:'',updatedAt:'',manifest:{data,tagline:'Synthetic fixture'}};
@@ -219,7 +221,12 @@ try{
     }
     if(url.hostname!=='127.0.0.1')return route.abort();
     if(path==='/auth/session')return json(route,authenticated?{authenticated:true,accountId:'synthetic-owner',parlorAllowed:allowed,user:{email:'fixture@example.test'}}:{authenticated:false});
-    if(path==='/api/parlor/capabilities')return json(route,{mode:'byok',...(ownerMode?{ownerKeys:{anthropicModel:'claude-test-owner',elevenlabs:true}}:{})});
+    if(path==='/api/parlor/transcript'){
+      assert.equal(transcriptMode,true);assert.equal(route.request().method(),'POST');const body=route.request().postDataJSON();transcriptRequests.push(body);
+      assert.ok(Buffer.byteLength(JSON.stringify(body))<=16384);assert.doesNotMatch(JSON.stringify(body),/synthetic-browser-key|synthetic-voice-key|raw_audio|authorization|xi-api-key/);
+      return json(route,body.start?{token:'synthetic-receipt-'+(++transcriptStarts)}:{accepted:body.events.length});
+    }
+    if(path==='/api/parlor/capabilities')return json(route,{mode:'byok',transcriptLogging:transcriptMode,...(ownerMode?{ownerKeys:{anthropicModel:'claude-test-owner',elevenlabs:true}}:{})});
     if(path==='/api/me/decks')return json(route,[deck]);
     if(path==='/api/decks/parlor-fixture')return json(route,deck);
     if(path.startsWith('/api/decks/parlor-fixture/artwork/assets/'))return json(route,{},404);
@@ -478,7 +485,14 @@ try{
   await page.reload();await begin();detailsAudio=await audioCount();await advance();await waitAudio(detailsAudio);await finishAudio();await phase('ready').waitFor();await notes.waitFor();await page.waitForTimeout(100);
   const longPages=[];for(let i=0;i<20;i++){const text=await notes.textContent();longPages.push(text);assert.equal(await notes.evaluate(el=>el.scrollHeight<=el.clientHeight+1),true);await page.clock.fastForward(silentExports.silentPageMs(text)+100);await page.waitForTimeout(10);if(longPages.join(' ').includes('Scene:'))break;}
   assert.match(longPages.join(' '),/A long authored name/);assert.match(longPages.join(' '),/Scene:/);await resetEncounter();await escape();await detailsToggle.uncheck();await page.reload();assert.equal(await detailsToggle.isChecked(),false);await page.setViewportSize({width:1280,height:960});
+  if(transcriptMode){
+    await page.getByText(/Text questions, generated responses and presentation diagnostics are sent to temporary Vercel runtime logs/).waitFor();
+    const events=transcriptRequests.flatMap(b=>b.events??[]);for(const kind of ['user_input','assistant_generated','presentation_progress','presentation_completed','presentation_interrupted','encounter_closed'])assert.ok(events.some(e=>e.kind===kind),'browser emits '+kind);
+    assert.ok(transcriptStarts>2,'reset obtains fresh encounter receipts');assert.ok(events.some(e=>e.timing==='silent')&&events.some(e=>e.timing==='aligned'));
+    assert.equal(await page.evaluate(()=>Object.entries(localStorage).some(([k,v])=>/transcript|eventId|presentation_progress/.test(k+' '+v))),false,'no transcript archive in browser storage');
+  }
   await begin();await stage().focus();await page.keyboard.down('Space');await cue().getByText('Speak now.',{exact:true}).waitFor();authenticated=false;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.getByText('Parlor access is restricted.',{exact:true}).waitFor();assert.equal(await page.locator('.parlor-show').count(),0);
+  const transcriptCount=transcriptRequests.length;await page.clock.fastForward(5000);await page.waitForTimeout(50);assert.equal(transcriptRequests.length,transcriptCount,'logout stops queued logging');
   await page.clock.fastForward(100);assert.equal(await page.evaluate(()=>window.__radioContexts.every(c=>c.state==='closed')),true,'logout closes ambience contexts');
   assert.equal(await page.evaluate(()=>window.__tracks.some(t=>!t.stopped)),false);await page.keyboard.up('Space');assert.ok(speechRequests.length>=8);assert.ok(scribeRequests.length>=8);console.log('PASS: global tap/hold/five-tap reset, overlapping keys and repeat, no tap microphone access, late transcription/narration/reading fences, saved choices retained, setup exclusion, four artwork proportions on desktop/mobile, v3 selected voice and aligned captions, per-card discussion, explicit advance, held-only Scribe v2, centered rolling captions and long questions across twelve viewport sizes, no read-ahead or page scrolling, full conversation retained, complete measured silent pages with reading time and reset-safe advance guards, touch drags without encounter input, explicit operator touch and cancellation, busy keyboard/pointer lock with five-tap reset and no replay, optional account-persisted deck notes with measured pages across ten viewports and current-only metadata, MP4, denial/empty/error/cancellation, Escape/logout cleanup. Synthetic providers and microphone only.');
 }catch(error){if(page&&!page.isClosed())await page.screenshot({path:resolve(evidence,'failure.png'),fullPage:true});throw error;}
