@@ -72,6 +72,18 @@ test('runtime transcript records missing delivery as unknown and silent pages in
   }finally{machine.dispose();}
 });
 
+test('three guide pages keep the reading paused until the final tap and reset discards the page',async()=>{
+  const {machine}=setup();
+  try {
+    machine.openGuide();assert.equal(machine.getSnapshot().guidePage,0);assert.equal(machine.presentationPause.paused,true);
+    machine.advanceGuide();assert.equal(machine.getSnapshot().guidePage,1);assert.equal(machine.presentationPause.paused,true);
+    machine.openGuide();assert.equal(machine.getSnapshot().guidePage,1,'repeat triple does not restart a page');
+    machine.advanceGuide();assert.equal(machine.getSnapshot().guidePage,2);assert.equal(machine.presentationPause.paused,true);
+    machine.advanceGuide();assert.equal(machine.getSnapshot().guideOpen,false);assert.equal(machine.getSnapshot().guidePage,undefined);assert.equal(machine.presentationPause.paused,false);assert.equal(machine.getSnapshot().phase,'idle');
+    machine.openGuide();machine.advanceGuide();machine.reset();machine.advanceGuide();assert.equal(machine.getSnapshot().guidePage,undefined);assert.equal(machine.getSnapshot().phase,'idle');
+  } finally {machine.dispose();}
+});
+
 test('deck guide pauses inference and speech completion without retries, context changes or duplicate history',async()=>{
   const generated=deferred(),audio=[];let requests=0;
   const {machine,draws}=setup({narrate:async(_,reading)=>{requests++;await generated.promise;return narration(reading);},speak:async(_,text,signal,playing,reading,caption,waiting,pause)=>{const done=deferred();audio.push({done,playing,caption,signal,pause});await done.promise;}});

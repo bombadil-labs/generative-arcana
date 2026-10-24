@@ -17,9 +17,11 @@
   ],
   "git": {
     "deploymentEnabled": {
+      "release/parlor-projector-137-140": false,
       "feat/parlor-soft-opening": false,
       "feat/parlor-signal-accents": false,
       "feat/parlor-both-meanings": false,
+      "feat/parlor-three-page-guide": false,
       "feat/parlor-runtime-transcripts": false,
       "fix/parlor-summon-intent": false,
       "feat/parlor-deck-introduction": false,

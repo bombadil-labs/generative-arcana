@@ -14,7 +14,7 @@ export interface State {
   revealed: number; segment: number; caption: string; timing: CaptionTiming;
   error: string; turns: Turn[]; pendingQuestion: string; userText: string;
   summonStartedAt?: number; audioPlaying?: boolean;
-  guideOpen?: boolean;
+  guideOpen?: boolean; guidePage?: 0 | 1 | 2;
   opening?: boolean;
 }
 const initial = (): State => ({ phase: "idle", question: "", revealed: 0, segment: 0, caption: "", timing: "aligned", error: "", turns: [], pendingQuestion: "", userText: "" });
@@ -49,8 +49,9 @@ export class ParlorMachine {
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   getSnapshot = () => this.state;
   canReadWithoutAudio = () => !!this.speech;
-  openGuide() { if (!this.disposed && !this.state.guideOpen) { this.presentationPause.set(true); this.set({ guideOpen: true, audioPlaying: false }); } }
-  closeGuide() { if (this.state.guideOpen) { this.set({ guideOpen: false }); this.presentationPause.set(false); } }
+  openGuide() { if (!this.disposed && !this.state.guideOpen) { this.presentationPause.set(true); this.set({ guideOpen: true, guidePage: 0, audioPlaying: false }); } }
+  closeGuide() { if (this.state.guideOpen) { this.set({ guideOpen: false, guidePage: undefined }); this.presentationPause.set(false); } }
+  advanceGuide() { if (!this.state.guideOpen) return; const page = this.state.guidePage ?? 0; if (page === 2) this.closeGuide(); else this.set({ guidePage: (page + 1) as 1 | 2 }); }
   private set(patch: Partial<State>) { if (!this.disposed) { this.state = { ...this.state, ...patch }; this.listeners.forEach(listener => listener()); } }
   private log(value: TranscriptInput) { try { this.service.transcript?.event(value); } catch { /* Diagnostics never alter the encounter. */ } }
   private generated(text: string, stage: TranscriptInput['stage'], card?: string, scripted = false) {

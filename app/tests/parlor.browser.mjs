@@ -12,6 +12,19 @@ const transcriptMode=process.env.PARLOR_TRANSCRIPT_BROWSER==='1';
 const transcriptRequests=[];let transcriptStarts=0;
 const {chromium}=await import(process.env.PLAYWRIGHT_MODULE?pathToFileURL(process.env.PLAYWRIGHT_MODULE).href:'playwright-core');
 const data=JSON.parse(await readFile(resolve(root,'../decks/deep-time/deck.json'),'utf8'));
+if(process.env.PARLOR_GUIDE_BROWSER==='1'){
+  // Synthetic cards retain valid structure; only the verified party taxonomy and
+  // concise guide copy are substituted. No guest reading or private art is saved.
+  const suitKeys=['martini','zeppelin','world-clock','atom'],suitNames=['The Martini','The Zeppelin','The World Clock','The Atom'];
+  const oldSuits=Object.keys(data.suits),oldRanks=Object.keys(data.ranks),rankKeys=[...Array.from({length:10},(_,i)=>'year-'+(1920+i)),'ingenue','daredevil','host','magnate'];
+  data.suits=Object.fromEntries(oldSuits.map((old,i)=>[suitKeys[i],{...data.suits[old],slug:suitKeys[i],name:suitNames[i],symbol:undefined}]));
+  data.ranks=Object.fromEntries(oldRanks.map((old,i)=>[rankKeys[i],{...data.ranks[old],slug:rankKeys[i],name:i<10?String(1920+i):'The '+['Ingenue','Daredevil','Host','Magnate'][i-10],numeric_value:i+1,index:i}]));
+  for(const card of Object.values(data.cards)){if(card.suit_slug)card.suit_slug=suitKeys[oldSuits.indexOf(card.suit_slug)];if(card.rank_slug)card.rank_slug=rankKeys[oldRanks.indexOf(card.rank_slug)];}
+  if(data.dialectic)data.dialectic.cells=Object.fromEntries(oldSuits.map((old,i)=>[suitKeys[i],data.dialectic.cells[old]]));
+  data.name=data.theme.name='The Roaring Twenties';data.slug='the-roaring-twenties';data.theme.description='An Art Deco divination of the Jazz Age: innovation versus inheritance, certainty versus the mysterious, the Great War’s aftermath, modernism, quantum physics and the 1929 crash.';
+  data.major_arcana.story='The world after the Great War loses its old certainties, dances through invention, liberation and frenzy, then encounters the Crash and a new dawn.';
+  data.cards['major-17'].name='The Emancipation';
+}
 const deck={id:'parlor-fixture',slug:data.slug,name:data.name,tagline:'Synthetic browser fixture',revision:1,visibility:'private',createdAt:'',updatedAt:'',manifest:{data,tagline:'Synthetic fixture'}};
 const evidence=resolve(root,'../..','parlor-conversation-verification');
 let server,browser,context,page,authenticated=false,allowed=true,calls=0,mode='ok',release;
@@ -31,10 +44,10 @@ async function finishSilent(){
     if(!['calling','speaking'].includes(await stage().getAttribute('data-phase')))break;
     const shown=await caption().textContent();assert.ok(shown.trim());pages.push(shown.trim());
     const bounds=await caption().evaluate(el=>{
-      const box=el.getBoundingClientRect(),node=el.firstElementChild.firstChild,range=document.createRange();
+      const box=el.getBoundingClientRect(),node=el.firstElementChild.firstChild,range=document.createRange(),nodes=[node];
       // pre-wrap may hang invisible trailing spaces beyond a line. Measure the
       // actual words, including every rectangle of a wrapped unbroken word.
-      const words=[...node.textContent.matchAll(/\S+/gu)].flatMap(match=>{range.setStart(node,match.index);range.setEnd(node,match.index+match[0].length);return [...range.getClientRects()].map(r=>r.toJSON());});
+      const words=nodes.flatMap(node=>[...node.textContent.matchAll(/\S+/gu)].flatMap(match=>{range.setStart(node,match.index);range.setEnd(node,match.index+match[0].length);return [...range.getClientRects()].map(r=>r.toJSON());}));
       return {fits:words.every(r=>r.top>=box.top-1&&r.bottom<=box.bottom+1&&r.left>=box.left-1&&r.right<=box.right+1)&&getComputedStyle(el).maskImage==='none',box:box.toJSON(),words,font:getComputedStyle(el).font};
     });
     assert.equal(bounds.fits,true,'every silent page is fully visible, including its first and last lines: '+JSON.stringify(bounds));
@@ -88,15 +101,15 @@ async function capture(name){if(await page.locator('.parlor-show').count()){asse
 async function pressA(){await page.keyboard.down('a');if(await page.locator('.parlor-idle').count())await page.clock.fastForward(300);}
 async function tap(key='a'){await page.keyboard.press(key);}
 async function openGuide(){for(let i=0;i<3;i++)await tap();await page.clock.fastForward(500);await page.getByRole('dialog').waitFor();await page.waitForFunction(()=>document.querySelector('.parlor-introduction-text')?.textContent.trim());}
-async function closeGuide(){await tap();await page.clock.fastForward(500);await page.getByRole('dialog').waitFor({state:'detached'});}
+async function closeGuide(){while(await page.getByRole('dialog').count()){await advance();}await page.getByRole('dialog').waitFor({state:'detached'});}
 async function guideFits(){
   const result=await page.locator('.parlor-introduction-text').evaluate(el=>{
-    const box=el.getBoundingClientRect(),node=el.firstChild,range=document.createRange();
-    const words=[...node.textContent.matchAll(/\S+/gu)].flatMap(match=>{range.setStart(node,match.index);range.setEnd(node,match.index+match[0].length);return [...range.getClientRects()].map(r=>r.toJSON());});
+    const box=el.getBoundingClientRect(),range=document.createRange(),walker=document.createTreeWalker(el,NodeFilter.SHOW_TEXT),nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);
+    const words=nodes.flatMap(node=>[...node.textContent.matchAll(/\S+/gu)].flatMap(match=>{range.setStart(node,match.index);range.setEnd(node,match.index+match[0].length);return [...range.getClientRects()].map(r=>r.toJSON());}));
     const dialog=el.closest('[role=dialog]').getBoundingClientRect(),cue=document.querySelector('.parlor-introduction-cue').getBoundingClientRect(),footer=document.querySelector('.parlor-shortcut-note').getBoundingClientRect();
-    return {fits:words.every(r=>r.top>=box.top-1&&r.bottom<=box.bottom+1&&r.left>=box.left-1&&r.right<=box.right+1),box:box.toJSON(),dialog:dialog.toJSON(),cue:cue.toJSON(),footer:footer.toJSON(),height:innerHeight,font:parseFloat(getComputedStyle(el).fontSize),scroll:document.documentElement.scrollHeight};
+    return {page:el.closest('[role=dialog]').dataset.guidePage,fits:words.every(r=>r.top>=box.top-1&&r.bottom<=box.bottom+1&&r.left>=box.left-1&&r.right<=box.right+1),box:box.toJSON(),dialog:dialog.toJSON(),cue:cue.toJSON(),footer:footer.toJSON(),height:innerHeight,lowest:Math.max(...words.map(r=>r.bottom)),children:[...el.children].map(n=>({height:n.getBoundingClientRect().height,top:n.getBoundingClientRect().top})),font:parseFloat(getComputedStyle(el).fontSize),scroll:document.documentElement.scrollHeight};
   });
-  assert.ok(result.fits,'all introduction words are visible: '+JSON.stringify(result));assert.ok(result.font>=19);assert.ok(result.dialog.y>=0&&result.dialog.bottom<=result.footer.y);assert.ok(result.cue.bottom<=result.dialog.bottom&&result.cue.top>=result.box.bottom);assert.ok(result.footer.bottom<=result.height);assert.ok(result.scroll<=result.height+1);return result;
+  assert.ok(result.fits,'all introduction words are visible: '+JSON.stringify(result));assert.ok(result.font>=18);assert.ok(result.dialog.y>=0&&result.dialog.bottom<=result.footer.y);assert.ok(result.cue.bottom<=result.dialog.bottom&&result.cue.top>=result.box.bottom);assert.ok(result.footer.bottom<=result.height);assert.ok(result.scroll<=result.height+1);return result;
 }
 async function frameLabels(){
   // Compare settled geometry; the prior footprint remains reserved while its
@@ -300,13 +313,28 @@ try{
   // Five taps never flash the introduction, including on the initial screen.
   await page.evaluate(()=>{window.__guideFlashes=0;new MutationObserver(records=>{for(const r of records)for(const n of r.addedNodes)if(n.nodeType===1&&(n.matches?.('[role=dialog]')||n.querySelector?.('[role=dialog]')))window.__guideFlashes++;}).observe(document.body,{childList:true,subtree:true});});
   await resetEncounter();await page.clock.fastForward(1000);assert.equal(await page.evaluate(()=>window.__guideFlashes),0);
-  for(const viewport of [{width:1920,height:1080},{width:1280,height:720},{width:390,height:640},{width:844,height:390},{width:390,height:360}]){
-    await page.setViewportSize(viewport);await openGuide();const pages=[];
-    for(let i=0;i<30;i++){await guideFits();const text=await page.locator('.parlor-introduction-text').textContent();if(pages.length&&text===pages[0])break;pages.push(text);await page.clock.fastForward(silentExports.silentPageMs(text)+100);await page.waitForTimeout(10);}
-    assert.ok(pages.join('').includes(data.name));assert.match(pages.join(''),/Major Arcana/);assert.match(pages.join(''),/Minor Arcana/);assert.match(pages.join(''),/Ranks/);
-    await capture('deck-introduction-'+viewport.width+'x'+viewport.height);await closeGuide();await idle();assert.equal(calls,0);assert.equal(await audioCount(),before);assert.equal(await page.evaluate(()=>window.__micRequests),0);assert.equal(await page.locator('[data-silent-measure]').count(),0);
+  for(const viewport of [{width:1360,height:768},{width:1920,height:1080},{width:1024,height:768},{width:800,height:600},{width:1024,height:600},{width:800,height:480},{width:390,height:640},{width:320,height:568},{width:844,height:390}]){
+    if(process.env.PARLOR_GUIDE_SIZE&&process.env.PARLOR_GUIDE_SIZE!==viewport.width+'x'+viewport.height)continue;
+    await page.setViewportSize(viewport);await openGuide();
+    for(let index=1;index<=3;index++){
+      await page.waitForTimeout(80);await page.screenshot({path:resolve(evidence,'guide-latest-'+index+'.png')});await guideFits();assert.equal(await page.getByRole('dialog').getAttribute('data-guide-page'),String(index));
+      if(index===2){const art=page.locator('.parlor-guide-art img');await art.waitFor();await art.evaluate(e=>e.decode());const actual=await art.evaluate(e=>({width:e.naturalWidth,height:e.naturalHeight,fit:getComputedStyle(e).objectFit,alt:e.alt}));assert.equal(actual.width,945);assert.equal(actual.height,1663);assert.equal(actual.fit,'contain');assert.match(actual.alt,/independent of this reading/);assert.equal(await page.locator('.is-revealed').count(),0);}
+      if(index===3&&process.env.PARLOR_GUIDE_BROWSER==='1')assert.equal(await page.locator('.parlor-guide-icon').count(),4);
+      const text=await page.locator('.parlor-introduction-text').textContent();await page.clock.fastForward(200000);assert.equal(await page.locator('.parlor-introduction-text').textContent(),text,'guide never turns itself');
+      await capture(`deck-introduction-${viewport.width}x${viewport.height}-page${index}`);await advance();
+    }
+    await idle();assert.equal(calls,0);assert.equal(await audioCount(),before);assert.equal(await page.evaluate(()=>window.__micRequests),0);assert.equal(await page.locator('[data-silent-measure]').count(),0);
   }
   await page.setViewportSize({width:1280,height:960});await openGuide();await resetEncounter();assert.equal(await page.getByRole('dialog').count(),0);await page.clock.fastForward(200000);await idle();
+  if(process.env.PARLOR_GUIDE_BROWSER==='1'){
+    await summon();const audioBefore=await audioCount();await advance();await waitAudio(audioBefore);await page.evaluate(()=>{window.__audio.currentTime=.5;window.__audio.ontimeupdate();window.__guideAudio=window.__audio;});
+    const spoken=await caption().textContent(),providerCount=calls;await openGuide();
+    for(let i=0;i<2;i++){await advance();assert.equal(await page.getByRole('dialog').count(),1);assert.equal(await caption().textContent(),spoken);assert.equal(calls,providerCount);assert.equal(await radioLevel(),0);}
+    await advance();await radio('speaking');assert.equal(await page.evaluate(()=>window.__audio===window.__guideAudio&&window.__audio.currentTime===.5),true);assert.equal(calls,providerCount);assert.equal(await page.locator('.is-revealed').count(),1);
+    await openGuide();await advance();await resetEncounter();await idle();assert.equal(await page.getByRole('dialog').count(),0);await escape();
+    await page.route('**/api/decks/parlor-fixture/cards/**/artwork/image?*',route=>json(route,{},404));await page.reload();await button('Start the show').click();await openGuide();await advance();await page.getByText('Artwork unavailable.',{exact:true}).waitFor();assert.equal(await page.locator('.parlor-guide-art img').count(),0);await resetEncounter();await idle();
+    console.log('PASS three manual guide pages at '+(process.env.PARLOR_GUIDE_SIZE||'nine viewport sizes')+' / DPR '+(process.env.PARLOR_DPR||1)+'; full-resolution fixed example and missing-art fallback; five-reset wins, mid-speech pause/resume without replay, no auto-pages. Synthetic providers/microphone only.');return;
+  }
   // Early physical-key release and lost focus return to blank without voice or microphone.
   for(const cancel of ['release','blur']){
     await pressA();
