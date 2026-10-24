@@ -162,7 +162,7 @@ async function run(){
 try{
   await mkdir(evidence,{recursive:true});server=await preview({root,preview:{host:'127.0.0.1',port:4187,strictPort:true}});
   browser=await chromium.launch({headless:true,...(process.env.PARLOR_BROWSER?{executablePath:process.env.PARLOR_BROWSER}:{channel:'msedge'})});
-  context=await browser.newContext({viewport:{width:1280,height:960},reducedMotion:'reduce',hasTouch:true});context.setDefaultTimeout(12000);
+  context=await browser.newContext({viewport:{width:1280,height:960},reducedMotion:'reduce',hasTouch:true,deviceScaleFactor:Number(process.env.PARLOR_DPR||1)});context.setDefaultTimeout(12000);
   await context.addInitScript(()=>{
     // Stub the output device as well as TTS: automated UI tests emit no real sound.
     window.__radioContexts=[];window.__radioUnavailable=false;
@@ -305,7 +305,7 @@ try{
   // Five taps never flash the introduction, including on the initial screen.
   await page.evaluate(()=>{window.__guideFlashes=0;new MutationObserver(records=>{for(const r of records)for(const n of r.addedNodes)if(n.nodeType===1&&(n.matches?.('[role=dialog]')||n.querySelector?.('[role=dialog]')))window.__guideFlashes++;}).observe(document.body,{childList:true,subtree:true});});
   await resetEncounter();await page.clock.fastForward(1000);assert.equal(await page.evaluate(()=>window.__guideFlashes),0);
-  for(const viewport of [{width:1920,height:1080},{width:1024,height:768},{width:800,height:600},{width:1024,height:600},{width:800,height:480},{width:390,height:640},{width:320,height:568},{width:844,height:390}]){
+  for(const viewport of [{width:1360,height:768},{width:1920,height:1080},{width:1024,height:768},{width:800,height:600},{width:1024,height:600},{width:800,height:480},{width:390,height:640},{width:320,height:568},{width:844,height:390}]){
     if(process.env.PARLOR_GUIDE_SIZE&&process.env.PARLOR_GUIDE_SIZE!==viewport.width+'x'+viewport.height)continue;
     await page.setViewportSize(viewport);await openGuide();
     for(let index=1;index<=3;index++){
@@ -325,7 +325,7 @@ try{
     await advance();await radio('speaking');assert.equal(await page.evaluate(()=>window.__audio===window.__guideAudio&&window.__audio.currentTime===.5),true);assert.equal(calls,providerCount);assert.equal(await page.locator('.is-revealed').count(),1);
     await openGuide();await advance();await resetEncounter();await idle();assert.equal(await page.getByRole('dialog').count(),0);await escape();
     await page.route('**/api/decks/parlor-fixture/cards/**/artwork/image?*',route=>json(route,{},404));await page.reload();await button('Start the show').click();await openGuide();await advance();await page.getByText('Artwork unavailable.',{exact:true}).waitFor();assert.equal(await page.locator('.parlor-guide-art img').count(),0);await resetEncounter();await idle();
-    console.log('PASS three manual guide pages at eight viewport sizes; full-resolution fixed example and missing-art fallback; five-reset wins, mid-speech pause/resume without replay, no auto-pages. Synthetic providers/microphone only.');return;
+    console.log('PASS three manual guide pages at '+(process.env.PARLOR_GUIDE_SIZE||'nine viewport sizes')+' / DPR '+(process.env.PARLOR_DPR||1)+'; full-resolution fixed example and missing-art fallback; five-reset wins, mid-speech pause/resume without replay, no auto-pages. Synthetic providers/microphone only.');return;
   }
   // Early physical-key release and lost focus return to blank without voice or microphone.
   for(const cancel of ['release','blur']){
