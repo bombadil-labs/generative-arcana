@@ -1,6 +1,6 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {TableGestures,tableKey,HOLD_MS,TAP_GAP_MS,SUMMON_MS}=require('../.test-build/parlor/gestures.js');
+const {TableGestures,tableInput,tableKey,HOLD_MS,TAP_GAP_MS,SUMMON_MS}=require('../.test-build/parlor/gestures.js');
 function setup(t,overrides={}) {
   t.mock.timers.enable({apis:['setTimeout']});
   const events=[];
@@ -56,4 +56,41 @@ test('reset/cancel during summoning fences the seven-second timer and the captur
   let contacts=0;const {controls,tap,tick,events}=setup(t,{holdDelay:()=>SUMMON_MS,captureHold:()=>()=>contacts++});
   controls.down('a');tick(5000);controls.cancel();controls.up('a');tick(3000);assert.equal(contacts,0);
   for(let i=0;i<5;i++){tap();tick(100);}tick(10000);assert.equal(contacts,0);assert.deepEqual(events,['cancel','reset']);
+});
+
+test('ordinary actions are unavailable during every busy phase and microphone operation',()=>{
+  for(const phase of ['summoning','calling','awaiting-release','confirm','drawing','generating','speaking','conversation']){
+    assert.deepEqual(tableInput({phase,segment:1},{phase:'idle'},true),{tap:false,hold:undefined},phase);
+  }
+  assert.deepEqual(tableInput({phase:'ready',segment:0},{phase:'idle'},true),{tap:false,hold:undefined},'first-card transition');
+  for(const phase of ['checking','listening','finishing'])for(const state of ['idle','question','ready','complete','paused','error']){
+    assert.deepEqual(tableInput({phase:state,segment:1},{phase},true),{tap:false,hold:undefined},`${state}/${phase}`);
+  }
+  assert.deepEqual(tableInput({phase:'idle',segment:0},{phase:'idle'},true),{tap:false,hold:'summon'});
+  assert.deepEqual(tableInput({phase:'ready',segment:1},{phase:'idle'},true),{tap:true,hold:'speak'});
+  assert.deepEqual(tableInput({phase:'ready',segment:1},{phase:'idle'},false),{tap:true,hold:undefined});
+});
+
+test('busy key and pointer gestures have no side effects or replay; five taps always reset',t=>{
+  let state={phase:'speaking',segment:1},mic={phase:'idle'};
+  const events=[];
+  const {controls,tap,tick}=setup(t,{
+    captureTap:()=>tableInput(state,mic,true).tap?()=>events.push('advance'):undefined,
+    captureHold:()=>tableInput(state,mic,true).hold?()=>events.push('record'):undefined,
+    press:()=>events.push('press'),lift:()=>events.push('lift'),release:()=>events.push('release'),cancel:()=>events.push('cancel'),reset:()=>events.push('reset'),
+  });
+  for(const phase of ['calling','confirm','drawing','generating','speaking','conversation','transcribing'])for(const key of ['key:Space','pointer:9']){
+    state={phase:phase==='transcribing'?'ready':phase,segment:1};mic={phase:phase==='transcribing'?'finishing':'idle'};
+    tap(key);state={phase:'ready',segment:1};mic={phase:'idle'};tick(1000);assert.deepEqual(events,[],'ignored tap never replays after ready');
+    state={phase:'speaking',segment:1};controls.down(key);state={phase:'ready',segment:1};tick(HOLD_MS+100);controls.up(key);tick(1000);assert.deepEqual(events,[],'ignored hold never starts after ready');
+    state={phase:'speaking',segment:1};controls.down(key);controls.cancelGesture();controls.up(key);tick(1000);assert.deepEqual(events,[],'cancelling ignored input does not stop narration');
+    state={phase:phase==='transcribing'?'ready':phase,segment:1};mic={phase:phase==='transcribing'?'finishing':'idle'};
+    for(let i=0;i<5;i++){tap(key);tick(100);}assert.deepEqual(events,['reset'],`${phase}/${key} reset`);events.length=0;
+  }
+});
+
+test('release of an accepted hold still runs after the state becomes busy',t=>{
+  let available=true;const events=[];
+  const {controls,tick}=setup(t,{captureTap:()=>undefined,captureHold:()=>available?()=>events.push('hold'):undefined,press:()=>events.push('press'),lift:()=>events.push('lift'),release:()=>events.push('release')});
+  controls.down('key:Space');tick(HOLD_MS);available=false;controls.up('key:Space');assert.deepEqual(events,['press','hold','lift','release']);
 });

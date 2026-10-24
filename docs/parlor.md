@@ -49,6 +49,12 @@ focusing a button. There are no visible guest buttons, inputs or menus. The scen
 does not consume pointer gestures: touch scrolling, dragging and text selection
 cannot summon, advance or start recording. Long captions retain native scrolling.
 
+While the spirit speaks, transcribes or prepares a response, ordinary taps and
+holds are ignored and never replayed later. Five quick taps still reset in every
+state, including pending work and narration. Releasing an already active capture
+or summon remains effective; Escape always returns to setup. The optional operator
+speech button follows the same busy lock and five-tap reset exception.
+
 - After the introduction, hold for **450 ms**, wait for **Speak now**, speak, then release to submit. Microphone
   permission/startup can take longer than the threshold. Short taps never request access.
 - Tap and release in less than 450 ms to continue without discussion. At the greeting's
