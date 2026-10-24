@@ -1,6 +1,33 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {TableGestures,tableInput,tableKey,HOLD_MS,TAP_GAP_MS,SUMMON_MS}=require('../.test-build/parlor/gestures.js');
+const {TableGestures,tableInput,tableKey,HOLD_MS,TAP_GAP_MS,SUMMON_MS,SUMMON_INTENT_MS}=require('../.test-build/parlor/gestures.js');
+
+test('idle intent is silent below 300ms; full seven-second summon begins at the threshold',t=>{
+  const states=[];const {controls,tick}=setup(t,{captureTap:()=>undefined,pressDelay:()=>SUMMON_INTENT_MS,holdDelay:()=>SUMMON_MS,press:()=>states.push('effects'),captureHold:()=>()=>states.push('contact'),lift:()=>states.push('lift'),release:()=>states.push('release')});
+  controls.down('a');tick(299);assert.deepEqual(states,[]);controls.up('a');tick(10000);assert.deepEqual(states,[],'released intent never fires late');
+  controls.down('a');tick(300);assert.deepEqual(states,['effects']);tick(6999);assert.deepEqual(states,['effects']);tick(1);assert.deepEqual(states,['effects','contact']);controls.up('a');assert.deepEqual(states,['effects','contact','lift','release']);
+});
+
+test('idle triple and five taps never start effects; mixed intent hold breaks the burst and early release is consumed',t=>{
+  const states=[];const {controls,tap,tick}=setup(t,{captureTap:()=>undefined,pressDelay:()=>300,holdDelay:()=>SUMMON_MS,press:()=>states.push('effects'),captureHold:()=>()=>states.push('contact'),lift:()=>states.push('lift'),introduction:()=>states.push('guide'),reset:()=>states.push('reset')});
+  for(let i=0;i<3;i++){tap();tick(100);}tick(500);assert.deepEqual(states,['guide']);
+  states.length=0;for(let i=0;i<5;i++){tap();tick(100);}tick(10000);assert.deepEqual(states,['reset']);
+  states.length=0;tap();tap();controls.down('a');tick(300);controls.up('a');tap();tick(500);assert.deepEqual(states,['effects','lift'],'early summon release is not the third tap');
+});
+
+test('intent timer aggregates overlap, ignores repeat, and cancel/dispose fence late effects',t=>{
+  const states=[];const {controls,tick}=setup(t,{captureTap:()=>undefined,pressDelay:()=>300,holdDelay:()=>SUMMON_MS,press:()=>states.push('effects'),captureHold:()=>()=>states.push('contact'),lift:()=>states.push('lift'),cancel:()=>{}});
+  controls.down('a');tick(100);controls.down('a',true);controls.down('b');tick(199);controls.up('a');assert.deepEqual(states,[]);tick(1);assert.deepEqual(states,['effects']);controls.up('b');assert.deepEqual(states,['effects','lift']);
+  states.length=0;controls.down('a');tick(299);controls.cancel();controls.up('a');tick(10000);assert.deepEqual(states,[],'blur/reset cancellation fences intent');
+  controls.down('a');tick(299);controls.dispose();tick(10000);controls.up('a');controls.down('b');tick(10000);assert.deepEqual(states,[]);
+});
+
+test('initial guide close is consumed and never arms summon; ordinary PTT stays at 450ms',t=>{
+  let guide=false,idle=true;const states=[];
+  const {controls,tap,tick}=setup(t,{pressDelay:()=>idle&&!guide?300:0,holdDelay:()=>idle&&!guide?SUMMON_MS:HOLD_MS,captureTap:()=>guide?()=>{guide=false;states.push('close');}:undefined,captureHold:()=>guide?undefined:()=>states.push(idle?'contact':'speak'),press:()=>{if(!guide)states.push('effects');},introduction:()=>{guide=true;states.push('guide');},reset:()=>{guide=false;states.push('reset');}});
+  for(let i=0;i<3;i++)tap();tick(500);tap();tick(10000);assert.deepEqual(states,['guide','close']);
+  states.length=0;idle=false;controls.down('a');tick(449);assert.deepEqual(states,['effects']);tick(1);assert.deepEqual(states,['effects','speak']);controls.up('a');
+});
 
 test('three taps open help only after the gap; five reset without opening help and four do nothing',t=>{
   const events=[];const {controls,tap,tick}=setup(t,{introduction:()=>events.push('guide'),reset:()=>events.push('reset'),captureTap:()=>()=>events.push('advance')});

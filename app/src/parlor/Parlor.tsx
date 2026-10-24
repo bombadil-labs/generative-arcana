@@ -10,7 +10,7 @@ import { useArtworkSelection, useArtworkStore } from "../artwork/context";
 import { characters, visionFrames, clearKeys, defaultSettings, readSettings, readySettings, saveSettings, useOwnerEleven, type Settings } from "./settings";
 import { ParlorMachine } from "./machine";
 import { ScribeMicrophone, transcribeScribe } from "./microphone";
-import { TableGestures, tableInput, tableKey, HOLD_MS, SUMMON_MS } from "./gestures";
+import { TableGestures, tableInput, tableKey, HOLD_MS, SUMMON_MS, SUMMON_INTENT_MS } from "./gestures";
 import { RadioSignal } from "./RadioSignal";
 import { Transcript } from "./Transcript";
 import { focusedCard } from "./cardFocus";
@@ -172,7 +172,7 @@ function TableSetup({ transcriptLogging, showDetails, changeDetails, detailsStor
     {detailsStorageError && <p role="alert">The display preference could not be saved; it applies for this session.</p>}
     <label className="parlor-check"><input type="checkbox" checked={operatorControls} onChange={event => setOperatorControls(event.target.checked)} />Show operator controls while testing</label>
     <button ref={startButton} className="parlor-primary" aria-disabled={!ready} onClick={() => { if (ready) start(); }}>Start the show</button>
-    <p className="parlor-show-hint">The idle table waits for a seven-second hold to summon the spirit, without recording. Keep holding until the visual cue says Release the button. After its introduction, hold for 450 ms, wait for Speak now, speak and release. A quick tap moves on after a 500 ms pause; three quick taps pause for the deck introduction (press once to return), and five quick taps with less than 500 ms between them return to blank idle. Overlapping keys count once. Escape returns to setup. Tab, modifier shortcuts and operator inputs keep their usual behavior. Test the mini keyboard and microphone on the party Mac before guests arrive.</p>
+    <p className="parlor-show-hint">The idle table waits for a 300 ms hold before starting the seven-second summon, without recording. Keep holding until the visual cue says Release the button. After its introduction, hold for 450 ms, wait for Speak now, speak and release. A quick tap moves on after a 500 ms pause; three quick taps pause for the deck introduction (press once to return), and five quick taps with less than 500 ms between them return to blank idle. Overlapping keys count once. Escape returns to setup. Tab, modifier shortcuts and operator inputs keep their usual behavior. Test the mini keyboard and microphone on the party Mac before guests arrive.</p>
   </div>;
 }
 function Ritual({ transcriptLogging, showDetails, deckId, settings, leave, radioPreferences, changeRadio, operatorControls }: { transcriptLogging: boolean; deckId: string; settings: Settings; leave(): void; operatorControls: boolean; showDetails: boolean } & RadioOptions) {
@@ -197,6 +197,7 @@ function Ritual({ transcriptLogging, showDetails, deckId, settings, leave, radio
     return () => { offMachine(); offMic(); };
   }, [machine, microphone, sound]);
   const controls = useMemo(() => new TableGestures({
+    pressDelay: () => !machine.getSnapshot().guideOpen && machine.getSnapshot().phase === "idle" ? SUMMON_INTENT_MS : 0,
     holdDelay: () => !machine.getSnapshot().guideOpen && machine.getSnapshot().phase === "idle" ? SUMMON_MS : HOLD_MS,
     press: startedAt => { if (machine.getSnapshot().guideOpen) return; sound.hold(machine.getSnapshot().phase !== "idle"); machine.summon(startedAt); sound.unlock(); },
     lift: () => { if (machine.getSnapshot().guideOpen) return; machine.releaseSummon(); if (!["checking", "listening"].includes(microphone.getSnapshot().phase)) sound.hold(false); },

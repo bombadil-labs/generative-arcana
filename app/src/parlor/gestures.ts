@@ -15,12 +15,15 @@ export function tableInput(state: Pick<State, "phase" | "segment">, mic: Pick<Mi
 export const HOLD_MS = 450;
 export const TAP_GAP_MS = 500;
 export const SUMMON_MS = 7000;
+export const SUMMON_INTENT_MS = 300;
 export interface GestureActions {
   captureTap(): (() => void) | undefined;
   /** Universal help gesture, resolved only after five-tap reset is ruled out. */
   introduction?(): void;
   captureHold?(): (() => void) | undefined;
   holdDelay?(): number;
+  /** Delay effects for idle summoning; seven-second hold starts after this intent gate. */
+  pressDelay?(): number;
   press?(startedAt: number): void;
   lift?(): void;
   hold(): void;
@@ -36,6 +39,9 @@ export class TableGestures {
   private tapAction?: () => void;
   private holdAction?: () => void;
   private holdTimer?: ReturnType<typeof setTimeout>;
+  private pressTimer?: ReturnType<typeof setTimeout>;
+  private pressStarted = false;
+  private deliberate = false;
   private tapTimer?: ReturnType<typeof setTimeout>;
   private epoch = 0;
   private disposed = false;
@@ -52,23 +58,36 @@ export class TableGestures {
     this.holdAction = this.actions.captureHold ? this.actions.captureHold() : this.actions.hold;
     this.engaged = !!tapAction || !!this.holdAction;
     const delay = this.actions.holdDelay?.() ?? HOLD_MS;
-    if (this.engaged) this.actions.press?.(performance.now());
     const epoch = this.epoch;
-    this.holdTimer = setTimeout(() => {
+    const arm = () => {
       if (this.disposed || epoch !== this.epoch || !this.pressed.size) return;
-      this.holdTimer = undefined; this.holding = true; this.taps = 0; this.tapAction = undefined;
-      this.holdAction?.();
-    }, delay);
+      this.pressTimer = undefined;
+      if (this.engaged) { this.pressStarted = true; this.actions.press?.(performance.now()); }
+      if (this.disposed || epoch !== this.epoch || !this.pressed.size) return;
+      this.holdTimer = setTimeout(() => {
+        if (this.disposed || epoch !== this.epoch || !this.pressed.size) return;
+        this.holdTimer = undefined; this.holding = true; this.taps = 0; this.tapAction = undefined;
+        this.holdAction?.();
+      }, delay);
+    };
+    const intent = this.actions.pressDelay?.() ?? 0;
+    if (intent > 0 && this.engaged) this.pressTimer = setTimeout(() => {
+      if (this.disposed || epoch !== this.epoch || !this.pressed.size) return;
+      this.deliberate = true; this.taps = 0; this.tapAction = undefined; arm();
+    }, intent);
+    else arm();
   }
   up(id: string) {
     if (!this.pressed.delete(id) || this.pressed.size) return;
     clearTimeout(this.holdTimer); this.holdTimer = undefined;
+    clearTimeout(this.pressTimer); this.pressTimer = undefined;
     // Freeze this gesture before lift can synchronously change the encounter or cancel it.
-    const engaged = this.engaged, holding = this.holding, epoch = this.epoch;
-    this.engaged = this.holding = false;
-    if (engaged) this.actions.lift?.();
+    const engaged = this.engaged, holding = this.holding, deliberate = this.deliberate, pressed = this.pressStarted, epoch = this.epoch;
+    this.engaged = this.holding = this.deliberate = this.pressStarted = false;
+    if (engaged && pressed) this.actions.lift?.();
     if (epoch !== this.epoch || this.disposed) return;
     if (holding) { if (engaged) this.actions.release(); return; }
+    if (deliberate) return; // An early summon release is consumed, never added to a tap burst.
     if (++this.taps === 5) { this.clear(); this.actions.reset(); return; }
     this.tapTimer = setTimeout(() => {
       if (this.disposed || epoch !== this.epoch || this.pressed.size) return;
@@ -78,9 +97,9 @@ export class TableGestures {
     }, TAP_GAP_MS);
   }
   private clear() {
-    ++this.epoch; clearTimeout(this.holdTimer); clearTimeout(this.tapTimer);
-    this.holdTimer = this.tapTimer = undefined; this.pressed.clear();
-    this.holding = this.engaged = false; this.taps = 0; this.tapAction = this.holdAction = undefined;
+    ++this.epoch; clearTimeout(this.pressTimer); clearTimeout(this.holdTimer); clearTimeout(this.tapTimer);
+    this.pressTimer = this.holdTimer = this.tapTimer = undefined; this.pressed.clear();
+    this.holding = this.engaged = this.deliberate = this.pressStarted = false; this.taps = 0; this.tapAction = this.holdAction = undefined;
   }
   cancelGesture() { const engaged = this.engaged; this.clear(); if (engaged) this.actions.cancel(); }
   cancel() { this.clear(); this.actions.cancel(); }
