@@ -5,6 +5,7 @@ const {narrate,converse,narrationInstructions,discussionInstructions}=require('.
 const {ArcanaEngine}=require('../.test-build/engine/ArcanaEngine.js');
 const {DeckRegistry}=require('../.test-build/decks/registry.js');
 const {rawDeck}=require('./fixtures.cjs');
+const {resolveCardRenderSpec}=require('../.test-build/decks/renderSpec.js');
 
 test('scripted personas contain no device instructions; keeper is the original spirit of the ether',()=>{
   assert.equal(characters.keeper.name,'The Spirit of the Ether');
@@ -56,7 +57,7 @@ test('both BYOK providers receive vision prompts with exact private identities a
       const follow=requests.at(-1),system=follow.system??follow.messages[0].content;
       assert.ok(system.startsWith(discussionInstructions(settings)));
       const context=JSON.parse(system.slice(system.lastIndexOf('\n')+1));
-      assert.deepEqual(context.cards,[{name:reading.placements[0].card.name,position:reading.placements[0].position.name,reversed:reading.placements[0].reversed,meaning:reading.placements[0].meaning,narrativeFrame:'Past'}]);
+      assert.deepEqual(context.cards,[{name:reading.placements[0].card.name,position:reading.placements[0].position.name,reversed:reading.placements[0].reversed,meaning:reading.placements[0].meaning,narrativeFrame:'Past',positionContext:reading.placements[0].position,visualGrounding:'authored_scene',card:reading.placements[0].card,renderSpec:resolveCardRenderSpec(reading.deck,reading.placements[0].card)}]);
       assert.deepEqual(follow.messages.slice(provider==='openai'?1:0),turns,'guest question is preserved as data, not elevated into instructions');
     }
   }finally{global.fetch=original;}

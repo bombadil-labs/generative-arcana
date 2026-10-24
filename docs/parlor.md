@@ -37,7 +37,26 @@ The final Scribe transcript appears above the cards. The first
 card follows the query (or an explicit tap for an open reading). Each card's narration ends at a pause: talk repeatedly
 about that card, or tap once to draw the next card. After card three, a tap requests
 the closing synthesis. Every later card requires an intentional gesture. Discussion context contains only
-revealed card names, positions, orientations and authored meanings.
+revealed cards' full authored payloads, positions, orientations and resolved visual
+specifications. This includes the complete `visuals.detailed_description`, overrides,
+factorization and inherited family/suit/rank/station/material directives. The reader
+describes that scene as a mind's-eye vision, preserving depicted people and actions;
+its imagination connects the scene to the question rather than replacing the scene.
+Card-specific descriptions take precedence over generic motifs. Missing scene text
+is explicitly marked so the reader can stay with meanings instead of guessing visual
+traits or gender from a title. This is text grounding, not image inspection or a
+guarantee against model mistakes: no artwork is fetched or sent to the language model.
+
+The existing single generation still prepares all three visions and their closing;
+only the intended segment is spoken, and discussion receives only revealed sources.
+Descriptions are never shortened to fit a request. Browser BYOK and owner requests
+reject complete UTF-8 payloads above 64,000 bytes before provider dispatch; legacy
+hosted mode retains its configured input ceiling. The error explains that nothing
+was sent. Larger authored sources use more text tokens within these existing bounds.
+The keeper's brief introduction has no mandatory sigh. Shared prompts encourage
+responsive, curious dry humor without habitual openings, repeated introductions or
+re-speaking previous answers; v3 delivery tags remain optional and sparse.
+
 Completed card narration joins the recent discussion history in order, so a
 question such as “What did you mean by that?” includes the interpretation just
 delivered. Advancing retains recent discussion alongside the next completed

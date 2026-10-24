@@ -2,7 +2,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createArcanaAdapter } from './hostStore';
 import type { BrowserPrincipalResolver, BrowserSessionAuthenticator } from './browserSession';
 import type { UserDeckCatalogRepository } from './userDeckCatalog';
-import { characters, defaultSettings, visionFrames } from '../../app/src/parlor/settings';
+import { characters, defaultSettings } from '../../app/src/parlor/settings';
+import { narrationContext } from '../../app/src/parlor/context';
 import { narrationInstructions, discussionInstructions, conversationContext, parseNarration } from '../../app/src/parlor/providers';
 import { ParlorFault, publicParlorConfig, type ParlorConfig } from './parlorConfig';
 import type { ParlorStore, Reservation } from './parlorStore';
@@ -89,9 +90,9 @@ export function createParlorHandler(options:{config:ParlorConfig;authorize?:(req
         const system=kind==='narrate'?narrationInstructions(persona):discussionInstructions(persona);
         const revealed=data.revealed??3;
         if(kind==='converse'&&(!Number.isInteger(revealed)||Number(revealed)<1||Number(revealed)>3))throw new ParlorFault(400,'invalid_conversation');
-        const context=kind==='converse'?conversationContext(reading,Number(revealed)):adapter.engine.buildInterpretationContext(reading);
+        const context=kind==='converse'?conversationContext(reading,Number(revealed)):narrationContext(reading);
         let messages:{role:'user'|'assistant';content:string}[];
-        if(kind==='narrate')messages=[{role:'user',content:context+'\nCARD IDENTITIES IN ORDER\n'+JSON.stringify(reading.placements.map((p,index)=>({slug:p.card.slug,name:p.card.name,position:p.position.name,reversed:p.reversed,narrativeFrame:visionFrames[index]})))}];
+        if(kind==='narrate')messages=[{role:'user',content:context}];
         else {
           if(!Array.isArray(data.turns)||!data.turns.length||data.turns.length>21||data.turns.length%2!==1)throw new ParlorFault(400,'invalid_conversation');
           messages=data.turns.map((turn:unknown,i:number)=>{if(!record(turn)||turn.role!==(i%2===0?'user':'assistant'))throw new ParlorFault(400,'invalid_conversation');return {role:turn.role as 'user'|'assistant',content:text(turn.content,i%2===0?1200:4000)};});
