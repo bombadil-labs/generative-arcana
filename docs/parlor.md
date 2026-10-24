@@ -68,10 +68,11 @@ failed delivery is not committed until a retry or explicit silent fallback compl
 While the encounter is open, ordinary keys work anywhere in the guest view without
 focusing a button. There are no visible guest buttons, inputs or menus. The scene
 does not consume pointer gestures: touch scrolling, dragging and text selection
-cannot summon, advance or start recording. Long captions retain native scrolling.
+cannot summon, advance or start recording. Captions stay within their rolling window.
 
 While the spirit speaks, transcribes or prepares a response, ordinary taps and
-holds are ignored and never replayed later. Five quick taps still reset in every
+holds are ignored and never replayed later. Three taps open the deck introduction;
+five quick taps still reset in every
 state, including pending work and narration. Releasing an already active capture
 or summon remains effective; Escape always returns to setup. The optional operator
 speech button follows the same busy lock and five-tap reset exception.
@@ -81,12 +82,18 @@ speech button follows the same busy lock and five-tap reset exception.
 - Tap and release in less than 450 ms to continue without discussion. At the greeting's
   end this starts an open reading; at each card pause it advances once; after the third
   card it requests the closing. A tap while narration/transcription is busy is discarded.
+- **Three taps** pause for an introduction to the selected deck, including before
+  summoning. The same 500 ms gap resolves the gesture only after a five-tap reset is
+  ruled out. The overview uses authored major-story, suit and rank data; the Roaring
+  Twenties year/court explanation appears only for that matching authored structure.
+  Readable pages turn automatically and repeat, with no scrolling. Press once to
+  return; that gesture is consumed and cannot advance, record or summon.
 - **Five taps** with less than **500 ms** from each release to the next press reset the
   encounter immediately on the fifth release. This stops audio/recording, aborts pending
   requests and clears cards, query, captions and history, then returns to blank idle.
   Selected decks, artwork, persona, voice and saved keys remain intact.
-- A tap waits 500 ms after release before advancing, to distinguish it from reset.
-  Two to four taps in the same burst coalesce into one advance. A hold breaks the burst.
+- A tap waits 500 ms after release before advancing, to distinguish it from help/reset.
+  Two taps coalesce into one advance; four do nothing. A hold breaks the burst.
   Keyboard auto-repeat is ignored. Overlapping keys count as one gesture, lasting until
   **all** keys are released; pressing three keys together is not three reset taps.
 - Escape returns to operator setup. Tab, modifier shortcuts, editable fields and operator
@@ -100,6 +107,17 @@ discussion or the next card; the third pause offers the closing, and the complet
 reading offers follow-up or five-tap reset. Pending work never invites a new action.
 The blank reset invitation is preserved. The radio decoration has no duplicate label,
 and user text above the cards contains only the guest's actual transcript.
+The permanent lower-right note says “Three button presses to learn about the deck,
+five to reset the reading”. Pending inference, transcription and speech preparation
+say “Please wait a moment, dialing in the etheric connection”.
+
+The deck introduction pauses the existing audio player and caption clock. Closing
+resumes that same player at its current position, without a new provider request.
+Completed inference results wait behind the introduction; the local step timeout
+also pauses. Microphone capture or unfinished transcription is cancelled, not saved
+or replayed. Reset, exit and logout discard the paused work. Losing focus still stops
+capture and cancels active encounter work; returning from help never bypasses that
+interruption. No transcript persistence or archive is introduced by this feature.
 
 Past/Present/Future sit 6px below the occupied artwork edge: the slots when settled,
 or the enlarged foreground card while it is in focus so labels cannot cover it.

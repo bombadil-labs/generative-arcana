@@ -17,6 +17,8 @@ export const TAP_GAP_MS = 500;
 export const SUMMON_MS = 7000;
 export interface GestureActions {
   captureTap(): (() => void) | undefined;
+  /** Universal help gesture, resolved only after five-tap reset is ruled out. */
+  introduction?(): void;
   captureHold?(): (() => void) | undefined;
   holdDelay?(): number;
   press?(startedAt: number): void;
@@ -70,7 +72,9 @@ export class TableGestures {
     if (++this.taps === 5) { this.clear(); this.actions.reset(); return; }
     this.tapTimer = setTimeout(() => {
       if (this.disposed || epoch !== this.epoch || this.pressed.size) return;
-      const action = this.tapAction; this.clear(); action?.();
+      const count = this.taps, action = this.tapAction; this.clear();
+      if (count === 3 && this.actions.introduction) this.actions.introduction();
+      else if (count < 3 || !this.actions.introduction) action?.();
     }, TAP_GAP_MS);
   }
   private clear() {

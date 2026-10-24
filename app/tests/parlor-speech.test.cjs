@@ -6,6 +6,38 @@ const {defaultSettings}=require('../.test-build/parlor/settings.js');
 const settings={...defaultSettings(),elevenKey:'synthetic-key',voiceId:'the-selected-voice'};
 const alignment={characters:['O','n','e',' ','t','w','o'],character_start_times_seconds:[0,.1,.2,.3,1,1.1,1.2],character_end_times_seconds:[.1,.2,.3,.4,1.1,1.2,1.3]};
 const tick=()=>new Promise(r=>setImmediate(r));
+const {PresentationPause}=require('../.test-build/parlor/pause.js');
+
+for(const owner of [false,true])test(`deck guide resumes the same ${owner?'owner':'BYOK'} audio player and aborts safely`,async()=>{
+  const old={fetch:global.fetch,Audio:global.Audio};let player,requests=0,plays=0,pauses=0;const captions=[];
+  try{
+    global.fetch=async()=>{requests++;return Response.json({audio_base64:btoa('audio'),normalized_alignment:alignment});};
+    global.Audio=class{currentTime=0;constructor(){player=this;}play(){plays++;return Promise.resolve();}pause(){pauses++;}removeAttribute(){}load(){}};
+    const selected=owner?{...settings,elevenKey:'',ownerKeys:{elevenlabs:true}}:settings;
+    const pause=new PresentationPause(),abort=new AbortController();let completed=false;
+    const pending=speak(selected,'One two',abort.signal,()=>{},undefined,t=>captions.push(t),()=>{},pause).then(()=>completed=true);
+    while(!player)await tick();player.onplaying();player.currentTime=.3;player.ontimeupdate();assert.equal(captions.at(-1),'One');
+    pause.set(true);assert.equal(pauses,1);player.onplaying();player.ontimeupdate();await tick();assert.equal(completed,false);assert.equal(captions.at(-1),'One');
+    pause.set(false);assert.equal(plays,2);assert.equal(player.currentTime,.3);assert.equal(requests,1);player.onplaying();assert.equal(captions.at(-1),'One');
+    pause.set(true);player.onended();await tick();assert.equal(completed,false,'queued completion is held behind guide');pause.set(false);await pending;assert.equal(captions.at(-1),'One two');assert.equal(requests,1);
+    player=null;const cancelled=speak(selected,'One two',abort.signal,()=>{},undefined,()=>{},()=>{},pause);const rejected=assert.rejects(cancelled,{name:'AbortError'});while(!player)await tick();pause.set(true);const late=player.onended;abort.abort();await rejected;const count=plays;pause.set(false);late();assert.equal(plays,count);assert.equal(player.onended,null);
+  }finally{Object.assign(global,old);}
+});
+
+test('TTS response arriving during guide waits without creating or starting a player',async()=>{
+  const old={fetch:global.fetch,Audio:global.Audio};let players=0;const pause=new PresentationPause(),abort=new AbortController();pause.set(true);
+  try{global.fetch=async()=>Response.json({audio_base64:btoa('audio'),normalized_alignment:alignment});global.Audio=class{constructor(){players++;}};
+    const pending=speak(settings,'One two',abort.signal,()=>{},undefined,()=>{},()=>{},pause);const rejected=assert.rejects(pending,{name:'AbortError'});await tick();await tick();assert.equal(players,0);abort.abort();await rejected;pause.set(false);assert.equal(players,0);
+  }finally{Object.assign(global,old);}
+});
+
+test('pausing before play settles ignores only the superseded play rejection',async()=>{
+  const old={fetch:global.fetch,Audio:global.Audio};let player;const rejects=[],pause=new PresentationPause();
+  try{global.fetch=async()=>Response.json({audio_base64:btoa('audio'),normalized_alignment:alignment});global.Audio=class{currentTime=0;constructor(){player=this;}play(){return new Promise((_,reject)=>rejects.push(reject));}pause(){}removeAttribute(){}load(){}};
+    const pending=speak(settings,'One two',new AbortController().signal,()=>{},undefined,()=>{},()=>{},pause);
+    while(!player)await tick();pause.set(true);pause.set(false);rejects[0](new DOMException('Interrupted by pause','AbortError'));await tick();assert.equal(typeof player.onplaying,'function');player.onplaying();player.onended();await pending;
+  }finally{Object.assign(global,old);}
+});
 
 test('v3 delivery is allowlisted, restrained and separate from visible words',()=>{
   assert.equal(speechPayload('[sighs] Hello. [sarcastic] Still here? [explosion]'),'[sighs] Hello. Still here?');

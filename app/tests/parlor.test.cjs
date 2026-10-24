@@ -32,6 +32,30 @@ async function until(machine, phase) {
   });
 }
 
+test('deck guide pauses inference and speech completion without retries, context changes or duplicate history',async()=>{
+  const generated=deferred(),audio=[];let requests=0;
+  const {machine,draws}=setup({narrate:async(_,reading)=>{requests++;await generated.promise;return narration(reading);},speak:async(_,text,signal,playing,reading,caption,waiting,pause)=>{const done=deferred();audio.push({done,playing,caption,signal,pause});await done.promise;}});
+  try{
+    machine.openGuide();machine.begin();machine.advance();machine.submit('ignored');assert.equal(machine.getSnapshot().phase,'idle');machine.closeGuide();
+    await confirm(machine);await until(machine,'generating');const before=machine.getSnapshot();machine.openGuide();generated.resolve();await tick();assert.equal(machine.getSnapshot().phase,'generating');assert.equal(machine.getSnapshot().reading,before.reading);assert.equal(machine.getSnapshot().question,before.question);
+    machine.advance();machine.submit('ignored');machine.closeGuide();await until(machine,'ready');assert.equal(draws(),1);assert.equal(requests,1);
+    machine.next();const first=audio.at(-1);first.playing();first.caption('Already spoken','aligned');machine.openGuide();first.playing();first.caption('Must not appear','aligned');first.done.resolve();await tick();assert.equal(machine.getSnapshot().caption,'Already spoken');assert.equal(machine.getSnapshot().audioPlaying,false);assert.equal(machine.getSnapshot().segment,0);assert.deepEqual(machine.getSnapshot().turns,[]);
+    machine.closeGuide();await until(machine,'ready');assert.equal(machine.getSnapshot().segment,1);assert.equal(machine.getSnapshot().turns.length,2);machine.openGuide();machine.closeGuide();await tick();assert.equal(machine.getSnapshot().turns.length,2);assert.equal(requests,1);
+    machine.next();const second=audio.at(-1);machine.openGuide();machine.reset();assert.equal(second.signal.aborted,true);second.playing();second.caption('Old guest','aligned');second.done.resolve();await tick();assert.equal(machine.getSnapshot().guideOpen,undefined);assert.equal(machine.getSnapshot().phase,'idle');assert.equal(machine.getSnapshot().caption,'');assert.deepEqual(machine.getSnapshot().turns,[]);
+  }finally{audio.forEach(a=>a.done.resolve());machine.dispose();}
+});
+
+test('reset starts a new provider context without the previous guest query, discussion or delivered text',async()=>{
+  const requests=[];let generation=0;
+  const {machine}=setup({narrate:async(_,reading)=>{requests.push({kind:'reading',question:reading.question});const out=narration(reading);out.cards[0].text=++generation===1?'PRIVATE_OLD_DELIVERED':'NEW_DELIVERED';return out;},converse:async(_,reading,turns,signal,revealed)=>{requests.push({kind:'discussion',question:reading.question,turns, revealed});return 'PRIVATE_OLD_ANSWER';}});
+  try{
+    await confirm(machine);await until(machine,'ready');machine.next();await until(machine,'ready');machine.ask('PRIVATE_OLD_FOLLOWUP');await until(machine,'ready');assert.match(JSON.stringify(machine.getSnapshot().turns),/PRIVATE_OLD/);
+    machine.openGuide();machine.reset();assert.deepEqual(machine.getSnapshot().turns,[]);assert.equal(machine.getSnapshot().reading,undefined);assert.equal(machine.getSnapshot().userText,'');
+    machine.begin();await until(machine,'question');machine.submit('NEW_GUEST_QUERY');await until(machine,'ready');machine.next();await until(machine,'ready');machine.ask('NEW_GUEST_FOLLOWUP');await until(machine,'ready');
+    const fresh=requests.slice(2);assert.equal(fresh.length,2);assert.doesNotMatch(JSON.stringify(fresh),/PRIVATE_OLD|A private question/);assert.match(JSON.stringify(fresh),/NEW_GUEST_QUERY/);assert.match(JSON.stringify(fresh),/NEW_DELIVERED/);
+  }finally{machine.dispose();}
+});
+
 test('visual card focus follows existing reveal and discussion state, with no extra advance and no stale focus after reset',async()=>{
   const audio=[];const response=deferred();const {machine,draws}=setup({speak:async(_,text,signal,playing)=>{const done=deferred();audio.push({done,playing});await done.promise;},converse:async()=>response.promise});
   const focus=()=>focusedCard(machine.getSnapshot());

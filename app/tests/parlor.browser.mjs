@@ -47,7 +47,7 @@ async function radioLevel(){return page.evaluate(()=>window.__radioLevel());}
 async function radio(mode){await page.locator(`.parlor-radio[data-mode="${mode}"]`).waitFor();}
 async function pending(get){const end=Date.now()+5000;while(!get()&&Date.now()<end)await new Promise(r=>setTimeout(r,20));assert.ok(get(),'fixture request arrived');}
 const idleText='Press and hold the button to make contact with the beyond';
-async function idle(){await page.locator('.parlor-idle').waitFor();assert.equal((await page.locator('.parlor-show').innerText()).trim(),idleText);assert.equal(await page.locator('.parlor-card,.parlor-slot,.parlor-caption,.parlor-radio').count(),0);}
+async function idle(){await page.locator('.parlor-idle').waitFor();assert.equal((await page.locator('.parlor-show').innerText()).trim(),idleText+'\n\nThree button presses to learn about the deck, five to reset the reading');assert.equal(await page.locator('.parlor-card,.parlor-slot,.parlor-caption,.parlor-radio').count(),0);}
 async function summon(finish=true){
   await idle();const n=await audioCount(),mic=await page.evaluate(()=>window.__micRequests);await page.keyboard.down('a');await page.locator('.parlor-summoning').waitFor();assert.equal(await page.locator('.parlor-slot').count(),3);
   await page.clock.fastForward(7000);await waitAudio(n);assert.match(speechRequests.at(-1).text,/signal holds/);assert.doesNotMatch(speechRequests.at(-1).text,/button|release|press|tap|click|reset|advance/i);assert.equal(await page.evaluate(()=>window.__micRequests),mic);await cue().getByText('Keep holding.',{exact:true}).waitFor();await finishAudio();await page.getByText('Release the button.',{exact:true}).waitFor();assert.equal(await audioCount(),n+1);
@@ -83,6 +83,17 @@ async function ignoredBusy(pointer=false){
 async function escape(){await page.keyboard.press('Escape');await button('Start the show').waitFor();assert.equal(await page.evaluate(()=>document.activeElement.textContent),'Start the show');assert.equal(await page.locator('.parlor-card').count(),0);await page.clock.fastForward(100);assert.equal(await page.evaluate(()=>window.__radioContexts.every(c=>c.state==='closed')),true,'exit closes every ambience context');}
 async function capture(name){if(await page.locator('.parlor-show').count()){assert.equal(await page.locator('.parlor-show button,.parlor-show input,.parlor-show summary').count(),0,'guest projection has no controls');assert.equal(await page.locator('.parlor-cue').count(),1);assert.equal(await page.locator('.parlor-radio-label,.parlor-status,.parlor-control-hint').count(),0);if((await page.viewportSize()).width>=900 && !(await page.locator('.parlor-idle').count())){const scene=await page.locator('.parlor-scene').boundingBox(),hint=await cue().boundingBox(),stageBox=await stage().boundingBox();assert.ok(hint.x>=scene.x+scene.width+20,'side cue cannot overlap cards or captions');assert.ok(stageBox.y>=0 && stageBox.y+stageBox.height<=(await page.viewportSize()).height+1,'projected scene fits vertically');}}await page.evaluate(()=>window.scrollTo(0,0));assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.screenshot({path:resolve(evidence,name+'.png'),fullPage:true});}
 async function tap(key='a'){await page.keyboard.press(key);}
+async function openGuide(){for(let i=0;i<3;i++)await tap();await page.clock.fastForward(500);await page.getByRole('dialog').waitFor();await page.waitForFunction(()=>document.querySelector('.parlor-introduction-text')?.textContent.trim());}
+async function closeGuide(){await tap();await page.clock.fastForward(500);await page.getByRole('dialog').waitFor({state:'detached'});}
+async function guideFits(){
+  const result=await page.locator('.parlor-introduction-text').evaluate(el=>{
+    const box=el.getBoundingClientRect(),node=el.firstChild,range=document.createRange();
+    const words=[...node.textContent.matchAll(/\S+/gu)].flatMap(match=>{range.setStart(node,match.index);range.setEnd(node,match.index+match[0].length);return [...range.getClientRects()].map(r=>r.toJSON());});
+    const dialog=el.closest('[role=dialog]').getBoundingClientRect(),cue=document.querySelector('.parlor-introduction-cue').getBoundingClientRect(),footer=document.querySelector('.parlor-shortcut-note').getBoundingClientRect();
+    return {fits:words.every(r=>r.top>=box.top-1&&r.bottom<=box.bottom+1&&r.left>=box.left-1&&r.right<=box.right+1),box:box.toJSON(),dialog:dialog.toJSON(),cue:cue.toJSON(),footer:footer.toJSON(),height:innerHeight,font:parseFloat(getComputedStyle(el).fontSize),scroll:document.documentElement.scrollHeight};
+  });
+  assert.ok(result.fits,'all introduction words are visible: '+JSON.stringify(result));assert.ok(result.font>=19);assert.ok(result.dialog.y>=0&&result.dialog.bottom<=result.footer.y);assert.ok(result.cue.bottom<=result.dialog.bottom&&result.cue.top>=result.box.bottom);assert.ok(result.footer.bottom<=result.height);assert.ok(result.scroll<=result.height+1);return result;
+}
 async function frameLabels(){
   // Compare settled geometry; the prior footprint remains reserved while its
   // transform is in flight so returning captions cannot cover a settling card.
@@ -251,6 +262,16 @@ try{
   assert.equal(await page.evaluate(()=>window.__radioContexts.length),0,'no AudioContext before a deliberate summon gesture');
   // Touching/dragging the blank scene never starts a summon, recording or ambience.
   await stage().dispatchEvent('pointerdown',{pointerId:9,pointerType:'touch',button:0,isPrimary:true});await page.clock.fastForward(7100);await stage().dispatchEvent('pointermove',{pointerId:9,clientY:100});await stage().dispatchEvent('pointercancel',{pointerId:9});await idle();assert.equal(await audioCount(),before);assert.equal(await page.evaluate(()=>window.__micRequests),0);assert.equal(await page.evaluate(()=>window.__radioContexts.length),0);
+  // Five taps never flash the introduction, including on the initial screen.
+  await page.evaluate(()=>{window.__guideFlashes=0;new MutationObserver(records=>{for(const r of records)for(const n of r.addedNodes)if(n.nodeType===1&&(n.matches?.('[role=dialog]')||n.querySelector?.('[role=dialog]')))window.__guideFlashes++;}).observe(document.body,{childList:true,subtree:true});});
+  await resetEncounter();await page.clock.fastForward(1000);assert.equal(await page.evaluate(()=>window.__guideFlashes),0);
+  for(const viewport of [{width:1920,height:1080},{width:1280,height:720},{width:390,height:640},{width:844,height:390},{width:390,height:360}]){
+    await page.setViewportSize(viewport);await openGuide();const pages=[];
+    for(let i=0;i<30;i++){await guideFits();const text=await page.locator('.parlor-introduction-text').textContent();if(pages.length&&text===pages[0])break;pages.push(text);await page.clock.fastForward(silentExports.silentPageMs(text)+100);await page.waitForTimeout(10);}
+    assert.ok(pages.join('').includes(data.name));assert.match(pages.join(''),/Major Arcana/);assert.match(pages.join(''),/Minor Arcana/);assert.match(pages.join(''),/Ranks/);
+    await capture('deck-introduction-'+viewport.width+'x'+viewport.height);await closeGuide();await idle();assert.equal(calls,0);assert.equal(await audioCount(),before);assert.equal(await page.evaluate(()=>window.__micRequests),0);assert.equal(await page.locator('[data-silent-measure]').count(),0);
+  }
+  await page.setViewportSize({width:1280,height:960});await openGuide();await resetEncounter();assert.equal(await page.getByRole('dialog').count(),0);await page.clock.fastForward(200000);await idle();
   // Early physical-key release and lost focus return to blank without voice or microphone.
   for(const cancel of ['release','blur']){
     await page.keyboard.down('a');
@@ -273,9 +294,12 @@ try{
   await page.emulateMedia({reducedMotion:'no-preference'});assert.equal(await page.locator('.radio-needle').evaluate(el=>getComputedStyle(el).animationName),'radio-search');await capture('radio-inference-search');assert.equal(await progress(),0,'no invented inference percent');
   await page.waitForFunction(()=>window.__radioLevel()>0);const searchingLevel=await radioLevel();assert.ok(searchingLevel>0&&searchingLevel<=1);
   for(const viewport of [{width:1920,height:1080},{width:1280,height:720},{width:390,height:844}]){await page.setViewportSize(viewport);await capture(`radio-search-${viewport.width}`);}await page.setViewportSize({width:1280,height:960});
-  ttsMode='delay';release();release=null;mode='ok';await pending(()=>ttsRelease);await ignoredBusy();await cue().getByText('The voice is taking shape.',{exact:true}).waitFor();await radio('searching');assert.equal(await page.locator('.is-revealed').count(),0);assert.equal(await caption().innerText(),'');await capture('radio-voice-search');
-  assert.equal(await page.locator('.parlor-cue-title').innerText(),'The voice is taking shape.');
+  ttsMode='delay';release();release=null;mode='ok';await pending(()=>ttsRelease);await ignoredBusy();await cue().getByText('Please wait a moment, dialing in the etheric connection',{exact:true}).waitFor();await radio('searching');assert.equal(await page.locator('.is-revealed').count(),0);assert.equal(await caption().innerText(),'');await capture('radio-voice-search');
+  assert.equal(await page.locator('.parlor-cue-title').innerText(),'Please wait a moment, dialing in the etheric connection');
   await page.emulateMedia({reducedMotion:'reduce'});assert.deepEqual(await page.locator('.radio-needle,.radio-wave,.parlor-radio-halo').evaluateAll(nodes=>nodes.map(el=>getComputedStyle(el).animationName)),['none','none','none']);await capture('radio-reduced-search');ttsRelease();ttsRelease=null;ttsMode='ok';await waitAudio(first);await radio('speaking');assert.equal(await page.locator('.is-revealed').count(),1);assert.equal(await caption().innerText(),'');assert.equal(await page.locator('.parlor-show button').count(),0);await capture('radio-speaking');await ignoredBusy();
+  await page.evaluate(()=>{window.__audio.currentTime=.5;window.__audio.ontimeupdate();window.__pausedAudio=window.__audio;});const guideCaption=await caption().textContent(),guideCalls=calls,guideAudio=await audioCount();
+  await openGuide();assert.equal(await radioLevel(),0);await page.clock.fastForward(200000);await guideFits();assert.equal(await caption().textContent(),guideCaption);assert.equal(calls,guideCalls);assert.equal(await audioCount(),guideAudio);assert.equal(await stage().getAttribute('data-phase'),'speaking');
+  await closeGuide();await radio('speaking');assert.equal(await page.evaluate(()=>window.__audio===window.__pausedAudio&&window.__audio.currentTime===.5),true);assert.equal(await caption().textContent(),guideCaption);assert.equal(calls,guideCalls);assert.equal(await audioCount(),guideAudio);await page.evaluate(()=>{window.__audio.currentTime=0;window.__audio.ontimeupdate();});
   await page.evaluate(()=>window.__audio.onwaiting());await radio('searching');assert.equal(await caption().innerText(),'');await page.evaluate(()=>window.__audio.onplaying());await radio('speaking');
   assert.ok(await radioLevel()<searchingLevel/10,'actual voice playback strongly ducks the ambience');
   await finishAudio();await phase('ready').waitFor();await page.waitForTimeout(250);assert.equal(await page.locator('.is-revealed').count(),1);await artwork();await capture('first-card-desktop');
@@ -302,7 +326,7 @@ try{
   await page.evaluate(()=>window.__micMode='empty');await talk('This clip is empty','enter');await page.locator('.parlor-cue[role="alert"][aria-description*="No audio was captured"]').waitFor();assert.equal(scribeRequests.length,previousScribe);
   await page.evaluate(()=>window.__micMode='ok');scribeMode='silent';await talk('No speech',true);await page.locator('.parlor-cue[role="alert"][aria-description*="No speech was heard"]').waitFor();assert.equal(calls,previousCalls);
   scribeMode='error';await talk('A transcription error',true);await page.locator('.parlor-cue[role="alert"][aria-description*="Scribe could not transcribe"]').waitFor();assert.equal(calls,previousCalls);
-  scribeMode='delay';await talk('A cancelled transcription',true);await cue().getByText('Finding your words.',{exact:true}).waitFor();await page.waitForFunction(()=>document.querySelector('.parlor-cue-title').textContent.includes('Finding your words'));await radio('searching');await capture('radio-transcription');await ignoredBusy();assert.ok(scribeRelease);await page.evaluate(()=>window.dispatchEvent(new Event('blur')));scribeRelease();scribeRelease=null;scribeMode='ok';await radio('waiting');await page.waitForTimeout(150);assert.equal(calls,previousCalls);
+  scribeMode='delay';await talk('A cancelled transcription',true);await cue().getByText('Please wait a moment, dialing in the etheric connection',{exact:true}).waitFor();await page.waitForFunction(()=>document.querySelector('.parlor-cue-title').textContent.includes('etheric connection'));await radio('searching');await capture('radio-transcription');await ignoredBusy();assert.ok(scribeRelease);await page.evaluate(()=>window.dispatchEvent(new Event('blur')));scribeRelease();scribeRelease=null;scribeMode='ok';await radio('waiting');await page.waitForTimeout(150);assert.equal(calls,previousCalls);
   // Global table controls need no button focus. Five taps never leak an advance or recording.
   await page.getByLabel('Interactive reading',{exact:true}).focus();const requestsBefore=await page.evaluate(()=>window.__micRequests);const callsBefore=calls;
   await resetEncounter();assert.equal(calls,callsBefore);assert.equal(await page.evaluate(()=>window.__micRequests),requestsBefore);assert.equal(await page.locator('.parlor-show textarea,.parlor-show input').count(),0);await summon();
@@ -315,8 +339,8 @@ try{
   // Reset during audio clears cards/history; captured callbacks cannot revive that reading.
   await page.evaluate(()=>window.__oldCallbacks=[window.__audio.onended,window.__audio.ontimeupdate]);await resetEncounter();await page.evaluate(()=>window.__oldCallbacks.forEach(fn=>fn?.()));await page.waitForTimeout(600);assert.equal(await page.locator('.parlor-card').count(),0);
   ttsMode='delay';const cancelledVoice=await audioCount();await page.keyboard.down('a');await page.clock.fastForward(7000);await pending(()=>ttsRelease);await radio('searching');await page.keyboard.up('a');await resetEncounter();ttsRelease();ttsRelease=null;ttsMode='ok';await page.waitForTimeout(150);await idle();assert.equal(await audioCount(),cancelledVoice,'late TTS response cannot revive the apparatus or player');
-  await summon();scribeMode='delay';const resetCalls=calls;await talk('Old guest transcription',true);await cue().getByText('Finding your words.',{exact:true}).waitFor();await page.getByLabel('Interactive reading',{exact:true}).focus();await resetEncounter();scribeRelease();scribeRelease=null;scribeMode='ok';await page.waitForTimeout(200);assert.equal(calls,resetCalls);assert.equal(await page.locator('.parlor-card').count(),0);
-  await summon();mode='delay';await talk('Old guest reading',true);await page.waitForFunction(()=>document.querySelector('.parlor-cue-title').textContent.includes('gathering'));await resetEncounter();release();release=null;mode='ok';await page.waitForTimeout(200);assert.equal(await page.locator('.parlor-card').count(),0);
+  await summon();scribeMode='delay';const resetCalls=calls;await talk('Old guest transcription',true);await cue().getByText('Please wait a moment, dialing in the etheric connection',{exact:true}).waitFor();await page.getByLabel('Interactive reading',{exact:true}).focus();await resetEncounter();scribeRelease();scribeRelease=null;scribeMode='ok';await page.waitForTimeout(200);assert.equal(calls,resetCalls);assert.equal(await page.locator('.parlor-card').count(),0);
+  await summon();mode='delay';await talk('Old guest reading',true);await page.waitForFunction(()=>document.querySelector('.parlor-cue-title').textContent.includes('etheric connection'));await resetEncounter();release();release=null;mode='ok';await page.waitForTimeout(200);assert.equal(await page.locator('.parlor-card').count(),0);
   // Genuine decoded WebP fixtures at all four observed source sizes, desktop/projector and phone.
   await escape();for(artIndex=0;artIndex<artSizes.length;artIndex++){
     await page.reload();assert.equal(await page.getByLabel('ElevenLabs voice ID',{exact:true}).inputValue(),'synthetic-selected-voice');
@@ -326,7 +350,7 @@ try{
     await page.setViewportSize({width:1280,height:960});await escape();
   }artIndex=0;await begin();const resumed=await audioCount();await talk('A new guest',true);await waitAudio(resumed);await finishAudio();
   // Cancellation fences late LLM and late speech, preserves no guest data on return.
-  mode='delay';const count=await audioCount();await talk('A delayed discussion',true);await page.waitForFunction(()=>document.querySelector('.parlor-cue-title').textContent.includes('considering'));assert.ok(release);await escape();release();mode='ok';await page.waitForTimeout(150);assert.equal(await audioCount(),count);
+  mode='delay';const count=await audioCount();await talk('A delayed discussion',true);await page.waitForFunction(()=>document.querySelector('.parlor-cue-title').textContent.includes('etheric connection'));assert.ok(release);await escape();release();mode='ok';await page.waitForTimeout(150);assert.equal(await audioCount(),count);
   assert.equal(await page.evaluate(()=>JSON.stringify(localStorage).includes('synthetic spoken query')),false);
   // Long text rolls within fixed rows. Only timestamp-revealed words enter the
   // DOM, and old lines leave without moving the cards or requiring scrolling.
@@ -359,7 +383,7 @@ try{
       return {stage:rect('.parlor-ritual'),user:rect('.parlor-user-transcript'),cards:rect('.parlor-table'),caption:rect('.parlor-caption'),cue:rect('.parlor-cue'),width:innerWidth,height:innerHeight,scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight};
     });
     assert.ok(layout.scrollHeight<=viewport.height+1 && layout.scrollWidth<=viewport.width+1,'guest scene never needs page scrolling');
-    assert.ok(Math.abs(layout.stage.x+layout.stage.width/2-viewport.width/2)<1 && Math.abs(layout.stage.y+layout.stage.height/2-viewport.height/2)<1,'composition remains centered');
+    assert.ok(Math.abs(layout.stage.x+layout.stage.width/2-viewport.width/2)<1 && Math.abs(layout.stage.y+layout.stage.height/2-(viewport.height-(viewport.width<=800?(viewport.height<=450?36:52):0))/2)<1,'composition remains centered');
     assert.ok(layout.user.bottom<=layout.cards.y+1 && layout.cards.bottom<=layout.caption.y+1,'cards and text occupy reserved nonoverlapping rows');
     assert.ok(layout.cue.y>=0 && layout.cue.bottom<=viewport.height && layout.caption.bottom<=viewport.height,'cue and latest narration stay onscreen');
     const capacity=await caption().evaluate(el=>({height:el.clientHeight,line:parseFloat(getComputedStyle(el).lineHeight),bottom:el.getBoundingClientRect().bottom,sceneBottom:el.closest('.parlor-scene').getBoundingClientRect().bottom}));
@@ -376,7 +400,7 @@ try{
   const scrollRequests={calls,scribe:scribeRequests.length,audio:await audioCount(),mic:await page.evaluate(()=>window.__micRequests)};
   const cdp=await context.newCDPSession(page);
   async function swipe(target){
-    const box=await target.boundingBox();assert.ok(box);const x=Math.round(box.x+box.width/2),bottom=Math.min((await page.viewportSize()).height-30,box.y+box.height-15),top=Math.max(30,box.y+15);assert.ok(bottom-top>30,'swipe target is visible');
+    const box=await target.boundingBox();assert.ok(box);const x=Math.round(box.x+box.width/2),bottom=Math.min((await page.viewportSize()).height-30,box.y+box.height-8),top=Math.max(30,box.y+8);assert.ok(bottom-top>30,'swipe target is visible');
     await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y:bottom}]});
     for(let i=1;i<=8;i++){await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:bottom-(bottom-top)*i/8}]});await page.waitForTimeout(25);}
     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await page.waitForTimeout(300);

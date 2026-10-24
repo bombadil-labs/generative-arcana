@@ -1,6 +1,6 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {guestCue,IDLE_INVITATION}=require('../.test-build/parlor/cue.js');
+const {guestCue,IDLE_INVITATION,LOADING_CUE}=require('../.test-build/parlor/cue.js');
 const cue=(phase,segment=0,mic='idle',audioPlaying=false)=>guestCue({phase,segment,audioPlaying},{phase:mic,error:''});
 const text=c=>[c.title,c.instruction].filter(Boolean).join(' ');
 
@@ -13,7 +13,7 @@ test('silent pages invite reading rather than speech or advance, and keep the su
 test('reset is blank except its invitation; summon never offers a microphone before release',()=>{
   assert.deepEqual(cue('idle',3,'error'),{title:IDLE_INVITATION});
   for(const phase of ['summoning','calling'])assert.match(text(cue(phase)),/holding/);
-  assert.deepEqual(cue('calling'),{title:'Keep holding.',instruction:'Contact is forming.'});
+  assert.deepEqual(cue('calling'),{title:'Keep holding.',instruction:LOADING_CUE});
   assert.doesNotMatch(text(cue('calling')),/spirit asks|voice asks/);
   assert.deepEqual(cue('awaiting-release'),{title:'Release the button.'});
   for(const phase of ['summoning','calling','awaiting-release'])assert.doesNotMatch(text(cue(phase)),/speak|query|\bask\b|next card/);
@@ -23,7 +23,7 @@ test('microphone cues separate permission, intentional recording and transcripti
   assert.match(text(cue('question',0,'checking')),/Keep holding.*microphone/);
   assert.match(text(cue('question',0,'listening')),/Speak now.*Release to send/);
   for(const phase of ['question','ready','complete']){
-    const waiting=cue(phase,2,'finishing');assert.equal(waiting.title,'Finding your words.');
+    const waiting=cue(phase,2,'finishing');assert.equal(waiting.title,LOADING_CUE);
     assert.doesNotMatch(text(waiting),/Hold|Press|Tap|speak|next/);
   }
 });
@@ -32,7 +32,7 @@ test('inference and voice preparation offer no unavailable actions or read-ahead
   for(const phase of ['confirm','drawing','generating','conversation','speaking','ready']){
     assert.doesNotMatch(text(cue(phase)),/Hold|Press|Tap|ask|next|retry/);
   }
-  assert.equal(cue('speaking',1,'idle',false).title,'The voice is taking shape.');
+  assert.equal(cue('speaking',1,'idle',false).title,LOADING_CUE);
   assert.equal(cue('speaking',1,'idle',true).title,'Listen.');
   // A stale microphone error cannot mask an intentional reading or imply failure during speech.
   assert.deepEqual(cue('speaking',1,'error',true),cue('speaking',1,'idle',true));

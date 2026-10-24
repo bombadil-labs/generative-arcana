@@ -1,4 +1,5 @@
 import type { ArcanaReading } from "../engine/types";
+import type { PresentationPause } from "./pause";
 import { characters, useOwnerAnthropic, useOwnerEleven, type Settings } from "./settings";
 import { conversationContext, narrationContext, READER_INPUT_BYTES, CONTEXT_TOO_LARGE } from './context';
 export { conversationContext, narrationContext } from './context';
@@ -97,7 +98,7 @@ export function converse(settings: Settings, reading: ArcanaReading, turns: Turn
 }
 
 /** One bounded audio resource, released on completion, interruption, failure and unmount. */
-export async function speak(settings: Settings, text: string, signal: AbortSignal, onPlaying: () => void, reading?: ArcanaReading, onCaption: (text: string, timing: CaptionTiming) => void = () => {}, onWaiting: () => void = () => {}): Promise<void> {
+export async function speak(settings: Settings, text: string, signal: AbortSignal, onPlaying: () => void, reading?: ArcanaReading, onCaption: (text: string, timing: CaptionTiming) => void = () => {}, onWaiting: () => void = () => {}, pause?: PresentationPause): Promise<void> {
   let url: string | undefined;
   let audio: HTMLAudioElement | undefined;
   try {
@@ -122,32 +123,46 @@ export async function speak(settings: Settings, text: string, signal: AbortSigna
     }
     if (signal.aborted) throw new Error();
     if (blob.size > 8_000_000 || !blob.size) throw new Error();
+    await pause?.wait(signal);
     url = URL.createObjectURL(blob);
     audio = new Audio(url);
     const player = audio;
     await new Promise<void>((resolve, reject) => {
-      let began = false, closed = false, frame: number | undefined, lastCaption = "";
+      let began = false, closed = false, ended = false, playAttempt = 0, frame: number | undefined, lastCaption = "";
+      let unsubscribe = () => {};
       const update = () => {
-        if (closed || !began || signal.aborted || !alignment) return;
+        if (closed || !began || signal.aborted || pause?.paused || !alignment) return;
         const caption = spokenCaption(alignment, player.currentTime);
         if (caption !== lastCaption) { lastCaption = caption; onCaption(caption, "aligned"); }
       };
-      const animate = () => { if (closed || signal.aborted) return; update(); if (!closed && !signal.aborted) frame = requestAnimationFrame(animate); };
-      const clean = () => { closed = true; if (frame !== undefined) cancelAnimationFrame(frame); signal.removeEventListener("abort", abort); player.onplaying = player.onended = player.onerror = player.ontimeupdate = player.onwaiting = player.onpause = null; };
+      const animate = () => { frame = undefined; if (closed || signal.aborted || pause?.paused) return; update(); if (!closed && !signal.aborted) frame = requestAnimationFrame(animate); };
+      const clean = () => { closed = true; unsubscribe(); if (frame !== undefined) cancelAnimationFrame(frame); signal.removeEventListener("abort", abort); player.onplaying = player.onended = player.onerror = player.ontimeupdate = player.onwaiting = player.onpause = null; };
       const abort = () => { clean(); player.pause(); reject(new Error()); };
       player.onplaying = () => {
         if (closed || signal.aborted) return;
-        if (!began) { began = true; onCaption("", alignment ? "aligned" : "segment"); if (alignment && typeof requestAnimationFrame === "function") animate(); }
+        if (pause?.paused) { player.pause(); return; }
+        if (!began) { began = true; onCaption("", alignment ? "aligned" : "segment"); }
+        if (alignment && frame === undefined && typeof requestAnimationFrame === "function") animate();
         onPlaying();
       };
       player.onwaiting = player.onpause = () => { if (!closed && !signal.aborted) onWaiting(); };
       player.ontimeupdate = update;
-      player.onended = () => { clean(); if (signal.aborted || !began) { reject(new Error()); return; } onCaption(alignment ? alignment.characters.join("").trim() : plainSpeech(text), alignment ? "aligned" : "segment"); resolve(); };
+      const finish = () => { clean(); if (signal.aborted || !began) { reject(new Error()); return; } onCaption(alignment ? alignment.characters.join("").trim() : plainSpeech(text), alignment ? "aligned" : "segment"); resolve(); };
+      player.onended = () => { if (closed) return; ended = true; if (!pause?.paused) finish(); };
       player.onerror = () => { clean(); reject(new Error()); };
       signal.addEventListener("abort", abort, { once: true });
       if (signal.aborted) { abort(); return; }
-      try { void player.play().catch(() => { clean(); reject(new Error()); }); }
-      catch { clean(); reject(new Error()); }
+      const play = () => {
+        const attempt = ++playAttempt;
+        const failed = () => { if (!closed && attempt === playAttempt && !pause?.paused) { clean(); reject(new Error()); } };
+        try { void player.play().catch(failed); } catch { failed(); }
+      };
+      unsubscribe = pause?.subscribe(paused => {
+        if (closed || signal.aborted) return;
+        if (paused) { ++playAttempt; if (frame !== undefined) cancelAnimationFrame(frame); frame = undefined; player.pause(); onWaiting(); }
+        else if (ended) finish(); else play();
+      }) ?? (() => {});
+      if (!pause?.paused) play();
     });
   } catch (error) {
     if (signal.aborted) throw new DOMException("Cancelled", "AbortError");

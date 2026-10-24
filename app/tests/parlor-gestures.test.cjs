@@ -1,6 +1,23 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {TableGestures,tableInput,tableKey,HOLD_MS,TAP_GAP_MS,SUMMON_MS}=require('../.test-build/parlor/gestures.js');
+
+test('three taps open help only after the gap; five reset without opening help and four do nothing',t=>{
+  const events=[];const {controls,tap,tick}=setup(t,{introduction:()=>events.push('guide'),reset:()=>events.push('reset'),captureTap:()=>()=>events.push('advance')});
+  for(let i=0;i<3;i++){tap();tick(100);}assert.deepEqual(events,[]);tick(399);assert.deepEqual(events,[]);tick(1);assert.deepEqual(events,['guide']);
+  events.length=0;for(let i=0;i<5;i++){tap();tick(100);}tick(1000);assert.deepEqual(events,['reset']);
+  events.length=0;for(let i=0;i<4;i++){tap();tick(100);}tick(1000);assert.deepEqual(events,[]);
+  for(let i=0;i<3;i++){controls.down('a');controls.down('a',true);controls.down('b');controls.up('a');controls.up('b');tick(100);}tick(500);assert.deepEqual(events,['guide'],'overlap and repeat are not extra gestures');
+});
+
+test('help is universal during busy states and a modal close gesture cannot replay as advance',t=>{
+  let open=false,busy=true;const events=[];
+  const {controls,tap,tick}=setup(t,{captureTap:()=>open?()=>{open=false;events.push('close');}:busy?undefined:()=>events.push('advance'),captureHold:()=>undefined,introduction:()=>{open=true;events.push('guide');},reset:()=>{open=false;events.push('reset');}});
+  for(let i=0;i<3;i++)tap();tick(500);assert.equal(open,true);assert.deepEqual(events,['guide']);
+  tap();busy=false;tick(500);tick(2000);assert.deepEqual(events,['guide','close']);
+  busy=true;for(let i=0;i<3;i++)tap();tick(500);for(let i=0;i<5;i++)tap();tick(500);assert.deepEqual(events,['guide','close','guide','reset']);
+  for(let i=0;i<3;i++)tap();controls.cancel();tick(1000);assert.equal(open,false,'cancel fences pending guide opening');
+});
 function setup(t,overrides={}) {
   t.mock.timers.enable({apis:['setTimeout']});
   const events=[];
