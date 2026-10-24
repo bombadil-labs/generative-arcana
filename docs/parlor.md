@@ -331,6 +331,26 @@ and the side cue remain separate at projection and small-screen sizes.
 
 ## Verification
 
+### Optional projected deck notes
+
+Escape to setup and enable **Show card details beside the current card** to place
+the current revealed card left of a compact authored-information panel. It is off
+by default; that setting preserves the centered focus. The preference is stored
+per account on this browser independently of the opt-in for remembering keys.
+
+Notes show the authored name, suit/Major designation, available rank and
+transversal/station, the first complete scene sentence and the first complete
+meaning sentence (or a short authored meaning phrase) for the actual orientation. Missing fields, rendering-only
+instructions, incomplete sentences and sentences longer than 340 characters are
+omitted rather than guessed or cut mid-sentence. These are deck notes, not the
+spirit's generated response. Spoken captions retain their existing timing.
+
+The notes use the real available area and font to paginate automatically when
+needed, with reading time before each page changes. They cycle while this card
+remains in focus, without advancing the encounter. Resize remeasures the current
+page; advance, reset, Escape and logout dispose its presentation. No extra model
+request, image dispatch, guest control or saved conversation is introduced.
+
 Use Node 24 and an existing installed Edge browser; the browser test does not
 download browsers or use a real browser profile:
 

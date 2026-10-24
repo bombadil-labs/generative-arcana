@@ -18,6 +18,7 @@
   "git": {
     "deploymentEnabled": {
       "fix/parlor-slot-caption-geometry": false,
+      "feat/parlor-card-details": false,
       "feat/parlor-ether-visions": false,
       "feat/parlor-card-focus": false,
       "fix/parlor-projection-captions": false,
