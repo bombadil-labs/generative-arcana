@@ -7,7 +7,7 @@ import { CardArt } from "../components/CardArt";
 import { PackAssetImage } from "../artwork/PackAssetImage";
 import { getPackArtworkAsset, type PackArtworkAsset } from "../artwork/api";
 import { useArtworkSelection, useArtworkStore } from "../artwork/context";
-import { characters, clearKeys, defaultSettings, readSettings, readySettings, saveSettings, useOwnerEleven, type Settings } from "./settings";
+import { characters, visionFrames, clearKeys, defaultSettings, readSettings, readySettings, saveSettings, useOwnerEleven, type Settings } from "./settings";
 import { ParlorMachine } from "./machine";
 import { ScribeMicrophone, transcribeScribe } from "./microphone";
 import { TableGestures, tableInput, tableKey, HOLD_MS, SUMMON_MS } from "./gestures";
@@ -158,7 +158,7 @@ function TableSetup({ deckId, settings, hosting, start, leave, startButton, radi
     <RadioControls radioPreferences={radioPreferences} changeRadio={changeRadio} />
     <label className="parlor-check"><input type="checkbox" checked={operatorControls} onChange={event => setOperatorControls(event.target.checked)} />Show operator controls while testing</label>
     <button ref={startButton} className="parlor-primary" aria-disabled={!ready} onClick={() => { if (ready) start(); }}>Start the show</button>
-    <p className="parlor-show-hint">The idle table waits for a seven-second hold to summon the spirit, without recording. Keep holding until the voice asks you to release. After its introduction, hold for 450 ms, wait for Speak now, speak and release. A quick tap moves on after a 500 ms pause; five quick taps with less than 500 ms between them return to blank idle. Overlapping keys count once. Escape returns to setup. Tab, modifier shortcuts and operator inputs keep their usual behavior. Test the mini keyboard and microphone on the party Mac before guests arrive.</p>
+    <p className="parlor-show-hint">The idle table waits for a seven-second hold to summon the spirit, without recording. Keep holding until the visual cue says Release the button. After its introduction, hold for 450 ms, wait for Speak now, speak and release. A quick tap moves on after a 500 ms pause; five quick taps with less than 500 ms between them return to blank idle. Overlapping keys count once. Escape returns to setup. Tab, modifier shortcuts and operator inputs keep their usual behavior. Test the mini keyboard and microphone on the party Mac before guests arrive.</p>
   </div>;
 }
 function Ritual({ deckId, settings, leave, radioPreferences, changeRadio, operatorControls }: { deckId: string; settings: Settings; leave(): void; operatorControls: boolean } & RadioOptions) {
@@ -261,7 +261,10 @@ function Ritual({ deckId, settings, leave, radioPreferences, changeRadio, operat
     )}
     {!state.reading && !idle && <div className="parlor-table parlor-spread-slots" aria-label="Three empty card spaces">{[0, 1, 2].map(index => <div key={index} className="parlor-slot" aria-hidden="true" />)}</div>}
     </div>}
-    {!idle && <Transcript kind="narrator" text={state.caption} silent={state.timing === "silent"} windowRef={captionWindow} />}
+    {!idle && <div className="parlor-narration-area">
+      <div className="parlor-slot-labels" aria-label="Vision frames">{visionFrames.map(frame => <span key={frame}>{frame}</span>)}</div>
+      <Transcript kind="narrator" text={state.caption} silent={state.timing === "silent"} windowRef={captionWindow} />
+    </div>}
     </div>
     <aside id="parlor-guest-cue" className="parlor-cue" aria-label="Table instructions" aria-description={cue.attention ? state.error || mic.error : undefined} role={cue.attention ? "alert" : "status"} aria-atomic="true">
       <p className="parlor-cue-title">{cue.title}</p>{cue.instruction && <p className="parlor-cue-detail">{cue.instruction}</p>}

@@ -5,6 +5,8 @@ import { parlorConfig } from '../src/parlorConfig';
 import { createParlorHandler } from '../src/parlorApi';
 import { PARLOR_OWNER } from '../src/parlorAccess';
 import { createArcanaAdapter } from '../src/hostStore';
+import { defaultSettings } from '../../app/src/parlor/settings';
+import { narrationInstructions, discussionInstructions } from '../../app/src/parlor/providers';
 import type { UserDeckCatalogRepository } from '../src/userDeckCatalog';
 
 const origin = new URL(PARLOR_OWNER.issuer).origin;
@@ -50,6 +52,8 @@ const provider:typeof fetch=async(input,init)=>{
     return Response.json({audio_base64:audio.toString('base64'),normalized_alignment:{characters:[...words],character_start_times_seconds:[...words].map((_,i)=>i/10),character_end_times_seconds:[...words].map((_,i)=>(i+1)/10)},discarded_metadata:'not returned'});
   }
   assert.equal(url,'https://api.anthropic.com/v1/messages');assert.equal(headers.get('x-api-key'),env.ANTHROPIC_API_KEY);assert.ok(['claude-test-owner','claude-sonnet-5-5'].includes(body.model));assert.equal(body.max_tokens,2000);
+  assert.ok(body.system.startsWith(body.system.includes('Return only JSON')?narrationInstructions(defaultSettings()):discussionInstructions(defaultSettings())),'owner uses the same ether/control-free prompt as BYOK');
+  if(body.system.includes('Return only JSON'))assert.deepEqual(JSON.parse(body.messages[0].content.split('CARD IDENTITIES IN ORDER\n')[1]).map((p:{narrativeFrame:string})=>p.narrativeFrame),['Past','Present','Future']);
   if(body.model==='claude-sonnet-5-5'){assert.deepEqual(body.thinking,{type:'between_tools'});assert.deepEqual(body.output_config,{effort:'low'});assert.equal(body.tools,undefined);assert.equal(body.tool_choice,undefined);}
   else {assert.equal(body.thinking,undefined);assert.equal(body.output_config,undefined);}
   return Response.json({content:[{type:'text',text:body.system.includes('Return only JSON')?JSON.stringify(narration):'A mock follow-up.'}]});

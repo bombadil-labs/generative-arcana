@@ -50,8 +50,8 @@ const idleText='Press and hold the button to make contact with the beyond';
 async function idle(){await page.locator('.parlor-idle').waitFor();assert.equal((await page.locator('.parlor-show').innerText()).trim(),idleText);assert.equal(await page.locator('.parlor-card,.parlor-slot,.parlor-caption,.parlor-radio').count(),0);}
 async function summon(finish=true){
   await idle();const n=await audioCount(),mic=await page.evaluate(()=>window.__micRequests);await page.keyboard.down('a');await page.locator('.parlor-summoning').waitFor();assert.equal(await page.locator('.parlor-slot').count(),3);
-  await page.clock.fastForward(7000);await waitAudio(n);assert.match(speechRequests.at(-1).text,/release the button/);assert.equal(await page.evaluate(()=>window.__micRequests),mic);await finishAudio();await page.getByText('Release the button.',{exact:true}).waitFor();assert.equal(await audioCount(),n+1);
-  await page.keyboard.up('a');await waitAudio(n+1);assert.match(speechRequests.at(-1).text,/I am the spirit/);assert.equal(await page.evaluate(()=>window.__micRequests),mic);assert.equal(await caption().innerText(),'');
+  await page.clock.fastForward(7000);await waitAudio(n);assert.match(speechRequests.at(-1).text,/signal holds/);assert.doesNotMatch(speechRequests.at(-1).text,/button|release|press|tap|click|reset|advance/i);assert.equal(await page.evaluate(()=>window.__micRequests),mic);await cue().getByText('Keep holding.',{exact:true}).waitFor();await finishAudio();await page.getByText('Release the button.',{exact:true}).waitFor();assert.equal(await audioCount(),n+1);
+  await page.keyboard.up('a');await waitAudio(n+1);assert.match(speechRequests.at(-1).text,/I am the spirit of the ether/);assert.doesNotMatch(speechRequests.at(-1).text,/button|press|hold|release|tap|click|reset|advance|cards|deck|spread/i);assert.equal(await page.evaluate(()=>window.__micRequests),mic);assert.equal(await caption().innerText(),'');
   if(finish){await finishAudio();await phase('question').waitFor();}
 }
 async function begin(){await button('Start the show').click();await summon();}
@@ -83,8 +83,20 @@ async function ignoredBusy(pointer=false){
 async function escape(){await page.keyboard.press('Escape');await button('Start the show').waitFor();assert.equal(await page.evaluate(()=>document.activeElement.textContent),'Start the show');assert.equal(await page.locator('.parlor-card').count(),0);await page.clock.fastForward(100);assert.equal(await page.evaluate(()=>window.__radioContexts.every(c=>c.state==='closed')),true,'exit closes every ambience context');}
 async function capture(name){if(await page.locator('.parlor-show').count()){assert.equal(await page.locator('.parlor-show button,.parlor-show input,.parlor-show summary').count(),0,'guest projection has no controls');assert.equal(await page.locator('.parlor-cue').count(),1);assert.equal(await page.locator('.parlor-radio-label,.parlor-status,.parlor-control-hint').count(),0);if((await page.viewportSize()).width>=900 && !(await page.locator('.parlor-idle').count())){const scene=await page.locator('.parlor-scene').boundingBox(),hint=await cue().boundingBox(),stageBox=await stage().boundingBox();assert.ok(hint.x>=scene.x+scene.width+20,'side cue cannot overlap cards or captions');assert.ok(stageBox.y>=0 && stageBox.y+stageBox.height<=(await page.viewportSize()).height+1,'projected scene fits vertically');}}await page.evaluate(()=>window.scrollTo(0,0));assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.screenshot({path:resolve(evidence,name+'.png'),fullPage:true});}
 async function tap(key='a'){await page.keyboard.press(key);}
+async function frameLabels(){
+  assert.deepEqual(await page.locator('.parlor-slot-labels span').allTextContents(),['Past','Present','Future']);
+  const geometry=await page.locator('.parlor-slot-labels').evaluate(el=>{
+    const rect=n=>n.getBoundingClientRect().toJSON(),table=document.querySelector('.parlor-table');
+    return {row:rect(el),labels:[...el.children].map(n=>({box:rect(n),text:n.textContent,font:parseFloat(getComputedStyle(n).fontSize),scroll:n.scrollWidth})),table:rect(table),stage:rect(table.closest('.parlor-spread-stage')),caption:rect(document.querySelector('.parlor-caption')),focus:document.querySelector('figure.is-focused')&&rect(document.querySelector('figure.is-focused')),width:innerWidth,height:innerHeight};
+  });
+  assert.ok(Math.abs(geometry.table.y+geometry.table.height/2-(geometry.stage.y+geometry.stage.height/2))<1,'small spread is vertically centered behind the focused artwork');
+  assert.ok(geometry.row.y>=geometry.stage.bottom && geometry.row.bottom<=geometry.caption.y+1,'labels have a reserved row between artwork and spoken captions');
+  if(geometry.focus)assert.ok(geometry.row.y>=geometry.focus.bottom-1,'labels never overlap the enlarged card');
+  for(const {box,font,scroll} of geometry.labels){assert.ok(font>=16);assert.ok(box.x>=0&&box.right<=geometry.width+1&&box.y>=0&&box.bottom<=geometry.height+1);assert.ok(scroll<=box.width+1,'frame names stay readable without horizontal overflow');}
+}
 async function focused(index){
   const figures=page.locator('.parlor-table figure'),active=page.locator('.parlor-table figure.is-focused');
+  await frameLabels();
   assert.equal(await page.locator('[role=dialog],[aria-modal=true]').count(),0,'card focus adds no modal or keyboard trap');
   if(index===null){assert.equal(await active.count(),0);assert.equal(await page.locator('.parlor-spread-stage.has-focus').count(),0);return;}
   assert.equal(await active.count(),1);assert.equal(await figures.evaluateAll(nodes=>nodes.findIndex(n=>n.classList.contains('is-focused'))),index);
@@ -97,6 +109,13 @@ async function focused(index){
   assert.ok(info.card.x>=info.stage.x-1 && info.card.right<=info.stage.right+1 && info.card.y>=info.stage.y-1 && info.card.bottom<=info.stage.bottom+1,'enlarged artwork stays inside its reserved row');
   assert.ok(info.user.bottom<=info.card.y+1 && info.card.bottom<=info.caption.y+1,'focus cannot obscure either transcript');
   assert.ok(Math.abs(info.card.x+info.card.width/2-(info.stage.x+info.stage.width/2))<1,'every current card occupies the same centered focus position');
+  assert.ok(Math.abs(info.card.y+info.card.height/2-(info.stage.y+info.stage.height/2))<1,'focused card retains its released vertical center');
+  const baseline=await active.evaluate(el=>{
+    const stage=el.closest('.parlor-spread-stage'),height=parseFloat(getComputedStyle(stage).height),gap=Math.min(36,Math.max(12,innerWidth*.03));
+    const tableWidth=Math.min(stage.clientWidth,800,1.2*height+2*gap),width=(tableWidth-2*gap)/3;
+    return {width:1.6*width,height:1.6*width*1.5};
+  });
+  assert.ok(Math.abs(info.card.width-baseline.width)<1&&Math.abs(info.card.height-baseline.height)<1,'enlarged artwork keeps the exact released sizing formula despite the new label row');
   assert.equal(info.dim,'1');if(info.reduced)assert.ok(parseFloat(info.transition)<=.001,'reduced motion settles immediately (including the app-wide near-zero override)');
 }
 async function resetEncounter(){const saved=await page.evaluate(()=>JSON.stringify(localStorage));const n=await audioCount();for(let i=0;i<5;i++)await tap();await idle();assert.equal(await radioLevel(),0,'reset fades ambience to silence');assert.equal(await audioCount(),n,'reset is silent');assert.equal(await page.evaluate(()=>window.__tracks.some(t=>!t.stopped)),false);assert.equal(await page.evaluate(()=>JSON.stringify(localStorage)),saved,'reset preserves saved keys and choices');}
@@ -164,7 +183,7 @@ try{
       const request=route.request().postDataJSON(),prompt=ownerLanguage?'':request.messages.at(-1).content;languageRequests.push(request);
       const identities=ownerLanguage?(path.endsWith('narrate')?JSON.parse(Buffer.from(request.token,'base64url')).c.map(([slug])=>({slug,name:slug})):null):prompt.includes('CARD IDENTITIES IN ORDER\n')?JSON.parse(prompt.split('CARD IDENTITIES IN ORDER\n')[1]):null;
       if(!identities)assert.doesNotMatch(JSON.stringify(ownerLanguage?request.turns:request.messages),/\[(?:sighs|exhales|sarcastic|curious)\]/,'history has no delivery tags');
-      const text=identities?JSON.stringify({cards:identities.map(card=>({slug:card.slug,text:`[sarcastic] ${card.name} invites you to reflect on this position. Its authored meaning opens a possibility.${longNarration?' Reflect on the choice before you, and consider what you might learn by making room for another possibility.'.repeat(14):''}`})),synthesis:'The cards invite reflection and a choice that remains yours.'}):'[curious] Stay with the meaning that resonates. What possibility does it open for you?';
+      const text=identities?JSON.stringify({cards:identities.map(card=>({slug:card.slug,text:`[sarcastic] A distant landscape takes shape in the mist. A path opens where you thought there was none.${longNarration?' Reflect on the choice before you, and consider what you might learn by making room for another possibility.'.repeat(14):''}`})),synthesis:'The visions leave a choice that remains yours.'}):'[curious] I know nothing of cards. I see only the landscape that reaches me through the ether.';
       if(mode==='delay')await new Promise(r=>release=r);
       return json(route,ownerLanguage?(identities?JSON.parse(text):{text}):{content:[{type:'text',text}]});
     }

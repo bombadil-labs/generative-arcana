@@ -8,7 +8,7 @@ export const IDLE_INVITATION = "Press and hold the button to make contact with t
 export function guestCue(state: Pick<State, "phase" | "segment" | "audioPlaying"> & Partial<Pick<State, "timing">>, mic: MicrophoneState, speechAvailable = true): GuestCue {
   if (state.phase === "idle") return { title: IDLE_INVITATION };
   if (state.phase === "summoning") return { title: "Keep holding.", instruction: "The signal is gathering." };
-  if (state.phase === "calling") return { title: "Keep holding until the spirit asks you to release." };
+  if (state.phase === "calling") return { title: "Keep holding.", instruction: "Contact is forming." };
   if (state.phase === "awaiting-release") return { title: "Release the button." };
   if (state.phase === "error") return { title: "The signal was interrupted.", instruction: "Press once to retry. Escape opens setup.", attention: true };
   if (state.phase === "paused") return { title: "The reading is paused.", instruction: "Press once to resume." };

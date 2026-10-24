@@ -13,6 +13,8 @@ test('silent pages invite reading rather than speech or advance, and keep the su
 test('reset is blank except its invitation; summon never offers a microphone before release',()=>{
   assert.deepEqual(cue('idle',3,'error'),{title:IDLE_INVITATION});
   for(const phase of ['summoning','calling'])assert.match(text(cue(phase)),/holding/);
+  assert.deepEqual(cue('calling'),{title:'Keep holding.',instruction:'Contact is forming.'});
+  assert.doesNotMatch(text(cue('calling')),/spirit asks|voice asks/);
   assert.deepEqual(cue('awaiting-release'),{title:'Release the button.'});
   for(const phase of ['summoning','calling','awaiting-release'])assert.doesNotMatch(text(cue(phase)),/speak|query|\bask\b|next card/);
 });

@@ -55,13 +55,13 @@ export class ParlorMachine {
   }
   begin() {
     if (!["idle", "awaiting-release"].includes(this.state.phase) || this.disposed) return;
-    this.speech = { kind: "greeting", segment: 0, text: `${characters[this.settings.character].greeting} Press and hold the button until the table is listening, speak your question, then release. A quick tap moves on. Five quick taps clear the table for another visitor.` };
+    this.speech = { kind: "greeting", segment: 0, text: characters[this.settings.character].greeting };
     void this.playSpeech(false);
   }
   summon(startedAt = performance.now()) { if (this.state.phase === "idle") { this.summonReleased = false; this.set({ phase: "summoning", summonStartedAt: startedAt }); } }
   contact() {
     if (this.state.phase !== "summoning") return;
-    this.speech = { kind: "release", segment: 0, text: this.settings.character === "keeper" ? "[exhales] Yes... the signal holds. You may release the button now." : "The signal holds. You may release the button now." };
+    this.speech = { kind: "release", segment: 0, text: this.settings.character === "keeper" ? "[exhales] Yes... the signal holds. Something stirs in the ether." : "The signal holds. Something stirs in the ether." };
     void this.playSpeech(false);
   }
   releaseSummon() {
@@ -149,7 +149,7 @@ export class ParlorMachine {
         // Record only completed delivery, not the pre-generated reading. Keep a user/assistant
         // pair for provider compatibility and preserve recent discussion across card advances.
         const turns: Turn[] = [...this.state.turns.slice(-18),
-          { role: "user", content: speech.segment === 3 ? "The reader is closing the reading." : `The reader has revealed card ${speech.segment + 1}.` },
+          { role: "user", content: speech.segment === 3 ? "The spirit is bringing the visions together." : `The spirit has described vision ${speech.segment + 1}.` },
           { role: "assistant", content: plainSpeech(speech.text) }];
         this.set({ phase: speech.segment === 3 ? "complete" : "ready", segment: speech.segment + 1, turns });
       }
