@@ -1,7 +1,9 @@
 import type { Settings } from './settings';
 import type { ArcanaReading } from '../engine/types';
+import { CONTEXT_TOO_LARGE } from './context';
 export interface ParlorCapabilities {mode:'byok'|'hosted';models:{provider:'anthropic'|'openai';id:string}[];voices:string[];ownerKeys?:Settings['ownerKeys']}
 const ownerErrors: Record<string,string> = {
+  context_too_large: CONTEXT_TOO_LARGE,
   provider_access_refused: 'The account provider refused access. Check its key permissions and model or voice access in setup.',
   provider_request_rejected: 'The account provider rejected this request. Check the selected model or voice in setup.',
   provider_resource_unavailable: 'The selected account model or voice is unavailable. Check its ID and account access in setup.',
@@ -43,6 +45,6 @@ export async function ownerTranscribe(audio:Blob,signal:AbortSignal):Promise<str
 export async function hostedRequest(kind:'narrate'|'converse'|'speech',settings:Settings,reading:ArcanaReading,signal:AbortSignal,extra:Record<string,unknown>={}) {
   const response=await fetch(`/api/parlor/${kind}`,{method:'POST',credentials:'same-origin',cache:'no-store',redirect:'error',signal,
     headers:{'content-type':'application/json'},body:JSON.stringify({operationId:crypto.randomUUID(),deckId:reading.deck.id,token:reading.token,character:settings.character,provider:settings.provider,model:settings.provider==='anthropic'?settings.anthropicModel:settings.openaiModel,...extra})});
-  if(!response.ok)throw new Error(response.status===401||response.status===403?'Hosted access is unavailable. Exit the show and check your account.':response.status===429?'The hosted usage limit has been reached.':'This hosted step could not finish. A retry is a new potentially billable operation.');
+  if(!response.ok)throw new Error(response.status===413?CONTEXT_TOO_LARGE:response.status===401||response.status===403?'Hosted access is unavailable. Exit the show and check your account.':response.status===429?'The hosted usage limit has been reached.':'This hosted step could not finish. A retry is a new potentially billable operation.');
   return response;
 }
