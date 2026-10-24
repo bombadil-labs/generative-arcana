@@ -384,11 +384,14 @@ by default; that setting preserves the centered focus. The preference is stored
 per account on this browser independently of the opt-in for remembering keys.
 
 Notes show the authored name, suit/Major designation, available rank and
-transversal/station, the first complete scene sentence and the first complete
-meaning sentence (or a short authored meaning phrase) for the actual orientation. Missing fields, rendering-only
-instructions, incomplete sentences and sentences longer than 340 characters are
-omitted rather than guessed or cut mid-sentence. These are deck notes, not the
-spirit's generated response. Spoken captions retain their existing timing.
+transversal/station, the first complete scene sentence, and both full authored
+upright and reversed meanings. The drawn orientation stays explicit in the heading;
+the other meaning is softly greyed but readable. Text labels identify drawn versus
+not drawn, and continuation pages identify their meaning independently of color.
+Missing meanings are omitted, never invented. Scene sentences that are incomplete,
+rendering-only or longer than 340 characters remain omitted; meanings are not
+shortened. These are optional deck notes, not the spirit's generated response.
+Spoken captions and provider context retain their existing timing and orientation.
 
 The notes use the real available area and font to paginate automatically when
 needed, with reading time before each page changes. They cycle while this card

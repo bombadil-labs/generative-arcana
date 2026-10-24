@@ -17,6 +17,7 @@
   ],
   "git": {
     "deploymentEnabled": {
+      "feat/parlor-both-meanings": false,
       "feat/parlor-runtime-transcripts": false,
       "fix/parlor-summon-intent": false,
       "feat/parlor-deck-introduction": false,

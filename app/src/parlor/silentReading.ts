@@ -27,7 +27,7 @@ export interface SilentLayout {
 
 /** A resize restarts the current page at the same offset, so no text is skipped.
  * Completion includes the final page's reading time. Abort fences every callback. */
-export function presentSilentPages(text: string, signal: AbortSignal, show: (page: string) => void, layout: SilentLayout, pause?: PresentationPause): Promise<void> {
+export function presentSilentPages(text: string, signal: AbortSignal, show: (page: string, start: number) => void, layout: SilentLayout, pause?: PresentationPause): Promise<void> {
   return new Promise((resolve, reject) => {
     let stopped = false, start = 0, timer: ReturnType<typeof setTimeout> | undefined;
     let unobserve = () => {}, unsubscribe = () => {}, advance = () => {};
@@ -45,7 +45,7 @@ export function presentSilentPages(text: string, signal: AbortSignal, show: (pag
       needsLayout = true;
       if (pause?.paused) return;
       try {
-        const page = silentPage(text, start, layout.fits); show(page.text);
+        const page = silentPage(text, start, layout.fits); show(page.text, start);
         if (stopped) return;
         needsLayout = false; remaining = silentPageMs(page.text);
         advance = function advanceSilentPage() {
@@ -67,7 +67,7 @@ export function presentSilentPages(text: string, signal: AbortSignal, show: (pag
 }
 
 /** Measure with the actual caption font/width rather than guessed line lengths. */
-export async function readSilently(text: string, signal: AbortSignal, show: (page: string) => void, window: HTMLElement | null, pause?: PresentationPause) {
+export async function readSilently(text: string, signal: AbortSignal, show: (page: string, start: number) => void, window: HTMLElement | null, pause?: PresentationPause) {
   if (!window || signal.aborted) throw new DOMException("Cancelled", "AbortError");
   const document = window.ownerDocument, view = document.defaultView!;
   const probe = document.createElement("div"); probe.dataset.silentMeasure = ""; probe.setAttribute("aria-hidden", "true");

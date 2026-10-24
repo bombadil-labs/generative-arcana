@@ -39,12 +39,12 @@ test('silent delivery completes only after every page including the ending has h
 });
 
 test('resize repeats the current page at its original offset and restarts reading time without skipping text',async t=>{
-  t.mock.timers.enable({apis:['setTimeout']});let resized,width=120,finished=false;const pages=[];
+  t.mock.timers.enable({apis:['setTimeout']});let resized,width=120,finished=false;const pages=[],starts=[];
   const text='Beginning. '+'A middle sentence. '.repeat(12)+'The end.';
-  const work=presentSilentPages(text,new AbortController().signal,page=>pages.push(page),{fits:v=>v.length<=width,observe:fn=>{resized=fn;return()=>{};}}).then(()=>finished=true);
+  const work=presentSilentPages(text,new AbortController().signal,(page,start)=>{pages.push(page);starts.push(start);assert.equal(Array.from(text).slice(start,start+Array.from(page).length).join(''),page);},{fits:v=>v.length<=width,observe:fn=>{resized=fn;return()=>{};}}).then(()=>finished=true);
   t.mock.timers.tick(3000);width=35;resized();assert.ok(pages[0].startsWith(pages[1]));const resizedPages=[pages.at(-1)];
   for(let i=0;i<40&&!finished;i++){const count=pages.length;t.mock.timers.tick(silentPageMs(pages.at(-1)));await Promise.resolve();if(pages.length>count)resizedPages.push(pages.at(-1));}
-  await work;assert.equal(resizedPages.join(''),text);
+  await work;assert.equal(resizedPages.join(''),text);assert.equal(starts[0],0);assert.equal(starts[1],0);assert.ok(starts.at(-1)>0);
 });
 
 test('abort cancels page timers and late resize callbacks; failed measurement cleans up without false completion',async t=>{

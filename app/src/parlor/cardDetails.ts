@@ -38,9 +38,25 @@ function cardDetails(reading: ArcanaReading, index: number) {
   const family = card.arcana === "major" ? "Major Arcana" : suit || undefined;
   let scene = authoredSentence(card.visuals?.detailed_description);
   if (scene && /^(?:render|draw|paint|style|composition|use|avoid|do not|the image should)\b/iu.test(scene)) scene = undefined;
-  const authoredMeaning = (reversed ? card.meaning.inverted : card.meaning.upright).replace(/\s+/gu, " ").trim();
-  const meaning = authoredSentence(authoredMeaning) || (authoredMeaning.length <= 180 ? authoredMeaning || undefined : undefined);
+  const upright = card.meaning.upright?.replace(/\s+/gu, " ").trim() || undefined;
+  const inverted = card.meaning.inverted?.replace(/\s+/gu, " ").trim() || undefined;
+  const meaning = reversed ? inverted : upright;
   const axes = [family, rank && `Rank: ${rank}`, station && `${data.transversal.name || "Station"}: ${station}`].filter(Boolean).join(" · ");
-  return { slug: card.slug, name: card.name, orientation: reversed ? "Reversed" : "Upright", family, rank: rank || undefined, station, scene, meaning,
-    text: [card.name, axes, scene && `Scene: ${scene}`, meaning && `Meaning: ${meaning}`].filter(Boolean).join("\n\n") };
+  const sections: DetailSection[] = [{kind:'context',text:[card.name, axes, scene && `Scene: ${scene}`].filter(Boolean).join('\n\n')}];
+  if (upright) sections.push({kind:'upright',active:!reversed,text:`Upright meaning (${!reversed?'drawn':'not drawn'}):\n${upright}`});
+  if (inverted) sections.push({kind:'reversed',active:reversed,text:`Reversed meaning (${reversed?'drawn':'not drawn'}):\n${inverted}`});
+  return { slug: card.slug, name: card.name, orientation: reversed ? "Reversed" : "Upright", family, rank: rank || undefined, station, scene, meaning, sections,
+    text: sections.map(section=>section.text).join('\n\n') };
+}
+
+export interface DetailSection { kind: 'context' | 'upright' | 'reversed'; text: string; active?: boolean }
+/** Offsets are Unicode code points, matching measured paging. No text search or
+ * label guessing: identical/repeated meanings still receive the correct style. */
+export function detailPageRuns(sections: DetailSection[], start: number, length: number) {
+  let offset = 0;
+  return sections.flatMap((section,index)=>{
+    const chars = Array.from(section.text + (index < sections.length-1 ? '\n\n' : ''));
+    const from = Math.max(0,start-offset), to = Math.min(chars.length,start+length-offset); offset += chars.length;
+    return to>from ? [{...section,text:chars.slice(from,to).join(''),index}] : [];
+  });
 }

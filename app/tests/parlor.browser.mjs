@@ -267,6 +267,7 @@ try{
   await page.getByLabel('Anthropic API key',{exact:true}).fill(ownerMode?'':'synthetic-browser-key');await page.getByLabel('Anthropic model ID',{exact:true}).fill(ownerMode?'claude-test-owner':'synthetic-model');
   await page.getByLabel('ElevenLabs API key',{exact:true}).fill(ownerMode?'':'synthetic-voice-key');await page.getByLabel('ElevenLabs voice ID',{exact:true}).fill('synthetic-selected-voice');await page.getByLabel('Remember keys on this device (plaintext)').check();
   await page.reload();assert.equal(await page.getByLabel('ElevenLabs voice ID',{exact:true}).inputValue(),'synthetic-selected-voice');assert.equal(await page.locator('textarea').count(),0);await capture('setup');
+  if(process.env.PARLOR_DETAILS_ONLY!=='1'){
   const before=await audioCount();await button('Start the show').click();await idle();assert.equal(await audioCount(),before);assert.equal(calls,0);
   assert.equal(await page.evaluate(()=>window.__radioContexts.length),0,'no AudioContext before a deliberate summon gesture');
   for(const viewport of [{width:1920,height:1080},{width:1366,height:768},{width:1024,height:768},{width:768,height:1024},{width:390,height:640},{width:320,height:568}]){
@@ -448,7 +449,7 @@ try{
   await cue().getByText('Read along.',{exact:true}).waitFor();await radio('waiting');await focused(0);await ignoredBusy();await ignoredBusy(true);assert.equal(await page.locator('.is-revealed').count(),1);
   await page.setViewportSize({width:390,height:640});await page.waitForTimeout(100);assert.ok(silentText.startsWith((await caption().textContent()).trim()),'resize restarts the unread first page rather than skipping its beginning');
   await page.screenshot({path:resolve(evidence,'silent-first-page.png'),fullPage:true});
-  const silentPages=await finishSilent();await phase('ready').waitFor();await focused(0);assert.ok(silentPages.length>5);assert.equal(silentPages.join(' ').replace(/\s+/g,' ').trim(),silentText.replace(/\s+/g,' ').trim(),'beginning, middle and ending of the full silent narration were visible');
+  const silentPages=await finishSilent();assert.equal(await stage().getAttribute('data-phase'),'ready','silent delivery outcome: '+await cue().getAttribute('aria-description'));await phase('ready').waitFor();await focused(0);assert.ok(silentPages.length>5);assert.equal(silentPages.join(' ').replace(/\s+/g,' ').trim(),silentText.replace(/\s+/g,' ').trim(),'beginning, middle and ending of the full silent narration were visible');
   assert.equal(await page.locator('.is-revealed').count(),1,'finishing silent pages never auto-advances');assert.equal(await audioCount(),silentAudio,'explicit silent delivery never starts speech');longNarration=false;await page.setViewportSize({width:1280,height:960});
   const touchAudio=await audioCount();await talk('Intentional operator touch discussion','touch');await waitAudio(touchAudio);await finishAudio();await phase('ready').waitFor();
   const cancelledInput={calls,scribe:scribeRequests.length};
@@ -481,6 +482,7 @@ try{
   // Explicit silent setup covers summon/greeting and a reset during paged delivery.
   await page.getByLabel('Read without audio',{exact:true}).check();const beforeSilent=await audioCount();await button('Start the show').click();await pressA();await page.clock.fastForward(7000);await finishSilent();await phase('awaiting-release').waitFor();await page.keyboard.up('a');await finishSilent();await phase('question').waitFor();assert.equal(await audioCount(),beforeSilent);
   await advance();await page.locator('.parlor-caption.is-silent').waitFor();await page.waitForFunction(()=>document.querySelector('.parlor-ritual').dataset.phase==='speaking');await resetEncounter();assert.equal(await page.locator('[data-silent-measure]').count(),0);await page.clock.fastForward(60000);await idle();assert.equal(await audioCount(),beforeSilent);await escape();await page.getByLabel('Read without audio',{exact:true}).uncheck();
+  }
   // Optional authored deck notes never enter provider payloads or reveal future cards.
   const detailsToggle=page.getByLabel('Show card details beside the current card',{exact:true});assert.equal(await detailsToggle.isChecked(),false);
   await detailsToggle.check();await page.reload();assert.equal(await detailsToggle.isChecked(),true);
@@ -497,14 +499,27 @@ try{
   }
   await page.setViewportSize({width:390,height:640});await page.waitForTimeout(100);
   const pages=[];for(let i=0;i<30;i++){const text=await notes.textContent();pages.push(text);await page.clock.fastForward(silentExports.silentPageMs(text)+100);await page.waitForTimeout(10);if(i>0&&(await notes.textContent())===pages[0])break;}
-  assert.ok(pages.length>1);assert.match(pages.join(' '),/Scene:/);assert.match(pages.join(' '),/Meaning:/);assert.equal(await page.locator('.is-revealed').count(),1,'deck-note pages do not advance the reading');
+  assert.ok(pages.length>1);assert.match(pages.join(' '),/Scene:/);assert.match(pages.join(' '),/Upright meaning/);assert.match(pages.join(' '),/Reversed meaning/);assert.equal(await page.locator('.is-revealed').count(),1,'deck-note pages do not advance the reading');
   detailsAudio=await audioCount();ttsMode='delay';await advance();await pending(()=>ttsRelease);assert.equal(await details.count(),0);ttsRelease();ttsRelease=null;ttsMode='ok';await waitAudio(detailsAudio);await finishAudio();assert.notEqual(await details.getAttribute('data-card'),firstSlug);
+  const labelEvidence=[];
+  for(let i=0;i<80;i++){
+    const runs=await notes.locator('[data-meaning]').evaluateAll(nodes=>nodes.map(n=>({kind:n.dataset.meaning,text:n.textContent,secondary:n.classList.contains('parlor-meaning-secondary'),color:getComputedStyle(n).color,font:getComputedStyle(n).fontSize})));
+    labelEvidence.push(...runs);const text=await notes.textContent();await page.clock.fastForward(silentExports.silentPageMs(text)+100);await page.waitForTimeout(10);
+    if(labelEvidence.some(r=>r.kind==='upright')&&labelEvidence.some(r=>r.kind==='reversed'))break;
+  }
+  assert.deepEqual([...new Set(labelEvidence.map(run=>run.kind))].sort(),['reversed','upright'],'both meanings render with explicit orientation styles');
+  const orientation=await details.getAttribute('data-orientation');
+  for(const run of labelEvidence){assert.equal(run.secondary,orientation.includes('Reversed')?run.kind==='upright':run.kind==='reversed');assert.ok(parseFloat(run.font)>=17);if(run.secondary)assert.equal(run.color,'rgb(185, 179, 187)');}
   await resetEncounter();assert.equal(await details.count(),0);assert.equal(await page.locator('[data-silent-measure]').count(),0);await page.clock.fastForward(60000);await idle();await escape();assert.equal(await detailsToggle.isChecked(),true);
   // Pathological authored names page at the same readable size rather than overflowing.
-  for(const card of Object.values(data.cards))card.name+=' — '+ 'A long authored name '.repeat(10).trim();
+  for(const card of Object.values(data.cards)){card.name+=' - '+ 'A long authored name '.repeat(10).trim();card.meaning={upright:'UPRIGHT_BEGIN '+ 'A patient possibility. '.repeat(12)+'UPRIGHT_END',inverted:'REVERSED_BEGIN '+ 'A different possibility. '.repeat(12)+'REVERSED_END'};}
   await page.reload();await begin();detailsAudio=await audioCount();await advance();await waitAudio(detailsAudio);await finishAudio();await phase('ready').waitFor();await notes.waitFor();await page.waitForTimeout(100);
   const longPages=[];for(let i=0;i<20;i++){const text=await notes.textContent();longPages.push(text);assert.equal(await notes.evaluate(el=>el.scrollHeight<=el.clientHeight+1),true);await page.clock.fastForward(silentExports.silentPageMs(text)+100);await page.waitForTimeout(10);if(longPages.join(' ').includes('Scene:'))break;}
-  assert.match(longPages.join(' '),/A long authored name/);assert.match(longPages.join(' '),/Scene:/);await resetEncounter();await escape();await detailsToggle.uncheck();await page.reload();assert.equal(await detailsToggle.isChecked(),false);await page.setViewportSize({width:1280,height:960});
+  assert.match(longPages.join(' '),/A long authored name/);assert.match(longPages.join(' '),/Scene:/);
+  const meaningPages=[];for(let i=0;i<160;i++){const text=await notes.textContent();meaningPages.push(text);assert.equal(await notes.evaluate(el=>el.scrollHeight<=el.clientHeight+1),true);await page.clock.fastForward(silentExports.silentPageMs(text)+100);await page.waitForTimeout(10);if(meaningPages.join('').includes('REVERSED_END'))break;}
+  for(const marker of ['UPRIGHT_BEGIN','UPRIGHT_END','REVERSED_BEGIN','REVERSED_END'])assert.ok(meaningPages.join('').includes(marker),'full authored meaning survives pages: '+marker);assert.equal(await page.locator('.is-revealed').count(),1);
+  await resetEncounter();await escape();await detailsToggle.uncheck();await page.reload();assert.equal(await detailsToggle.isChecked(),false);await page.setViewportSize({width:1280,height:960});
+  if(process.env.PARLOR_DETAILS_ONLY==='1'){console.log('PASS focused deck notes: both complete meanings, orientation styling, measured pages, ten viewports, long names, reset/advance and no future metadata. Synthetic providers only.');return;}
   if(transcriptMode){
     await page.getByText(/Text questions, generated responses and presentation diagnostics are sent to temporary Vercel runtime logs/).waitFor();
     const events=transcriptRequests.flatMap(b=>b.events??[]);for(const kind of ['user_input','assistant_generated','presentation_progress','presentation_completed','presentation_interrupted','encounter_closed'])assert.ok(events.some(e=>e.kind===kind),'browser emits '+kind);
