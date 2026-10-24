@@ -9,6 +9,7 @@
   },
   "include": [
     "src/parlor/cardFocus.ts",
+    "src/parlor/silentReading.ts",
     "src/parlor/cue.ts",
     "src/parlor/radio.ts",
     "src/parlor/radioAudio.ts",

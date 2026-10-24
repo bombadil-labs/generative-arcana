@@ -278,8 +278,13 @@ and narration its last four at projector sizes; smaller screens reserve fewer
 lines while keeping readable type. Older lines leave through a soft top edge as
 new lines arrive. There are no caption scrollbars or required scrolling controls.
 Only the already-revealed speech prefix enters the caption window; resizing does
-not reveal later words or change audio timing. Explicit silent reading still
-delivers the whole segment at once, with its ending visible in the same window.
+not reveal later words or change audio timing. Explicit silent reading instead
+shows every page from beginning to end, measured against the actual caption
+font and window. Pages remain for at least four seconds, with additional time
+for longer text (about 150 words per minute). The final page also gets its full
+reading time before discussion or advance becomes available. Resize restarts
+the current page without skipping words; pause/reset/exit stop page timers.
+Retrying an interrupted silent segment restarts it silently from the beginning.
 The full question and completed narration remain in conversation state, independent
 of the visible excerpt. Reset clears both. Optional operator controls remain
 scrollable outside the guest composition.

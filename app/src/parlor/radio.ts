@@ -5,7 +5,7 @@ import { SUMMON_MS } from "./gestures";
 export type RadioMode = "quiet" | "tuning" | "searching" | "listening" | "speaking" | "contact" | "waiting" | "stopped";
 export interface RadioState { mode: RadioMode; label: string }
 /** Real application events only. Searching is indeterminate, never a provider ETA. */
-export function radioState(state: Pick<State, "phase" | "audioPlaying">, mic: Pick<MicrophoneState, "phase">): RadioState {
+export function radioState(state: Pick<State, "phase" | "audioPlaying"> & Partial<Pick<State, "timing">>, mic: Pick<MicrophoneState, "phase">): RadioState {
   if (state.phase === "idle") return { mode: "quiet", label: "" };
   if (state.phase === "error") return { mode: "stopped", label: "Signal interrupted" };
   if (state.phase === "paused") return { mode: "stopped", label: "Transmission paused" };
@@ -14,6 +14,7 @@ export function radioState(state: Pick<State, "phase" | "audioPlaying">, mic: Pi
   if (mic.phase === "checking") return { mode: "searching", label: "Opening the microphone" };
   if (mic.phase === "finishing") return { mode: "searching", label: "Deciphering your words" };
   // A recoverable microphone error must not mask a later intentional open reading.
+  if ((state.phase === "calling" || state.phase === "speaking") && state.timing === "silent") return { mode: "waiting", label: "Reading without audio" };
   if (state.phase === "calling" || state.phase === "speaking") return state.audioPlaying
     ? { mode: "speaking", label: state.phase === "calling" ? "Contact established" : "The spirit speaks" }
     : { mode: "searching", label: state.phase === "calling" ? "A presence is approaching" : "Finding the voice" };

@@ -14,9 +14,10 @@ const engine = new ArcanaEngine(new DeckRegistry());
 const deck = engine.importDeck(rawDeck());
 const settings = { ...defaultSettings(), anthropicKey: 'fake-anthropic-key', anthropicModel: 'fake-model', openaiKey: 'fake-openai-key', openaiModel: 'fake-model', elevenKey: 'fake-eleven-key', voiceId: 'fake-voice' };
 const narration = reading => ({ cards: reading.placements.map(p => ({ slug: p.card.slug, text: `${p.card.name}: ${p.meaning}` })), synthesis: 'Reflect on the possibilities.' });
+const immediateSilent = async (text, signal, show) => { if (!signal.aborted) show(text); };
 function setup(overrides = {}) {
   let draws = 0;
-  const machine = new ParlorMachine(deck.id, settings, { draw: async (_, q) => { draws++; return engine.castReading(deck.id, 'three-card', q); }, narrate: async (_, reading) => narration(reading), speak: async (_, text, signal, playing) => playing(), ...overrides });
+  const machine = new ParlorMachine(deck.id, settings, { draw: async (_, q) => { draws++; return engine.castReading(deck.id, 'three-card', q); }, narrate: async (_, reading) => narration(reading), speak: async (_, text, signal, playing) => playing(), readSilently: immediateSilent, ...overrides });
   return { machine, draws: () => draws };
 }
 async function confirm(machine) { machine.begin(); machine.captions(); await until(machine,'question'); machine.question('A private question'); machine.review(); machine.confirm(); machine.confirm(); }
@@ -40,6 +41,22 @@ test('visual card focus follows existing reveal and discussion state, with no ex
     machine.advance();assert.equal(focus(),null);assert.equal(machine.getSnapshot().revealed,1);const second=audio.at(-1);second.playing();assert.equal(focus(),1);machine.cancel();assert.equal(focus(),1);
     machine.reset();assert.equal(focus(),null);second.playing();second.done.resolve();await tick();assert.equal(focus(),null);assert.equal(machine.getSnapshot().reading,undefined);assert.equal(draws(),1);
   }finally{audio.forEach(a=>a.done.resolve());machine.dispose();}
+});
+
+test('silent presentation gates advance and discussion until the ending is read; pause, retry and reset fence late pages',async()=>{
+  let paging=false,speechCalls=0;const pages=[];
+  const {machine}=setup({speak:async(_,text,s,playing)=>{speechCalls++;playing();},readSilently:async(text,signal,show)=>{
+    if(!paging){show(text);return;}const done=deferred();pages.push({text,signal,show,done});await done.promise;
+  }});
+  try{
+    await confirm(machine);await until(machine,'ready');paging=true;machine.next(true);const first=pages[0];
+    for(const text of ['Beginning.','Middle.','The ending.']){
+      first.show(text);machine.advance();machine.submit('Too early');assert.equal(machine.getSnapshot().phase,'speaking');assert.equal(machine.getSnapshot().segment,0);assert.equal(machine.getSnapshot().caption,text);assert.deepEqual(machine.getSnapshot().turns,[]);
+    }
+    first.done.resolve();await until(machine,'ready');assert.equal(machine.getSnapshot().turns.at(-1).content,first.text);assert.equal(machine.getSnapshot().segment,1);
+    machine.next(true);const cancelled=pages[1];cancelled.show('Before pause');machine.cancel();assert.equal(cancelled.signal.aborted,true);cancelled.show('Late page');assert.equal(machine.getSnapshot().caption,'Before pause');
+    const spoken=speechCalls;machine.retry();assert.equal(pages.length,3);assert.equal(speechCalls,spoken,'silent retry stays silent');machine.reset();pages[2].show('After reset');pages[2].done.resolve();cancelled.done.resolve();await tick();assert.equal(machine.getSnapshot().phase,'idle');assert.equal(machine.getSnapshot().caption,'');assert.deepEqual(machine.getSnapshot().turns,[]);
+  }finally{pages.forEach(p=>p.done.resolve());machine.dispose();}
 });
 
 test('tap can begin an open reading; busy taps never queue another card',async()=>{
@@ -85,7 +102,7 @@ test('failed summon audio never reveals script, completes or draws; late callbac
 
 test('missing account voice is an error; explicit silence remains distinct and still waits for physical release',async()=>{
   for(const silent of [false,true]){
-    let draws=0,speeches=0;const machine=new ParlorMachine(deck.id,{...settings,elevenKey:'',voiceId:'',ownerKeys:{anthropicModel:'claude-owner',elevenlabs:true},silent},{draw:async()=>{draws++;throw Error('must not draw');},speak:async()=>{speeches++;}});
+    let draws=0,speeches=0;const machine=new ParlorMachine(deck.id,{...settings,elevenKey:'',voiceId:'',ownerKeys:{anthropicModel:'claude-owner',elevenlabs:true},silent},{draw:async()=>{draws++;throw Error('must not draw');},speak:async()=>{speeches++;},readSilently:immediateSilent});
     try{machine.summon();machine.contact();await until(machine,silent?'awaiting-release':'error');assert.equal(speeches,0);assert.equal(draws,0);
       if(!silent){assert.equal(machine.getSnapshot().caption,'');assert.match(machine.getSnapshot().error,/Select an ElevenLabs voice/);machine.releaseSummon();assert.equal(machine.getSnapshot().phase,'error');}
       else{assert.equal(machine.getSnapshot().timing,'silent');machine.releaseSummon();await until(machine,'question');machine.releaseSummon();assert.equal(machine.getSnapshot().phase,'question');}
@@ -260,6 +277,7 @@ test('follow-up provider requests retain completed narration and discussion acro
       draw:async(_,q)=>engine.castReading(deck.id,'three-card',q),
       narrate:async(_,reading)=>({cards:reading.placements.map((p,i)=>({slug:p.card.slug,text:`CARD_NARRATION_${i+1}`})),synthesis:'CLOSING_NARRATION'}),
       speak:async(_,text,signal,playing,reading,caption)=>{playing();caption(text,'aligned');},
+      readSilently:immediateSilent,
     });
     try{
       await confirm(machine);await until(machine,'ready');machine.next();await until(machine,'ready');

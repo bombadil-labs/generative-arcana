@@ -160,6 +160,7 @@
   mask-image: linear-gradient(to bottom, transparent, #000 .65em);
 }
 .parlor-show .parlor-transcript-lines { flex: none; width: 100%; white-space: pre-wrap; }
+.parlor-show .parlor-transcript-window.is-silent { justify-content: flex-start; -webkit-mask-image: none; mask-image: none; }
 .parlor-show .parlor-user-transcript { height: var(--user-height); font-size: var(--user-font); line-height: 1.4; }
 .parlor-show .parlor-caption { height: var(--caption-height); font-size: var(--caption-font); line-height: 1.5; }
 .parlor-show .parlor-idle .parlor-scene { display: none; }
