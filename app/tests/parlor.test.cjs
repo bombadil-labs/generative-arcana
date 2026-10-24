@@ -69,7 +69,7 @@ test('idle summon never draws; early release returns blank; release cue precedes
   const spoken=[];const pending=[];const {machine,draws}=setup({speak:async(_,text,s,playing)=>{spoken.push(text);playing();const d=deferred();pending.push(d);await d.promise;}});
   try {
     assert.equal(machine.getSnapshot().phase,'idle');machine.summon();assert.equal(machine.getSnapshot().phase,'summoning');machine.releaseSummon();assert.equal(machine.getSnapshot().phase,'idle');assert.deepEqual(spoken,[]);
-    machine.summon();machine.contact();assert.equal(machine.getSnapshot().phase,'calling');assert.match(spoken[0],/release the button/);pending[0].resolve();await until(machine,'awaiting-release');await tick();assert.equal(spoken.length,1,'no introduction while still held');assert.equal(draws(),0);
+    machine.summon();machine.contact();assert.equal(machine.getSnapshot().phase,'calling');assert.match(spoken[0],/signal holds/);assert.doesNotMatch(spoken[0],/button|release|press|tap|click|reset|advance/i);pending[0].resolve();await until(machine,'awaiting-release');await tick();assert.equal(spoken.length,1,'no introduction while still held');assert.equal(draws(),0);
     machine.releaseSummon();assert.equal(spoken.length,2);assert.match(spoken[1],/I am the spirit/);pending[1].resolve();await until(machine,'question');assert.equal(draws(),0);assert.deepEqual(machine.getSnapshot().turns,[]);
   }finally{pending.forEach(p=>p.resolve());machine.dispose();}
 });
@@ -241,9 +241,9 @@ test('audio releases its object URL and player on abort without accepting late p
   } finally { global.fetch=original.fetch; global.Audio=original.Audio; URL.createObjectURL=original.create; URL.revokeObjectURL=original.revoke; }
 });
 
-test('spoken greeting invites hold-to-talk and no cards are drawn until a query is submitted',async()=>{
+test('ether greeting omits control instructions and no cards are drawn until a query is submitted',async()=>{
   const speech=deferred();let caption,spoken;const {machine,draws}=setup({speak:async(_,text,signal,playing,reading,update)=>{spoken=text;caption=update;playing();await speech.promise;}});
-  try{machine.begin();assert.match(spoken,/Press and hold the button/);assert.match(spoken,/Five quick taps/);assert.equal(machine.getSnapshot().question,'');assert.equal(machine.getSnapshot().caption,'');assert.equal(draws(),0);machine.submit('too early');assert.equal(draws(),0);caption('Come closer','aligned');assert.equal(machine.getSnapshot().caption,'Come closer');speech.resolve();await until(machine,'question');machine.submit('My spoken query');await until(machine,'ready');assert.equal(draws(),1);assert.equal(machine.getSnapshot().userText,'My spoken query');}finally{machine.dispose();}
+  try{machine.begin();assert.match(spoken,/spirit of the ether/);assert.doesNotMatch(spoken,/button|press|hold|release|tap|click|reset|advance|cards|deck|spread/i);assert.equal(machine.getSnapshot().question,'');assert.equal(machine.getSnapshot().caption,'');assert.equal(draws(),0);machine.submit('too early');assert.equal(draws(),0);caption('Come closer','aligned');assert.equal(machine.getSnapshot().caption,'Come closer');speech.resolve();await until(machine,'question');machine.submit('My spoken query');await until(machine,'ready');assert.equal(draws(),1);assert.equal(machine.getSnapshot().userText,'My spoken query');}finally{machine.dispose();}
 });
 
 test('audio ended without playing cannot reveal the unspoken transcript or count as completion',async()=>{
@@ -283,10 +283,10 @@ test('follow-up provider requests retain completed narration and discussion acro
       await confirm(machine);await until(machine,'ready');machine.next();await until(machine,'ready');
       machine.ask('What did you mean by that?');await until(machine,'ready');
       const turns=body=>provider==='hosted'?body.turns:body.messages.filter(turn=>turn.role!=='system');
-      assert.deepEqual(turns(requests[0]).map(turn=>turn.content),['The reader has revealed card 1.','CARD_NARRATION_1','What did you mean by that?']);
+      assert.deepEqual(turns(requests[0]).map(turn=>turn.content),['The spirit has described vision 1.','CARD_NARRATION_1','What did you mean by that?']);
       for(const unseen of ['CARD_NARRATION_2','CARD_NARRATION_3','CLOSING_NARRATION'])assert.ok(!JSON.stringify(requests[0]).includes(unseen),`${provider} excludes ${unseen}`);
       machine.next();await until(machine,'ready');machine.ask('How does this connect to what we discussed?');await until(machine,'ready');
-      assert.deepEqual(turns(requests[1]).map(turn=>turn.content),['The reader has revealed card 1.','CARD_NARRATION_1','What did you mean by that?','DISCUSSION_REPLY_1','The reader has revealed card 2.','CARD_NARRATION_2','How does this connect to what we discussed?']);
+      assert.deepEqual(turns(requests[1]).map(turn=>turn.content),['The spirit has described vision 1.','CARD_NARRATION_1','What did you mean by that?','DISCUSSION_REPLY_1','The spirit has described vision 2.','CARD_NARRATION_2','How does this connect to what we discussed?']);
       for(const unseen of ['CARD_NARRATION_3','CLOSING_NARRATION'])assert.ok(!JSON.stringify(requests[1]).includes(unseen));
       machine.next();await until(machine,'ready');machine.ask('Stay with the third card');await until(machine,'ready');
       assert.ok(JSON.stringify(requests[2]).includes('CARD_NARRATION_3'));assert.ok(!JSON.stringify(requests[2]).includes('CLOSING_NARRATION'));
@@ -318,7 +318,7 @@ test('discussion context includes only revealed meanings and current card, never
     for(const revealed of [0,1,2,3]){
       await converse(settings,reading,[{role:'user',content:'Tell me more'}],new AbortController().signal,revealed);
       const context=JSON.parse(body.system.slice(body.system.lastIndexOf('\n')+1));
-      assert.deepEqual(context.cards,reading.placements.slice(0,revealed).map(p=>({name:p.card.name,position:p.position.name,reversed:p.reversed,meaning:p.meaning})));
+      assert.deepEqual(context.cards,reading.placements.slice(0,revealed).map((p,index)=>({name:p.card.name,position:p.position.name,reversed:p.reversed,meaning:p.meaning,narrativeFrame:['Past','Present','Future'][index]})));
       assert.equal(context.currentCard,reading.placements[revealed-1]?.card.name);
       for(const hidden of reading.placements.slice(revealed)){assert.ok(!body.system.includes(hidden.card.name));assert.ok(!body.system.includes(hidden.meaning));}
     }

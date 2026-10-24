@@ -4,8 +4,8 @@ import type { UserDeckCatalogRepository } from './userDeckCatalog';
 import { createArcanaAdapter } from './hostStore';
 import { isParlorOwner } from './parlorAccess';
 import { ParlorFault, type OwnerKeysConfig } from './parlorConfig';
-import { defaultSettings, characters } from '../../app/src/parlor/settings';
-import { instructions, conversationContext, parseNarration, anthropicReadingOptions } from '../../app/src/parlor/providers';
+import { defaultSettings, characters, visionFrames } from '../../app/src/parlor/settings';
+import { narrationInstructions, discussionInstructions, conversationContext, parseNarration, anthropicReadingOptions } from '../../app/src/parlor/providers';
 import { boundedSpeechBody, parseAlignment, speechPayload } from '../../app/src/parlor/speech';
 import type { ArcanaReading } from '../../app/src/engine/types';
 
@@ -92,16 +92,17 @@ export function createOwnerParlorHandler(options: OwnerParlorOptions) {
           catch { throw new ParlorFault(400, 'invalid_reading'); }
           if (reading.legacy || reading.placements.length !== 3 || reading.question.length > 1200) throw new ParlorFault(400, 'invalid_reading');
           const character = text(data.character, 20); if (!Object.hasOwn(characters, character)) throw new ParlorFault(400, 'invalid_character');
-          let system = instructions({ ...defaultSettings(), character: character as keyof typeof characters });
+          const persona = { ...defaultSettings(), character: character as keyof typeof characters };
+          let system: string;
           let messages: { role: 'user' | 'assistant'; content: string }[];
           if (kind === 'narrate') {
-            system += ' Return only JSON: {"cards":[{"slug":"exact-card-slug","text":"interpretation"}],"synthesis":"closing synthesis"}. Exactly three cards in the given order. Each card text: 2-3 sentences about its position and authored meaning. Synthesis: 2-3 sentences weaving the cards together. Never reveal later cards in an earlier segment.';
-            messages = [{ role: 'user', content: adapter.engine.buildInterpretationContext(reading) + '\nCARD IDENTITIES IN ORDER\n' + JSON.stringify(reading.placements.map(p => ({ slug: p.card.slug, name: p.card.name, position: p.position.name, reversed: p.reversed }))) }];
+            system = narrationInstructions(persona);
+            messages = [{ role: 'user', content: adapter.engine.buildInterpretationContext(reading) + '\nCARD IDENTITIES IN ORDER\n' + JSON.stringify(reading.placements.map((p, index) => ({ slug: p.card.slug, name: p.card.name, position: p.position.name, reversed: p.reversed, narrativeFrame: visionFrames[index] }))) }];
           } else {
             const revealed = data.revealed;
             if (!Number.isInteger(revealed) || Number(revealed) < 1 || Number(revealed) > 3 || !Array.isArray(data.turns) || !data.turns.length || data.turns.length > 21 || data.turns.length % 2 !== 1) throw new ParlorFault(400, 'invalid_conversation');
             messages = data.turns.map((v, i) => { if (!record(v) || v.role !== (i % 2 === 0 ? 'user' : 'assistant')) throw new ParlorFault(400, 'invalid_conversation'); return { role: v.role as 'user' | 'assistant', content: text(v.content, i % 2 === 0 ? 1200 : 4000) }; });
-            system += ` Discuss the current card and the guest's follow-up in 2-4 sentences. Only the revealed cards below are available. Do not invent, name or predict later cards, draw new cards, or advance the reading.\n${conversationContext(reading, Number(revealed))}`;
+            system = `${discussionInstructions(persona)}\n${conversationContext(reading, Number(revealed))}`;
           }
           payload = JSON.stringify({ model: data.model, ...anthropicReadingOptions(data.model), max_tokens: 2000, system, messages });
           if (Buffer.byteLength(payload) > 64000) throw new ParlorFault(413, 'context_too_large');

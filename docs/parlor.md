@@ -25,8 +25,10 @@ settings; browser-key speech now requests `eleven_v3`.
 Start the show opens a blank dark screen with exactly: **Press and hold the button to make contact with the beyond**.
 A separate **seven-second summon hold** gradually reveals three empty card spaces
 and slow radio-like light pulses. It never requests microphone access. At the threshold,
-the selected voice asks the guest to release; the introduction and invitation to speak
-follow only after release. Releasing during the cue lets it finish before the introduction.
+the selected voice acknowledges contact without giving control instructions. The visual
+cue changes from **Keep holding. Contact is forming.** to **Release the button.** when
+that contact line finishes. The introduction follows only after release. Releasing during
+the contact line lets it finish before the introduction.
 Early release or cancellation before the threshold returns to blank idle without a provider call.
 Cancellation after contact aborts pending speech and prevents a late introduction; it cannot
 retract a request already received by ElevenLabs.
@@ -165,12 +167,22 @@ hardware, room acoustics and live provider audio still need an owner acceptance 
 
 ## Spirit and vocal delivery
 
-The default storyteller is an original old Austrian male spirit: gloomy, existential,
+The default storyteller is the **Spirit of the Ether**, an original old Austrian male spirit: gloomy, existential,
 bored by eternity and dryly playful. It gently needles life's absurdities rather than
 the guest's identity or vulnerabilities, with no hostility, threats or certainty claims.
 It uses the **existing selected voice ID**, never a named person's imitation or a new
 voice. Alternate storyteller selections, model/key overrides and remembered voice settings
 are preserved. The default `keeper` persona is updated in place.
+
+The spirit perceives visions from the spirit world and knows nothing of cards, even
+when asked about them. Browser BYOK, owner-key and dormant hosted generation share
+the same narration/discussion rules. Authored imagery, meanings, positions and
+orientations still ground the interpretation internally; slugs remain in the response
+schema, while card/deck names and mechanics stay out of spoken prose. Past, Present
+and Future provide reflective narrative framing, not factual supernatural claims.
+Generated narration, discussion, the contact line and greeting give no button/control
+instructions; only the state-aware visual cues do. Synthetic completed-narration
+history entries describe visions, without seeding old card or button language.
 
 The [official ElevenLabs v3 guidance](https://elevenlabs.io/docs/overview/capabilities/text-to-speech/best-practices#prompting-eleven-v3)
 was checked on 2026-10-22. The speech payload permits at most one leading documented tag:
@@ -299,6 +311,15 @@ spread. This is presentation only: no modal, focus trap, extra dismissal, new
 gesture, timer-based reveal or change to the encounter state machine. Reduced
 motion removes the settling animation. The focus stays within the reserved card
 row, clear of both transcript windows and the side cue.
+
+The smaller three-slot spread is vertically centered behind the focused card. The
+focused artwork retains its exact released center and 1.6× sizing formula. Fixed
+**Past**, **Present**, **Future** labels run left to right in a reserved row below the
+artwork; they never move or scale with the focused figure. This row uses 28 pixels
+of the existing caption area, leaving the scene/card geometry unchanged. Spoken
+captions still roll through only already-spoken text, and silent pages measure the
+remaining caption window before displaying each complete page. Labels, captions
+and the side cue remain separate at projection and small-screen sizes.
 
 ## Verification
 

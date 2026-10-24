@@ -10,6 +10,8 @@ import { inspectEntitlement,applyEntitlement,type EntitlementPlan } from '../src
 import { createParlorHandler } from '../src/parlorApi';
 import { PARLOR_OWNER } from '../src/parlorAccess';
 import { createArcanaAdapter } from '../src/hostStore';
+import { defaultSettings } from '../../app/src/parlor/settings';
+import { narrationInstructions, discussionInstructions } from '../../app/src/parlor/providers';
 import type { UserDeckCatalogRepository } from '../src/userDeckCatalog';
 
 const env:NodeJS.ProcessEnv={PARLOR_MODE:'hosted',BETTER_AUTH_URL:'https://parlor.example.test',ANTHROPIC_API_KEY:'synthetic-server-anthropic',OPENAI_API_KEY:'synthetic-server-openai',ELEVENLABS_API_KEY:'synthetic-server-voice',
@@ -68,6 +70,8 @@ try {
     if(providerMode==='revoke')await db.query("UPDATE arcana_entitlements SET revoked_at=now() WHERE principal_id='usr_host'");
     if(url.includes('elevenlabs'))return new Response(new Uint8Array([1,2,3]),{headers:{'content-type':'audio/mpeg'}});
     const prompt=JSON.parse(seenBody);const isNarration=seenBody.includes('CARD IDENTITIES IN ORDER');
+    assert.equal(prompt.system??prompt.messages[0].content,isNarration?narrationInstructions(defaultSettings()):discussionInstructions(defaultSettings()),'hosted prompts retain the shared ether persona and visual-only control guidance');
+    if(isNarration)assert.deepEqual(JSON.parse(prompt.messages.at(-1).content.split('CARD IDENTITIES IN ORDER\n')[1]).map((p:{narrativeFrame:string})=>p.narrativeFrame),['Past','Present','Future']);
     const content=providerMode==='echo'?JSON.stringify({...narration,synthesis:'synthetic-server-anthropic'}):isNarration?JSON.stringify(narration):'Synthetic follow-up.';
     if(url.includes('openai')){assert.equal(prompt.store,false);return Response.json({choices:[{message:{content}}]});}
     return Response.json({content:[{type:'text',text:content}]});
@@ -103,7 +107,7 @@ try {
   const first=reading.placements[0];
   assert.deepEqual(JSON.parse(revealedContext),{
     question:reading.question,deck:reading.deck.name,currentCard:first.card.name,
-    cards:[{name:first.card.name,position:first.position.name,reversed:first.reversed,meaning:first.meaning}],
+    cards:[{name:first.card.name,position:first.position.name,reversed:first.reversed,meaning:first.meaning,narrativeFrame:'Past'}],
   });
   assert.equal(followUp,'Stay with this card');
   assert.equal((await request('converse',{revealed:4,turns:[{role:'user',content:'Invalid count'}]})).status,400);
