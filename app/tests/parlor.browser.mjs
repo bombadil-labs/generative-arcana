@@ -83,10 +83,26 @@ async function ignoredBusy(pointer=false){
 async function escape(){await page.keyboard.press('Escape');await button('Start the show').waitFor();assert.equal(await page.evaluate(()=>document.activeElement.textContent),'Start the show');assert.equal(await page.locator('.parlor-card').count(),0);await page.clock.fastForward(100);assert.equal(await page.evaluate(()=>window.__radioContexts.every(c=>c.state==='closed')),true,'exit closes every ambience context');}
 async function capture(name){if(await page.locator('.parlor-show').count()){assert.equal(await page.locator('.parlor-show button,.parlor-show input,.parlor-show summary').count(),0,'guest projection has no controls');assert.equal(await page.locator('.parlor-cue').count(),1);assert.equal(await page.locator('.parlor-radio-label,.parlor-status,.parlor-control-hint').count(),0);if((await page.viewportSize()).width>=900 && !(await page.locator('.parlor-idle').count())){const scene=await page.locator('.parlor-scene').boundingBox(),hint=await cue().boundingBox(),stageBox=await stage().boundingBox();assert.ok(hint.x>=scene.x+scene.width+20,'side cue cannot overlap cards or captions');assert.ok(stageBox.y>=0 && stageBox.y+stageBox.height<=(await page.viewportSize()).height+1,'projected scene fits vertically');}}await page.evaluate(()=>window.scrollTo(0,0));assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.screenshot({path:resolve(evidence,name+'.png'),fullPage:true});}
 async function tap(key='a'){await page.keyboard.press(key);}
+async function focused(index){
+  const figures=page.locator('.parlor-table figure'),active=page.locator('.parlor-table figure.is-focused');
+  assert.equal(await page.locator('[role=dialog],[aria-modal=true]').count(),0,'card focus adds no modal or keyboard trap');
+  if(index===null){assert.equal(await active.count(),0);assert.equal(await page.locator('.parlor-spread-stage.has-focus').count(),0);return;}
+  assert.equal(await active.count(),1);assert.equal(await figures.evaluateAll(nodes=>nodes.findIndex(n=>n.classList.contains('is-focused'))),index);
+  assert.equal(await active.locator('.is-revealed').count(),1,'only an actually revealed card may be foregrounded');
+  await page.waitForFunction(()=>{const el=document.querySelector('figure.is-focused');return el&&el.getBoundingClientRect().height/el.offsetHeight>1.59&&getComputedStyle(el.closest('.parlor-spread-stage'),'::before').opacity==='1';});
+  const info=await active.evaluate(el=>{
+    const rect=n=>{const r=n.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom};};
+    return {card:rect(el),stage:rect(el.closest('.parlor-spread-stage')),cue:rect(document.querySelector('.parlor-cue')),user:rect(document.querySelector('.parlor-user-transcript')),caption:rect(document.querySelector('.parlor-caption')),dim:getComputedStyle(el.closest('.parlor-spread-stage'),'::before').opacity,transition:getComputedStyle(el).transitionDuration,reduced:matchMedia('(prefers-reduced-motion: reduce)').matches};
+  });
+  assert.ok(info.card.x>=info.stage.x-1 && info.card.right<=info.stage.right+1 && info.card.y>=info.stage.y-1 && info.card.bottom<=info.stage.bottom+1,'enlarged artwork stays inside its reserved row');
+  assert.ok(info.user.bottom<=info.card.y+1 && info.card.bottom<=info.caption.y+1,'focus cannot obscure either transcript');
+  assert.ok(Math.abs(info.card.x+info.card.width/2-(info.stage.x+info.stage.width/2))<1,'every current card occupies the same centered focus position');
+  assert.equal(info.dim,'1');if(info.reduced)assert.ok(parseFloat(info.transition)<=.001,'reduced motion settles immediately (including the app-wide near-zero override)');
+}
 async function resetEncounter(){const saved=await page.evaluate(()=>JSON.stringify(localStorage));const n=await audioCount();for(let i=0;i<5;i++)await tap();await idle();assert.equal(await radioLevel(),0,'reset fades ambience to silence');assert.equal(await audioCount(),n,'reset is silent');assert.equal(await page.evaluate(()=>window.__tracks.some(t=>!t.stopped)),false);assert.equal(await page.evaluate(()=>JSON.stringify(localStorage)),saved,'reset preserves saved keys and choices');}
 async function artwork(){
   await page.waitForFunction(()=>[...document.querySelectorAll('.parlor-artwork img')].every(img=>img.complete&&img.naturalWidth>0));
-  const slots=await page.locator('.parlor-card').evaluateAll(nodes=>nodes.map(n=>{const r=n.getBoundingClientRect();return [r.width,r.height];}));
+  const slots=await page.locator('.parlor-card').evaluateAll(nodes=>nodes.map(n=>[n.offsetWidth,n.offsetHeight]));
   for(const [w,h] of slots){assert.ok(Math.abs(w/h-2/3)<.01);assert.ok(Math.abs(w-slots[0][0])<1);assert.ok(Math.abs(h-slots[0][1])<1);}
   const images=await page.locator('.parlor-artwork img').evaluateAll(nodes=>nodes.map(img=>{const r=img.getBoundingClientRect(),card=img.closest('.parlor-card').getBoundingClientRect(),style=getComputedStyle(img);return {natural:[img.naturalWidth,img.naturalHeight],fit:style.objectFit,opacity:style.opacity,inset:Math.min(r.left-card.left,r.top-card.top,card.right-r.right,card.bottom-r.bottom),width:r.width,height:r.height};}));
   assert.ok(images.length);for(const img of images){assert.deepEqual(img.natural,artSizes[artIndex]);assert.equal(img.fit,'contain');assert.equal(img.opacity,'1');assert.ok(img.inset>=6,'full artwork stays inside rounded frame');const scale=Math.min(img.width/img.natural[0],img.height/img.natural[1]);assert.ok(img.natural[0]*scale<=img.width+.1&&img.natural[1]*scale<=img.height+.1);}
@@ -239,12 +255,21 @@ try{
   await page.evaluate(()=>window.__audio.onwaiting());await radio('searching');assert.equal(await caption().innerText(),'');await page.evaluate(()=>window.__audio.onplaying());await radio('speaking');
   assert.ok(await radioLevel()<searchingLevel/10,'actual voice playback strongly ducks the ambience');
   await finishAudio();await phase('ready').waitFor();await page.waitForTimeout(250);assert.equal(await page.locator('.is-revealed').count(),1);await artwork();await capture('first-card-desktop');
-  for(const text of ['Tell me more about this card','How does that connect to my question?']){const count=await audioCount();await talk(text,true);await waitAudio(count);assert.equal(await page.locator('.is-revealed').count(),1);assert.equal(await caption().innerText(),'');await finishAudio();await phase('ready').waitFor();}
+  await focused(0);
+  for(const text of ['Tell me more about this card','How does that connect to my question?']){const count=await audioCount();await talk(text,true);await waitAudio(count);await focused(0);assert.equal(await page.locator('.is-revealed').count(),1);assert.equal(await caption().innerText(),'');await finishAudio();await phase('ready').waitFor();await focused(0);}
   await page.setViewportSize({width:390,height:844});await page.evaluate(()=>window.__mimeType='audio/mp4');
   const mobile=await audioCount();await talk('A keyboard-controlled mobile discussion','enter');await waitAudio(mobile);await finishAudio();await phase('ready').waitFor();if(ownerMode)assert.equal(scribeTypes.at(-1),'audio/mp4');else assert.match(scribeRequests.at(-1),/recording.m4a/);await artwork();await capture('discussion-mobile');
   await page.evaluate(()=>window.__mimeType='audio/webm;codecs=opus');await page.setViewportSize({width:1280,height:960});
-  for(let revealed=2;revealed<=3;revealed++){const count=await audioCount();await advance();await waitAudio(count);assert.equal(await page.locator('.is-revealed').count(),revealed);await finishAudio();}
-  await phase('ready').waitFor();assert.match(await cue().innerText(),/hear the closing/);await capture('third-card-closing-cue');const closing=await audioCount();await advance();await waitAudio(closing);await finishAudio();await phase('complete').waitFor();assert.match(await cue().innerText(),/ask about the reading.*five times/s);await capture('complete-followup-cue');assert.equal(await page.locator('.parlor-show button').count(),0);
+  for(let revealed=2;revealed<=3;revealed++){
+    if(revealed===2)await page.emulateMedia({reducedMotion:'no-preference'});
+    const count=await audioCount();ttsMode='delay';await advance();await pending(()=>ttsRelease);await focused(null);
+    await page.waitForFunction(()=>[...document.querySelectorAll('.parlor-table figure')].every(el=>el.getBoundingClientRect().height/el.offsetHeight<1.01));
+    assert.equal(await page.locator('.is-revealed').count(),revealed-1,'settling the old card cannot reveal the next card while audio loads');
+    assert.equal(await caption().textContent(),'');await capture(`card-${revealed}-preparing`);ttsRelease();ttsRelease=null;ttsMode='ok';
+    await waitAudio(count);assert.equal(await page.locator('.is-revealed').count(),revealed);await focused(revealed-1);await finishAudio();await focused(revealed-1);await page.emulateMedia({reducedMotion:'reduce'});
+  }
+  await phase('ready').waitFor();assert.match(await cue().innerText(),/hear the closing/);await capture('third-card-closing-cue');const closing=await audioCount();await advance();await waitAudio(closing);await focused(null);await finishAudio();await phase('complete').waitFor();assert.match(await cue().innerText(),/ask about the reading.*five times/s);await capture('complete-followup-cue');assert.equal(await page.locator('.parlor-show button').count(),0);
+  await focused(null);const finalDiscussion=await audioCount();await talk('How do all three cards fit together?');await waitAudio(finalDiscussion);await focused(null);await finishAudio();await phase('complete').waitFor();await focused(null);
   // Permission denial, pending permission, blur and cancelled gestures never upload.
   let previousCalls=calls,previousScribe=scribeRequests.length;await page.evaluate(()=>window.__micMode='denied');await stage().focus();await page.keyboard.down('Space');await page.locator('.parlor-cue[role="alert"][aria-description*="Microphone access was denied"]').waitFor();await page.keyboard.up('Space');assert.equal(calls,previousCalls);
   const starts=await page.evaluate(()=>window.__micStarts);await page.evaluate(()=>window.__micMode='pending');await stage().focus();await page.keyboard.down('Space');await page.waitForFunction(()=>!!window.__grant);await page.keyboard.up('Space');await page.evaluate(()=>window.__grant());assert.equal(await page.evaluate(()=>window.__micStarts),starts);assert.equal(await page.evaluate(()=>window.__tracks.some(t=>!t.stopped)),false);
@@ -273,7 +298,7 @@ try{
     await page.reload();assert.equal(await page.getByLabel('ElevenLabs voice ID',{exact:true}).inputValue(),'synthetic-selected-voice');
     const setupMic=await page.evaluate(()=>window.__micRequests);await page.getByLabel('ElevenLabs voice ID',{exact:true}).focus();for(let i=0;i<5;i++)await page.keyboard.press('ArrowLeft');await page.waitForTimeout(600);assert.equal(await page.evaluate(()=>window.__micRequests),setupMic);assert.equal(await page.locator('.parlor-show').count(),0);
     await begin();const sizeAudio=await audioCount();await tap();await waitAudio(sizeAudio);await finishAudio();
-    for(const viewport of [{width:1920,height:1080},{width:1280,height:720},{width:390,height:844}]){await page.setViewportSize(viewport);await artwork();await capture(`artwork-${artSizes[artIndex].join('x')}-${viewport.width}`);}
+    for(const viewport of [{width:1920,height:1080},{width:1280,height:720},{width:390,height:844}]){await page.setViewportSize(viewport);await artwork();await focused(0);await capture(`artwork-${artSizes[artIndex].join('x')}-${viewport.width}`);}
     await page.setViewportSize({width:1280,height:960});await escape();
   }artIndex=0;await begin();const resumed=await audioCount();await talk('A new guest',true);await waitAudio(resumed);await finishAudio();
   // Cancellation fences late LLM and late speech, preserves no guest data on return.
@@ -304,7 +329,7 @@ try{
     assert.equal(info.animation,'none','caption updates never simulate speech with animation');
   }
   for(const viewport of [{width:1920,height:1080},{width:1280,height:720},{width:768,height:1024},{width:390,height:844},{width:390,height:640},{width:390,height:360},{width:844,height:390}]){
-    await page.setViewportSize(viewport);await boundedTranscript(caption(),true);await boundedTranscript(page.getByLabel('Your words',{exact:true}),true);
+    await page.setViewportSize(viewport);await boundedTranscript(caption(),true);await boundedTranscript(page.getByLabel('Your words',{exact:true}),true);await focused(0);
     const layout=await page.evaluate(()=>{
       const rect=s=>{const r=document.querySelector(s).getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,bottom:r.bottom,right:r.right};};
       return {stage:rect('.parlor-ritual'),user:rect('.parlor-user-transcript'),cards:rect('.parlor-table'),caption:rect('.parlor-caption'),cue:rect('.parlor-cue'),width:innerWidth,height:innerHeight,scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight};
@@ -315,7 +340,7 @@ try{
     assert.ok(layout.cue.y>=0 && layout.cue.bottom<=viewport.height && layout.caption.bottom<=viewport.height,'cue and latest narration stay onscreen');
     await capture(`rolling-captions-${viewport.width}x${viewport.height}`);
   }
-  await page.emulateMedia({reducedMotion:'no-preference'});await boundedTranscript(caption(),true);await page.emulateMedia({reducedMotion:'reduce'});
+  await page.emulateMedia({reducedMotion:'no-preference'});await boundedTranscript(caption(),true);await focused(0);assert.ok(parseFloat(await page.locator('figure.is-focused').evaluate(el=>getComputedStyle(el).transitionDuration))>.1);await page.emulateMedia({reducedMotion:'reduce'});
   // Touch drags/cancellation still cannot become encounter input. There is no
   // scroll position for a guest to maintain or repair after a viewport resize.
   await page.setViewportSize({width:390,height:640});
@@ -336,14 +361,14 @@ try{
   if(ownerMode)assert.equal(JSON.parse(Buffer.from(history.token,'base64url')).q,longQuestion);else assert.ok(history.system.includes(JSON.stringify(longQuestion)),'full user question remains in provider context');
   await finishAudio();const next=await audioCount();await advance();await waitAudio(next);await finishAudio();assert.equal(await page.locator('.is-revealed').count(),2,'deliberate physical input still advances after touch gestures');
   await cdp.detach();scribeMode='error';await talk('A recoverable microphone error');await cue().getByText('Your voice did not reach us.',{exact:true}).waitFor();
-  await page.setViewportSize({width:390,height:360});const errorCue=await cue().boundingBox();assert.ok(errorCue.y>=0 && errorCue.y+errorCue.height<=360,'even the longest recovery cue stays within a short viewport');
+  await page.setViewportSize({width:390,height:360});const errorCue=await cue().boundingBox();assert.ok(errorCue.y>=0 && errorCue.y+errorCue.height<=360,'even the longest recovery cue stays within a short viewport');await focused(1);
   scribeMode='ok';await resetEncounter();await escape();longNarration=false;await page.setViewportSize({width:1280,height:960});
   await page.getByLabel('Show operator controls while testing',{exact:true}).check();
   longNarration=true;await begin();const n=await audioCount();await talk('Pause this reading',true);await waitAudio(n);await button('Pause reading').click();await button('Retry this step').waitFor();assert.ok(await page.evaluate(()=>window.__audioCleared>0));const silentAudio=await audioCount(),silentText=speechRequests.at(-1).text.replace(/\[[^\]]+\]\s*/g,'');await button('Read without audio').click();
-  await cue().getByText('Read along.',{exact:true}).waitFor();await radio('waiting');await ignoredBusy();await ignoredBusy(true);assert.equal(await page.locator('.is-revealed').count(),1);
+  await cue().getByText('Read along.',{exact:true}).waitFor();await radio('waiting');await focused(0);await ignoredBusy();await ignoredBusy(true);assert.equal(await page.locator('.is-revealed').count(),1);
   await page.setViewportSize({width:390,height:640});await page.waitForTimeout(100);assert.ok(silentText.startsWith((await caption().textContent()).trim()),'resize restarts the unread first page rather than skipping its beginning');
   await page.screenshot({path:resolve(evidence,'silent-first-page.png'),fullPage:true});
-  const silentPages=await finishSilent();await phase('ready').waitFor();assert.ok(silentPages.length>5);assert.equal(silentPages.join(' ').replace(/\s+/g,' ').trim(),silentText.replace(/\s+/g,' ').trim(),'beginning, middle and ending of the full silent narration were visible');
+  const silentPages=await finishSilent();await phase('ready').waitFor();await focused(0);assert.ok(silentPages.length>5);assert.equal(silentPages.join(' ').replace(/\s+/g,' ').trim(),silentText.replace(/\s+/g,' ').trim(),'beginning, middle and ending of the full silent narration were visible');
   assert.equal(await page.locator('.is-revealed').count(),1,'finishing silent pages never auto-advances');assert.equal(await audioCount(),silentAudio,'explicit silent delivery never starts speech');longNarration=false;await page.setViewportSize({width:1280,height:960});
   const touchAudio=await audioCount();await talk('Intentional operator touch discussion','touch');await waitAudio(touchAudio);await finishAudio();await phase('ready').waitFor();
   const cancelledInput={calls,scribe:scribeRequests.length};

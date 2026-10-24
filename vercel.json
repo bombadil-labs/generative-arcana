@@ -17,6 +17,7 @@
   ],
   "git": {
     "deploymentEnabled": {
+      "feat/parlor-card-focus": false,
       "fix/parlor-projection-captions": false,
       "fix/parlor-narration-recovery": false,
       "feat/parlor-projection-cues": false,
