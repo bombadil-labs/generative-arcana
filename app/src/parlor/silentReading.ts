@@ -21,13 +21,16 @@ export function silentPage(text: string, start: number, fits: (text: string) => 
 }
 
 export interface SilentLayout {
+  /** A browser resize can briefly collapse the viewport. Wait for observation
+   * rather than treating that intermediate geometry as a failed reading. */
+  available?(): boolean;
   fits(text: string): boolean;
   observe(resize: () => void): () => void;
 }
 
 /** A resize restarts the current page at the same offset, so no text is skipped.
  * Completion includes the final page's reading time. Abort fences every callback. */
-export function presentSilentPages(text: string, signal: AbortSignal, show: (page: string, start: number) => void, layout: SilentLayout, pause?: PresentationPause): Promise<void> {
+export function presentSilentPages(text: string, signal: AbortSignal, show: (page: string) => void, layout: SilentLayout, pause?: PresentationPause): Promise<void> {
   return new Promise((resolve, reject) => {
     let stopped = false, start = 0, timer: ReturnType<typeof setTimeout> | undefined;
     let unobserve = () => {}, unsubscribe = () => {}, advance = () => {};
@@ -45,7 +48,8 @@ export function presentSilentPages(text: string, signal: AbortSignal, show: (pag
       needsLayout = true;
       if (pause?.paused) return;
       try {
-        const page = silentPage(text, start, layout.fits); show(page.text, start);
+        if (layout.available && !layout.available()) return;
+        const page = silentPage(text, start, layout.fits); show(page.text);
         if (stopped) return;
         needsLayout = false; remaining = silentPageMs(page.text);
         advance = function advanceSilentPage() {
@@ -67,7 +71,7 @@ export function presentSilentPages(text: string, signal: AbortSignal, show: (pag
 }
 
 /** Measure with the actual caption font/width rather than guessed line lengths. */
-export async function readSilently(text: string, signal: AbortSignal, show: (page: string, start: number) => void, window: HTMLElement | null, pause?: PresentationPause) {
+export async function readSilently(text: string, signal: AbortSignal, show: (page: string) => void, window: HTMLElement | null, pause?: PresentationPause) {
   if (!window || signal.aborted) throw new DOMException("Cancelled", "AbortError");
   const document = window.ownerDocument, view = document.defaultView!;
   const probe = document.createElement("div"); probe.dataset.silentMeasure = ""; probe.setAttribute("aria-hidden", "true");
@@ -75,6 +79,10 @@ export async function readSilently(text: string, signal: AbortSignal, show: (pag
   document.body.append(probe);
   try {
     await presentSilentPages(text, signal, show, {
+      available() {
+        const box = window.getBoundingClientRect();
+        return box.width > 0 && box.height > 0;
+      },
       fits(candidate) {
         const box = window.getBoundingClientRect(), style = view.getComputedStyle(window);
         if (box.width <= 0 || box.height <= 0) return false;
