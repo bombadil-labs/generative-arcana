@@ -17,6 +17,7 @@
   ],
   "git": {
     "deploymentEnabled": {
+      "feat/parlor-projection-cues": false,
       "feat/parlor-radio-recording": false,
       "feat/parlor-owner-keys": false,
       "feat/parlor-radio-signals": false,

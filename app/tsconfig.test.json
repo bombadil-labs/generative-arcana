@@ -8,6 +8,7 @@
     "outDir": ".test-build"
   },
   "include": [
+    "src/parlor/cue.ts",
     "src/parlor/radio.ts",
     "src/parlor/radioAudio.ts",
     "src/parlor/gestures.ts",

@@ -22,7 +22,8 @@ function Capture({children}) { sessionControl=useSession(); return children; }
 function button(text){return [...document.querySelectorAll('button')].find(el=>el.textContent===text);}
 async function click(text){const target=button(text);assert.ok(target,`button exists: ${text}`);await act(async()=>target.click());await settle();}
 async function input(label,value){const field=[...document.querySelectorAll('label')].find(el=>el.childNodes[0].textContent===label)?.querySelector('input,textarea,select');assert.ok(field,`input exists: ${label}`);await act(async()=>{const proto=field.tagName==='TEXTAREA'?dom.window.HTMLTextAreaElement.prototype:dom.window.HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(field,value);field.dispatchEvent(new dom.window.Event('input',{bubbles:true}));});await flush();}
-async function guest(){await click('Start the show');assert.equal(document.querySelectorAll('textarea').length,0);assert.ok(!button('Type instead'));assert.equal(document.querySelector('.parlor-idle').textContent,'Press and hold the button to make contact with the beyond');await act(async()=>window.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'a',code:'KeyA',bubbles:true})));await act(async()=>{await new Promise(r=>realSetTimeout(r,20));});await settle();await act(async()=>window.dispatchEvent(new dom.window.KeyboardEvent('keyup',{key:'a',code:'KeyA',bubbles:true})));await settle();await click('Begin an open reading');}
+async function tap(){await act(async()=>{window.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'a',code:'KeyA',bubbles:true}));window.dispatchEvent(new dom.window.KeyboardEvent('keyup',{key:'a',code:'KeyA',bubbles:true}));});await act(async()=>{await new Promise(r=>realSetTimeout(r,20));});await settle();}
+async function guest(){await click('Start the show');assert.equal(document.querySelectorAll('textarea').length,0);assert.ok(!button('Type instead'));assert.equal(document.querySelector('.parlor-idle').textContent,'Press and hold the button to make contact with the beyond');await act(async()=>window.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'a',code:'KeyA',bubbles:true})));await act(async()=>{await new Promise(r=>realSetTimeout(r,20));});await settle();await act(async()=>window.dispatchEvent(new dom.window.KeyboardEvent('keyup',{key:'a',code:'KeyA',bubbles:true})));await settle();await tap();}
 async function escape(){await act(async()=>window.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));await settle();}
 
 
@@ -36,7 +37,7 @@ before(async()=>{
 beforeEach(async()=>{
   // Only accelerate the summon threshold in this DOM fixture. Pure gesture tests
   // and the real-browser test independently verify the actual seven seconds.
-  global.setTimeout=(callback,ms,...args)=>realSetTimeout(callback,ms===7000?5:ms,...args);
+  global.setTimeout=(callback,ms,...args)=>realSetTimeout(callback,ms===7000||ms===500?5:ms,...args);
   authenticated=true;parlorAllowed=true;deckCalls=0;accountId='test-account';providerCalls=0;delayed=false;lateResolve=undefined;
   accessMode='byok';hostedDenied=false;hostedBodies=[];ownerAvailable=false;
   window.history.replaceState(null,'','/parlor');window.localStorage.clear();
@@ -114,12 +115,26 @@ test('fresh owner gets env voice/model defaults and can override or restore both
   await click('Use account voice');await click('Use account model');assert.equal(field('ElevenLabs voice ID').value,'env-owner-voice');assert.equal(field('Anthropic model ID').value,'claude-test-owner');
 });
 test('confirm then reset and navigation clear guest state; no questions in URL/storage',async()=>{
-  await mount();await guest();assert.equal(document.querySelectorAll('.parlor-card').length,3);assert.equal(providerCalls,1);assert.ok(button('Hold to talk'));assert.ok(button('Next card'));assert.equal(document.querySelectorAll('.is-revealed').length,1);
+  await mount();await guest();assert.equal(document.querySelectorAll('.parlor-card').length,3);assert.equal(providerCalls,1);assert.equal(document.querySelectorAll('.parlor-show button').length,0);assert.match(document.querySelector('.parlor-cue').textContent,/Press once to draw the next card/);assert.equal(document.querySelectorAll('.is-revealed').length,1);
   assert.equal(window.location.pathname,'/parlor');assert.equal(window.location.hash,'');assert.ok(!JSON.stringify(window.localStorage).includes('Private guest'));
   await escape();assert.ok(button('Start the show'));assert.ok(!document.body.textContent.includes('Private guest'));assert.equal(document.querySelectorAll('.parlor-card').length,0);
   await act(async()=>router.navigate('/my-decks'));await settle();assert.equal(window.location.pathname,'/');assert.equal(window.location.hash,'#/my-decks');
   // Real entry uses a document navigation so the server rechecks authorization.
   await act(async()=>{window.history.pushState(null,'','/parlor');window.dispatchEvent(new dom.window.PopStateEvent('popstate'));});await settle();assert.equal(window.location.pathname,'/parlor');assert.ok(button('Start the show'));
+});
+test('guest pointer taps, held drags and cancellation cannot summon or advance',async()=>{
+  await mount();await click('Start the show');
+  async function drag(target,end){
+    const pointer=type=>{const event=new dom.window.Event(type,{bubbles:true,cancelable:true});Object.assign(event,{pointerId:9,pointerType:'touch',button:0,isPrimary:true});return event;};
+    await act(async()=>{const event=pointer('pointerdown');target.dispatchEvent(event);assert.equal(event.defaultPrevented,false,'native panning remains available');});
+    await act(async()=>{await new Promise(r=>realSetTimeout(r,30));});
+    await act(async()=>{target.dispatchEvent(pointer('pointermove'));target.dispatchEvent(pointer(end));});await settle();
+  }
+  await drag(document.querySelector('.parlor-ritual'),'pointercancel');assert.ok(document.querySelector('.parlor-idle'));assert.equal(providerCalls,0);
+  await escape();await guest();const transcript=document.querySelector('.parlor-caption');
+  for(const end of ['pointerup','pointercancel','lostpointercapture'])await drag(transcript,end);
+  assert.equal(providerCalls,1);assert.equal(document.querySelectorAll('.is-revealed').length,1);assert.equal(document.querySelectorAll('.parlor-show button').length,0);
+  await tap();assert.equal(document.querySelectorAll('.is-revealed').length,2,'physical input still advances');
 });
 test('account change with same email interrupts and fences pending response',async()=>{
   await mount();delayed=true;await guest();assert.equal(providerCalls,1);assert.ok(lateResolve);
@@ -159,7 +174,7 @@ test('denied or disabled hosted access does not offer browser-key fallback',asyn
   accessMode='hosted';hostedDenied=true;await mount();assert.ok(!button('Start the show'));assert.equal(document.querySelectorAll('input[type=password]').length,0);assert.equal(providerCalls,0);
 });
 test('revoked hosted request stays in hosted mode and logout fences a late hosted result',async()=>{
-  accessMode='hosted';await mount();hostedDenied=true;await guest();assert.equal(providerCalls,0);assert.ok(button('Retry this step'));assert.ok(document.querySelector('[role=alert]'));assert.equal(document.querySelectorAll('input[type=password]').length,0);
+  accessMode='hosted';await mount();hostedDenied=true;await guest();assert.equal(providerCalls,0);assert.match(document.querySelector('.parlor-cue').textContent,/Press once to retry/);assert.ok(document.querySelector('[role=alert]'));assert.equal(document.querySelectorAll('input[type=password]').length,0);
   await escape();hostedDenied=false;delayed=true;await guest();assert.ok(lateResolve);await act(async()=>sessionControl.signOut());await settle();lateResolve();await settle();assert.match(document.body.textContent,/Parlor access is restricted/);assert.equal(document.querySelectorAll('.parlor-card').length,0);
 });
 
@@ -168,10 +183,10 @@ test('reading waits after each card and keeps user text above narrated text',asy
   await act(async()=>{await new Promise(r=>setTimeout(r,1100));});
   await act(async()=>{await new Promise(r=>setTimeout(r,1100));});
   await act(async()=>{await new Promise(r=>setTimeout(r,1100));});
-  assert.equal(document.querySelectorAll('.is-revealed').length,1);await click('Next card');assert.equal(document.querySelectorAll('.is-revealed').length,2);await click('Next card');assert.equal(document.querySelectorAll('.is-revealed').length,3);await click('Hear the closing');
+  assert.equal(document.querySelectorAll('.is-revealed').length,1);await tap();assert.equal(document.querySelectorAll('.is-revealed').length,2);await tap();assert.equal(document.querySelectorAll('.is-revealed').length,3);await tap();
   const show=document.querySelector('.parlor-show');
-  assert.ok(button('Hold to talk'));assert.ok(button('Leave the table'));assert.ok(!button('Next card'));
-  assert.ok(show.textContent.includes('Mock synthesis'));assert.equal(show.querySelector('.parlor-user-transcript').textContent,'What have you brought to the table?');
+  assert.equal(show.querySelectorAll('button,input,summary').length,0);assert.match(show.querySelector('.parlor-cue').textContent,/Press five times/);
+  assert.ok(show.textContent.includes('Mock synthesis'));assert.equal(show.querySelector('.parlor-user-transcript').textContent,'');
   assert.ok(show.querySelector('.parlor-user-transcript').compareDocumentPosition(show.querySelector('.parlor-table')) & 4);
   assert.ok(show.querySelector('.parlor-table').compareDocumentPosition(show.querySelector('.parlor-caption')) & 4);
   await escape();assert.equal(document.activeElement,button('Start the show'));
