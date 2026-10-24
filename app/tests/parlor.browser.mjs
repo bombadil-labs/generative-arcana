@@ -180,10 +180,23 @@ try{
     if(url.hostname==='api.anthropic.com'||url.hostname==='api.openai.com'||ownerLanguage){
       assert.equal(ownerLanguage,ownerMode,'owner mode never sends browser requests to paid language providers');
       calls++;if(mode==='error')return json(route,{},429);
-      const request=route.request().postDataJSON(),prompt=ownerLanguage?'':request.messages.at(-1).content;languageRequests.push(request);
-      const identities=ownerLanguage?(path.endsWith('narrate')?JSON.parse(Buffer.from(request.token,'base64url')).c.map(([slug])=>({slug,name:slug})):null):prompt.includes('CARD IDENTITIES IN ORDER\n')?JSON.parse(prompt.split('CARD IDENTITIES IN ORDER\n')[1]):null;
+      const request=route.request().postDataJSON(),content=ownerLanguage?'':request.messages.at(-1).content,prompt=Array.isArray(content)?content.at(-1).text:content;languageRequests.push(request);
+      const step=ownerLanguage?request.segment:request.system.includes('"text":"spoken vision"')?(JSON.parse(prompt).current==='closing'?3:JSON.parse(prompt).cards[0].narrativeFrame==='Past'?0:JSON.parse(prompt).cards[0].narrativeFrame==='Present'?1:2):undefined;
+      const identities=ownerLanguage?(path.endsWith('narrate')?JSON.parse(Buffer.from(request.token,'base64url')).c.map(([slug])=>({slug,name:slug})):null):step!==undefined?JSON.parse(prompt).cards:prompt.includes('CARD IDENTITIES IN ORDER\n')?JSON.parse(prompt.split('CARD IDENTITIES IN ORDER\n')[1]):null;
+      if(ownerLanguage){
+        const slugs=JSON.parse(Buffer.from(request.token,'base64url')).c.map(([slug])=>slug);
+        const expected=step===undefined?slugs.slice(0,request.revealed):step===3?slugs:[slugs[step]];
+        assert.deepEqual(request.artwork.map(a=>a.slug),expected,'only intended/revealed selected fronts go to owner route');
+        for(const art of request.artwork){assert.equal(art.packId,'saved-artwork');assert.equal(art.version,`synthetic-art-${artIndex}-${art.slug}`);}
+      }else{
+        const source=step===undefined?JSON.parse(request.system.split('\n').at(-1)):JSON.parse(prompt);
+        assert.ok(Array.isArray(content),`fixture expected inline artwork: step=${step}, artIndex=${artIndex}, request=${calls}`);
+        assert.equal(content.filter(p=>p.type==='image').length,source.cards.length,'actual displayed WebP blobs reach the BYOK payload');
+        for(const block of content.filter(p=>p.type==='image')){assert.equal(block.source.type,'base64');assert.equal(block.source.media_type,'image/webp');assert.ok(Buffer.from(block.source.data,'base64').length<512000);}
+      }
       if(!identities)assert.doesNotMatch(JSON.stringify(ownerLanguage?request.turns:request.messages),/\[(?:sighs|exhales|sarcastic|curious)\]/,'history has no delivery tags');
-      const text=identities?JSON.stringify({cards:identities.map(card=>({slug:card.slug,text:`[sarcastic] A distant landscape takes shape in the mist. A path opens where you thought there was none.${longNarration?' Reflect on the choice before you, and consider what you might learn by making room for another possibility.'.repeat(14):''}`})),synthesis:'The visions leave a choice that remains yours.'}):'[curious] I know nothing of cards. I see only the landscape that reaches me through the ether.';
+      const visionText=`[sarcastic] A distant landscape takes shape in the mist. A path opens where you thought there was none.${longNarration?' Reflect on the choice before you, and consider what you might learn by making room for another possibility.'.repeat(14):''}`;
+      const text=step!==undefined?JSON.stringify({text:step===3?'The visions leave a choice that remains yours.':visionText}):identities?JSON.stringify({cards:identities.map(card=>({slug:card.slug,text:visionText})),synthesis:'The visions leave a choice that remains yours.'}):'[curious] I know nothing of cards. I see only the landscape that reaches me through the ether.';
       if(mode==='delay')await new Promise(r=>release=r);
       return json(route,ownerLanguage?(identities?JSON.parse(text):{text}):{content:[{type:'text',text}]});
     }
@@ -203,7 +216,7 @@ try{
     }
     if(url.hostname!=='127.0.0.1')return route.abort();
     if(path==='/auth/session')return json(route,authenticated?{authenticated:true,accountId:'synthetic-owner',parlorAllowed:allowed,user:{email:'fixture@example.test'}}:{authenticated:false});
-    if(path==='/api/parlor/capabilities')return json(route,{mode:'byok',...(ownerMode?{ownerKeys:{anthropicModel:'claude-test-owner',elevenlabs:true}}:{})});
+    if(path==='/api/parlor/capabilities')return json(route,{mode:'byok',...(ownerMode?{ownerKeys:{anthropicModel:'claude-sonnet-5-5',elevenlabs:true}}:{})});
     if(path==='/api/me/decks')return json(route,[deck]);
     if(path==='/api/decks/parlor-fixture')return json(route,deck);
     if(path.startsWith('/api/decks/parlor-fixture/artwork/assets/'))return json(route,{},404);
@@ -239,7 +252,7 @@ try{
   await page.goto('http://127.0.0.1:4187/parlor');await page.getByText('Parlor access is restricted.',{exact:true}).waitFor();assert.equal(await page.locator('input[type=password]').count(),0);
   authenticated=true;allowed=false;await page.reload();await page.getByText('Parlor access is restricted.',{exact:true}).waitFor();assert.equal(await button('Parlor').count(),0);
   allowed=true;await page.reload();
-  await page.getByLabel('Anthropic API key',{exact:true}).fill(ownerMode?'':'synthetic-browser-key');await page.getByLabel('Anthropic model ID',{exact:true}).fill(ownerMode?'claude-test-owner':'synthetic-model');
+  await page.getByLabel('Anthropic API key',{exact:true}).fill(ownerMode?'':'synthetic-browser-key');await page.getByLabel('Anthropic model ID',{exact:true}).fill('claude-sonnet-5-5');
   await page.getByLabel('ElevenLabs API key',{exact:true}).fill(ownerMode?'':'synthetic-voice-key');await page.getByLabel('ElevenLabs voice ID',{exact:true}).fill('synthetic-selected-voice');await page.getByLabel('Remember keys on this device (plaintext)').check();
   await page.reload();assert.equal(await page.getByLabel('ElevenLabs voice ID',{exact:true}).inputValue(),'synthetic-selected-voice');assert.equal(await page.locator('textarea').count(),0);await capture('setup');
   const before=await audioCount();await button('Start the show').click();await idle();assert.equal(await audioCount(),before);assert.equal(calls,0);
@@ -311,7 +324,7 @@ try{
   await page.evaluate(()=>window.__oldCallbacks=[window.__audio.onended,window.__audio.ontimeupdate]);await resetEncounter();await page.evaluate(()=>window.__oldCallbacks.forEach(fn=>fn?.()));await page.waitForTimeout(600);assert.equal(await page.locator('.parlor-card').count(),0);
   ttsMode='delay';const cancelledVoice=await audioCount();await page.keyboard.down('a');await page.clock.fastForward(7000);await pending(()=>ttsRelease);await radio('searching');await page.keyboard.up('a');await resetEncounter();ttsRelease();ttsRelease=null;ttsMode='ok';await page.waitForTimeout(150);await idle();assert.equal(await audioCount(),cancelledVoice,'late TTS response cannot revive the apparatus or player');
   await summon();scribeMode='delay';const resetCalls=calls;await talk('Old guest transcription',true);await cue().getByText('Finding your words.',{exact:true}).waitFor();await page.getByLabel('Interactive reading',{exact:true}).focus();await resetEncounter();scribeRelease();scribeRelease=null;scribeMode='ok';await page.waitForTimeout(200);assert.equal(calls,resetCalls);assert.equal(await page.locator('.parlor-card').count(),0);
-  await summon();mode='delay';await talk('Old guest reading',true);await page.waitForFunction(()=>document.querySelector('.parlor-cue-title').textContent.includes('gathering'));await resetEncounter();release();release=null;mode='ok';await page.waitForTimeout(200);assert.equal(await page.locator('.parlor-card').count(),0);
+  await summon();mode='delay';await talk('Old guest reading',true);await page.waitForFunction(()=>document.querySelector('.parlor-cue-title').textContent.includes('gathering'));await pending(()=>release);await resetEncounter();release();release=null;mode='ok';await page.waitForTimeout(200);assert.equal(await page.locator('.parlor-card').count(),0);
   // Genuine decoded WebP fixtures at all four observed source sizes, desktop/projector and phone.
   await escape();for(artIndex=0;artIndex<artSizes.length;artIndex++){
     await page.reload();assert.equal(await page.getByLabel('ElevenLabs voice ID',{exact:true}).inputValue(),'synthetic-selected-voice');
@@ -319,9 +332,9 @@ try{
     await begin();const sizeAudio=await audioCount();await tap();await waitAudio(sizeAudio);await finishAudio();
     for(const viewport of [{width:1920,height:1080},{width:1280,height:720},{width:390,height:844}]){await page.setViewportSize(viewport);await artwork();await focused(0);await capture(`artwork-${artSizes[artIndex].join('x')}-${viewport.width}`);}
     await page.setViewportSize({width:1280,height:960});await escape();
-  }artIndex=0;await begin();const resumed=await audioCount();await talk('A new guest',true);await waitAudio(resumed);await finishAudio();
+  }artIndex=0;await page.reload();await begin();const resumed=await audioCount();await talk('A new guest',true);await waitAudio(resumed);await finishAudio();
   // Cancellation fences late LLM and late speech, preserves no guest data on return.
-  mode='delay';const count=await audioCount();await talk('A delayed discussion',true);await page.waitForFunction(()=>document.querySelector('.parlor-cue-title').textContent.includes('considering'));assert.ok(release);await escape();release();mode='ok';await page.waitForTimeout(150);assert.equal(await audioCount(),count);
+  mode='delay';const count=await audioCount();await talk('A delayed discussion',true);await page.waitForFunction(()=>document.querySelector('.parlor-cue-title').textContent.includes('considering'));await pending(()=>release);await escape();release();mode='ok';await page.waitForTimeout(150);assert.equal(await audioCount(),count);
   assert.equal(await page.evaluate(()=>JSON.stringify(localStorage).includes('synthetic spoken query')),false);
   // Long text rolls within fixed rows. Only timestamp-revealed words enter the
   // DOM, and old lines leave without moving the cards or requiring scrolling.

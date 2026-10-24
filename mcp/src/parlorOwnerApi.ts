@@ -5,7 +5,9 @@ import { createArcanaAdapter } from './hostStore';
 import { isParlorOwner } from './parlorAccess';
 import { ParlorFault, type OwnerKeysConfig } from './parlorConfig';
 import { defaultSettings, characters, visionFrames } from '../../app/src/parlor/settings';
-import { narrationInstructions, discussionInstructions, conversationContext, parseNarration, anthropicReadingOptions } from '../../app/src/parlor/providers';
+import { narrationInstructions, discussionInstructions, conversationContext, parseNarration, anthropicReadingOptions, stepInstructions, stepContext, parseStep } from '../../app/src/parlor/providers';
+import { visionMessages } from '../../app/src/parlor/vision';
+import { artworkReferences, ownerVision, type ParlorArtwork } from './parlorVision';
 import { boundedSpeechBody, parseAlignment, speechPayload } from '../../app/src/parlor/speech';
 import type { ArcanaReading } from '../../app/src/engine/types';
 
@@ -34,6 +36,7 @@ async function bodyBytes(req: IncomingMessage, max: number, signal: AbortSignal)
 export interface OwnerParlorOptions {
   config?: OwnerKeysConfig; authenticator?: BrowserSessionAuthenticator; principal?: BrowserPrincipalResolver;
   catalog?: UserDeckCatalogRepository; allowRequest?: () => Promise<boolean>; fetch?: typeof fetch;
+  artwork?: () => ParlorArtwork | undefined;
 }
 /** Separate credential boundary: general page access or an entitlement never grants these keys. */
 export function createOwnerParlorHandler(options: OwnerParlorOptions) {
@@ -60,6 +63,7 @@ export function createOwnerParlorHandler(options: OwnerParlorOptions) {
       if (!await allowRequest()) throw new ParlorFault(429, 'parlor_limit_reached');
       let url: string, headers: Record<string, string>, payload: string | FormData;
       let reading: ArcanaReading | undefined;
+      let segment: number | undefined;
       if (kind === 'transcribe') {
         if (!c.keys.elevenlabs) throw new ParlorFault(503, 'owner_provider_unavailable');
         const mime = req.headers['content-type'] ?? '';
@@ -82,7 +86,7 @@ export function createOwnerParlorHandler(options: OwnerParlorOptions) {
           url = `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}/with-timestamps`;
           headers = { 'xi-api-key': c.keys.elevenlabs, 'content-type': 'application/json', accept: 'application/json' }; payload = JSON.stringify({ text: prose, model_id: 'eleven_v3' });
         } else {
-          fields(data, ['deckId', 'token', 'character', 'provider', 'model', 'turns', 'revealed']);
+          fields(data, ['deckId', 'token', 'character', 'provider', 'model', 'turns', 'revealed', 'segment', 'artwork']);
           if (!c.keys.anthropic || !c.anthropicModel) throw new ParlorFault(503, 'owner_provider_unavailable');
           if (data.provider !== 'anthropic' || typeof data.model !== 'string' || !/^claude-[A-Za-z0-9._-]{1,140}$/.test(data.model)) throw new ParlorFault(400, 'model_not_allowed');
           const deckId = text(data.deckId, 200), token = text(data.token, 65536);
@@ -93,9 +97,18 @@ export function createOwnerParlorHandler(options: OwnerParlorOptions) {
           if (reading.legacy || reading.placements.length !== 3 || reading.question.length > 1200) throw new ParlorFault(400, 'invalid_reading');
           const character = text(data.character, 20); if (!Object.hasOwn(characters, character)) throw new ParlorFault(400, 'invalid_character');
           const persona = { ...defaultSettings(), character: character as keyof typeof characters };
+          if (data.segment !== undefined) {
+            if (kind !== 'narrate' || !Number.isInteger(data.segment) || Number(data.segment) < 0 || Number(data.segment) > 3) throw new ParlorFault(400, 'invalid_parlor_request');
+            segment = Number(data.segment);
+          }
           let system: string;
           let messages: { role: 'user' | 'assistant'; content: string }[];
-          if (kind === 'narrate') {
+          if (kind === 'narrate' && segment !== undefined) {
+            if (!Array.isArray(data.turns) || data.turns.length > 18 || data.turns.length % 2 !== 0) throw new ParlorFault(400, 'invalid_conversation');
+            messages = data.turns.map((v, i) => { if (!record(v) || v.role !== (i % 2 === 0 ? 'user' : 'assistant')) throw new ParlorFault(400, 'invalid_conversation'); return { role: v.role as 'user' | 'assistant', content: text(v.content, i % 2 === 0 ? 1200 : 4000) }; });
+            messages.push({ role: 'user', content: stepContext(reading, segment) });
+            system = stepInstructions(persona, segment);
+          } else if (kind === 'narrate') {
             system = narrationInstructions(persona);
             messages = [{ role: 'user', content: adapter.engine.buildInterpretationContext(reading) + '\nCARD IDENTITIES IN ORDER\n' + JSON.stringify(reading.placements.map((p, index) => ({ slug: p.card.slug, name: p.card.name, position: p.position.name, reversed: p.reversed, narrativeFrame: visionFrames[index] }))) }];
           } else {
@@ -106,7 +119,14 @@ export function createOwnerParlorHandler(options: OwnerParlorOptions) {
           }
           payload = JSON.stringify({ model: data.model, ...anthropicReadingOptions(data.model), max_tokens: 2000, system, messages });
           if (Buffer.byteLength(payload) > 64000) throw new ParlorFault(413, 'context_too_large');
-          rejectSecrets(payload, c); url = 'https://api.anthropic.com/v1/messages'; headers = { 'x-api-key': c.keys.anthropic, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' };
+          rejectSecrets(payload, c);
+          // Legacy all-at-once narration stays text-only. New requests identify only
+          // the intended card, or already revealed cards for discussion/closing.
+          const refs = artworkReferences(data.artwork, reading, kind === 'converse' ? Number(data.revealed) : segment === 3 ? 3 : 0, segment);
+          const images = await ownerVision(options.artwork?.(), who.id, reading, data.model, refs, abort.signal);
+          payload = JSON.stringify({ model: data.model, ...anthropicReadingOptions(data.model), max_tokens: 2000, system, messages: visionMessages('anthropic', messages, images) });
+          if (Buffer.byteLength(payload) > 2_200_000) throw new ParlorFault(413, 'context_too_large');
+          url = 'https://api.anthropic.com/v1/messages'; headers = { 'x-api-key': c.keys.anthropic, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' };
         }
       }
       await verify(); if ((await principal.resolve(req, res))?.id !== who.id) throw new ParlorFault(403, 'owner_credentials_required');
@@ -142,7 +162,7 @@ export function createOwnerParlorHandler(options: OwnerParlorOptions) {
         if (parts.some(p => typeof p.text !== 'string')) throw new ParlorFault(502, 'unusable_provider_response');
         const prose = parts.map(p => p.text).join('\n');
         if (!prose.trim() || prose.length > (kind === 'narrate' ? 18000 : 4000)) throw new ParlorFault(502, 'unusable_provider_response');
-        try { result = kind === 'narrate' ? parseNarration(prose, reading!) : { text: prose }; }
+        try { result = kind === 'narrate' ? segment === undefined ? parseNarration(prose, reading!) : parseStep(prose) : { text: prose }; }
         catch { throw new ParlorFault(502, 'unusable_provider_response'); }
       }
       rejectSecrets(result, c); await verify(); if ((await principal.resolve(req, res))?.id !== who.id) throw new ParlorFault(403, 'owner_credentials_required');

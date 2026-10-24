@@ -1,7 +1,7 @@
 import { getReadableArtwork, getArtworkImage, ArtworkApiError, DEFAULT_ARTWORK_PACK_ID, type ArtworkPack, type CardArtwork, type OwnedArtworkCatalog } from "./api";
 import { resolveArtworkPack } from "./selection";
 
-export type ArtworkState = { status: "idle" | "loading" | "missing" | "error" } | { status: "ready"; artwork: CardArtwork; url: string };
+export type ArtworkState = { status: "idle" | "loading" | "missing" | "error" } | { status: "ready"; artwork: CardArtwork; url: string; blob?: Blob };
 export const EMPTY_ARTWORK: ArtworkState = Object.freeze({ status: "idle" });
 interface ArtworkTransport {
   catalog: typeof getReadableArtwork;
@@ -132,7 +132,7 @@ export class ArtworkStore {
       const blob = await this.transport.image(artwork, controller.signal);
       if (!current()) return;
       const url = this.transport.createUrl(blob);
-      this.states.set(slug, { status: "ready", artwork, url });
+      this.states.set(slug, { status: "ready", artwork, url, blob });
     } catch (error) {
       if (!current()) return;
       const status = error && typeof error === "object" && "status" in error ? error.status : undefined;

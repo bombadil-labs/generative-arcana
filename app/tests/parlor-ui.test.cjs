@@ -59,7 +59,7 @@ beforeEach(async()=>{
     if(path==='/api/parlor/narrate'||path==='/api/parlor/owner/narrate'){
       hostedBodies.push(JSON.parse(init.body));if(hostedDenied)return json({},403);
       const token=JSON.parse(Buffer.from(hostedBodies.at(-1).token,'base64url').toString());
-      const response=json({cards:token.c.map(([slug])=>({slug,text:'Hosted synthetic narration.'})),synthesis:'Hosted synthetic synthesis.'});
+      const response=json(hostedBodies.at(-1).segment!==undefined?{text:'Hosted synthetic narration.'}:{cards:token.c.map(([slug])=>({slug,text:'Hosted synthetic narration.'})),synthesis:'Hosted synthetic synthesis.'});
       if(delayed)return new Promise(resolve=>{lateResolve=()=>resolve(response);});return response;
     }
     if(path==='/auth/session')return json(authenticated?{authenticated:true,accountId,parlorAllowed,user:{email:'host@example.test'}}:{authenticated:false});
@@ -69,8 +69,8 @@ beforeEach(async()=>{
     if(path.startsWith('/api/decks/parlor-deck/artwork/assets/'))return json({},404);
     if(path.startsWith('/api/decks/parlor-deck/artwork'))return json({enabled:true,deckRevision:1,packId:'saved-artwork',packs:[{id:'saved-artwork',label:'Chosen set',cardCount:0,complete:false}],cards:[]});
     if(path==='https://api.anthropic.com/v1/messages'){
-      providerCalls++; const body=JSON.parse(init.body);const identities=JSON.parse(body.messages[0].content.split('CARD IDENTITIES IN ORDER\n')[1]);
-      const response=json({content:[{type:'text',text:JSON.stringify({cards:identities.map(card=>({slug:card.slug,text:'Mock interpretation for this card.'})),synthesis:'Mock synthesis.'})}]});
+      providerCalls++; const body=JSON.parse(init.body);const step=body.system.includes('"text":"spoken vision"');const identities=step?null:JSON.parse(body.messages[0].content.split('CARD IDENTITIES IN ORDER\n')[1]);
+      const response=json({content:[{type:'text',text:JSON.stringify(step?{text:JSON.parse(body.messages.at(-1).content).current==='closing'?'Mock synthesis.':'Mock interpretation for this card.'}:{cards:identities.map(card=>({slug:card.slug,text:'Mock interpretation for this card.'})),synthesis:'Mock synthesis.'})}]});
       if(delayed)return new Promise(resolve=>{lateResolve=()=>resolve(response);});
       return response;
     }

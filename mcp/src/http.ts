@@ -120,7 +120,7 @@ const parlorAccess = createParlorAccessGuard(browserAuth?.browserAuthenticator);
 const ownerParlorLimiter = hostedParlorConfig.ownerKeys && databaseUrl ? new DurableRateLimiter(databaseUrl, 30) : undefined;
 const parlorHandler = createParlorHandler({config:hostedParlorConfig,authorize:parlorAccess,authenticator:browserAuth?.browserAuthenticator,
   ownerAllowRequest:ownerParlorLimiter?async()=>(await ownerParlorLimiter.check('parlor-owner-provider')).allowed:undefined,
-  store:parlorPool?new PostgresParlorStore(parlorPool):undefined,principal:browserPrincipalResolver,catalog});
+  store:parlorPool?new PostgresParlorStore(parlorPool):undefined,principal:browserPrincipalResolver,catalog,artwork:()=>artwork});
 const artworkConfig = artworkStorageConfiguration();
 if (artworkConfig && (!databaseUrl || !catalog)) throw new Error("Artwork requires a durable database catalog.");
 const artworkPool = artworkConfig ? new Pool({ connectionString: databaseUrl, max: 3, connectionTimeoutMillis: 10_000 }) : undefined;

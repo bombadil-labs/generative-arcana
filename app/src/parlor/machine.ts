@@ -4,6 +4,7 @@ import { converse, narrate, speak, ParlorError, type Narration, type Turn } from
 import { characters, useOwnerEleven, type Settings } from "./settings";
 import { plainSpeech, type CaptionTiming } from "./speech";
 import { OwnerRequestError } from "./hosted";
+import { noVision, optionalVision, type VisionInput } from './vision';
 
 export type Phase = "idle" | "summoning" | "calling" | "awaiting-release" | "question" | "confirm" | "drawing" | "generating" | "ready" | "speaking" | "paused" | "error" | "complete" | "conversation";
 export interface State {
@@ -16,10 +17,12 @@ const initial = (): State => ({ phase: "idle", question: "", revealed: 0, segmen
 export interface Services {
   draw(deckId: string, question: string): Promise<ArcanaReading>;
   narrate: typeof narrate; converse: typeof converse; speak: typeof speak;
-  preload(reading: ArcanaReading): Promise<void>;
+  preload(reading: ArcanaReading, segment: number): Promise<void>;
+  vision(settings: Settings, reading: ArcanaReading, revealed: number, signal: AbortSignal, segment?: number): Promise<VisionInput>;
+  clearVision(): void;
   readSilently(text: string, signal: AbortSignal, show: (page: string) => void): Promise<void>;
 }
-const services: Services = { draw: (id, question) => arcanaEngine.castReading(id, "three-card", question), narrate, converse, speak, preload: async () => {}, readSilently: async () => { throw new ParlorError("Silent reading is unavailable. Return to setup and retry."); } };
+const services: Services = { draw: (id, question) => arcanaEngine.castReading(id, "three-card", question), narrate, converse, speak, preload: async () => {}, vision: async () => noVision(), clearVision: () => {}, readSilently: async () => { throw new ParlorError("Silent reading is unavailable. Return to setup and retry."); } };
 type Speech = { kind: "release" | "greeting" | "card" | "answer"; text: string; segment: number; turns?: Turn[]; silent?: boolean };
 
 /** A synchronous transition gate plus an epoch fence: even late responses after abort are inert. */
@@ -31,6 +34,8 @@ export class ParlorMachine {
   private timer?: ReturnType<typeof setTimeout>;
   private drawPromise?: Promise<ArcanaReading>;
   private speech?: Speech;
+  private preparedAdvance = false;
+  private preparedMuted = false;
   private summonReleased = false;
   private disposed = false;
   private service: Services;
@@ -88,16 +93,32 @@ export class ParlorMachine {
     this.drawPromise = Promise.resolve().then(() => this.service.draw(this.deckId, question));
     void this.prepare();
   }
-  private prepare() {
+  private prepare(advance = this.preparedAdvance, muted = this.preparedMuted) {
+    this.preparedAdvance = advance; this.preparedMuted = muted;
+    const segment = this.state.segment;
     this.set({ phase: this.state.reading ? "generating" : "drawing", error: "" });
     return this.run(async (signal, current) => {
       const reading = this.state.reading ?? await this.drawPromise!;
       if (!current()) return;
       this.set({ reading, phase: "generating" });
-      const narration = await this.service.narrate(this.settings, reading, signal);
+      await optionalVision(() => this.service.preload(reading, segment), signal, undefined);
       if (!current()) return;
-      await this.service.preload(reading);
-      if (current()) this.set({ narration, phase: "ready" });
+      const vision = await this.service.vision(this.settings, reading, this.state.revealed, signal, segment);
+      if (!current()) return;
+      const result = await this.service.narrate(this.settings, reading, signal, segment, this.state.turns, vision);
+      if (!current()) return;
+      // Only the requested segment enters state, even if a legacy service supplies more.
+      const narration = this.state.narration ?? { cards: reading.placements.map(p => ({ slug: p.card.slug, text: '' })), synthesis: '' };
+      const text = segment < 3 ? result.cards[segment]?.text : result.synthesis;
+      if (!text?.trim()) throw new ParlorError('The reader returned an incomplete vision. Retry with the same cards.');
+      const next = { cards: narration.cards.map((card, index) => index === segment ? { ...card, text } : card), synthesis: segment === 3 ? text : narration.synthesis };
+      this.preparedAdvance = false; this.preparedMuted = false;
+      if (advance) {
+        this.set({ narration: next });
+        if (!current()) return;
+        this.speech = { kind: 'card', segment, text };
+        void this.playSpeech(muted);
+      } else this.set({ narration: next, phase: "ready" });
     });
   }
   cancel() {
@@ -114,7 +135,9 @@ export class ParlorMachine {
   next(muted = false) {
     if (this.state.phase !== "ready" || !this.state.narration || this.state.segment > 3) return;
     const segment = this.state.segment;
-    this.speech = { kind: "card", segment, text: segment < 3 ? this.state.narration.cards[segment].text : this.state.narration.synthesis };
+    const text = segment < 3 ? this.state.narration.cards[segment].text : this.state.narration.synthesis;
+    if (!text) { void this.prepare(true, muted); return; }
+    this.speech = { kind: "card", segment, text };
     void this.playSpeech(muted);
   }
   advance() {
@@ -166,13 +189,15 @@ export class ParlorMachine {
     const turns: Turn[] = [...this.state.turns.slice(-18), { role: "user", content: this.state.pendingQuestion }];
     this.set({ phase: "conversation", error: "" });
     return this.run(async (signal, current) => {
-      const content = await this.service.converse(this.settings, this.state.reading!, turns, signal, this.state.revealed);
+      const vision = await this.service.vision(this.settings, this.state.reading!, this.state.revealed, signal);
+      if (!current()) return;
+      const content = await this.service.converse(this.settings, this.state.reading!, turns, signal, this.state.revealed, vision);
       if (!current()) return;
       this.speech = { kind: "answer", segment: this.state.segment, text: content, turns: [...turns, { role: "assistant", content: plainSpeech(content) }] };
       // Keep the generated answer for audio retry without another model call.
       void this.playSpeech(false);
     });
   }
-  reset() { this.invalidate(); this.drawPromise = undefined; this.speech = undefined; this.summonReleased = false; this.state = initial(); this.listeners.forEach(listener => listener()); }
+  reset() { this.invalidate(); this.service.clearVision(); this.preparedAdvance = this.preparedMuted = false; this.drawPromise = undefined; this.speech = undefined; this.summonReleased = false; this.state = initial(); this.listeners.forEach(listener => listener()); }
   dispose() { this.reset(); this.disposed = true; this.settings = { ...this.settings, anthropicKey: "", openaiKey: "", elevenKey: "" }; this.listeners.clear(); }
 }
