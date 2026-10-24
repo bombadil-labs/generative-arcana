@@ -10,7 +10,7 @@ global.window=dom.window; global.document=dom.window.document; global.PopStateEv
 Object.defineProperty(global,'navigator',{configurable:true,value:dom.window.navigator}); global.IS_REACT_ACT_ENVIRONMENT=true;
 const { createRoot } = require('react-dom/client');
 const { act } = React;
-let vite,root,App,Provider,useSession,sessionControl,router,settingsApi;
+let vite,root,App,Provider,useSession,sessionControl,router,settingsApi,Transcript;
 let authenticated,accountId,providerCalls,lateResolve,delayed,accessMode,hostedDenied,hostedBodies,parlorAllowed,deckCalls,ownerAvailable;
 let ownerEleven,ownerVoice,ttsRequests;
 const data=rawDeck();
@@ -34,6 +34,7 @@ before(async()=>{
   ({App}=await vite.ssrLoadModule('/src/app/App.tsx'));
   ({BrowserSessionProvider:Provider,useBrowserSession:useSession}=await vite.ssrLoadModule('/src/auth/session.tsx'));
   router=await vite.ssrLoadModule('/src/app/router.ts'); settingsApi=await vite.ssrLoadModule('/src/parlor/settings.ts');
+  ({Transcript}=await vite.ssrLoadModule('/src/parlor/Transcript.tsx'));
 });
 beforeEach(async()=>{
   // Only accelerate the summon threshold in this DOM fixture. Pure gesture tests
@@ -78,6 +79,26 @@ async function mount(){
 }
 afterEach(async()=>{await act(async()=>root.unmount());document.getElementById('root').replaceChildren();global.setTimeout=realSetTimeout;});
 after(async()=>{await vite?.close();dom.window.close();global.window=original.window;global.document=original.document;global.fetch=original.fetch;global.PopStateEvent=original.PopStateEvent;if(original.navigator)Object.defineProperty(global,'navigator',original.navigator);else delete global.navigator;delete global.IS_REACT_ACT_ENVIRONMENT;});
+
+test('transcript presentation renders only the revealed prefix, preserves full text and clears on reset',async()=>{
+  const text='Already spoken. '.repeat(180)+'The final thought.';
+  for(const kind of ['user','narrator']){
+    for(const revealed of ['',text.slice(0,27),text,'']){
+      await act(async()=>root.render(React.createElement(Transcript,{kind,text:revealed})));
+      assert.equal(document.querySelector('.parlor-transcript-lines').textContent,revealed.trim());
+      assert.equal(document.querySelector('.parlor-transcript-window').getAttribute('aria-label'),kind==='user'?'Your words':'Narrator transcript');
+      assert.equal(document.querySelectorAll('button,textarea,input').length,0);
+    }
+  }
+  assert.ok(text.endsWith('The final thought.'),'display does not truncate the conversation source');
+});
+
+test('transcript presentation preserves line breaks and unbroken text without interpreting markup',async()=>{
+  const text='A question\n\n'+'word'.repeat(300)+'\n<script>untrusted</script>';
+  await act(async()=>root.render(React.createElement(Transcript,{kind:'user',text})));
+  assert.equal(document.querySelector('.parlor-transcript-lines').textContent,text);
+  assert.equal(document.querySelectorAll('script').length,0);
+});
 
 test('anonymous /parlor is gated before settings and no provider request is made',async()=>{
   authenticated=false;await mount();assert.match(document.body.textContent,/Parlor access is restricted/);assert.ok(!button('Parlor'));assert.equal(document.querySelectorAll('input[type=password]').length,0);assert.equal(providerCalls,0);assert.equal(deckCalls,0);

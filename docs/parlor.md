@@ -270,6 +270,20 @@ Retries preserve the original draw. Retrying discussion audio reuses the generat
 answer rather than charging for another language-model response. Conversation
 history is bounded to ten narration/discussion pairs while allowing further discussion.
 
+## Projection layout
+
+Performance mode reserves fixed rows for the apparatus, guest question, spread,
+and narration inside the centered viewport. Questions show their last two lines
+and narration its last four at projector sizes; smaller screens reserve fewer
+lines while keeping readable type. Older lines leave through a soft top edge as
+new lines arrive. There are no caption scrollbars or required scrolling controls.
+Only the already-revealed speech prefix enters the caption window; resizing does
+not reveal later words or change audio timing. Explicit silent reading still
+delivers the whole segment at once, with its ending visible in the same window.
+The full question and completed narration remain in conversation state, independent
+of the visible excerpt. Reset clears both. Optional operator controls remain
+scrollable outside the guest composition.
+
 ## Verification
 
 Use Node 24 and an existing installed Edge browser; the browser test does not
