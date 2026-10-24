@@ -153,13 +153,13 @@ try{
   context=await browser.newContext({viewport:{width:1280,height:960},reducedMotion:'reduce',hasTouch:true});context.setDefaultTimeout(12000);
   await context.addInitScript(()=>{
     // Stub the output device as well as TTS: automated UI tests emit no real sound.
-    window.__radioContexts=[];window.__radioUnavailable=false;
+    window.__radioContexts=[];window.__radioUnavailable=false;window.__signalStarts=0;
     class Param {value=0;target=0;cancelScheduledValues(){}setValueAtTime(value){this.value=value;}linearRampToValueAtTime(value){this.target=value;}}
     window.AudioContext=class {
       state='suspended';sampleRate=8000;nodes=[];destination={};
       constructor(){if(window.__radioUnavailable)throw Error('Synthetic unavailable Web Audio');window.__radioContexts.push(this);}
       get currentTime(){return performance.now()/1000;}
-      node(source=false){const owner=this;const n={gain:new Param(),frequency:new Param(),Q:new Param(),source,disconnected:false,stopped:false,master:false,connect(to){if(to===owner.destination)this.master=true;return to;},disconnect(){this.disconnected=true;},start(){},stop(){this.stopped=true;}};this.nodes.push(n);return n;}
+      node(source=false){const owner=this;const n={gain:new Param(),frequency:new Param(),Q:new Param(),source,disconnected:false,stopped:false,master:false,connect(to){if(to===owner.destination)this.master=true;return to;},disconnect(){this.disconnected=true;},start(){if(source&&!this.loop)window.__signalStarts++;},stop(){this.stopped=true;}};this.nodes.push(n);return n;}
       createGain(){return this.node();}createBiquadFilter(){return this.node();}createBufferSource(){return this.node(true);}createOscillator(){return this.node(true);}
       createBuffer(_,size){const data=new Float32Array(size);return {getChannelData:()=>data};}
       decodeAudioData(){return Promise.resolve({duration:180,numberOfChannels:1});}
@@ -331,12 +331,13 @@ try{
   ttsMode='delay';release();release=null;mode='ok';await pending(()=>ttsRelease);await ignoredBusy();await cue().getByText('Please wait a moment, dialing in the etheric connection',{exact:true}).waitFor();await radio('searching');assert.equal(await page.locator('.is-revealed').count(),0);assert.equal(await caption().innerText(),'');await capture('radio-voice-search');
   assert.equal(await page.locator('.parlor-cue-title').innerText(),'Please wait a moment, dialing in the etheric connection');
   await page.emulateMedia({reducedMotion:'reduce'});assert.deepEqual(await page.locator('.radio-needle,.radio-wave,.parlor-radio-halo').evaluateAll(nodes=>nodes.map(el=>getComputedStyle(el).animationName)),['none','none','none']);await capture('radio-reduced-search');ttsRelease();ttsRelease=null;ttsMode='ok';await waitAudio(first);await radio('speaking');assert.equal(await page.locator('.is-revealed').count(),1);assert.equal(await caption().innerText(),'');assert.equal(await page.locator('.parlor-show button').count(),0);await capture('radio-speaking');await ignoredBusy();
-  await page.evaluate(()=>{window.__audio.currentTime=.5;window.__audio.ontimeupdate();window.__pausedAudio=window.__audio;});const guideCaption=await caption().textContent(),guideCalls=calls,guideAudio=await audioCount();
+  await page.evaluate(()=>{window.__audio.currentTime=.5;window.__audio.ontimeupdate();window.__pausedAudio=window.__audio;});const guideCaption=await caption().textContent(),guideCalls=calls,guideAudio=await audioCount(),guideSignals=await page.evaluate(()=>window.__signalStarts);
   await openGuide();assert.equal(await radioLevel(),0);await page.clock.fastForward(200000);await guideFits();assert.equal(await caption().textContent(),guideCaption);assert.equal(calls,guideCalls);assert.equal(await audioCount(),guideAudio);assert.equal(await stage().getAttribute('data-phase'),'speaking');
-  await closeGuide();await radio('speaking');assert.equal(await page.evaluate(()=>window.__audio===window.__pausedAudio&&window.__audio.currentTime===.5),true);assert.equal(await caption().textContent(),guideCaption);assert.equal(calls,guideCalls);assert.equal(await audioCount(),guideAudio);await page.evaluate(()=>{window.__audio.currentTime=0;window.__audio.ontimeupdate();});
+  await closeGuide();await radio('speaking');assert.equal(await page.evaluate(()=>window.__audio===window.__pausedAudio&&window.__audio.currentTime===.5),true);assert.equal(await caption().textContent(),guideCaption);assert.equal(calls,guideCalls);assert.equal(await audioCount(),guideAudio);assert.equal(await page.evaluate(()=>window.__signalStarts),guideSignals,'pause/resume cannot emit an accent');await page.evaluate(()=>{window.__audio.currentTime=0;window.__audio.ontimeupdate();});
   await page.evaluate(()=>window.__audio.onwaiting());await radio('searching');assert.equal(await caption().innerText(),'');await page.evaluate(()=>window.__audio.onplaying());await radio('speaking');
+  assert.equal(await page.evaluate(()=>window.__signalStarts),guideSignals,'caption and buffering events do not relock');
   assert.ok(await radioLevel()<searchingLevel/10,'actual voice playback strongly ducks the ambience');
-  await finishAudio();await phase('ready').waitFor();await page.waitForTimeout(250);assert.equal(await page.locator('.is-revealed').count(),1);await artwork();await capture('first-card-desktop');
+  await finishAudio();await phase('ready').waitFor();assert.equal(await page.evaluate(()=>window.__signalStarts),guideSignals+1,'natural speech end emits one loss accent');await page.waitForTimeout(250);assert.equal(await page.locator('.is-revealed').count(),1);await artwork();await capture('first-card-desktop');
   await focused(0);
   for(const text of ['Tell me more about this card','How does that connect to my question?']){const count=await audioCount();await talk(text,true);await waitAudio(count);await focused(0);assert.equal(await page.locator('.is-revealed').count(),1);assert.equal(await caption().innerText(),'');await finishAudio();await phase('ready').waitFor();await focused(0);}
   await page.setViewportSize({width:390,height:844});await page.evaluate(()=>window.__mimeType='audio/mp4');
@@ -486,7 +487,7 @@ try{
   }
   await page.getByLabel('Show operator controls while testing',{exact:true}).uncheck();
   // Explicit silent setup covers summon/greeting and a reset during paged delivery.
-  await page.getByLabel('Read without audio',{exact:true}).check();const beforeSilent=await audioCount();await button('Start the show').click();await pressA();await page.clock.fastForward(7000);await finishSilent();await phase('awaiting-release').waitFor();await page.keyboard.up('a');await finishSilent();await phase('question').waitFor();assert.equal(await audioCount(),beforeSilent);
+  await page.getByLabel('Read without audio',{exact:true}).check();const beforeSilent=await audioCount(),silentSignals=await page.evaluate(()=>window.__signalStarts);await button('Start the show').click();await pressA();await page.clock.fastForward(7000);await finishSilent();await phase('awaiting-release').waitFor();await page.keyboard.up('a');await finishSilent();await phase('question').waitFor();assert.equal(await audioCount(),beforeSilent);assert.equal(await page.evaluate(()=>window.__signalStarts),silentSignals,'silent presentation has no vocalization accents');
   await advance();await page.locator('.parlor-caption.is-silent').waitFor();await page.waitForFunction(()=>document.querySelector('.parlor-ritual').dataset.phase==='speaking');await resetEncounter();assert.equal(await page.locator('[data-silent-measure]').count(),0);await page.clock.fastForward(60000);await idle();assert.equal(await audioCount(),beforeSilent);await escape();await page.getByLabel('Read without audio',{exact:true}).uncheck();
   // Optional authored deck notes never enter provider payloads or reveal future cards.
   const detailsToggle=page.getByLabel('Show card details beside the current card',{exact:true});assert.equal(await detailsToggle.isChecked(),false);

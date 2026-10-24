@@ -178,16 +178,16 @@ function TableSetup({ transcriptLogging, showDetails, changeDetails, detailsStor
 function Ritual({ transcriptLogging, showDetails, deckId, settings, leave, radioPreferences, changeRadio, operatorControls }: { transcriptLogging: boolean; deckId: string; settings: Settings; leave(): void; operatorControls: boolean; showDetails: boolean } & RadioOptions) {
   const artwork = useArtworkStore();
   const captionWindow = useRef<HTMLDivElement>(null);
-  const machine = useMemo(() => new ParlorMachine(deckId, settings, { transcript: transcriptLogging ? new RuntimeTranscript([settings.anthropicKey,settings.openaiKey,settings.elevenKey]) : undefined, preload: async (reading) => {
+  const sound = useMemo(() => new RadioAudio(), [deckId, settings, artwork, transcriptLogging]);
+  const machine = useMemo(() => new ParlorMachine(deckId, settings, { vocalization: edge => sound.signal(edge), transcript: transcriptLogging ? new RuntimeTranscript([settings.anthropicKey,settings.openaiKey,settings.elevenKey]) : undefined, preload: async (reading) => {
     await Promise.all(reading.cards.map((card) => artwork?.load(card.slug)));
-  }, readSilently: (text, signal, show, pause) => readSilently(text, signal, show, captionWindow.current, pause) }), [deckId, settings, artwork, transcriptLogging]);
+  }, readSilently: (text, signal, show, pause) => readSilently(text, signal, show, captionWindow.current, pause) }), [deckId, settings, artwork, transcriptLogging, sound]);
   const state = useSyncExternalStore(machine.subscribe, machine.getSnapshot, machine.getSnapshot);
   const speechInputAvailable = !settings.hosted && (!!settings.elevenKey.trim() || useOwnerEleven(settings));
   const microphone = useMemo(() => new ScribeMicrophone(text => machine.submit(text), () => settings.hosted ? "" : settings.elevenKey, undefined,
     (audio,key,signal)=>useOwnerEleven(settings)?ownerTranscribe(audio,signal):transcribeScribe(audio,key,signal),
     ()=>!settings.hosted&&(!!settings.elevenKey.trim()||useOwnerEleven(settings))), [machine, settings]);
   const mic = useSyncExternalStore(microphone.subscribe, microphone.getSnapshot, microphone.getSnapshot);
-  const sound = useMemo(() => new RadioAudio(), [machine]);
   const soundError = useSyncExternalStore(sound.subscribe, sound.getSnapshot, sound.getSnapshot);
   useLayoutEffect(() => { sound.setPreferences(radioPreferences); }, [sound, radioPreferences]);
   useLayoutEffect(() => {

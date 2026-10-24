@@ -32,6 +32,16 @@ async function until(machine, phase) {
   });
 }
 
+test('vocalization accents are fenced by reset/pause and absent from silent delivery',async()=>{
+  const edges=[],audio=[];
+  const {machine}=setup({vocalization:e=>edges.push(e),speak:async(_,text,signal,playing,r,caption,waiting,pause,accent)=>{const d=deferred();audio.push({d,accent});playing();accent('lock');await d.promise;}});
+  try {
+    machine.begin();assert.deepEqual(edges,['lock']);machine.openGuide();audio[0].accent('loss');assert.deepEqual(edges,['lock']);machine.closeGuide();assert.deepEqual(edges,['lock']);
+    machine.reset();audio[0].accent('loss');audio[0].d.resolve();await tick();assert.deepEqual(edges,['lock']);
+    machine.begin();machine.captions();const count=edges.length;await until(machine,'question');audio[1].accent('loss');audio[1].d.resolve();await tick();assert.equal(edges.length,count,'cancelled audio cannot accent silent presentation');
+  } finally {audio.forEach(a=>a.d.resolve());machine.dispose();}
+});
+
 for (const source of ['byok','owner']) test(`runtime transcript ${source}: generated is separate from presentation, reset fences late callbacks and new context`,async()=>{
   const events=[];let encounter=1,disposed=false;const audio=[],generated=deferred();
   const configured=source==='owner'?{...settings,anthropicKey:'',elevenKey:'',ownerKeys:{anthropicModel:'claude-test',elevenlabs:true}}:settings;

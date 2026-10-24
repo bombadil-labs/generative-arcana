@@ -20,6 +20,7 @@ export interface State {
 const initial = (): State => ({ phase: "idle", question: "", revealed: 0, segment: 0, caption: "", timing: "aligned", error: "", turns: [], pendingQuestion: "", userText: "" });
 export interface Services {
   transcript?: TranscriptSink;
+  vocalization?(edge: 'lock' | 'loss'): void;
   draw(deckId: string, question: string): Promise<ArcanaReading>;
   narrate: typeof narrate; converse: typeof converse; speak: typeof speak; introduce: typeof introduce;
   preload(reading: ArcanaReading): Promise<void>;
@@ -201,7 +202,7 @@ export class ParlorMachine {
         // not hit the remote-request timeout before their last page can be read.
         clearTimeout(this.timer); this.timer = undefined;
         await this.service.readSilently(plainSpeech(speech.text), signal, page => caption(page, "silent"), this.presentationPause);
-      } else await this.service.speak(this.settings, speech.text, signal, () => { if (current() && !this.presentationPause.paused) { this.set({ audioPlaying: true }); reveal(); } }, this.state.reading, caption, () => { if (current()) this.set({ audioPlaying: false }); }, this.presentationPause);
+      } else await this.service.speak(this.settings, speech.text, signal, () => { if (current() && !this.presentationPause.paused) { this.set({ audioPlaying: true }); reveal(); } }, this.state.reading, caption, () => { if (current()) this.set({ audioPlaying: false }); }, this.presentationPause, edge => { if (current() && !this.presentationPause.paused) this.service.vocalization?.(edge); });
       await this.presentationPause.wait(signal);
       if (!current()) return;
       this.finishPresentation('presentation_completed');

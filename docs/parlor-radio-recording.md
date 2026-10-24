@@ -63,3 +63,21 @@ including this MP3. No public bucket or new asset-sharing permission is created.
 Mute, volume, speech ducking, microphone silence, blank reset, focus loss and
 teardown remain governed by the existing radio lifecycle. Failure leaves the
 reading functional and shows the existing operator-only ambience notice.
+
+## Vocalization accents
+
+A quiet, locally generated band-pass static accent marks the first actual `playing`
+event (75 ms) and natural `ended` event (110 ms) of each vocalization. The latter
+starts after the last spoken sample. The start accent has a soft 12 ms attack;
+both taper to zero, with gain capped at 0.012 before the existing volume control.
+They use the existing gesture-unlocked context, without another asset or service.
+The approved radio recording and its gain/ducking remain unchanged.
+
+Buffering, caption updates and guide pause/resume never replay the start accent.
+Errors, cancellation, silent pages and a completion queued behind the guide do not
+pretend to be a natural audible ending. Mute/zero volume, capture, reset, blur and
+teardown suppress or stop accents; capture disconnects immediately. No accent is
+queued for later unlock. Reduced-motion preferences affect visuals independently.
+Offline waveform measurements and mocked browser lifecycle tests do not replace
+checking the actual voice/projector-room volume; adjust with the existing radio
+volume/mute controls.

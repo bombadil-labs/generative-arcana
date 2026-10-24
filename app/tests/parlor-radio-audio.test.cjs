@@ -18,6 +18,33 @@ class Context {
 function fixture(t,loader,random=()=>0){t.mock.timers.enable({apis:['setTimeout']});const context=new Context();let created=0,loads=0;const sound=new RadioAudio(()=>{created++;return context;},async(...args)=>{loads++;return loader?loader(...args):{duration:180,numberOfChannels:1};},random);return {sound,context,created:()=>created,loads:()=>loads,advance:ms=>t.mock.timers.tick(ms)};}
 const master=context=>context.nodes.find(n=>n.connected.includes(context.destination));
 
+test('signal accents need unlocked actual playback, stay short/quiet and obey mute, volume and capture',async t=>{
+  const {sound,context,created,advance}=fixture(t);sound.signal('lock');assert.equal(created(),0);
+  sound.setState('speaking',false);sound.unlock();await tick();
+  const count=()=>context.nodes.filter(n=>n.source).length;
+  const initial=count();sound.signal('lock');assert.equal(count(),initial+1);
+  const source=context.nodes.filter(n=>n.source).at(-1),gain=context.nodes.at(-1).gain;
+  assert.deepEqual(gain.events,[['set',0,0],['ramp',.012*.35,.012],['ramp',0,.075]]);assert.deepEqual(source.stopped,[.075]);assert.equal(source.loop,undefined);
+  context.currentTime=.02;sound.setState('listening',true);assert.equal(source.stopped.at(-1),undefined,'capture stops immediately');assert.equal(source.disconnected,1);advance(20);
+  sound.signal('loss');assert.equal(count(),initial+1);
+  sound.setState('speaking',false);sound.hold(true);sound.signal('lock');assert.equal(count(),initial+1);sound.hold(false);
+  sound.setPreferences({muted:false,volume:1});sound.signal('loss');assert.equal(context.nodes.at(-1).gain.events[1][1],.012*.8);advance(200);assert.ok(context.nodes.at(-1).disconnected);
+  sound.setPreferences({muted:true,volume:1});sound.signal('lock');advance(100);const muted=count();sound.unlock();sound.signal('loss');assert.equal(count(),muted);
+  sound.setPreferences({muted:false,volume:0});sound.unlock();sound.signal('lock');assert.equal(count(),muted);sound.dispose();advance(100);assert.equal(context.closed,1);
+});
+
+test('accents cancel on reset/blur/dispose and cannot be queued or resurrect a context',async t=>{
+  const {sound,context,advance}=fixture(t);sound.setState('speaking',false);sound.unlock();await tick();sound.signal('lock');
+  const sources=()=>context.nodes.filter(n=>n.source);const accent=sources().at(-1);context.currentTime=.01;sound.stop();assert.ok(accent.stopped.at(-1)<=.0161);advance(100);
+  const count=sources().length;sound.signal('loss');sound.setState('speaking',false);sound.signal('lock');assert.equal(sources().length,count);
+  sound.unlock();await tick();for(let i=0;i<20;i++)sound.signal(i%2?'lock':'loss');assert.ok(context.nodes.filter(n=>n.source&&!n.disconnected).length<=3,'one bed, at most two bounded accents');sound.dispose();advance(100);assert.ok(context.nodes.every(n=>n.disconnected));assert.equal(context.closed,1);
+});
+
+test('unsupported accent graph fails quietly without stopping voice or bed, and cleans partial resources',async t=>{
+  const {sound,context,advance}=fixture(t);sound.setState('speaking',false);sound.unlock();await tick();context.createBiquadFilter=()=>{throw Error('unsupported');};
+  sound.signal('lock');assert.equal(sound.getSnapshot(),'');assert.equal(context.state,'running');assert.equal(context.nodes.at(-1).disconnected,1);sound.dispose();advance(100);assert.equal(context.closed,1);
+});
+
 test('quiet-cue start and cursor survive short waits, silence and resets without restarting a passage',async t=>{
   const {sound,context,loads,advance}=fixture(t,undefined,()=>.6);sound.setState('searching',false);sound.unlock();await tick();
   const sources=()=>context.nodes.filter(n=>n.source);assert.deepEqual(sources()[0].starts[0],[0,95.2]);
