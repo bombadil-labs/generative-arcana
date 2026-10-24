@@ -82,6 +82,14 @@ reading offers follow-up or five-tap reset. Pending work never invites a new act
 The blank reset invitation is preserved. The radio decoration has no duplicate label,
 and user text above the cards contains only the guest's actual transcript.
 
+Past/Present/Future sit 6px below the occupied artwork edge: the slots when settled,
+or the enlarged foreground card while it is in focus so labels cannot cover it.
+Unused space below the artwork goes to the caption window rather than a fixed tall
+spread band. The enlarged card retains its center and sizing formula. Its footprint
+remains reserved during the settling animation, then captions reclaim that space;
+reduced motion settles immediately. Silent pages remeasure the actual caption area
+after viewport and layout changes, without skipping unread text.
+
 Escape returns to setup, including radio mute/volume and the optional **Show operator
 controls while testing** checkbox. It is off by default and is not persisted across
 reloads. When enabled, a dedicated Hold to talk button supports intentional pointer

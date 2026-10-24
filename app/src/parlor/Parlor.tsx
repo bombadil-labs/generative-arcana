@@ -240,12 +240,22 @@ function Ritual({ deckId, settings, leave, radioPreferences, changeRadio, operat
   const signal = radioState(state, mic);
   const cue = guestCue(state, mic, speechInputAvailable);
   const focus = focusedCard(state);
+  const [focusSpace, setFocusSpace] = useState(false);
+  useLayoutEffect(() => {
+    if (focus !== null) { setFocusSpace(true); return; }
+    if (idle || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { setFocusSpace(false); return; }
+    // Let the card settle before reclaiming its footprint. Reset/unmount/new
+    // focus clears this timer; it never drives encounter or provider state.
+    const timer = setTimeout(() => setFocusSpace(false), 650);
+    return () => clearTimeout(timer);
+  }, [focus, idle]);
   return <div ref={stage} tabIndex={-1} className={`parlor-ritual${idle ? " parlor-idle" : ""}${summoning ? " parlor-summoning" : ""}`} aria-label="Interactive reading" aria-describedby="parlor-guest-cue" data-phase={state.phase}
     onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) controls.cancel(); }}>
     <div className="parlor-scene">
     <RadioSignal signal={signal} startedAt={state.summonStartedAt} showLabel={false} />
     {!idle && <Transcript kind="user" text={contact ? "" : state.userText} />}
-    {!idle && <div className={`parlor-spread-stage${focus !== null ? " has-focus" : ""}`}>
+    {!idle && <div className={`parlor-spread-stage${focus !== null ? " has-focus" : ""}${focus !== null || focusSpace ? " reserves-focus" : ""}`}>
+    <div className="parlor-card-area">
     {state.reading && (
       <div className="parlor-table" aria-label="Three-card reading">
         {state.reading.placements.map((placement, index) => <figure key={placement.card.slug} className={index === focus ? "is-focused" : undefined}>
@@ -260,9 +270,10 @@ function Ritual({ deckId, settings, leave, radioPreferences, changeRadio, operat
       </div>
     )}
     {!state.reading && !idle && <div className="parlor-table parlor-spread-slots" aria-label="Three empty card spaces">{[0, 1, 2].map(index => <div key={index} className="parlor-slot" aria-hidden="true" />)}</div>}
+    </div>
+    <div className="parlor-slot-labels" aria-label="Vision frames">{visionFrames.map(frame => <span key={frame}>{frame}</span>)}</div>
     </div>}
     {!idle && <div className="parlor-narration-area">
-      <div className="parlor-slot-labels" aria-label="Vision frames">{visionFrames.map(frame => <span key={frame}>{frame}</span>)}</div>
       <Transcript kind="narrator" text={state.caption} silent={state.timing === "silent"} windowRef={captionWindow} />
     </div>}
     </div>

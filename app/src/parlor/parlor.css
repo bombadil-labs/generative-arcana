@@ -147,7 +147,7 @@
   height: 100dvh; padding: var(--stage-pad); overflow: hidden; overflow: clip;
 }
 .parlor-show .parlor-ritual:not(.parlor-idle) { height: var(--stage-height); min-height: 0; align-items: center; }
-.parlor-show .parlor-scene { height: var(--scene-height); display: grid; grid-template-rows: var(--dial-height) var(--user-height) minmax(0, 1fr) var(--caption-height); gap: var(--stage-gap); }
+.parlor-show .parlor-scene { height: var(--scene-height); container-type: inline-size; display: grid; grid-template-rows: var(--dial-height) var(--user-height) auto minmax(0, 1fr); gap: var(--stage-gap); }
 .parlor-show .parlor-radio { height: var(--dial-height); margin: 0 auto; }
 .parlor-show .parlor-radio-dial { height: 100%; }
 .parlor-show .parlor-table { width: min(100%, 800px, calc(2 * var(--spread-height) + 2 * clamp(12px, 3vw, 36px))); margin: 0 auto; align-self: center; }
@@ -181,8 +181,21 @@
 
 /* The current card moves within its reserved row, never over captions or cues.
    This is a visual focus treatment, with no dialog, focus trap or new input. */
-.parlor-spread-stage { position: relative; isolation: isolate; min-height: 0; height: 100%; display: flex; align-items: center; justify-content: center; }
-.parlor-show .parlor-spread-stage .parlor-table { --card-gap: clamp(12px, 3vw, 36px); width: min(100%, 800px, calc(1.2 * var(--spread-height) + 2 * var(--card-gap))); align-self: center; }
+.parlor-spread-stage {
+  --card-gap: clamp(12px, 3vw, 36px);
+  --table-width: min(100cqw, 800px, calc(1.2 * var(--spread-height) + 2 * var(--card-gap)));
+  --card-height: calc((var(--table-width) - 2 * var(--card-gap)) / 2);
+  --art-height: var(--card-height);
+  --frame-height: 28px;
+  position: relative; isolation: isolate; min-height: 0;
+  /* Keep the released card center and sizing budget. Only the unused space
+     below the actual artwork is returned to captions, rather than a tall band. */
+  padding-top: max(0px, calc((var(--spread-height) - var(--art-height)) / 2));
+  display: grid; grid-template-rows: var(--art-height) var(--frame-height); row-gap: 6px;
+}
+.parlor-spread-stage.reserves-focus { --art-height: calc(1.6 * var(--card-height)); }
+.parlor-card-area { position: relative; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.parlor-show .parlor-spread-stage .parlor-table { width: var(--table-width); align-self: center; }
 .parlor-spread-stage::before { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(ellipse, #09060db3, #09060d66 50%, #09060d00 75%); opacity: 0; transition: opacity 650ms ease; }
 .parlor-spread-stage.has-focus::before { opacity: 1; }
 .parlor-spread-stage figure { position: relative; z-index: 0; transform: translate(0, 0) scale(1); transform-origin: center; transition: transform 650ms cubic-bezier(.2,.7,.2,1), filter 650ms ease; }
@@ -191,11 +204,12 @@
 .parlor-spread-stage figure.is-focused:first-child { --focus-x: calc(100% + var(--card-gap)); }
 .parlor-spread-stage figure.is-focused:last-child { --focus-x: calc(-100% - var(--card-gap)); }
 .parlor-spread-stage .is-focused .parlor-card-front { box-shadow: 0 10px 30px #0009, 0 0 20px #e9c98a26; }
-/* Labels occupy the existing caption row, not the card row: the focused artwork
-   keeps its released size and center. All three frames stay clear of its edges. */
-.parlor-narration-area { --frame-height: 28px; min-height: 0; height: 100%; display: grid; grid-template-rows: var(--frame-height) minmax(0, 1fr); }
-.parlor-slot-labels { --card-gap: clamp(12px, 3vw, 36px); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--card-gap); width: min(100%, 800px, max(216px, calc(1.2 * var(--spread-height) + 2 * var(--card-gap)))); margin: 0 auto; color: var(--parlor-gold); text-align: center; font: clamp(16px, 1.2vw, 22px)/1.2 var(--font-display); }
-.parlor-show .parlor-narration-area .parlor-caption { height: calc(var(--caption-height) - var(--frame-height)); }
+/* Labels follow the occupied artwork edge: ordinary slots when settled, the
+   enlarged card while focused. They never sit over the foreground art. */
+.parlor-narration-area { min-height: 0; height: 100%; }
+.parlor-slot-labels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--card-gap); width: min(100%, max(216px, var(--table-width))); margin: 0 auto; color: var(--parlor-gold); text-align: center; font: clamp(16px, 1.2vw, 22px)/1.2 var(--font-display); }
+.parlor-show .parlor-narration-area .parlor-caption { height: 100%; }
+@media (max-height: 600px) { .parlor-spread-stage { --frame-height: 22px; } }
 @media (prefers-reduced-motion: reduce) {
   .parlor-spread-stage figure, .parlor-spread-stage::before { transition: none; }
 }
