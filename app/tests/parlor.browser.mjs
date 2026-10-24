@@ -13,7 +13,7 @@ const deck={id:'parlor-fixture',slug:data.slug,name:data.name,tagline:'Synthetic
 const evidence=resolve(root,'../..','parlor-conversation-verification');
 let server,browser,context,page,authenticated=false,allowed=true,calls=0,mode='ok',release;
 const speechRequests=[],scribeRequests=[],scribeTypes=[];let scribeMode='ok',scribeRelease,ttsMode='ok',ttsRelease;
-const artSizes=[[945,1663],[958,1642],[971,1619],[1024,1536]];let artIndex=0;const artFixtures=[];
+const artSizes=[[945,1663],[958,1642],[971,1619],[1024,1536]];let artIndex=0,longNarration=false;const artFixtures=[];
 const json=(route,body,status=200)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
 const button=name=>page.getByRole('button',{name,exact:true});
 const stage=()=>page.getByLabel('Interactive reading',{exact:true});
@@ -37,10 +37,10 @@ async function summon(finish=true){
 }
 async function begin(){await button('Start the show').click();await summon();}
 async function talk(text,control=false){
-  const target=stage();await page.evaluate(text=>window.__utterance=text,text);
+  const target=control==='touch'?button('Hold to talk'):stage();await page.evaluate(text=>window.__utterance=text,text);
   const previousWords=await page.getByLabel('Your words',{exact:true}).innerText();
   if(control==='touch')await target.dispatchEvent('pointerdown',{pointerId:9,pointerType:'touch',button:0,isPrimary:true});
-  else if(control){await target.focus();await page.keyboard.down(control==='enter'?'Enter':'Space');}else{await target.hover({position:{x:10,y:10}});await page.mouse.down();}
+  else {await target.focus();await page.keyboard.down(control==='enter'?'Enter':'Space');}
   await cue().getByText('Speak now.',{exact:true}).waitFor();
   await radio('listening');
   assert.equal(await radioLevel(),0,'ambience stays silent throughout microphone capture');
@@ -48,7 +48,7 @@ async function talk(text,control=false){
   const before=scribeRequests.length;await page.waitForTimeout(300);assert.equal(scribeRequests.length,before,'no upload while held');
   assert.equal(await page.getByLabel('Your words',{exact:true}).innerText(),previousWords,'batch transcript is not simulated while recording');
   if(control==='touch')await target.dispatchEvent('pointerup',{pointerId:9,pointerType:'touch',button:0,isPrimary:true});
-  else if(control)await page.keyboard.up(control==='enter'?'Enter':'Space');else{await page.mouse.move(2,2);await page.mouse.up();}
+  else await page.keyboard.up(control==='enter'?'Enter':'Space');
   assert.equal(await page.evaluate(()=>window.__tracks.some(t=>!t.stopped)),false,'release stops all tracks');
   if(scribeMode==='ok' && await page.evaluate(()=>window.__micMode!=='empty'))await page.waitForFunction(text=>document.querySelector('.parlor-user-transcript').textContent===text,text);
 }
@@ -120,7 +120,7 @@ try{
       const request=route.request().postDataJSON(),prompt=ownerLanguage?'':request.messages.at(-1).content;
       const identities=ownerLanguage?(path.endsWith('narrate')?JSON.parse(Buffer.from(request.token,'base64url')).c.map(([slug])=>({slug,name:slug})):null):prompt.includes('CARD IDENTITIES IN ORDER\n')?JSON.parse(prompt.split('CARD IDENTITIES IN ORDER\n')[1]):null;
       if(!identities)assert.doesNotMatch(JSON.stringify(ownerLanguage?request.turns:request.messages),/\[(?:sighs|exhales|sarcastic|curious)\]/,'history has no delivery tags');
-      const text=identities?JSON.stringify({cards:identities.map(card=>({slug:card.slug,text:`[sarcastic] ${card.name} invites you to reflect on this position. Its authored meaning opens a possibility.`})),synthesis:'The cards invite reflection and a choice that remains yours.'}):'[curious] Stay with the meaning that resonates. What possibility does it open for you?';
+      const text=identities?JSON.stringify({cards:identities.map(card=>({slug:card.slug,text:`[sarcastic] ${card.name} invites you to reflect on this position. Its authored meaning opens a possibility.${longNarration?' Reflect on the choice before you, and consider what you might learn by making room for another possibility.'.repeat(14):''}`})),synthesis:'The cards invite reflection and a choice that remains yours.'}):'[curious] Stay with the meaning that resonates. What possibility does it open for you?';
       if(mode==='delay')await new Promise(r=>release=r);
       return json(route,ownerLanguage?(identities?JSON.parse(text):{text}):{content:[{type:'text',text}]});
     }
@@ -181,12 +181,14 @@ try{
   await page.reload();assert.equal(await page.getByLabel('ElevenLabs voice ID',{exact:true}).inputValue(),'synthetic-selected-voice');assert.equal(await page.locator('textarea').count(),0);await capture('setup');
   const before=await audioCount();await button('Start the show').click();await idle();assert.equal(await audioCount(),before);assert.equal(calls,0);
   assert.equal(await page.evaluate(()=>window.__radioContexts.length),0,'no AudioContext before a deliberate summon gesture');
-  // Early release, lost focus and pointer cancellation return to blank without voice or microphone.
-  for(const cancel of ['release','blur','pointer']){
-    if(cancel==='pointer')await stage().dispatchEvent('pointerdown',{pointerId:9,pointerType:'touch',button:0,isPrimary:true});else await page.keyboard.down('a');
+  // Touching/dragging the blank scene never starts a summon, recording or ambience.
+  await stage().dispatchEvent('pointerdown',{pointerId:9,pointerType:'touch',button:0,isPrimary:true});await page.clock.fastForward(7100);await stage().dispatchEvent('pointermove',{pointerId:9,clientY:100});await stage().dispatchEvent('pointercancel',{pointerId:9});await idle();assert.equal(await audioCount(),before);assert.equal(await page.evaluate(()=>window.__micRequests),0);assert.equal(await page.evaluate(()=>window.__radioContexts.length),0);
+  // Early physical-key release and lost focus return to blank without voice or microphone.
+  for(const cancel of ['release','blur']){
+    await page.keyboard.down('a');
     await page.locator('.parlor-summoning').waitFor();await radio('tuning');assert.equal(await page.locator('.parlor-slot').count(),3);assert.equal(await page.locator('.radio-needle').evaluate(el=>getComputedStyle(el).animationName),'none');assert.equal(await page.locator('.parlor-radio').evaluate(el=>el.style.getPropertyValue('--contact')),'0');
-    if(cancel==='pointer')await stage().dispatchEvent('pointercancel',{pointerId:9});else if(cancel==='blur')await page.evaluate(()=>window.dispatchEvent(new Event('blur')));
-    if(cancel!=='pointer')await page.keyboard.up('a');await idle();await page.clock.fastForward(7100);assert.equal(await audioCount(),before);assert.equal(await page.evaluate(()=>window.__micRequests),0);
+    if(cancel==='blur')await page.evaluate(()=>window.dispatchEvent(new Event('blur')));
+    await page.keyboard.up('a');await idle();await page.clock.fastForward(7100);assert.equal(await audioCount(),before);assert.equal(await page.evaluate(()=>window.__micRequests),0);
   }
   await page.emulateMedia({reducedMotion:'no-preference'});await page.keyboard.down('a');await radio('tuning');
   const progress=()=>page.locator('.parlor-radio').evaluate(el=>Number(el.style.getPropertyValue('--contact')));
@@ -211,7 +213,7 @@ try{
   await finishAudio();await phase('ready').waitFor();await page.waitForTimeout(250);assert.equal(await page.locator('.is-revealed').count(),1);await artwork();await capture('first-card-desktop');
   for(const text of ['Tell me more about this card','How does that connect to my question?']){const count=await audioCount();await talk(text,true);await waitAudio(count);assert.equal(await page.locator('.is-revealed').count(),1);assert.equal(await caption().innerText(),'');await finishAudio();await phase('ready').waitFor();}
   await page.setViewportSize({width:390,height:844});await page.evaluate(()=>window.__mimeType='audio/mp4');
-  const mobile=await audioCount();await talk('A touch-controlled mobile discussion','touch');await waitAudio(mobile);await finishAudio();await phase('ready').waitFor();if(ownerMode)assert.equal(scribeTypes.at(-1),'audio/mp4');else assert.match(scribeRequests.at(-1),/recording.m4a/);await artwork();await capture('discussion-mobile');
+  const mobile=await audioCount();await talk('A keyboard-controlled mobile discussion','enter');await waitAudio(mobile);await finishAudio();await phase('ready').waitFor();if(ownerMode)assert.equal(scribeTypes.at(-1),'audio/mp4');else assert.match(scribeRequests.at(-1),/recording.m4a/);await artwork();await capture('discussion-mobile');
   await page.evaluate(()=>window.__mimeType='audio/webm;codecs=opus');await page.setViewportSize({width:1280,height:960});
   for(let revealed=2;revealed<=3;revealed++){const count=await audioCount();await advance();await waitAudio(count);assert.equal(await page.locator('.is-revealed').count(),revealed);await finishAudio();}
   await phase('ready').waitFor();assert.match(await cue().innerText(),/hear the closing/);await capture('third-card-closing-cue');const closing=await audioCount();await advance();await waitAudio(closing);await finishAudio();await phase('complete').waitFor();assert.match(await cue().innerText(),/ask about the reading.*five times/s);await capture('complete-followup-cue');assert.equal(await page.locator('.parlor-show button').count(),0);
@@ -219,7 +221,6 @@ try{
   let previousCalls=calls,previousScribe=scribeRequests.length;await page.evaluate(()=>window.__micMode='denied');await stage().focus();await page.keyboard.down('Space');await page.locator('.parlor-cue[role="alert"][aria-description*="Microphone access was denied"]').waitFor();await page.keyboard.up('Space');assert.equal(calls,previousCalls);
   const starts=await page.evaluate(()=>window.__micStarts);await page.evaluate(()=>window.__micMode='pending');await stage().focus();await page.keyboard.down('Space');await page.waitForFunction(()=>!!window.__grant);await page.keyboard.up('Space');await page.evaluate(()=>window.__grant());assert.equal(await page.evaluate(()=>window.__micStarts),starts);assert.equal(await page.evaluate(()=>window.__tracks.some(t=>!t.stopped)),false);
   await page.evaluate(()=>window.__micMode='ok');await stage().focus();await page.keyboard.down('Space');await cue().getByText('Speak now.',{exact:true}).waitFor();await page.evaluate(()=>window.dispatchEvent(new Event('blur')));await page.keyboard.up('Space');assert.equal(calls,previousCalls);assert.equal(await page.evaluate(()=>window.__tracks.some(t=>!t.stopped)),false);
-  for(const event of ['pointercancel','lostpointercapture']){await stage().hover({position:{x:10,y:10}});await page.mouse.down();await cue().getByText('Speak now.',{exact:true}).waitFor();await stage().dispatchEvent(event,{pointerId:1,pointerType:'mouse'});await page.mouse.up();assert.equal(calls,previousCalls);assert.equal(await page.evaluate(()=>window.__tracks.some(t=>!t.stopped)),false);}
   await stage().focus();await page.keyboard.down('Space');await cue().getByText('Speak now.',{exact:true}).waitFor();await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));delete document.hidden;});await page.keyboard.up('Space');assert.equal(calls,previousCalls);assert.equal(scribeRequests.length,previousScribe);assert.equal(await page.evaluate(()=>window.__tracks.some(t=>!t.stopped)),false);
   await page.evaluate(()=>window.__micMode='empty');await talk('This clip is empty','enter');await page.locator('.parlor-cue[role="alert"][aria-description*="No audio was captured"]').waitFor();assert.equal(scribeRequests.length,previousScribe);
   await page.evaluate(()=>window.__micMode='ok');scribeMode='silent';await talk('No speech',true);await page.locator('.parlor-cue[role="alert"][aria-description*="No speech was heard"]').waitFor();assert.equal(calls,previousCalls);
@@ -250,8 +251,31 @@ try{
   // Cancellation fences late LLM and late speech, preserves no guest data on return.
   mode='delay';const count=await audioCount();await talk('A delayed discussion',true);await page.waitForFunction(()=>document.querySelector('.parlor-cue-title').textContent.includes('considering'));assert.ok(release);await escape();release();mode='ok';await page.waitForTimeout(150);assert.equal(await audioCount(),count);
   assert.equal(await page.evaluate(()=>JSON.stringify(localStorage).includes('synthetic spoken query')),false);
+  // Real browser touch input scrolls the spoken caption and the tall page. It
+  // must not be interpreted as a tap/hold or leak a delayed encounter action.
+  longNarration=true;await begin();const longAudio=await audioCount();await tap();await waitAudio(longAudio);await finishAudio();await phase('ready').waitFor();await page.setViewportSize({width:390,height:640});
+  const scrollRequests={calls,scribe:scribeRequests.length,audio:await audioCount(),mic:await page.evaluate(()=>window.__micRequests)};
+  const cdp=await context.newCDPSession(page);
+  async function swipe(target){
+    const box=await target.boundingBox();assert.ok(box);const x=Math.round(box.x+box.width/2),bottom=Math.min((await page.viewportSize()).height-30,box.y+box.height-15),top=Math.max(30,box.y+15);assert.ok(bottom-top>60,'swipe target is visible');
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y:bottom}]});
+    for(let i=1;i<=8;i++){await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:bottom-(bottom-top)*i/8}]});await page.waitForTimeout(25);}
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await page.waitForTimeout(300);
+  }
+  await caption().scrollIntoViewIfNeeded();assert.ok(await caption().evaluate(el=>el.scrollHeight>el.clientHeight+100),'fixture produces a genuinely scrollable caption');
+  assert.equal(await caption().evaluate(el=>{for(let n=el;n;n=n.parentElement)if(getComputedStyle(n).touchAction==='none')return false;return true;}),true,'no guest ancestor blocks native touch panning');
+  await swipe(caption());assert.ok(await caption().evaluate(el=>el.scrollTop)>0,'native touch scrolls the caption');
+  await page.setViewportSize({width:390,height:360});await page.evaluate(()=>window.scrollTo(0,0));assert.ok(await page.evaluate(()=>document.documentElement.scrollHeight>innerHeight+100),'mobile scene really overflows the page');
+  await swipe(page.locator('.parlor-table'));assert.ok(await page.evaluate(()=>window.scrollY)>0,'native touch scrolls the page from the card scene');
+  for(const end of ['pointerup','pointercancel']){await caption().dispatchEvent('pointerdown',{pointerId:17,pointerType:'touch',button:0,isPrimary:true});await page.clock.fastForward(600);await caption().dispatchEvent('pointermove',{pointerId:17,clientY:20});await caption().dispatchEvent(end,{pointerId:17,pointerType:'touch'});}
+  await page.clock.fastForward(600);assert.deepEqual({calls,scribe:scribeRequests.length,audio:await audioCount(),mic:await page.evaluate(()=>window.__micRequests)},scrollRequests,'scroll, held drag and cancellation never request a microphone, provider or advance');assert.equal(await page.locator('.is-revealed').count(),1);
+  await stage().focus();await advance();await waitAudio(scrollRequests.audio);await finishAudio();assert.equal(await page.locator('.is-revealed').count(),2,'deliberate physical input still advances after scrolling');
+  await cdp.detach();await escape();longNarration=false;await page.setViewportSize({width:1280,height:960});
   await page.getByLabel('Show operator controls while testing',{exact:true}).check();
   await begin();const n=await audioCount();await talk('Pause this reading',true);await waitAudio(n);await button('Pause reading').click();await button('Retry this step').waitFor();assert.ok(await page.evaluate(()=>window.__audioCleared>0));await button('Read without audio').click();await phase('ready').waitFor();
+  const touchAudio=await audioCount();await talk('Intentional operator touch discussion','touch');await waitAudio(touchAudio);await finishAudio();await phase('ready').waitFor();
+  const cancelledInput={calls,scribe:scribeRequests.length};
+  for(const event of ['pointercancel','lostpointercapture']){const target=button('Hold to talk');await target.dispatchEvent('pointerdown',{pointerId:9,pointerType:'touch',button:0,isPrimary:true});await cue().getByText('Speak now.',{exact:true}).waitFor();await target.dispatchEvent(event,{pointerId:9,pointerType:'touch'});await target.dispatchEvent('pointerup',{pointerId:9,pointerType:'touch'});assert.deepEqual({calls,scribe:scribeRequests.length},cancelledInput);assert.equal(await page.evaluate(()=>window.__tracks.some(t=>!t.stopped)),false);}
   await page.locator('.parlor-sound-options summary').click();await page.getByLabel('Mute radio ambience',{exact:true}).check();assert.equal(await radioLevel(),0);
   const radioVolume=page.getByLabel('Radio ambience volume',{exact:true});await radioVolume.focus();await page.keyboard.press('End');assert.equal(await radioVolume.inputValue(),'100');assert.equal(await radioLevel(),0);assert.equal(await page.locator('.is-revealed').count(),1,'sound controls do not reset the reading');
   await page.getByLabel('Mute radio ambience',{exact:true}).uncheck();await page.waitForFunction(()=>window.__radioLevel()>0);assert.ok(await radioLevel()<=1);await page.locator('.parlor-sound-options summary').click();
@@ -260,6 +284,6 @@ try{
   await page.evaluate(()=>window.__radioUnavailable=true);await begin();await page.locator('.parlor-sound-options summary').click();await page.getByText('Radio ambience is unavailable. The reading continues.',{exact:true}).waitFor();await escape();await page.evaluate(()=>window.__radioUnavailable=false);await page.getByLabel('Show operator controls while testing',{exact:true}).uncheck();
   await begin();await stage().focus();await page.keyboard.down('Space');await cue().getByText('Speak now.',{exact:true}).waitFor();authenticated=false;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.getByText('Parlor access is restricted.',{exact:true}).waitFor();assert.equal(await page.locator('.parlor-show').count(),0);
   await page.clock.fastForward(100);assert.equal(await page.evaluate(()=>window.__radioContexts.every(c=>c.state==='closed')),true,'logout closes ambience contexts');
-  assert.equal(await page.evaluate(()=>window.__tracks.some(t=>!t.stopped)),false);await page.keyboard.up('Space');assert.ok(speechRequests.length>=8);assert.ok(scribeRequests.length>=8);console.log('PASS: global tap/hold/five-tap reset, overlapping keys and repeat, no tap microphone access, late transcription/narration/reading fences, saved choices retained, setup exclusion, four artwork proportions on desktop/mobile, v3 selected voice and aligned captions, per-card discussion, explicit advance, held-only Scribe v2, touch/MP4, denial/empty/error/cancellation, Escape/logout cleanup. Synthetic providers and microphone only.');
+  assert.equal(await page.evaluate(()=>window.__tracks.some(t=>!t.stopped)),false);await page.keyboard.up('Space');assert.ok(speechRequests.length>=8);assert.ok(scribeRequests.length>=8);console.log('PASS: global tap/hold/five-tap reset, overlapping keys and repeat, no tap microphone access, late transcription/narration/reading fences, saved choices retained, setup exclusion, four artwork proportions on desktop/mobile, v3 selected voice and aligned captions, per-card discussion, explicit advance, held-only Scribe v2, native touch caption/page scrolling without encounter input, explicit operator touch and cancellation, MP4, denial/empty/error/cancellation, Escape/logout cleanup. Synthetic providers and microphone only.');
 }catch(error){if(page&&!page.isClosed())await page.screenshot({path:resolve(evidence,'failure.png'),fullPage:true});throw error;}
 finally{release?.();scribeRelease?.();ttsRelease?.();await context?.close();await browser?.close();await new Promise(r=>server?.httpServer?server.httpServer.close(r):r());console.log('Cleanup: browser, context and local preview closed.');}

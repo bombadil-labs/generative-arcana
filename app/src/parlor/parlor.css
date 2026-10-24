@@ -110,7 +110,7 @@
 
 /* One quiet side cue; the central projection contains only the apparatus, cards
    and spoken text. Operator tools are explicitly enabled from setup. */
-.parlor-show .parlor-ritual { display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, 240px); gap: clamp(24px, 4vw, 64px); max-width: 1480px; touch-action: none; user-select: none; }
+.parlor-show .parlor-ritual { display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, 240px); gap: clamp(24px, 4vw, 64px); max-width: 1480px; }
 .parlor-scene { min-width: 0; position: relative; isolation: isolate; }
 .parlor-cue { align-self: center; border-left: 1px solid #a98b5e; padding-left: clamp(18px, 2vw, 28px); overflow-wrap: anywhere; }
 .parlor .parlor-cue-title { color: #f1d8ab; font: 400 clamp(20px, 1.8vw, 28px)/1.55 var(--font-display); margin: 0; }
@@ -128,3 +128,7 @@
   .parlor-show .parlor-idle .parlor-cue { border: 0; }
   .parlor-show .parlor-caption { font-size: 20px; }
 }
+
+/* Only the explicit operator test button consumes touch gestures. The guest
+   scene, caption scroller and page retain native panning and text selection. */
+.parlor-operator-talk { touch-action: none; user-select: none; }

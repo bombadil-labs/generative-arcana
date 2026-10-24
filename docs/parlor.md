@@ -46,7 +46,8 @@ failed delivery is not committed until a retry or explicit silent fallback compl
 
 While the encounter is open, ordinary keys work anywhere in the guest view without
 focusing a button. There are no visible guest buttons, inputs or menus. The scene
-itself accepts the same pointer gestures for setup testing and touch devices.
+does not consume pointer gestures: touch scrolling, dragging and text selection
+cannot summon, advance or start recording. Long captions retain native scrolling.
 
 - After the introduction, hold for **450 ms**, wait for **Speak now**, speak, then release to submit. Microphone
   permission/startup can take longer than the threshold. Short taps never request access.
@@ -75,7 +76,9 @@ and user text above the cards contains only the guest's actual transcript.
 
 Escape returns to setup, including radio mute/volume and the optional **Show operator
 controls while testing** checkbox. It is off by default and is not persisted across
-reloads. When enabled, the host can pause/retry, read without audio, cancel transcription,
+reloads. When enabled, a dedicated Hold to talk button supports intentional pointer
+and touch testing; only that button captures its gesture. The host can pause/retry,
+read without audio, cancel transcription,
 inspect detailed errors and adjust Radio sound during the test encounter. Leave it
 unchecked for guests. Error details also remain available to assistive technology;
 the projected cue gives concise recovery instructions. A single tap retries paused

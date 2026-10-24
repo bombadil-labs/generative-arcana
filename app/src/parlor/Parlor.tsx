@@ -230,12 +230,11 @@ function Ritual({ deckId, settings, leave, radioPreferences, changeRadio, operat
   const idle = state.phase === "idle";
   const summoning = state.phase === "summoning";
   const contact = summoning || state.phase === "calling" || state.phase === "awaiting-release";
+  const canTalk = speechInputAvailable && (state.phase === "question" || state.phase === "complete" || state.phase === "ready" && state.segment > 0) && mic.phase !== "finishing";
   const signal = radioState(state, mic);
   const cue = guestCue(state, mic, speechInputAvailable);
   return <div ref={stage} tabIndex={-1} className={`parlor-ritual${idle ? " parlor-idle" : ""}${summoning ? " parlor-summoning" : ""}`} aria-label="Interactive reading" aria-describedby="parlor-guest-cue" data-phase={state.phase}
-    onPointerDown={event => { if (event.button !== 0 || !event.isPrimary || (event.target as Element).closest("[data-parlor-operator]")) return; event.preventDefault(); stage.current?.focus({ preventScroll: true }); try { event.currentTarget.setPointerCapture(event.pointerId); } catch {} controls.down("pointer:" + event.pointerId); }}
-    onPointerUp={event => controls.up("pointer:" + event.pointerId)} onPointerCancel={cancelMic} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) controls.cancel(); }}
-    onLostPointerCapture={event => { if (controls.owns("pointer:" + event.pointerId)) controls.cancel(); }} onContextMenu={event => { if (!(event.target as Element).closest("[data-parlor-operator]")) event.preventDefault(); }}>
+    onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) controls.cancel(); }}>
     <div className="parlor-scene">
     <RadioSignal signal={signal} startedAt={state.summonStartedAt} showLabel={false} />
     {!idle && !contact && <div className="parlor-user-transcript" aria-label="Your words" aria-live="polite">{state.userText}</div>}
@@ -259,6 +258,13 @@ function Ritual({ deckId, settings, leave, radioPreferences, changeRadio, operat
       <p className="parlor-cue-title">{cue.title}</p>{cue.instruction && <p className="parlor-cue-detail">{cue.instruction}</p>}
     </aside>
     {operatorControls && !idle && <div className="parlor-operator-controls" data-parlor-operator aria-label="Operator controls">
+      {/* Keep focus on release: native disabled would blur and cancel transcription. */}
+      <button className="parlor-operator-talk" aria-pressed={mic.phase === "listening"} aria-disabled={!canTalk}
+        onPointerDown={event => { if (!canTalk || event.button !== 0 || !event.isPrimary) return; event.preventDefault(); event.currentTarget.focus(); try { event.currentTarget.setPointerCapture(event.pointerId); } catch {} controls.down("pointer:" + event.pointerId); }}
+        onPointerUp={event => controls.up("pointer:" + event.pointerId)} onPointerCancel={cancelMic}
+        onLostPointerCapture={event => { if (controls.owns("pointer:" + event.pointerId)) controls.cancel(); }} onBlur={cancelMic} onContextMenu={event => event.preventDefault()}
+        onKeyDown={event => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); if (canTalk) controls.down("operator:" + event.key, event.repeat); } }}
+        onKeyUp={event => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); controls.up("operator:" + event.key); } }}>Hold to talk</button>
       {!idle && state.timing === "segment" && <p>Timing is unavailable. Captions appear after each spoken segment.</p>}
       {!idle && state.timing === "silent" && <p>Reading without audio.</p>}
       {busy && <button data-parlor-operator onClick={() => { controls.cancel(); machine.cancel(); }}>Pause reading</button>}

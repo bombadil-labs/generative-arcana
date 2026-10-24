@@ -122,6 +122,20 @@ test('confirm then reset and navigation clear guest state; no questions in URL/s
   // Real entry uses a document navigation so the server rechecks authorization.
   await act(async()=>{window.history.pushState(null,'','/parlor');window.dispatchEvent(new dom.window.PopStateEvent('popstate'));});await settle();assert.equal(window.location.pathname,'/parlor');assert.ok(button('Start the show'));
 });
+test('guest pointer taps, held drags and cancellation cannot summon or advance',async()=>{
+  await mount();await click('Start the show');
+  async function drag(target,end){
+    const pointer=type=>{const event=new dom.window.Event(type,{bubbles:true,cancelable:true});Object.assign(event,{pointerId:9,pointerType:'touch',button:0,isPrimary:true});return event;};
+    await act(async()=>{const event=pointer('pointerdown');target.dispatchEvent(event);assert.equal(event.defaultPrevented,false,'native panning remains available');});
+    await act(async()=>{await new Promise(r=>realSetTimeout(r,30));});
+    await act(async()=>{target.dispatchEvent(pointer('pointermove'));target.dispatchEvent(pointer(end));});await settle();
+  }
+  await drag(document.querySelector('.parlor-ritual'),'pointercancel');assert.ok(document.querySelector('.parlor-idle'));assert.equal(providerCalls,0);
+  await escape();await guest();const transcript=document.querySelector('.parlor-caption');
+  for(const end of ['pointerup','pointercancel','lostpointercapture'])await drag(transcript,end);
+  assert.equal(providerCalls,1);assert.equal(document.querySelectorAll('.is-revealed').length,1);assert.equal(document.querySelectorAll('.parlor-show button').length,0);
+  await tap();assert.equal(document.querySelectorAll('.is-revealed').length,2,'physical input still advances');
+});
 test('account change with same email interrupts and fences pending response',async()=>{
   await mount();delayed=true;await guest();assert.equal(providerCalls,1);assert.ok(lateResolve);
   accountId='different-account';await act(async()=>sessionControl.refresh());await settle();lateResolve();await settle();
