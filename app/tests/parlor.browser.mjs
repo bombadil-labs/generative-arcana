@@ -16,7 +16,7 @@ const deck={id:'parlor-fixture',slug:data.slug,name:data.name,tagline:'Synthetic
 const evidence=resolve(root,'../..','parlor-conversation-verification');
 let server,browser,context,page,authenticated=false,allowed=true,calls=0,mode='ok',release;
 const speechRequests=[],scribeRequests=[],scribeTypes=[],languageRequests=[];let scribeMode='ok',scribeRelease,ttsMode='ok',ttsRelease;
-const artSizes=[[945,1663],[958,1642],[971,1619],[1024,1536]];let artIndex=0,longNarration=false;const artFixtures=[];
+const artSizes=[[945,1663],[958,1642],[971,1619],[1024,1536]];let artIndex=0,longNarration=false;const artFixtures=[],artRequests=[];
 const json=(route,body,status=200)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
 const button=name=>page.getByRole('button',{name,exact:true});
 const stage=()=>page.getByLabel('Interactive reading',{exact:true});
@@ -149,7 +149,7 @@ async function run(){
 try{
   await mkdir(evidence,{recursive:true});server=await preview({root,preview:{host:'127.0.0.1',port:4187,strictPort:true}});
   browser=await chromium.launch({headless:true,...(process.env.PARLOR_BROWSER?{executablePath:process.env.PARLOR_BROWSER}:{channel:'msedge'})});
-  context=await browser.newContext({viewport:{width:1280,height:960},reducedMotion:'reduce',hasTouch:true});context.setDefaultTimeout(12000);
+  context=await browser.newContext({viewport:{width:1280,height:960},reducedMotion:'reduce',hasTouch:true,deviceScaleFactor:Number(process.env.PARLOR_DPR||1)});context.setDefaultTimeout(12000);
   await context.addInitScript(()=>{
     // Stub the output device as well as TTS: automated UI tests emit no real sound.
     window.__radioContexts=[];window.__radioUnavailable=false;
@@ -232,7 +232,7 @@ try{
     if(path==='/api/me/decks')return json(route,[deck]);
     if(path==='/api/decks/parlor-fixture')return json(route,deck);
     if(path.startsWith('/api/decks/parlor-fixture/artwork/assets/'))return json(route,{},404);
-    if(/^\/api\/decks\/parlor-fixture\/cards\/[^/]+\/artwork\/image$/.test(path))return route.fulfill({contentType:'image/webp',body:artFixtures[artIndex]});
+    if(/^\/api\/decks\/parlor-fixture\/cards\/[^/]+\/artwork\/image$/.test(path)){artRequests.push(url);return route.fulfill({contentType:'image/webp',body:artFixtures[artIndex]});}
     if(path.startsWith('/api/decks/parlor-fixture/artwork'))return json(route,{enabled:true,deckRevision:1,packId:'saved-artwork',packs:[{id:'saved-artwork',label:'Saved artwork',cardCount:Object.keys(data.cards).length,complete:true}],cards:Object.values(data.cards).map(card=>({slug:card.slug,name:card.name,artwork:{id:`synthetic-art-${artIndex}-${card.slug}`,deckId:deck.id,cardSlug:card.slug,packId:'saved-artwork',mediaType:'image/webp',width:artSizes[artIndex][0],height:artSizes[artIndex][1],byteLength:artFixtures[artIndex].length,integrity:'synthetic',deckRevision:1}}))});
     if(path.startsWith('/api/'))return json(route,{},404);
     return route.continue();
@@ -483,43 +483,49 @@ try{
   await page.getByLabel('Read without audio',{exact:true}).check();const beforeSilent=await audioCount();await button('Start the show').click();await pressA();await page.clock.fastForward(7000);await finishSilent();await phase('awaiting-release').waitFor();await page.keyboard.up('a');await finishSilent();await phase('question').waitFor();assert.equal(await audioCount(),beforeSilent);
   await advance();await page.locator('.parlor-caption.is-silent').waitFor();await page.waitForFunction(()=>document.querySelector('.parlor-ritual').dataset.phase==='speaking');await resetEncounter();assert.equal(await page.locator('[data-silent-measure]').count(),0);await page.clock.fastForward(60000);await idle();assert.equal(await audioCount(),beforeSilent);await escape();await page.getByLabel('Read without audio',{exact:true}).uncheck();
   }
-  // Optional authored deck notes never enter provider payloads or reveal future cards.
+  // Optional static deck notes are separate from spoken captions and never page.
   const detailsToggle=page.getByLabel('Show card details beside the current card',{exact:true});assert.equal(await detailsToggle.isChecked(),false);
   await detailsToggle.check();await page.reload();assert.equal(await detailsToggle.isChecked(),true);
   await begin();assert.equal(await page.locator('.parlor-card-details').count(),0);let detailsAudio=await audioCount();await advance();await waitAudio(detailsAudio);await finishAudio();await phase('ready').waitFor();
-  const details=page.getByLabel('Current card deck notes',{exact:true}),notes=page.locator('.parlor-details-text');await details.waitFor();
-  const firstSlug=await details.getAttribute('data-card');assert.equal(await page.locator('.is-revealed').count(),1);
-  for(const viewport of [{width:1920,height:1080},{width:2560,height:1440},{width:1280,height:600},{width:1024,height:768},{width:768,height:1024},{width:600,height:1200},{width:390,height:844},{width:390,height:640},{width:390,height:360},{width:844,height:390}]){
-    await page.setViewportSize(viewport);await page.waitForTimeout(100);
-    const g=await notes.evaluate(el=>{const r=n=>n.getBoundingClientRect().toJSON(),card=document.querySelector('figure.is-focused'),cap=document.querySelector('.parlor-caption');return {notes:r(el),card:r(card),panel:r(el.parentElement),caption:r(cap),font:parseFloat(getComputedStyle(el).fontSize),height:document.documentElement.scrollHeight,width:document.documentElement.scrollWidth,scroll:el.scrollHeight,text:el.textContent};});
-    assert.ok(g.card.right<=g.panel.x+1&&g.card.x>=0,'focused art is left of deck notes: '+JSON.stringify(g));
-    assert.ok(g.panel.bottom<=g.caption.y+1&&g.notes.height>=24&&g.font>=17,'details stay readable above captions: '+JSON.stringify(g));
-    assert.ok(g.scroll<=g.notes.height+1&&g.height<=viewport.height+1&&g.width<=viewport.width+1,'notes fit without clipping or page scrolling: '+JSON.stringify(g));
-    assert.equal(await details.getAttribute('data-card'),firstSlug);assert.equal(await page.locator('.is-revealed').count(),1);await capture(`card-details-${viewport.width}x${viewport.height}`);
+  const details=page.getByLabel('Current card deck notes',{exact:true});await details.waitFor();
+  const firstSlug=await details.getAttribute('data-card');assert.equal(await page.locator('.is-revealed').count(),1);const source=artRequests.findLast(url=>url.pathname.includes('/cards/'+firstSlug+'/'));assert.ok(source);assert.equal(source.searchParams.get('packId'),'saved-artwork');assert.equal(source.searchParams.get('version'),'synthetic-art-0-'+firstSlug);assert.deepEqual([...source.searchParams.keys()].sort(),['packId','version']);
+  const sizes=[{width:1360,height:768},{width:1920,height:1080},{width:1024,height:768},{width:800,height:600},{width:1024,height:600},{width:800,height:480},{width:390,height:844},{width:390,height:640},{width:320,height:568},{width:844,height:390}];
+  async function lightboxFits(viewport){
+    await page.setViewportSize(viewport);await page.waitForTimeout(120);
+    await page.waitForFunction(()=>document.querySelector('.parlor-lightbox-art img')?.naturalWidth>0);
+    const g=await details.evaluate(el=>{
+      const r=n=>n.getBoundingClientRect().toJSON(),panel=el.closest('.parlor-details-lightbox'),art=panel.querySelector('.parlor-lightbox-art'),img=art.querySelector('img'),cap=document.querySelector('.parlor-caption'),cue=document.querySelector('.parlor-cue'),note=document.querySelector('.parlor-shortcut-note');
+      const words=[];const walker=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);let node;
+      while(node=walker.nextNode()){const range=document.createRange();for(const m of node.textContent.matchAll(/\S+/gu)){range.setStart(node,m.index);range.setEnd(node,m.index+m[0].length);words.push(...[...range.getClientRects()].map(b=>b.toJSON()));}}
+      const b=r(el),scale=Math.min(art.clientWidth/img.naturalWidth,art.clientHeight/img.naturalHeight);
+      return {notes:b,art:r(art),panel:r(panel),caption:r(cap),cue:r(cue),footer:r(note),font:parseFloat(getComputedStyle(el).fontSize),height:document.documentElement.scrollHeight,width:document.documentElement.scrollWidth,scroll:el.scrollHeight,level:panel.dataset.detailLevel,wordsFit:words.every(w=>w.x>=b.x-1&&w.right<=b.right+1&&w.y>=b.y-1&&w.bottom<=b.bottom+1),natural:[img.naturalWidth,img.naturalHeight],rendered:[img.naturalWidth*scale,img.naturalHeight*scale],dpr:devicePixelRatio,fit:getComputedStyle(img).objectFit,transform:art.style.transform,text:el.textContent};
+    });
+    assert.ok(g.wordsFit&&g.scroll<=g.notes.height+1,'all summary words fit without scrolling or clipping: '+JSON.stringify(g));
+    assert.ok(g.panel.bottom<=g.caption.y+1&&g.font>=18,'summary stays readable above independent captions: '+JSON.stringify(g));
+    assert.ok(g.panel.x>=0&&g.panel.y>=0&&g.height<=viewport.height+1&&g.width<=viewport.width+1,'lightbox fits viewport: '+JSON.stringify(g));
+    assert.ok(g.art.right<=g.notes.x+1||g.art.bottom<=g.notes.y+1,'art cannot overlap summary: '+JSON.stringify(g));
+    assert.ok(g.caption.bottom<=g.footer.y+1||g.caption.right<=g.footer.x+1,'footer never obscures captions: '+JSON.stringify(g));
+    assert.deepEqual(g.natural,[945,1663]);assert.equal(g.fit,'contain');
+    assert.equal(await details.getAttribute('data-card'),firstSlug);assert.equal(await page.locator('.is-revealed').count(),1);
+    const runs=await details.locator('[data-meaning]').evaluateAll(nodes=>nodes.map(n=>({kind:n.dataset.meaning,secondary:n.classList.contains('parlor-meaning-secondary'),text:n.textContent,color:getComputedStyle(n).color})));
+    assert.equal(runs.length,2);const orientation=await details.getAttribute('data-orientation');
+    for(const run of runs){assert.equal(run.secondary,orientation==='Reversed'?run.kind==='upright':run.kind==='reversed');assert.match(run.text,/drawn/);if(run.secondary)assert.equal(run.color,'rgb(185, 179, 187)');}
+    if(viewport.width===1360)console.log('Primary projector lightbox',JSON.stringify(g));
+    await capture(`lightbox-${viewport.width}x${viewport.height}`);return g;
   }
-  await page.setViewportSize({width:390,height:640});await page.waitForTimeout(100);
-  const pages=[];for(let i=0;i<30;i++){const text=await notes.textContent();pages.push(text);await page.clock.fastForward(silentExports.silentPageMs(text)+100);await page.waitForTimeout(10);if(i>0&&(await notes.textContent())===pages[0])break;}
-  assert.ok(pages.length>1);assert.match(pages.join(' '),/Scene:/);assert.match(pages.join(' '),/Upright meaning/);assert.match(pages.join(' '),/Reversed meaning/);assert.equal(await page.locator('.is-revealed').count(),1,'deck-note pages do not advance the reading');
-  detailsAudio=await audioCount();ttsMode='delay';await advance();await pending(()=>ttsRelease);assert.equal(await details.count(),0);ttsRelease();ttsRelease=null;ttsMode='ok';await waitAudio(detailsAudio);await finishAudio();assert.notEqual(await details.getAttribute('data-card'),firstSlug);
-  const labelEvidence=[];
-  for(let i=0;i<80;i++){
-    const runs=await notes.locator('[data-meaning]').evaluateAll(nodes=>nodes.map(n=>({kind:n.dataset.meaning,text:n.textContent,secondary:n.classList.contains('parlor-meaning-secondary'),color:getComputedStyle(n).color,font:getComputedStyle(n).fontSize})));
-    labelEvidence.push(...runs);const text=await notes.textContent();await page.clock.fastForward(silentExports.silentPageMs(text)+100);await page.waitForTimeout(10);
-    if(labelEvidence.some(r=>r.kind==='upright')&&labelEvidence.some(r=>r.kind==='reversed'))break;
-  }
-  assert.deepEqual([...new Set(labelEvidence.map(run=>run.kind))].sort(),['reversed','upright'],'both meanings render with explicit orientation styles');
-  const orientation=await details.getAttribute('data-orientation');
-  for(const run of labelEvidence){assert.equal(run.secondary,orientation.includes('Reversed')?run.kind==='upright':run.kind==='reversed');assert.ok(parseFloat(run.font)>=17);if(run.secondary)assert.equal(run.color,'rgb(185, 179, 187)');}
+  for(const size of sizes)await lightboxFits(size);
+  const stable=await details.textContent();await page.clock.fastForward(120000);assert.equal(await details.textContent(),stable,'single-screen summary never auto-pages');assert.equal(await page.locator('.is-revealed').count(),1);
+  detailsAudio=await audioCount();ttsMode='delay';await advance();await pending(()=>ttsRelease);assert.equal(await details.count(),0);ttsRelease();ttsRelease=null;ttsMode='ok';await waitAudio(detailsAudio);await finishAudio();await phase('ready').waitFor();assert.notEqual(await details.getAttribute('data-card'),firstSlug);
   await resetEncounter();assert.equal(await details.count(),0);assert.equal(await page.locator('[data-silent-measure]').count(),0);await page.clock.fastForward(60000);await idle();await escape();assert.equal(await detailsToggle.isChecked(),true);
-  // Pathological authored names page at the same readable size rather than overflowing.
+  // Long authored data is visibly excerpted, never rewritten, and stays intact for the reader.
   for(const card of Object.values(data.cards)){card.name+=' - '+ 'A long authored name '.repeat(10).trim();card.meaning={upright:'UPRIGHT_BEGIN '+ 'A patient possibility. '.repeat(12)+'UPRIGHT_END',inverted:'REVERSED_BEGIN '+ 'A different possibility. '.repeat(12)+'REVERSED_END'};}
-  await page.reload();await begin();detailsAudio=await audioCount();await advance();await waitAudio(detailsAudio);await finishAudio();await phase('ready').waitFor();await notes.waitFor();await page.waitForTimeout(100);
-  const longPages=[];for(let i=0;i<20;i++){const text=await notes.textContent();longPages.push(text);assert.equal(await notes.evaluate(el=>el.scrollHeight<=el.clientHeight+1),true);await page.clock.fastForward(silentExports.silentPageMs(text)+100);await page.waitForTimeout(10);if(longPages.join(' ').includes('Scene:'))break;}
-  assert.match(longPages.join(' '),/A long authored name/);assert.match(longPages.join(' '),/Scene:/);
-  const meaningPages=[];for(let i=0;i<160;i++){const text=await notes.textContent();meaningPages.push(text);assert.equal(await notes.evaluate(el=>el.scrollHeight<=el.clientHeight+1),true);await page.clock.fastForward(silentExports.silentPageMs(text)+100);await page.waitForTimeout(10);if(meaningPages.join('').includes('REVERSED_END'))break;}
-  for(const marker of ['UPRIGHT_BEGIN','UPRIGHT_END','REVERSED_BEGIN','REVERSED_END'])assert.ok(meaningPages.join('').includes(marker),'full authored meaning survives pages: '+marker);assert.equal(await page.locator('.is-revealed').count(),1);
-  await resetEncounter();await escape();await detailsToggle.uncheck();await page.reload();assert.equal(await detailsToggle.isChecked(),false);await page.setViewportSize({width:1280,height:960});
-  if(process.env.PARLOR_DETAILS_ONLY==='1'){console.log('PASS focused deck notes: both complete meanings, orientation styling, measured pages, ten viewports, long names, reset/advance and no future metadata. Synthetic providers only.');return;}
+  await page.reload();await begin();detailsAudio=await audioCount();await advance();await waitAudio(detailsAudio);await finishAudio();await phase('ready').waitFor();
+  for(const viewport of sizes){await page.setViewportSize(viewport);await page.waitForTimeout(120);const info=await details.evaluate(el=>({text:el.textContent,overflow:el.scrollHeight>el.clientHeight+1,font:parseFloat(getComputedStyle(el).fontSize)}));assert.equal(info.overflow,false,JSON.stringify({viewport,info}));assert.ok(info.font>=18);assert.match(info.text,/UPRIGHT_BEGIN/);assert.match(info.text,/REVERSED_BEGIN/);assert.doesNotMatch(info.text,/UPRIGHT_END|REVERSED_END/);}
+  if(!ownerMode)assert.match(JSON.stringify(languageRequests.at(-1)),/UPRIGHT_END/,'full authored BYOK provider context remains independent of excerpts');
+  assert.ok(Object.values(data.cards).every(card=>card.meaning.upright.endsWith('UPRIGHT_END')),'presentation cannot mutate the server-loaded authored source');
+  await resetEncounter();await escape();await detailsToggle.uncheck();await page.reload();assert.equal(await detailsToggle.isChecked(),false);await page.setViewportSize({width:1360,height:768});
+  await begin();detailsAudio=await audioCount();await advance();await waitAudio(detailsAudio);await finishAudio();await phase('ready').waitFor();assert.equal(await page.locator('.parlor-details-lightbox').count(),0);await focused(0);await escape();
+  if(process.env.PARLOR_DETAILS_ONLY==='1'){console.log('PASS focused lightbox: both labelled authored meaning excerpts, no summary paging, full saved artwork, ten viewports including 1360x768, long data, reset/advance and optional-off centered focus. Synthetic providers only.');return;}
   if(transcriptMode){
     await page.getByText(/Text questions, generated responses and presentation diagnostics are sent to temporary Vercel runtime logs/).waitFor();
     const events=transcriptRequests.flatMap(b=>b.events??[]);for(const kind of ['user_input','assistant_generated','presentation_progress','presentation_completed','presentation_interrupted','encounter_closed'])assert.ok(events.some(e=>e.kind===kind),'browser emits '+kind);
@@ -529,7 +535,7 @@ try{
   await begin();await stage().focus();await page.keyboard.down('Space');await cue().getByText('Speak now.',{exact:true}).waitFor();authenticated=false;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.getByText('Parlor access is restricted.',{exact:true}).waitFor();assert.equal(await page.locator('.parlor-show').count(),0);
   const transcriptCount=transcriptRequests.length;await page.clock.fastForward(5000);await page.waitForTimeout(50);assert.equal(transcriptRequests.length,transcriptCount,'logout stops queued logging');
   await page.clock.fastForward(100);assert.equal(await page.evaluate(()=>window.__radioContexts.every(c=>c.state==='closed')),true,'logout closes ambience contexts');
-  assert.equal(await page.evaluate(()=>window.__tracks.some(t=>!t.stopped)),false);await page.keyboard.up('Space');assert.ok(speechRequests.length>=8);assert.ok(scribeRequests.length>=8);console.log('PASS: global tap/hold/five-tap reset, overlapping keys and repeat, no tap microphone access, late transcription/narration/reading fences, saved choices retained, setup exclusion, four artwork proportions on desktop/mobile, v3 selected voice and aligned captions, per-card discussion, explicit advance, held-only Scribe v2, centered rolling captions and long questions across twelve viewport sizes, no read-ahead or page scrolling, full conversation retained, complete measured silent pages with reading time and reset-safe advance guards, touch drags without encounter input, explicit operator touch and cancellation, busy keyboard/pointer lock with five-tap reset and no replay, optional account-persisted deck notes with measured pages across ten viewports and current-only metadata, MP4, denial/empty/error/cancellation, Escape/logout cleanup. Synthetic providers and microphone only.');
+  assert.equal(await page.evaluate(()=>window.__tracks.some(t=>!t.stopped)),false);await page.keyboard.up('Space');assert.ok(speechRequests.length>=8);assert.ok(scribeRequests.length>=8);console.log('PASS: global tap/hold/five-tap reset, overlapping keys and repeat, no tap microphone access, late transcription/narration/reading fences, saved choices retained, setup exclusion, four artwork proportions on desktop/mobile, v3 selected voice and aligned captions, per-card discussion, explicit advance, held-only Scribe v2, centered rolling captions and long questions across twelve viewport sizes, no read-ahead or page scrolling, full conversation retained, complete measured silent pages with reading time and reset-safe advance guards, touch drags without encounter input, explicit operator touch and cancellation, busy keyboard/pointer lock with five-tap reset and no replay, optional account-persisted single-screen lightbox across ten viewports and current-only metadata, MP4, denial/empty/error/cancellation, Escape/logout cleanup. Synthetic providers and microphone only.');
 }catch(error){if(page&&!page.isClosed())await page.screenshot({path:resolve(evidence,'failure.png'),fullPage:true});throw error;}
 finally{release?.();scribeRelease?.();ttsRelease?.();await context?.close();await browser?.close();await new Promise(r=>server?.httpServer?server.httpServer.close(r):r());console.log('Cleanup: browser, context and local preview closed.');}
 

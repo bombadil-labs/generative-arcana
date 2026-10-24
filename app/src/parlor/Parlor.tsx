@@ -284,7 +284,7 @@ function Ritual({ transcriptLogging, showDetails, deckId, settings, leave, radio
     <div className="parlor-card-area">
     {state.reading && (
       <div className="parlor-table" aria-label="Three-card reading">
-        {state.reading.placements.map((placement, index) => <figure key={placement.card.slug} className={index === focus ? "is-focused" : undefined}>
+        {state.reading.placements.map((placement, index) => <figure key={placement.card.slug} className={index === focus ? "is-focused" : undefined} aria-hidden={details && index === focus ? true : undefined}>
           <div className={`parlor-card ${index < state.revealed ? "is-revealed" : ""}`} aria-label={index < state.revealed ? `${placement.card.name}, ${placement.reversed ? "reversed" : "upright"}` : `Card ${index + 1}, face down`}>
             <div className="parlor-card-turn">
               <div className="parlor-card-back" aria-hidden={index < state.revealed}><PackAssetImage asset={back} scope={artwork} alt="Selected artwork set card back" fallback={<span className="parlor-back-symbol" aria-hidden>✦<br />☾<br />✦</span>} /></div>
