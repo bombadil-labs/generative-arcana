@@ -161,7 +161,9 @@ Confirm the save and report the path. If the user also asked to import it into a
 
 When illustration is in scope, discuss and agree all three artwork roles within the existing visual-language dialogue. Each visual pack should have a coherent deck cover and card back as well as its card fronts. Agree the cover/back concepts before generating images. Preserve approved artwork unless replacement is explicitly requested.
 
-Recommended raster masters (width × height): **card fronts 1024 × 1536, portrait 2:3; deck cover 1536 × 1024, landscape 3:2; card back 1024 × 1536, portrait 2:3**. These are authoring targets, not retroactive validation or upload restrictions. Keep existing alternate proportions intact. See `references/visual_language.md` for composition and safe areas.
+Before drawing, declare the visual pack's exact **width x height in pixels and aspect ratio**: one shared canvas for all card fronts and the matching back, with the cover specified separately. Recover an existing pack's agreed dimensions before proposing defaults. Recommended starting points for a new pack are fronts/back 1024 x 1536 (2:3) and cover 1536 x 1024 (3:2); they never override a pack's own target. Dimensions are artwork delivery requirements, not new DeckManifest fields or retroactive upload restrictions.
+
+Follow the one-card generation and actual-pixel verification procedure in `references/visual_language.md` before upload. Each generation needs that card's full authored payload and resolved render specification. A prompt requesting dimensions does not prove the resulting image has them; do not silently accept a different canvas, stretch the art, or crop its composition to fit.
 
 Deliver cover and back as separate set-level assets in the same visual pack as the fronts, using `cover` and `cardBack` bindings when a VisualPackManifest is supported. They are not semantic cards or required DeckManifest fields. Do not invent card slugs, alter deck/card counts, put image bytes into DeckManifest, or declare fronts complete because these extras exist. Generation, transfer, and upload are distinct steps; check current host byte/format limits separately and upload only within the user's authorized scope.
 
@@ -186,4 +188,5 @@ Deliver cover and back as separate set-level assets in the same visual pack as t
 - **Integration real?** Are card meanings syntheses, not concatenations? Are inversions chiral?
 - **Cross-cutting families legible?** Could a reader pull "all the [station] cards" across suits?
 - **Artist/generator handoff works?** A resolved `get_card(...).render` should contain enough deck/family/rank/station/number context plus the concrete scene to render the card without auxiliary lookups.
+- **Artwork dimensions verified?** For each generated image, were decoded pixel width/height checked against the declared pack canvas before upload, with fronts and back matching and the cover checked separately? Preserve the full composition; report unsupported dimensions rather than treating a prompt or displayed thumbnail as verification.
 - **Visual grammar stress-tested?** Run the applicable diagnostics in `references/visual_language.md`: rank recognizability, factorization composition, opposition/diptych where authored, style inversion, subject removal, station leakage, progression, and cross-deck distinctiveness.
