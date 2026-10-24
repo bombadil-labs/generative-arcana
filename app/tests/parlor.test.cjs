@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const { ArcanaEngine } = require('../.test-build/engine/ArcanaEngine.js');
 const { DeckRegistry } = require('../.test-build/decks/registry.js');
 const { ParlorMachine } = require('../.test-build/parlor/machine.js');
+const { focusedCard } = require('../.test-build/parlor/cardFocus.js');
 const { defaultSettings, saveSettings, readSettings } = require('../.test-build/parlor/settings.js');
 const { narrate, speak, converse, parseNarration, ParlorError } = require('../.test-build/parlor/providers.js');
 const { safeAccountReturnTo } = require('../.test-build/auth/api.js');
@@ -28,6 +29,18 @@ async function until(machine, phase) {
     const unsubscribe=machine.subscribe(()=>{if(machine.getSnapshot().phase===phase){clearTimeout(timer);unsubscribe();resolve();}});
   });
 }
+
+test('visual card focus follows existing reveal and discussion state, with no extra advance and no stale focus after reset',async()=>{
+  const audio=[];const response=deferred();const {machine,draws}=setup({speak:async(_,text,signal,playing)=>{const done=deferred();audio.push({done,playing});await done.promise;},converse:async()=>response.promise});
+  const focus=()=>focusedCard(machine.getSnapshot());
+  try{
+    await confirm(machine);await until(machine,'ready');assert.equal(focus(),null);
+    machine.advance();assert.equal(focus(),null);const first=audio.at(-1);first.playing();assert.equal(focus(),0);first.done.resolve();await until(machine,'ready');assert.equal(focus(),0);
+    machine.submit('A discussion');assert.equal(focus(),0);response.resolve('A response');await until(machine,'speaking');assert.equal(focus(),0);const answer=audio.at(-1);answer.playing();answer.done.resolve();await until(machine,'ready');assert.equal(focus(),0);
+    machine.advance();assert.equal(focus(),null);assert.equal(machine.getSnapshot().revealed,1);const second=audio.at(-1);second.playing();assert.equal(focus(),1);machine.cancel();assert.equal(focus(),1);
+    machine.reset();assert.equal(focus(),null);second.playing();second.done.resolve();await tick();assert.equal(focus(),null);assert.equal(machine.getSnapshot().reading,undefined);assert.equal(draws(),1);
+  }finally{audio.forEach(a=>a.done.resolve());machine.dispose();}
+});
 
 test('tap can begin an open reading; busy taps never queue another card',async()=>{
   const questions=[];const late=deferred();

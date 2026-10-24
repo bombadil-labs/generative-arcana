@@ -13,6 +13,7 @@ import { ScribeMicrophone, transcribeScribe } from "./microphone";
 import { TableGestures, tableInput, tableKey, HOLD_MS, SUMMON_MS } from "./gestures";
 import { RadioSignal } from "./RadioSignal";
 import { Transcript } from "./Transcript";
+import { focusedCard } from "./cardFocus";
 import { radioState } from "./radio";
 import { guestCue } from "./cue";
 import { RadioAudio, defaultRadioPreferences, type RadioPreferences } from "./radioAudio";
@@ -236,14 +237,16 @@ function Ritual({ deckId, settings, leave, radioPreferences, changeRadio, operat
   const canTalk = tableInput(state, mic, speechInputAvailable).hold === "speak";
   const signal = radioState(state, mic);
   const cue = guestCue(state, mic, speechInputAvailable);
+  const focus = focusedCard(state);
   return <div ref={stage} tabIndex={-1} className={`parlor-ritual${idle ? " parlor-idle" : ""}${summoning ? " parlor-summoning" : ""}`} aria-label="Interactive reading" aria-describedby="parlor-guest-cue" data-phase={state.phase}
     onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) controls.cancel(); }}>
     <div className="parlor-scene">
     <RadioSignal signal={signal} startedAt={state.summonStartedAt} showLabel={false} />
     {!idle && <Transcript kind="user" text={contact ? "" : state.userText} />}
+    {!idle && <div className={`parlor-spread-stage${focus !== null ? " has-focus" : ""}`}>
     {state.reading && (
       <div className="parlor-table" aria-label="Three-card reading">
-        {state.reading.placements.map((placement, index) => <figure key={placement.card.slug}>
+        {state.reading.placements.map((placement, index) => <figure key={placement.card.slug} className={index === focus ? "is-focused" : undefined}>
           <div className={`parlor-card ${index < state.revealed ? "is-revealed" : ""}`} aria-label={index < state.revealed ? `${placement.card.name}, ${placement.reversed ? "reversed" : "upright"}` : `Card ${index + 1}, face down`}>
             <div className="parlor-card-turn">
               <div className="parlor-card-back" aria-hidden={index < state.revealed}><PackAssetImage asset={back} scope={artwork} alt="Selected artwork set card back" fallback={<span className="parlor-back-symbol" aria-hidden>✦<br />☾<br />✦</span>} /></div>
@@ -255,6 +258,7 @@ function Ritual({ deckId, settings, leave, radioPreferences, changeRadio, operat
       </div>
     )}
     {!state.reading && !idle && <div className="parlor-table parlor-spread-slots" aria-label="Three empty card spaces">{[0, 1, 2].map(index => <div key={index} className="parlor-slot" aria-hidden="true" />)}</div>}
+    </div>}
     {!idle && <Transcript kind="narrator" text={state.caption} />}
     </div>
     <aside id="parlor-guest-cue" className="parlor-cue" aria-label="Table instructions" aria-description={cue.attention ? state.error || mic.error : undefined} role={cue.attention ? "alert" : "status"} aria-atomic="true">

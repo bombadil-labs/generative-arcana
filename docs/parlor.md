@@ -284,6 +284,17 @@ The full question and completed narration remain in conversation state, independ
 of the visible excerpt. Reset clears both. Optional operator controls remain
 scrollable outside the guest composition.
 
+## Current-card focus
+
+The revealed current card is enlarged over the dimmed spread during its narration
+and discussion. A deliberate advance settles it into its original slot while the
+next voice prepares; the next card comes forward only when the existing narration
+reveal occurs. The closing and subsequent whole-reading discussion show the full
+spread. This is presentation only: no modal, focus trap, extra dismissal, new
+gesture, timer-based reveal or change to the encounter state machine. Reduced
+motion removes the settling animation. The focus stays within the reserved card
+row, clear of both transcript windows and the side cue.
+
 ## Verification
 
 Use Node 24 and an existing installed Edge browser; the browser test does not
