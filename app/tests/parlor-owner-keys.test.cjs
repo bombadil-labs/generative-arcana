@@ -1,7 +1,7 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {defaultSettings,useOwnerAnthropic,useOwnerEleven,readySettings,saveSettings,readSettings}=require('../.test-build/parlor/settings.js');
-const {readParlorCapabilities,ownerTranscribe}=require('../.test-build/parlor/hosted.js');
+const {readParlorCapabilities,ownerTranscribe,ownerRequest,OwnerRequestError}=require('../.test-build/parlor/hosted.js');
 const {narrate,converse}=require('../.test-build/parlor/providers.js');
 const {ArcanaEngine}=require('../.test-build/engine/ArcanaEngine.js');
 const {DeckRegistry}=require('../.test-build/decks/registry.js');
@@ -19,7 +19,7 @@ test('owner availability is transient; each explicit browser key takes precedenc
   saveSettings(storage,'owner',settings,true);assert.ok(![...values.values()].join('').includes('ownerKeys'));assert.equal(readSettings(storage,'owner').settings.ownerKeys,undefined);
 });
 
-test('env model/voice defaults seed new settings, while explicit persisted values including silence override them',()=>{
+test('env defaults replace legacy blank selections; real choices and explicit silence persist',()=>{
   const values=new Map(),storage={setItem:(k,v)=>values.set(k,v),getItem:k=>values.get(k),removeItem:k=>values.delete(k)};
   const defaults={anthropicModel:'claude-sonnet-5-5',voiceId:'env-voice'};
   assert.equal(readSettings(storage,'new',defaults).settings.voiceId,'env-voice');
@@ -27,7 +27,11 @@ test('env model/voice defaults seed new settings, while explicit persisted value
   saveSettings(storage,'owner',{...settings,voiceId:'chosen-voice',anthropicModel:'claude-chosen'},true);
   assert.equal(readSettings(storage,'owner',defaults).settings.voiceId,'chosen-voice');assert.equal(readSettings(storage,'owner',defaults).settings.anthropicModel,'claude-chosen');
   saveSettings(storage,'owner',{...settings,voiceId:'',anthropicModel:''},true);
-  assert.equal(readSettings(storage,'owner',defaults).settings.voiceId,'');assert.equal(readSettings(storage,'owner',defaults).settings.anthropicModel,'claude-sonnet-5-5');
+  assert.equal(readSettings(storage,'owner',defaults).settings.voiceId,'env-voice');assert.equal(readSettings(storage,'owner',defaults).settings.anthropicModel,'claude-sonnet-5-5');
+  saveSettings(storage,'owner',{...settings,silent:true,voiceId:'chosen-voice'},true);
+  const silent=readSettings(storage,'owner',defaults).settings;assert.equal(silent.silent,true);assert.equal(silent.voiceId,'chosen-voice');
+  assert.equal(readySettings({...settings,voiceId:''}),false);
+  assert.equal(readySettings({...settings,voiceId:'',silent:true}),true);
 });
 
 test('Sonnet 5.5 browser calls use documented low-latency tool-free thinking settings',async()=>{
@@ -50,13 +54,26 @@ test('blank owner Anthropic key routes same-origin with reading/history; explici
   const original=global.fetch,engine=new ArcanaEngine(new DeckRegistry()),deck=engine.importDeck(rawDeck());
   const reading=await engine.castReading(deck.id,'three-card','Question');const result={cards:reading.placements.map(p=>({slug:p.card.slug,text:'Interpretation'})),synthesis:'Closing'};
   const requests=[];try{
-    global.fetch=async(url,init)=>{requests.push({url,init});assert.equal(init.credentials,'same-origin');assert.equal(init.redirect,'error');assert.equal(init.cache,'no-store');assert.deepEqual(Object.keys(init.headers),['content-type']);return Response.json(url.endsWith('narrate')?result:{text:'Follow-up'});};
+    global.fetch=async(url,init)=>{requests.push({url,init});assert.equal(init.method,'POST');assert.equal(init.credentials,'same-origin');assert.equal(init.redirect,'error');assert.equal(init.cache,'no-store');assert.deepEqual(Object.keys(init.headers),['content-type']);return Response.json(url.endsWith('narrate')?result:{text:'Follow-up'});};
     assert.deepEqual(await narrate(settings,reading,new AbortController().signal),result);
     assert.equal(await converse(settings,reading,[{role:'user',content:'What did you mean?'}],new AbortController().signal,1),'Follow-up');
     assert.deepEqual(requests.map(r=>r.url),['/api/parlor/owner/narrate','/api/parlor/owner/converse']);
     const body=JSON.parse(requests[1].init.body);assert.equal(body.revealed,1);assert.equal(body.turns[0].content,'What did you mean?');assert.equal(body.token,reading.token);assert.ok(!('ownerKeys' in body));
     requests.length=0;global.fetch=async(url,init)=>{requests.push({url,init});return new Response('private provider error',{status:401});};
     await assert.rejects(narrate({...settings,anthropicKey:'browser-key'},reading,new AbortController().signal));assert.equal(requests.length,1);assert.equal(requests[0].url,'https://api.anthropic.com/v1/messages');assert.equal(requests[0].init.headers['x-api-key'],'browser-key');
+  }finally{global.fetch=original;}
+});
+
+test('owner errors use only fixed safe messages and never echo provider text or arbitrary codes',async()=>{
+  const original=global.fetch;try{
+    for(const code of ['provider_access_refused','provider_request_rejected','provider_resource_unavailable','provider_rate_limited','provider_connection_failed','unusable_provider_response','invalid_reading']){
+      global.fetch=async()=>Response.json({error:code,message:'synthetic-private-data',key:'synthetic-secret'},{status:502});
+      await assert.rejects(ownerRequest('narrate',{},new AbortController().signal),e=>e instanceof OwnerRequestError&&!e.message.includes('synthetic')&&!e.message.includes('Check server configuration'));
+    }
+    for(const error of ['synthetic-secret','toString','__proto__']){
+      global.fetch=async()=>Response.json({error},{status:503});
+      await assert.rejects(ownerRequest('narrate',{},new AbortController().signal),e=>e instanceof OwnerRequestError&&e.message==='The account provider is unavailable. Check server configuration or supply your own key.');
+    }
   }finally{global.fetch=original;}
 });
 test('owner Scribe sends only the intentional clip with abort signal and no credential headers',async()=>{

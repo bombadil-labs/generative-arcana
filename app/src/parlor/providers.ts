@@ -1,7 +1,7 @@
 import type { ArcanaReading } from "../engine/types";
 import { arcanaEngine } from "../engine/ArcanaEngine";
 import { characters, useOwnerAnthropic, useOwnerEleven, type Settings } from "./settings";
-import { hostedRequest, ownerRequest } from './hosted';
+import { hostedRequest, ownerRequest, OwnerRequestError } from './hosted';
 import { boundedSpeechBody, parseAlignment, spokenCaption, captionAlignment, plainSpeech, speechPayload, type CaptionTiming, type SpeechAlignment } from './speech';
 
 export interface Narration { cards: { slug: string; text: string }[]; synthesis: string }
@@ -136,15 +136,16 @@ export async function speak(settings: Settings, text: string, signal: AbortSigna
       };
       player.onwaiting = player.onpause = () => { if (!closed && !signal.aborted) onWaiting(); };
       player.ontimeupdate = update;
-      player.onended = () => { clean(); if (!signal.aborted && began) onCaption(alignment ? alignment.characters.join("").trim() : plainSpeech(text), alignment ? "aligned" : "segment"); resolve(); };
+      player.onended = () => { clean(); if (signal.aborted || !began) { reject(new Error()); return; } onCaption(alignment ? alignment.characters.join("").trim() : plainSpeech(text), alignment ? "aligned" : "segment"); resolve(); };
       player.onerror = () => { clean(); reject(new Error()); };
       signal.addEventListener("abort", abort, { once: true });
       if (signal.aborted) { abort(); return; }
       try { void player.play().catch(() => { clean(); reject(new Error()); }); }
       catch { clean(); reject(new Error()); }
     });
-  } catch {
+  } catch (error) {
     if (signal.aborted) throw new DOMException("Cancelled", "AbortError");
+    if (error instanceof OwnerRequestError) throw error;
     throw new ParlorError("Audio is unavailable or playback was blocked. Continue with captions, or retry audio.");
   } finally {
     if (audio) { audio.pause(); audio.removeAttribute("src"); audio.load(); }

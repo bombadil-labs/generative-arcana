@@ -108,10 +108,12 @@ function Host({ accountId, onShowChange, capabilities }: { accountId: string; on
         <KeyInput label="OpenAI API key" value={settings.openaiKey} change={(value) => update({ ...settings, openaiKey: value })} />
         <label>OpenAI model ID<input value={settings.openaiModel} onChange={(event) => update({ ...settings, openaiModel: event.target.value })} maxLength={160} placeholder="Enter a chat-completions compatible model" /></label>
       </div>
-      <div><h2>The voice</h2><p>{capabilities.ownerKeys?.elevenlabs?'Your account provides ElevenLabs narration and Scribe when the key below is blank. Keep your selected voice ID, or leave the voice ID blank for captions.':'Optional. Leave the voice key empty for a silent show.'}</p>
+      <div><h2>The voice</h2><p>{capabilities.ownerKeys?.elevenlabs?'Your account provides ElevenLabs narration and Scribe when the key below is blank. Select a voice, or explicitly choose Read without audio.':'Optional. Leave the voice key empty for a silent show.'}</p>
         <KeyInput label="ElevenLabs API key" value={settings.elevenKey} change={(value) => update({ ...settings, elevenKey: value })} />
         <label>ElevenLabs voice ID<input value={settings.voiceId} onChange={(event) => update({ ...settings, voiceId: event.target.value })} maxLength={160} /></label>
-        {capabilities.ownerKeys?.voiceId&&<button onClick={()=>update({...settings,voiceId:capabilities.ownerKeys!.voiceId!})}>Use account voice</button>}
+        {capabilities.ownerKeys?.voiceId&&<button onClick={()=>update({...settings,voiceId:capabilities.ownerKeys!.voiceId!,silent:false})}>Use account voice</button>}
+        <label className="parlor-check"><input type="checkbox" checked={settings.silent === true} onChange={event=>update({...settings,silent:event.target.checked})} />Read without audio</label>
+        {useOwnerEleven(settings)&&!settings.voiceId.trim()&&!settings.silent&&<p role="alert">Select your ElevenLabs voice ID, or choose Read without audio before starting.</p>}
         <p className="parlor-warning">Entered keys are masked on screen, not encrypted. This browser and same-origin scripts can read them. Anyone using this device may access remembered keys. Login does not protect localStorage. Entered-key calls go directly from this browser; account-provider calls go through the authenticated server. Server keys are never sent here.</p>
         <label className="parlor-check"><input type="checkbox" checked={remember} onChange={(event) => update(settings, event.target.checked)} />Remember keys on this device (plaintext)</label>
         <button onClick={() => update(clearKeys(settings), false)}>Clear keys from this device</button>

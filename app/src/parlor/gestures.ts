@@ -61,11 +61,13 @@ export class TableGestures {
   up(id: string) {
     if (!this.pressed.delete(id) || this.pressed.size) return;
     clearTimeout(this.holdTimer); this.holdTimer = undefined;
-    const engaged = this.engaged; this.engaged = false;
+    // Freeze this gesture before lift can synchronously change the encounter or cancel it.
+    const engaged = this.engaged, holding = this.holding, epoch = this.epoch;
+    this.engaged = this.holding = false;
     if (engaged) this.actions.lift?.();
-    if (this.holding) { this.holding = false; if (engaged) this.actions.release(); return; }
+    if (epoch !== this.epoch || this.disposed) return;
+    if (holding) { if (engaged) this.actions.release(); return; }
     if (++this.taps === 5) { this.clear(); this.actions.reset(); return; }
-    const epoch = this.epoch;
     this.tapTimer = setTimeout(() => {
       if (this.disposed || epoch !== this.epoch || this.pressed.size) return;
       const action = this.tapAction; this.clear(); action?.();

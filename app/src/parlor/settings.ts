@@ -10,6 +10,7 @@ export interface Settings {
   openaiModel: string;
   elevenKey: string;
   voiceId: string;
+  silent?: boolean;
   character: "keeper" | "showman" | "botanist";
 }
 export const defaultSettings = (): Settings => ({ provider: "anthropic", anthropicKey: "", anthropicModel: "", openaiKey: "", openaiModel: "", elevenKey: "", voiceId: "", character: "keeper" });
@@ -31,16 +32,17 @@ export function readSettings(storage: Storage, accountId: string, defaults: Part
     const preferences = value as Record<string, unknown>;
     if (preferences.provider === "anthropic" || preferences.provider === "openai") settings.provider = preferences.provider;
     if (preferences.character === "keeper" || preferences.character === "showman" || preferences.character === "botanist") settings.character = preferences.character;
+    settings.silent = preferences.silent === true;
     for (const field of fields) {
       const text = (value as Record<string, unknown>)[field];
-      if (typeof text === "string" && text.length <= 4096 && (field !== 'anthropicModel' || text.trim())) settings[field] = text;
+      if (typeof text === "string" && text.length <= 4096 && (!['anthropicModel', 'voiceId'].includes(field) || text.trim())) settings[field] = text;
     }
     return { settings, remember: true };
   } catch { return { settings, remember: false }; }
 }
 export function saveSettings(storage: Storage, accountId: string, settings: Settings, remember: boolean): boolean {
   try {
-    if (remember) storage.setItem(storageKey(accountId), JSON.stringify({ provider: settings.provider, character: settings.character, ...Object.fromEntries(fields.map((field) => [field, settings[field]])) }));
+    if (remember) storage.setItem(storageKey(accountId), JSON.stringify({ provider: settings.provider, character: settings.character, silent: settings.silent === true, ...Object.fromEntries(fields.map((field) => [field, settings[field]])) }));
     else storage.removeItem(storageKey(accountId));
     return true;
   } catch { return false; }
@@ -49,7 +51,7 @@ export function clearKeys(settings: Settings): Settings { return { ...settings, 
 export function readySettings(settings: Settings): boolean {
   if(settings.hosted)return !!(settings.provider==='anthropic'?settings.anthropicModel:settings.openaiModel);
   return !!(settings.provider === "anthropic" ? (settings.anthropicKey.trim() || useOwnerAnthropic(settings)) && settings.anthropicModel.trim() : settings.openaiKey.trim() && settings.openaiModel.trim())
-    && (!settings.elevenKey.trim() || !!settings.voiceId.trim());
+    && (settings.silent === true || (!(settings.elevenKey.trim() || useOwnerEleven(settings)) || !!settings.voiceId.trim()));
 }
 export const useOwnerAnthropic = (s: Settings) => !s.hosted && s.provider === 'anthropic' && !s.anthropicKey.trim() && !!s.ownerKeys?.anthropicModel && /^claude-[A-Za-z0-9._-]{1,140}$/.test(s.anthropicModel);
 export const useOwnerEleven = (s: Settings) => !s.hosted && !s.elevenKey.trim() && s.ownerKeys?.elevenlabs === true;

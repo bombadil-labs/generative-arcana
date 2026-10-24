@@ -21,6 +21,7 @@ const narration={cards:reading.placements.map(p=>({slug:p.card.slug,text:'A mock
 const base={deckId:'owner-deck',token:reading.token,character:'keeper',provider:'anthropic',model:'claude-test-owner'};
 const catalog={get:async(id:string)=>id==='owner-deck'?{id,ownerId:'usr_owner',manifest:{data:raw}}:null} as unknown as UserDeckCatalogRepository;
 let config=parlorConfig(env), identityMode='owner', revoked=false, authFails=false, limited=false, limitFails=false, calls=0, responseMode='ok';
+let upstreamStatus=200;
 let dispatches:{url:string;headers:Headers;body:unknown}[]=[];
 let pending:Promise<void>|undefined, release:()=>void=()=>{}, started:()=>void=()=>{};
 let limitGate:Promise<void>|undefined, limitStarted:()=>void=()=>{}, lastSignal:AbortSignal|null|undefined;
@@ -34,6 +35,9 @@ const provider:typeof fetch=async(input,init)=>{
   dispatches.push({url,headers,body});assert.equal(init?.redirect,'error');assert.equal(init?.method,'POST');
   started();if(pending)await pending;
   if(init?.signal?.aborted)throw new DOMException('Aborted','AbortError');
+  if(upstreamStatus!==200)return new Response(env.ANTHROPIC_API_KEY,{status:upstreamStatus,headers:{'x-private-detail':env.ELEVENLABS_API_KEY}});
+  if(responseMode==='invalid-json')return new Response(env.ANTHROPIC_API_KEY);
+  if(responseMode==='invalid-reading')return Response.json({content:[{type:'text',text:'{"cards":[]}'}]});
   if(responseMode==='error')return new Response(env.ELEVENLABS_API_KEY,{status:400});
   if(responseMode==='throw')throw new Error(env.ANTHROPIC_API_KEY);
   if(responseMode==='logout')revoked=true;
@@ -60,6 +64,7 @@ async function call(kind:string,data:unknown={},extra:Record<string,string>={},s
 async function denied(kind:string,data:unknown,status:number,headers:Record<string,string>={}){const before=calls;const r=await call(kind,data,headers);assert.equal(r.status,status,`${identityMode} ${kind}`);const body=await r.text();for(const key of Object.values(config.ownerKeys?.keys??{}))if(key)assert.ok(!body.includes(key));assert.equal(calls,before,'no provider dispatch');}
 try{
   const caps=await (await fetch(local+'/api/parlor/capabilities')).json();assert.deepEqual(caps.ownerKeys,{anthropicModel:'claude-test-owner',elevenlabs:true,voiceId:'env-voice'});assert.ok(!JSON.stringify(caps).includes('secret'));
+  for(const method of ['GET','OPTIONS']){const before=calls;const r=await fetch(local+'/api/parlor/owner/narrate',{method});assert.equal(r.status,405);assert.deepEqual(await r.json(),{error:'post_required'});assert.equal(calls,before,'opening the endpoint is not a provider request');}
   for(const mode of ['other','issuer','anonymous']){identityMode=mode;const otherCaps=await (await fetch(local+'/api/parlor/capabilities')).json();assert.equal(otherCaps.mode,'byok');assert.equal(otherCaps.ownerKeys,undefined);for(const kind of ['narrate','converse','speech','transcribe'])await denied(kind,{...base,text:'Hello',voiceId:'voice'},mode==='anonymous'?401:403);}
   identityMode='owner';authFails=true;for(const kind of ['narrate','speech','transcribe'])await denied(kind,base,503);authFails=false;
   for(const kind of ['narrate','converse','speech','transcribe']){
@@ -71,10 +76,16 @@ try{
   for(const kind of ['narrate','converse']){const data={...base,model:'claude-sonnet-5-5',...(kind==='converse'?{turns:[{role:'user',content:'Follow up'}],revealed:1}:{})};assert.equal((await call(kind,data)).status,200,'owner can explicitly override default model');}
   await denied('narrate',{...base,provider:'openai'},400);await denied('narrate',{...base,model:'https://other.invalid/model'},400);await denied('narrate',{...base,model:'gpt-other'},400);
   await denied('narrate',{...base,deckId:'someone-elses-deck'},404);await denied('narrate',{...base,owner:true},400);await denied('speech',{text:'Hello',voiceId:'../../other'},400);
+  await denied('narrate',{...base,token:'malformed-token'},400);
   await denied('speech',{text:'Hello',voiceId:'voice'},403,{origin:'https://attacker.invalid'});await denied('speech',{text:'x'.repeat(4001),voiceId:'voice'},400);
   for(const [key,kinds] of [['ANTHROPIC_API_KEY',['narrate','converse']],['ELEVENLABS_API_KEY',['speech','transcribe']]] as const){config=parlorConfig({...env,[key]:''});for(const kind of kinds)await denied(kind,kind==='speech'?{text:'Hello',voiceId:'voice'}:base,503);}
   config=parlorConfig({...env,PARLOR_OWNER_KEYS_ENABLED:'false'});await denied('speech',{text:'Hello',voiceId:'voice'},503);config=parlorConfig(env);
   limited=true;await denied('speech',{text:'Hello',voiceId:'voice'},429);limited=false;limitFails=true;await denied('speech',{text:'Hello',voiceId:'voice'},503);limitFails=false;
+  for(const kind of ['narrate','converse','speech','transcribe'])for(const [status,code] of [[400,'provider_request_rejected'],[401,'provider_access_refused'],[403,'provider_access_refused'],[404,'provider_resource_unavailable'],[422,'provider_request_rejected'],[429,'provider_rate_limited'],[500,'provider_unavailable'],[503,'provider_unavailable']] as const){
+    upstreamStatus=status;const before=calls;const data=kind==='converse'?{...base,turns:[{role:'user',content:'Follow up'}],revealed:1}:kind==='speech'?{text:'Hello',voiceId:'voice'}:base;
+    const r=await call(kind,data);assert.equal(r.status,status===429?429:502);assert.deepEqual(await r.json(),{error:code});assert.equal(r.headers.get('x-private-detail'),null);assert.equal(calls,before+1,'one POST, no retries or credential fallback');
+  }upstreamStatus=200;
+  for(const mode of ['invalid-json','invalid-reading']){responseMode=mode;const r=await call('narrate',base);assert.equal(r.status,502);assert.deepEqual(await r.json(),{error:'unusable_provider_response'});}responseMode='ok';
   for(const mode of ['error','throw','echo','alignment-echo','audio-echo']){responseMode=mode;const r=await call('speech',{text:'Hello',voiceId:'voice'});assert.ok(r.status>=400);const body=await r.text();assert.ok(!body.includes(env.ANTHROPIC_API_KEY)&&!body.includes(env.ELEVENLABS_API_KEY));}
   responseMode='logout';assert.equal((await call('speech',{text:'Hello',voiceId:'voice'})).status,401);revoked=false;responseMode='ok';
   pending=new Promise(r=>{release=r;});const startedPromise=new Promise<void>(r=>{started=r;});const late=call('speech',{text:'Hello',voiceId:'voice'});await startedPromise;identityMode='other';release();assert.equal((await late).status,403);pending=undefined;identityMode='owner';

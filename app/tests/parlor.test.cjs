@@ -57,6 +57,30 @@ test('delivery annotations stay out of completed narration and discussion histor
   try {await confirm(machine);await until(machine,'ready');machine.next(true);await until(machine,'ready');assert.equal(machine.getSnapshot().caption,'A perfectly ordinary existential problem.');machine.submit('What do you mean?');await until(machine,'ready');assert.ok(!JSON.stringify(histories).includes('[sarcastic]'));assert.equal(machine.getSnapshot().turns.at(-1).content,'What might you try?');}finally{machine.dispose();}
 });
 
+test('failed summon audio never reveals script, completes or draws; late callbacks are fenced before retry/reset',async()=>{
+  for(const releaseEarly of [true,false]){
+    const pending=[];const {machine,draws}=setup({speak:async(_,text,signal,playing,r,caption)=>{const d=deferred();pending.push({d,signal,playing,caption});await d.promise;throw new ParlorError('Synthetic audio failure');}});
+    try{
+      machine.summon();machine.contact();if(releaseEarly)machine.releaseSummon();
+      pending[0].d.resolve();await until(machine,'error');assert.equal(pending[0].signal.aborted,true);
+      if(!releaseEarly)machine.releaseSummon();pending[0].playing();pending[0].caption('Unheard script','aligned');await tick();
+      assert.equal(machine.getSnapshot().phase,'error');assert.equal(machine.getSnapshot().caption,'');assert.equal(machine.getSnapshot().audioPlaying,false);assert.equal(draws(),0);
+      machine.retry();assert.equal(machine.getSnapshot().phase,'calling');machine.reset();pending[1].playing();pending[1].caption('Stale script','aligned');pending[1].d.resolve();await tick();assert.equal(machine.getSnapshot().phase,'idle');assert.equal(machine.getSnapshot().caption,'');assert.equal(draws(),0);
+    }finally{pending.forEach(p=>p.d.resolve());machine.dispose();}
+  }
+});
+
+test('missing account voice is an error; explicit silence remains distinct and still waits for physical release',async()=>{
+  for(const silent of [false,true]){
+    let draws=0,speeches=0;const machine=new ParlorMachine(deck.id,{...settings,elevenKey:'',voiceId:'',ownerKeys:{anthropicModel:'claude-owner',elevenlabs:true},silent},{draw:async()=>{draws++;throw Error('must not draw');},speak:async()=>{speeches++;}});
+    try{machine.summon();machine.contact();await until(machine,silent?'awaiting-release':'error');assert.equal(speeches,0);assert.equal(draws,0);
+      if(!silent){assert.equal(machine.getSnapshot().caption,'');assert.match(machine.getSnapshot().error,/Select an ElevenLabs voice/);machine.releaseSummon();assert.equal(machine.getSnapshot().phase,'error');}
+      else{assert.equal(machine.getSnapshot().timing,'silent');machine.releaseSummon();await until(machine,'question');machine.releaseSummon();assert.equal(machine.getSnapshot().phase,'question');}
+      assert.equal(draws,0);
+    }finally{machine.dispose();}
+  }
+});
+
 test('voice waiting ends only on actual playback; reset/error/pause fence stale playback indicators',async()=>{
   const pending=[];let fail=false;const {machine}=setup({speak:async(_,text,s,playing,r,c,waiting)=>{const d=deferred();pending.push({d,playing,waiting});await d.promise;if(fail)throw new Error('synthetic');}});
   try {
@@ -190,6 +214,16 @@ test('audio releases its object URL and player on abort without accepting late p
 test('spoken greeting invites hold-to-talk and no cards are drawn until a query is submitted',async()=>{
   const speech=deferred();let caption,spoken;const {machine,draws}=setup({speak:async(_,text,signal,playing,reading,update)=>{spoken=text;caption=update;playing();await speech.promise;}});
   try{machine.begin();assert.match(spoken,/Press and hold the button/);assert.match(spoken,/Five quick taps/);assert.equal(machine.getSnapshot().question,'');assert.equal(machine.getSnapshot().caption,'');assert.equal(draws(),0);machine.submit('too early');assert.equal(draws(),0);caption('Come closer','aligned');assert.equal(machine.getSnapshot().caption,'Come closer');speech.resolve();await until(machine,'question');machine.submit('My spoken query');await until(machine,'ready');assert.equal(draws(),1);assert.equal(machine.getSnapshot().userText,'My spoken query');}finally{machine.dispose();}
+});
+
+test('audio ended without playing cannot reveal the unspoken transcript or count as completion',async()=>{
+  const original={fetch:global.fetch,Audio:global.Audio,create:URL.createObjectURL,revoke:URL.revokeObjectURL};let player,revoked=0;const captions=[];
+  try{
+    global.fetch=async()=>Response.json({audio_base64:btoa('synthetic audio')});URL.createObjectURL=()=>'blob:synthetic';URL.revokeObjectURL=()=>revoked++;
+    global.Audio=class{constructor(){player=this;}play(){return Promise.resolve();}pause(){}removeAttribute(){}load(){}};
+    const pending=speak(settings,'Unspoken script',new AbortController().signal,()=>assert.fail('never played'),undefined,text=>captions.push(text));
+    for(let i=0;i<50&&!player;i++)await new Promise(r=>setTimeout(r,2));assert.ok(player);player.onended();await assert.rejects(pending,/Audio is unavailable/);assert.deepEqual(captions,[]);assert.equal(revoked,1);
+  }finally{global.fetch=original.fetch;global.Audio=original.Audio;URL.createObjectURL=original.create;URL.revokeObjectURL=original.revoke;}
 });
 test('each card waits for explicit advance and permits repeated spoken discussion without drawing again',async()=>{
   const seen=[];const {machine,draws}=setup({converse:async(_,reading,turns,signal,revealed)=>{seen.push({turns,revealed});return 'A spoken answer.';},speak:async(_,text,signal,playing,reading,caption)=>{playing();caption(text,'aligned');}});

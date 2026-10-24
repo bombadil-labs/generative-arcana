@@ -35,8 +35,9 @@ model IDs keep their existing request behavior. [Sonnet 5.5 compatibility](https
 
 No OpenAI server fallback is enabled. ElevenLabs narration remains `eleven_v3`
 with timestamps, and transcription remains `scribe_v2`. These are fixed in code;
-no extra speech model variables are needed. The new voice ID setting seeds setup
-only when no voice choice was saved. Identity ID, role, budget and database
+no extra speech model variables are needed. The voice ID setting seeds setup
+when no nonblank voice choice was saved. Use the bare ID, not a URL, display name
+or quoted value. Identity ID, role, budget and database
 variables are unchanged. Leave the existing `BETTER_AUTH_URL` and database settings unchanged.
 
 For all hosted deployments select **Production and Preview** for the variables.
@@ -60,19 +61,27 @@ such accounts equivalent.
   an automatic server-key retry or provider change.
 - When the relevant browser key is blank, the verified owner can use the server
   key advertised by authenticated capabilities. New or previously empty models
-  use the configured model; new voice settings use the configured voice ID.
+  use the configured model; new or previously blank voice settings use the configured voice ID.
   **Use account model** and **Use account voice** restore these defaults explicitly.
-  Existing nonblank model/voice choices and personas are retained, and an explicitly
-  saved blank voice remains silent. Both IDs can be overridden in setup. OpenAI
+  Existing nonblank model/voice choices and personas are retained. Intentional
+  silence is saved separately with **Read without audio**, so clearing keys or a
+  legacy blank voice cannot accidentally disable the account voice default.
+  Both IDs can be overridden in setup. OpenAI
   still requires the browser's own OpenAI key.
-- An empty voice ID disables narration when using the owner fallback; Scribe can
-  still transcribe intentional push-to-talk clips. Microphone handling, release,
+- With an owner ElevenLabs fallback, a missing voice ID requires selecting a
+  voice or explicitly choosing **Read without audio**. Scribe can still transcribe
+  intentional push-to-talk clips in silent mode. Microphone handling, release,
   cancellation, audio timing and radio ambience are otherwise unchanged.
 - Other permitted users, if page access is expanded in a separate change, see BYOK
   capabilities and cannot use these server credentials. Client flags, emails,
   names, entitlements and even a matching domain principal do not grant access.
 - Missing/disabled server keys, wrong providers/models, auth or database failures,
   provider errors and limits fail closed. They never trigger another remote route.
+- Failed account-provider requests return fixed, status-based diagnostic codes;
+  provider error bodies and headers are discarded. A GET opened in a browser
+  returns `post_required`; it does not describe the preceding POST's failure.
+  Failed speech keeps its retry state and never reveals the remaining script or
+  advances the reading. Summoning release cannot itself deal cards.
   Availability is transient client state; it is neither authorization nor saved
   in localStorage. Server secret values are never returned.
 

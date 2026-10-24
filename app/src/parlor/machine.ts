@@ -3,6 +3,7 @@ import type { ArcanaReading } from "../engine/types";
 import { converse, narrate, speak, ParlorError, type Narration, type Turn } from "./providers";
 import { characters, useOwnerEleven, type Settings } from "./settings";
 import { plainSpeech, type CaptionTiming } from "./speech";
+import { OwnerRequestError } from "./hosted";
 
 export type Phase = "idle" | "summoning" | "calling" | "awaiting-release" | "question" | "confirm" | "drawing" | "generating" | "ready" | "speaking" | "paused" | "error" | "complete" | "conversation";
 export interface State {
@@ -48,7 +49,7 @@ export class ParlorMachine {
     }, 180000);
     this.timer = timer;
     try { await work(controller.signal, current); }
-    catch (error) { if (current()) this.set({ phase: "error", audioPlaying: false, error: error instanceof ParlorError ? error.message : "This step could not finish. Retry or leave the table." }); }
+    catch (error) { if (current()) { this.invalidate(); this.set({ phase: "error", audioPlaying: false, error: error instanceof ParlorError || error instanceof OwnerRequestError ? error.message : "This step could not finish. Retry or leave the table." }); } }
     finally { clearTimeout(timer); if (epoch === this.epoch) { this.controller = undefined; this.timer = undefined; } }
   }
   begin() {
@@ -128,7 +129,10 @@ export class ParlorMachine {
       const caption = (text: string, timing: CaptionTiming) => { if (current()) this.set({ caption: text, timing }); };
       // Hosted speech requires a drawn reading token. Its opening stays explicitly silent.
       const voice = this.settings.hosted ? !!this.state.reading && !!this.settings.voiceId : !!this.settings.elevenKey.trim() || useOwnerEleven(this.settings) && !!this.settings.voiceId.trim();
-      if (muted || !voice) {
+      if (!muted && !this.settings.silent && !voice && useOwnerEleven(this.settings)) {
+        throw new ParlorError("Select an ElevenLabs voice in setup, or explicitly choose Read without audio.");
+      }
+      if (muted || this.settings.silent || !voice) {
         reveal(); caption(plainSpeech(speech.text), "silent");
         // Yield once so repeated input cannot consume more than one card in the same turn.
         await Promise.resolve();
