@@ -9,6 +9,7 @@ import { defaultSettings } from '../../app/src/parlor/settings';
 import { encodeReading } from '../../app/src/reading/encode';
 import { resolveCardRenderSpec } from '../../app/src/decks/renderSpec';
 import { narrationInstructions, discussionInstructions } from '../../app/src/parlor/providers';
+import { openingInstructions } from '../../app/src/parlor/opening';
 import type { UserDeckCatalogRepository } from '../src/userDeckCatalog';
 
 const origin = new URL(PARLOR_OWNER.issuer).origin;
@@ -57,9 +58,10 @@ const provider:typeof fetch=async(input,init)=>{
     return Response.json({audio_base64:audio.toString('base64'),normalized_alignment:{characters:[...words],character_start_times_seconds:[...words].map((_,i)=>i/10),character_end_times_seconds:[...words].map((_,i)=>(i+1)/10)},discarded_metadata:'not returned'});
   }
   assert.equal(url,'https://api.anthropic.com/v1/messages');assert.equal(headers.get('x-api-key'),env.ANTHROPIC_API_KEY);assert.ok(['claude-test-owner','claude-sonnet-5-5'].includes(body.model));assert.equal(body.max_tokens,2000);
+  if(body.system===openingInstructions(defaultSettings())){assert.deepEqual(body.messages,[{role:'user',content:'Call me River'}]);assert.ok(!JSON.stringify(body).includes('AUTHORED VISION SOURCES'));return Response.json({content:[{type:'text',text:JSON.stringify({text:'A mystery is welcome. What would you like to ask?',hasQuestion:false})}]});}
   assert.ok(body.system.startsWith(body.system.includes('Return only JSON')?narrationInstructions(defaultSettings()):discussionInstructions(defaultSettings())),'owner uses the same ether/control-free prompt as BYOK');
-  if(body.system.includes('Return only JSON'))assert.deepEqual(JSON.parse(body.messages[0].content.split('CARD IDENTITIES IN ORDER\n')[1]).map((p:{narrativeFrame:string})=>p.narrativeFrame),['Past','Present','Future']);
-  const context=body.system.includes('Return only JSON')?JSON.parse(body.messages[0].content.split('AUTHORED VISION SOURCES\n')[1].split('\n\nCARD IDENTITIES')[0]):JSON.parse(body.system.slice(body.system.lastIndexOf('\n')+1));
+  if(body.system.includes('Return only JSON'))assert.deepEqual(JSON.parse(body.messages.at(-1).content.split('CARD IDENTITIES IN ORDER\n')[1]).map((p:{narrativeFrame:string})=>p.narrativeFrame),['Past','Present','Future']);
+  const context=body.system.includes('Return only JSON')?JSON.parse(body.messages.at(-1).content.split('AUTHORED VISION SOURCES\n')[1].split('\n\nCARD IDENTITIES')[0]):JSON.parse(body.system.slice(body.system.lastIndexOf('\n')+1));
   for(const [i,source] of context.cards.entries()){
     assert.deepEqual(source.card,reading.placements[i].card,'owner gets full authored card, not a title/meaning summary');
     assert.deepEqual(source.renderSpec,resolveCardRenderSpec(reading.deck,reading.placements[i].card));
@@ -82,26 +84,32 @@ async function denied(kind:string,data:unknown,status:number,headers:Record<stri
 try{
   const caps=await (await fetch(local+'/api/parlor/capabilities')).json();assert.deepEqual(caps.ownerKeys,{anthropicModel:'claude-test-owner',elevenlabs:true,voiceId:'env-voice'});assert.ok(!JSON.stringify(caps).includes('secret'));
   for(const method of ['GET','OPTIONS']){const before=calls;const r=await fetch(local+'/api/parlor/owner/narrate',{method});assert.equal(r.status,405);assert.deepEqual(await r.json(),{error:'post_required'});assert.equal(calls,before,'opening the endpoint is not a provider request');}
-  for(const mode of ['other','issuer','anonymous']){identityMode=mode;const otherCaps=await (await fetch(local+'/api/parlor/capabilities')).json();assert.equal(otherCaps.mode,'byok');assert.equal(otherCaps.ownerKeys,undefined);for(const kind of ['narrate','converse','speech','transcribe'])await denied(kind,{...base,text:'Hello',voiceId:'voice'},mode==='anonymous'?401:403);}
+  for(const mode of ['other','issuer','anonymous']){identityMode=mode;const otherCaps=await (await fetch(local+'/api/parlor/capabilities')).json();assert.equal(otherCaps.mode,'byok');assert.equal(otherCaps.ownerKeys,undefined);for(const kind of ['narrate','converse','speech','transcribe','introduce'])await denied(kind,{...base,text:'Hello',voiceId:'voice'},mode==='anonymous'?401:403);}
   identityMode='owner';authFails=true;for(const kind of ['narrate','speech','transcribe'])await denied(kind,base,503);authFails=false;
-  for(const kind of ['narrate','converse','speech','transcribe']){
-    const data=kind==='converse'?{...base,turns:[{role:'user',content:'What did you mean?'}],revealed:1}:kind==='speech'?{text:'[sighs] Hello',voiceId:'my-selected-voice'}:base;
+  for(const kind of ['narrate','converse','speech','transcribe','introduce']){
+    const data=kind==='introduce'?{deckId:base.deckId,character:base.character,provider:base.provider,model:base.model,text:'Call me River'}:kind==='converse'?{...base,turns:[{role:'user',content:'What did you mean?'}],revealed:1}:kind==='speech'?{text:'[sighs] Hello',voiceId:'my-selected-voice'}:base;
     const r=await call(kind,data);assert.equal(r.status,200,kind);assert.equal(r.headers.get('cache-control'),'private, no-store');const result=await r.json();assert.equal(result.discarded_metadata,undefined);
     if(kind==='speech'){assert.ok(dispatches.at(-1)!.url.endsWith('/my-selected-voice/with-timestamps'));assert.ok(result.normalized_alignment);}
     if(kind==='converse'){const body=dispatches.at(-1)!.body as {system:string};const context=JSON.parse(body.system.slice(body.system.lastIndexOf('\n')+1));assert.equal(context.cards.length,1);}
   }
   for(const kind of ['narrate','converse']){const data={...base,model:'claude-sonnet-5-5',...(kind==='converse'?{turns:[{role:'user',content:'Follow up'}],revealed:1}:{})};assert.equal((await call(kind,data)).status,200,'owner can explicitly override default model');}
+  const introduction={deckId:base.deckId,character:'keeper',provider:'anthropic',model:'claude-test-owner',text:'Call me River'};
+  for(const extra of [{deckId:'someone-elses-deck'},{provider:'openai'},{model:'https://bad.invalid'},{text:'x'.repeat(1201)},{token:base.token}])await denied('introduce',{...introduction,...extra},extra.deckId?404:400);
+  await denied('introduce',introduction,403,{origin:'https://bad.invalid'});
+  const opening=[{role:'user',content:'Call me River'},{role:'assistant',content:'What would you like to ask?'}];
+  assert.equal((await call('narrate',{...base,opening})).status,200);assert.deepEqual((dispatches.at(-1)!.body as {messages:unknown[]}).messages.slice(0,2),opening);
+  await denied('narrate',{...base,opening:[opening[0]]},400);
   for(const revealed of [2,3])assert.equal((await call('converse',{...base,turns:[{role:'user',content:'Continue from the completed vision'}],revealed})).status,200,'all and only revealed scenes reach later discussion');
   {const before=calls;const response=await call('converse',{...base,revealed:1,turns:Array.from({length:21},(_,i)=>({role:i%2?'assistant':'user',content:i%2?'界'.repeat(2000):'x'.repeat(1200)}))});assert.equal(response.status,413);assert.deepEqual(await response.json(),{error:'context_too_large'});assert.equal(calls,before,'oversize context is rejected before provider dispatch');}
   await denied('narrate',{...base,provider:'openai'},400);await denied('narrate',{...base,model:'https://other.invalid/model'},400);await denied('narrate',{...base,model:'gpt-other'},400);
   await denied('narrate',{...base,deckId:'someone-elses-deck'},404);await denied('narrate',{...base,owner:true},400);await denied('speech',{text:'Hello',voiceId:'../../other'},400);
   await denied('narrate',{...base,token:'malformed-token'},400);
   await denied('speech',{text:'Hello',voiceId:'voice'},403,{origin:'https://attacker.invalid'});await denied('speech',{text:'x'.repeat(4001),voiceId:'voice'},400);
-  for(const [key,kinds] of [['ANTHROPIC_API_KEY',['narrate','converse']],['ELEVENLABS_API_KEY',['speech','transcribe']]] as const){config=parlorConfig({...env,[key]:''});for(const kind of kinds)await denied(kind,kind==='speech'?{text:'Hello',voiceId:'voice'}:base,503);}
+  for(const [key,kinds] of [['ANTHROPIC_API_KEY',['narrate','converse','introduce']],['ELEVENLABS_API_KEY',['speech','transcribe']]] as const){config=parlorConfig({...env,[key]:''});for(const kind of kinds)await denied(kind,kind==='speech'?{text:'Hello',voiceId:'voice'}:kind==='introduce'?introduction:base,503);}
   config=parlorConfig({...env,PARLOR_OWNER_KEYS_ENABLED:'false'});await denied('speech',{text:'Hello',voiceId:'voice'},503);config=parlorConfig(env);
   limited=true;await denied('speech',{text:'Hello',voiceId:'voice'},429);limited=false;limitFails=true;await denied('speech',{text:'Hello',voiceId:'voice'},503);limitFails=false;
-  for(const kind of ['narrate','converse','speech','transcribe'])for(const [status,code] of [[400,'provider_request_rejected'],[401,'provider_access_refused'],[403,'provider_access_refused'],[404,'provider_resource_unavailable'],[422,'provider_request_rejected'],[429,'provider_rate_limited'],[500,'provider_unavailable'],[503,'provider_unavailable']] as const){
-    upstreamStatus=status;const before=calls;const data=kind==='converse'?{...base,turns:[{role:'user',content:'Follow up'}],revealed:1}:kind==='speech'?{text:'Hello',voiceId:'voice'}:base;
+  for(const kind of ['narrate','converse','speech','transcribe','introduce'])for(const [status,code] of [[400,'provider_request_rejected'],[401,'provider_access_refused'],[403,'provider_access_refused'],[404,'provider_resource_unavailable'],[422,'provider_request_rejected'],[429,'provider_rate_limited'],[500,'provider_unavailable'],[503,'provider_unavailable']] as const){
+    upstreamStatus=status;const before=calls;const data=kind==='introduce'?{deckId:base.deckId,character:base.character,provider:base.provider,model:base.model,text:'Call me River'}:kind==='converse'?{...base,turns:[{role:'user',content:'Follow up'}],revealed:1}:kind==='speech'?{text:'Hello',voiceId:'voice'}:base;
     const r=await call(kind,data);assert.equal(r.status,status===429?429:502);assert.deepEqual(await r.json(),{error:code});assert.equal(r.headers.get('x-private-detail'),null);assert.equal(calls,before+1,'one POST, no retries or credential fallback');
   }upstreamStatus=200;
   for(const mode of ['invalid-json','invalid-reading']){responseMode=mode;const r=await call('narrate',base);assert.equal(r.status,502);assert.deepEqual(await r.json(),{error:'unusable_provider_response'});}responseMode='ok';
@@ -117,5 +125,5 @@ try{
   config={...parlorConfig(env),mode:'hosted',keys:{anthropic:env.ANTHROPIC_API_KEY,elevenlabs:env.ELEVENLABS_API_KEY}};identityMode='other';
   assert.equal((await (await fetch(local+'/api/parlor/capabilities')).json()).mode,'byok');
   for(const kind of ['narrate','converse','speech']){const before=calls;const r=await fetch(local+'/api/parlor/'+kind,{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(base)});assert.equal(r.status,403);assert.equal(calls,before);}
-  console.log('PASS owner-only server keys: independent stable identity, future permitted nonowner BYOK, all four provider routes, missing config/keys, mismatches, origin/deck/input gates, shared-limit failures, output/key redaction, late identity changes, legacy hosted isolation; synthetic providers only.');
+  console.log('PASS owner-only server keys: independent stable identity, future permitted nonowner BYOK, all five provider routes, missing config/keys, mismatches, origin/deck/input gates, shared-limit failures, output/key redaction, late identity changes, legacy hosted isolation; synthetic providers only.');
 }finally{release();await new Promise<void>(r=>server.close(()=>r()));}
