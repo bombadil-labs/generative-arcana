@@ -5,6 +5,13 @@ const tick=()=>new Promise(resolve=>setImmediate(resolve));
 const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};};
 async function drain(log){for(let i=0;i<100&&log.queue.length;i++){await log.flush();await tick();}assert.equal(log.queue.length,0);}
 
+test('transport keeps native fetch receiver semantics instead of binding the transcript sink',async()=>{
+  const bodies=[];
+  async function send(_,init){'use strict';assert.equal(this,undefined);const body=JSON.parse(init.body);bodies.push(body);return Response.json(body.start?{token:'receipt'}:{accepted:body.events.length});}
+  const log=new RuntimeTranscript([],send);
+  try{log.event({kind:'user_input',text:'synthetic fetch input'});await drain(log);assert.equal(bodies.length,2);assert.equal(bodies[1].events[0].kind,'user_input');}finally{log.dispose();}
+});
+
 test('transcript queue redacts before Unicode chunking, projects fields, bounds batches and preserves reconstructable text',async()=>{
   const bodies=[];const secret='synthetic-local-secret';
   const log=new RuntimeTranscript([secret],async(_,init)=>{bodies.push(JSON.parse(init.body));assert.ok(Buffer.byteLength(init.body)<=TRANSCRIPT_BATCH_BYTES);return Response.json(init.body.includes('"start"')?{token:'receipt'}:{accepted:1});});

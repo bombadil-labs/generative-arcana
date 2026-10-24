@@ -72,7 +72,10 @@ export class RuntimeTranscript implements TranscriptSink {
   }
   private schedule() { if (!this.running && !this.timer && !this.disposed) this.timer = setTimeout(() => { this.timer = undefined; void this.flush(); }, 250); }
   private async post(body: unknown, signal: AbortSignal): Promise<Response> {
-    return this.send('/api/parlor/transcript', { method: 'POST', credentials: 'same-origin', cache: 'no-store', redirect: 'error', signal, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    // Native Window.fetch rejects the sink instance as its receiver. Keep an
+    // injected transport callable without assigning it an unrelated `this`.
+    const send = this.send;
+    return send('/api/parlor/transcript', { method: 'POST', credentials: 'same-origin', cache: 'no-store', redirect: 'error', signal, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   }
   private async flush() {
     if (this.disposed || !this.queue.length || this.running) return;
