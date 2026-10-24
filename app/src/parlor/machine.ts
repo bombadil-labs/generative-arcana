@@ -17,9 +17,10 @@ export interface Services {
   draw(deckId: string, question: string): Promise<ArcanaReading>;
   narrate: typeof narrate; converse: typeof converse; speak: typeof speak;
   preload(reading: ArcanaReading): Promise<void>;
+  readSilently(text: string, signal: AbortSignal, show: (page: string) => void): Promise<void>;
 }
-const services: Services = { draw: (id, question) => arcanaEngine.castReading(id, "three-card", question), narrate, converse, speak, preload: async () => {} };
-type Speech = { kind: "release" | "greeting" | "card" | "answer"; text: string; segment: number; turns?: Turn[] };
+const services: Services = { draw: (id, question) => arcanaEngine.castReading(id, "three-card", question), narrate, converse, speak, preload: async () => {}, readSilently: async () => { throw new ParlorError("Silent reading is unavailable. Return to setup and retry."); } };
+type Speech = { kind: "release" | "greeting" | "card" | "answer"; text: string; segment: number; turns?: Turn[]; silent?: boolean };
 
 /** A synchronous transition gate plus an epoch fence: even late responses after abort are inert. */
 export class ParlorMachine {
@@ -129,13 +130,15 @@ export class ParlorMachine {
       const caption = (text: string, timing: CaptionTiming) => { if (current()) this.set({ caption: text, timing }); };
       // Hosted speech requires a drawn reading token. Its opening stays explicitly silent.
       const voice = this.settings.hosted ? !!this.state.reading && !!this.settings.voiceId : !!this.settings.elevenKey.trim() || useOwnerEleven(this.settings) && !!this.settings.voiceId.trim();
-      if (!muted && !this.settings.silent && !voice && useOwnerEleven(this.settings)) {
+      if (!muted && !speech.silent && !this.settings.silent && !voice && useOwnerEleven(this.settings)) {
         throw new ParlorError("Select an ElevenLabs voice in setup, or explicitly choose Read without audio.");
       }
-      if (muted || this.settings.silent || !voice) {
-        reveal(); caption(plainSpeech(speech.text), "silent");
-        // Yield once so repeated input cannot consume more than one card in the same turn.
-        await Promise.resolve();
+      if (muted || speech.silent || this.settings.silent || !voice) {
+        speech.silent = true; reveal(); this.set({ timing: "silent" });
+        // Reading is user-facing delivery, not a provider wait. Long passages must
+        // not hit the remote-request timeout before their last page can be read.
+        clearTimeout(this.timer); this.timer = undefined;
+        await this.service.readSilently(plainSpeech(speech.text), signal, page => caption(page, "silent"));
       } else await this.service.speak(this.settings, speech.text, signal, () => { if (current()) { this.set({ audioPlaying: true }); reveal(); } }, this.state.reading, caption, () => { if (current()) this.set({ audioPlaying: false }); });
       if (!current()) return;
       this.speech = undefined;

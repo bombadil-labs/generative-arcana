@@ -4,6 +4,10 @@ const {radioState,summonProgress}=require('../.test-build/parlor/radio.js');
 const {TableGestures,SUMMON_MS}=require('../.test-build/parlor/gestures.js');
 const signal=(phase,mic='idle',audioPlaying=false)=>radioState({phase,audioPlaying},{phase:mic});
 
+test('silent reading is delivery rather than a pending provider request or simulated audio',()=>{
+  for(const phase of ['speaking','calling'])assert.deepEqual(radioState({phase,timing:'silent',audioPlaying:false},{phase:'idle'}),{mode:'waiting',label:'Reading without audio'});
+});
+
 test('radio maps each real pending state to indeterminate searching, playback only after audio starts',()=>{
   for(const phase of ['drawing','generating','conversation','calling','speaking'])assert.equal(signal(phase).mode,'searching',phase);
   assert.equal(signal('ready','checking').label,'Opening the microphone');

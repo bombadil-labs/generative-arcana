@@ -17,6 +17,14 @@ const data=rawDeck();
 const deck={id:'parlor-deck',slug:data.slug,name:data.name,tagline:'Fixture deck',revision:1,visibility:'private',createdAt:'',updatedAt:'',manifest:{data,tagline:'Fixture deck'}};
 const flush=()=>act(async()=>{await new Promise(r=>setTimeout(r,0));});
 const realSetTimeout=global.setTimeout;
+// JSDOM has no layout. Browser tests below independently measure real fonts and
+// page bounds; this fixture supplies only a deterministic caption measurement.
+const actualRect=dom.window.HTMLElement.prototype.getBoundingClientRect;
+dom.window.HTMLElement.prototype.getBoundingClientRect=function(){
+  if(this.classList.contains('parlor-caption'))return new dom.window.DOMRect(0,0,600,168);
+  if(this.hasAttribute('data-silent-measure'))return new dom.window.DOMRect(0,0,600,Math.ceil(this.textContent.length/60)*42);
+  return actualRect.call(this);
+};
 async function settle(){for(let i=0;i<8;i++)await flush();}
 const json=(body,status=200)=>Response.json(body,{status});
 function Capture({children}) { sessionControl=useSession(); return children; }
@@ -39,7 +47,7 @@ before(async()=>{
 beforeEach(async()=>{
   // Only accelerate the summon threshold in this DOM fixture. Pure gesture tests
   // and the real-browser test independently verify the actual seven seconds.
-  global.setTimeout=(callback,ms,...args)=>realSetTimeout(callback,ms===7000||ms===500?5:ms,...args);
+  global.setTimeout=(callback,ms,...args)=>realSetTimeout(callback,callback.name==='advanceSilentPage'?0:ms===7000||ms===500?5:ms,...args);
   authenticated=true;parlorAllowed=true;deckCalls=0;accountId='test-account';providerCalls=0;delayed=false;lateResolve=undefined;
   accessMode='byok';hostedDenied=false;hostedBodies=[];ownerAvailable=false;
   ownerEleven=false;ownerVoice='env-owner-voice';ttsRequests=[];
