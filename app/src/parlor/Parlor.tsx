@@ -15,6 +15,8 @@ import { RadioSignal } from "./RadioSignal";
 import { Transcript } from "./Transcript";
 import { focusedCard } from "./cardFocus";
 import { CardDetails } from "./DeckNotes";
+import { DeckIntroduction } from "./DeckGuide";
+import { DECK_SHORTCUT_NOTE } from "./deckIntroduction";
 import { currentCardDetails, readDetailsPreference, saveDetailsPreference } from "./cardDetails";
 import { readSilently } from "./silentReading";
 import { radioState } from "./radio";
@@ -131,6 +133,7 @@ function Host({ accountId, onShowChange, capabilities }: { accountId: string; on
     {deckId && <RemoteDeckBoundary key={deckId} deckId={deckId} routeKey="/parlor">
       <TableSetup showDetails={showDetails} changeDetails={changeDetails} detailsStorageError={detailsStorageError} deckId={deckId} settings={settings} hosting={hosting} start={() => setHosting(true)} leave={() => setHosting(false)} startButton={startButton} radioPreferences={radioPreferences} changeRadio={setRadioPreferences} />
     </RemoteDeckBoundary>}
+    {hosting && <p className="parlor-shortcut-note">{DECK_SHORTCUT_NOTE}</p>}
   </section>;
 }
 function KeyInput({ label, value, change }: { label: string; value: string; change(value: string): void }) {
@@ -167,7 +170,7 @@ function TableSetup({ showDetails, changeDetails, detailsStorageError, deckId, s
     {detailsStorageError && <p role="alert">The display preference could not be saved; it applies for this session.</p>}
     <label className="parlor-check"><input type="checkbox" checked={operatorControls} onChange={event => setOperatorControls(event.target.checked)} />Show operator controls while testing</label>
     <button ref={startButton} className="parlor-primary" aria-disabled={!ready} onClick={() => { if (ready) start(); }}>Start the show</button>
-    <p className="parlor-show-hint">The idle table waits for a seven-second hold to summon the spirit, without recording. Keep holding until the visual cue says Release the button. After its introduction, hold for 450 ms, wait for Speak now, speak and release. A quick tap moves on after a 500 ms pause; five quick taps with less than 500 ms between them return to blank idle. Overlapping keys count once. Escape returns to setup. Tab, modifier shortcuts and operator inputs keep their usual behavior. Test the mini keyboard and microphone on the party Mac before guests arrive.</p>
+    <p className="parlor-show-hint">The idle table waits for a seven-second hold to summon the spirit, without recording. Keep holding until the visual cue says Release the button. After its introduction, hold for 450 ms, wait for Speak now, speak and release. A quick tap moves on after a 500 ms pause; three quick taps pause for the deck introduction (press once to return), and five quick taps with less than 500 ms between them return to blank idle. Overlapping keys count once. Escape returns to setup. Tab, modifier shortcuts and operator inputs keep their usual behavior. Test the mini keyboard and microphone on the party Mac before guests arrive.</p>
   </div>;
 }
 function Ritual({ showDetails, deckId, settings, leave, radioPreferences, changeRadio, operatorControls }: { deckId: string; settings: Settings; leave(): void; operatorControls: boolean; showDetails: boolean } & RadioOptions) {
@@ -175,7 +178,7 @@ function Ritual({ showDetails, deckId, settings, leave, radioPreferences, change
   const captionWindow = useRef<HTMLDivElement>(null);
   const machine = useMemo(() => new ParlorMachine(deckId, settings, { preload: async (reading) => {
     await Promise.all(reading.cards.map((card) => artwork?.load(card.slug)));
-  }, readSilently: (text, signal, show) => readSilently(text, signal, show, captionWindow.current) }), [deckId, settings, artwork]);
+  }, readSilently: (text, signal, show, pause) => readSilently(text, signal, show, captionWindow.current, pause) }), [deckId, settings, artwork]);
   const state = useSyncExternalStore(machine.subscribe, machine.getSnapshot, machine.getSnapshot);
   const speechInputAvailable = !settings.hosted && (!!settings.elevenKey.trim() || useOwnerEleven(settings));
   const microphone = useMemo(() => new ScribeMicrophone(text => machine.submit(text), () => settings.hosted ? "" : settings.elevenKey, undefined,
@@ -192,20 +195,23 @@ function Ritual({ showDetails, deckId, settings, leave, radioPreferences, change
     return () => { offMachine(); offMic(); };
   }, [machine, microphone, sound]);
   const controls = useMemo(() => new TableGestures({
-    holdDelay: () => machine.getSnapshot().phase === "idle" ? SUMMON_MS : HOLD_MS,
-    press: startedAt => { sound.hold(machine.getSnapshot().phase !== "idle"); machine.summon(startedAt); sound.unlock(); },
-    lift: () => { machine.releaseSummon(); if (!["checking", "listening"].includes(microphone.getSnapshot().phase)) sound.hold(false); },
+    holdDelay: () => !machine.getSnapshot().guideOpen && machine.getSnapshot().phase === "idle" ? SUMMON_MS : HOLD_MS,
+    press: startedAt => { if (machine.getSnapshot().guideOpen) return; sound.hold(machine.getSnapshot().phase !== "idle"); machine.summon(startedAt); sound.unlock(); },
+    lift: () => { if (machine.getSnapshot().guideOpen) return; machine.releaseSummon(); if (!["checking", "listening"].includes(microphone.getSnapshot().phase)) sound.hold(false); },
     captureTap: () => {
       const before = machine.getSnapshot(), input = microphone.getSnapshot();
+      if (before.guideOpen) return () => { if (machine.getSnapshot().guideOpen) { if (machine.getSnapshot().phase !== "idle") sound.unlock(); machine.closeGuide(); } };
       if (!tableInput(before, input, speechInputAvailable).tap) return;
       return () => { if (machine.getSnapshot() === before && microphone.getSnapshot() === input) machine.advance(); };
     },
     captureHold: () => {
       const before = machine.getSnapshot(), input = microphone.getSnapshot();
+      if (before.guideOpen) return;
       const intent = tableInput(before, input, speechInputAvailable).hold;
       if (intent === "summon") return () => machine.contact();
       if (intent === "speak") return () => { if (machine.getSnapshot() === before && microphone.getSnapshot() === input) void microphone.press(); };
     },
+    introduction: () => { sound.stop(); microphone.cancel(); machine.openGuide(); },
     hold: () => {}, release: () => { microphone.release(); sound.hold(false); },
     cancel: () => { sound.stop(); microphone.cancel(); machine.cancelSummon(); sound.hold(false); },
     reset: () => { sound.stop(); microphone.cancel(); machine.reset(); sound.hold(false); },
@@ -216,8 +222,8 @@ function Ritual({ showDetails, deckId, settings, leave, radioPreferences, change
   useEffect(() => { if (state.phase === "idle") stage.current?.focus({ preventScroll: true }); }, [state.phase]);
   useEffect(() => {
     // Only the first card follows the spoken query. Later cards require an explicit action.
-    if (state.phase === "ready" && state.segment === 0 && state.revealed === 0) machine.next();
-  }, [machine, state.phase, state.segment, state.revealed]);
+    if (!state.guideOpen && state.phase === "ready" && state.segment === 0 && state.revealed === 0) machine.next();
+  }, [machine, state.phase, state.segment, state.revealed, state.guideOpen]);
   useEffect(() => {
     const cancel = () => { sound.stop(); controls.cancel(); machine.cancel(); };
     const hidden = () => { if (document.hidden) cancel(); };
@@ -240,6 +246,12 @@ function Ritual({ showDetails, deckId, settings, leave, radioPreferences, change
     if (artwork?.packId) void getPackArtworkAsset(deckId, "cardBack", abort.signal, artwork.packId).then(asset => { if (!abort.signal.aborted) setBack(asset); }).catch(() => {});
     return () => abort.abort();
   }, [deckId, artwork]);
+  useLayoutEffect(() => {
+    const elements = stage.current?.querySelectorAll<HTMLElement>(".parlor-scene,.parlor-cue,.parlor-operator-controls");
+    elements?.forEach(element => { element.inert = !!state.guideOpen; });
+    if (!state.guideOpen) stage.current?.focus({ preventScroll: true });
+    return () => elements?.forEach(element => { element.inert = false; });
+  }, [state.guideOpen]);
   const cancelMic = () => { if (controls.active) controls.cancelGesture(); };
   const busy = ["drawing", "generating", "speaking", "conversation"].includes(state.phase);
   const idle = state.phase === "idle";
@@ -292,6 +304,7 @@ function Ritual({ showDetails, deckId, settings, leave, radioPreferences, change
     <aside id="parlor-guest-cue" className="parlor-cue" aria-label="Table instructions" aria-description={cue.attention ? state.error || mic.error : undefined} role={cue.attention ? "alert" : "status"} aria-atomic="true">
       <p className="parlor-cue-title">{cue.title}</p>{cue.instruction && <p className="parlor-cue-detail">{cue.instruction}</p>}
     </aside>
+    {state.guideOpen && <DeckIntroduction deck={getDeck(deckId)!} />}
     {operatorControls && !idle && <div className="parlor-operator-controls" data-parlor-operator aria-label="Operator controls">
       {/* Ordinary input is disabled while busy, but five taps must still reset.
           Keep focus on release: native disabled would blur and cancel transcription. */}

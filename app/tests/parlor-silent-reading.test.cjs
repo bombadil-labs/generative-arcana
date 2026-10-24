@@ -1,6 +1,23 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {silentPage,silentPageMs,presentSilentPages}=require('../.test-build/parlor/silentReading.js');
+const {PresentationPause}=require('../.test-build/parlor/pause.js');
+
+test('guide pauses silent page reading time, resumes the same page, and abort discards pending work',async t=>{
+  t.mock.timers.enable({apis:['setTimeout']});let now=0,resize,cleanups=0; t.mock.method(performance,'now',()=>now);
+  const pause=new PresentationPause(),abort=new AbortController(),pages=[];
+  const work=presentSilentPages('Beginning. Middle. Ending.',abort.signal,p=>pages.push(p),{fits:s=>s.length<=12,observe:fn=>{resize=fn;return()=>cleanups++;}},pause);
+  const rejection=assert.rejects(work,{name:'AbortError'}),first=pages[0];now=1000;t.mock.timers.tick(1000);pause.set(true);
+  now=100000;t.mock.timers.tick(99000);assert.deepEqual(pages,[first]);pause.set(false);t.mock.timers.tick(silentPageMs(first)-1001);assert.deepEqual(pages,[first]);t.mock.timers.tick(1);assert.equal(pages.length,2);
+  pause.set(true);resize();t.mock.timers.tick(100000);assert.equal(pages.length,2);pause.set(false);assert.equal(pages[2],pages[1],'resize does not skip current text');
+  pause.set(true);abort.abort();await rejection;pause.set(false);resize();t.mock.timers.tick(100000);assert.equal(pages.length,3);assert.equal(cleanups,1);
+});
+
+test('pause waiters resume once or abort without reviving',async()=>{
+  const pause=new PresentationPause(),abort=new AbortController();pause.set(true);let completed=false;
+  const pending=pause.wait(abort.signal).then(()=>completed=true);await Promise.resolve();assert.equal(completed,false);pause.set(false);await pending;assert.equal(completed,true);
+  pause.set(true);const stopped=pause.wait(abort.signal);const rejected=assert.rejects(stopped,{name:'AbortError'});abort.abort();await rejected;pause.set(false);await assert.rejects(pause.wait(abort.signal),{name:'AbortError'});
+});
 
 test('silent pages retain beginning, middle, ending and Unicode without clipping or dropping characters',()=>{
   const text='Beginning.\n'+'A thought worth reading. '.repeat(35)+'🕯️'.repeat(40)+'\nThe ending.';

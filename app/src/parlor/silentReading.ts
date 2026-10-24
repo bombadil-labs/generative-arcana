@@ -1,3 +1,4 @@
+import type { PresentationPause } from "./pause";
 /** Silent pages use reading time, never pretend to have speech alignment. */
 export function silentPageMs(text: string): number {
   return Math.max(4000, Math.max(text.trim().split(/\s+/u).length * 400, Array.from(text).length * 45) + 800);
@@ -26,36 +27,47 @@ export interface SilentLayout {
 
 /** A resize restarts the current page at the same offset, so no text is skipped.
  * Completion includes the final page's reading time. Abort fences every callback. */
-export function presentSilentPages(text: string, signal: AbortSignal, show: (page: string) => void, layout: SilentLayout): Promise<void> {
+export function presentSilentPages(text: string, signal: AbortSignal, show: (page: string) => void, layout: SilentLayout, pause?: PresentationPause): Promise<void> {
   return new Promise((resolve, reject) => {
     let stopped = false, start = 0, timer: ReturnType<typeof setTimeout> | undefined;
-    let unobserve = () => {};
+    let unobserve = () => {}, unsubscribe = () => {}, advance = () => {};
+    let remaining = 0, started = 0, needsLayout = true;
     const finish = (error?: unknown) => {
       if (stopped) return;
-      stopped = true; clearTimeout(timer); unobserve(); signal.removeEventListener("abort", abort);
+      stopped = true; clearTimeout(timer); unobserve(); unsubscribe(); signal.removeEventListener("abort", abort);
       if (error) reject(error); else resolve();
     };
     const abort = () => finish(new DOMException("Cancelled", "AbortError"));
+    const arm = () => { started = performance.now(); timer = setTimeout(advance, remaining); };
     const render = () => {
       if (stopped) return;
       clearTimeout(timer);
+      needsLayout = true;
+      if (pause?.paused) return;
       try {
         const page = silentPage(text, start, layout.fits); show(page.text);
         if (stopped) return;
-        timer = setTimeout(function advanceSilentPage() {
+        needsLayout = false; remaining = silentPageMs(page.text);
+        advance = function advanceSilentPage() {
           if (stopped) return;
           if (page.done) finish(); else { start = page.end; render(); }
-        }, silentPageMs(page.text));
+        };
+        arm();
       } catch (error) { finish(error); }
     };
     if (signal.aborted) { abort(); return; }
     signal.addEventListener("abort", abort, { once: true });
+    unsubscribe = pause?.subscribe(paused => {
+      if (stopped) return;
+      if (paused) { remaining = Math.max(0, remaining - (performance.now() - started)); clearTimeout(timer); }
+      else if (needsLayout) render(); else arm();
+    }) ?? (() => {});
     try { unobserve = layout.observe(render); if (stopped) unobserve(); else render(); } catch (error) { finish(error); }
   });
 }
 
 /** Measure with the actual caption font/width rather than guessed line lengths. */
-export async function readSilently(text: string, signal: AbortSignal, show: (page: string) => void, window: HTMLElement | null) {
+export async function readSilently(text: string, signal: AbortSignal, show: (page: string) => void, window: HTMLElement | null, pause?: PresentationPause) {
   if (!window || signal.aborted) throw new DOMException("Cancelled", "AbortError");
   const document = window.ownerDocument, view = document.defaultView!;
   const probe = document.createElement("div"); probe.dataset.silentMeasure = ""; probe.setAttribute("aria-hidden", "true");
@@ -77,6 +89,6 @@ export async function readSilently(text: string, signal: AbortSignal, show: (pag
         void document.fonts?.ready.then(() => { if (active) resize(); });
         return () => { active = false; observer?.disconnect(); view.removeEventListener("resize", resize); };
       },
-    });
+    }, pause);
   } finally { probe.remove(); }
 }
