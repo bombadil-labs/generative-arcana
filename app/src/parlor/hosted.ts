@@ -1,6 +1,17 @@
 import type { Settings } from './settings';
 import type { ArcanaReading } from '../engine/types';
 export interface ParlorCapabilities {mode:'byok'|'hosted';models:{provider:'anthropic'|'openai';id:string}[];voices:string[];ownerKeys?:Settings['ownerKeys']}
+const ownerErrors: Record<string,string> = {
+  provider_access_refused: 'The account provider refused access. Check its key permissions and model or voice access in setup.',
+  provider_request_rejected: 'The account provider rejected this request. Check the selected model or voice in setup.',
+  provider_resource_unavailable: 'The selected account model or voice is unavailable. Check its ID and account access in setup.',
+  provider_rate_limited: 'The account provider is busy or its usage limit was reached. Wait before retrying.',
+  provider_unavailable: 'The account provider could not complete this request. Retry later.',
+  provider_connection_failed: 'The server could not reach the account provider. Retry later.',
+  unusable_provider_response: 'The account provider returned an unusable response. Retry this step with the same cards.',
+  invalid_reading: 'This reading no longer matches the saved deck. Reset the encounter and reload the deck.',
+};
+export class OwnerRequestError extends Error {}
 export async function readParlorCapabilities(signal:AbortSignal):Promise<ParlorCapabilities> {
   const response=await fetch('/api/parlor/capabilities',{credentials:'same-origin',cache:'no-store',redirect:'error',signal});
   if(!response.ok)throw new Error(response.status===403?'This account does not have hosted parlor access.':'Parlor is unavailable on this deployment.');
@@ -16,7 +27,11 @@ export async function readParlorCapabilities(signal:AbortSignal):Promise<ParlorC
 }
 export async function ownerRequest(kind:'narrate'|'converse'|'speech',data:Record<string,unknown>,signal:AbortSignal) {
   const response=await fetch(`/api/parlor/owner/${kind}`,{method:'POST',credentials:'same-origin',cache:'no-store',redirect:'error',signal,headers:{'content-type':'application/json'},body:JSON.stringify(data)});
-  if(!response.ok)throw new Error('The account provider is unavailable. Check server configuration or supply your own key.');
+  if(!response.ok){
+    const value:unknown=await response.json().catch(()=>null);
+    const code=value&&typeof value==='object'&&'error' in value?value.error:undefined;
+    throw new OwnerRequestError(typeof code==='string'&&Object.prototype.hasOwnProperty.call(ownerErrors,code)?ownerErrors[code]:'The account provider is unavailable. Check server configuration or supply your own key.');
+  }
   return response;
 }
 export async function ownerTranscribe(audio:Blob,signal:AbortSignal):Promise<string> {

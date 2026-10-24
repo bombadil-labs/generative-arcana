@@ -94,3 +94,11 @@ test('release of an accepted hold still runs after the state becomes busy',t=>{
   const {controls,tick}=setup(t,{captureTap:()=>undefined,captureHold:()=>available?()=>events.push('hold'):undefined,press:()=>events.push('press'),lift:()=>events.push('lift'),release:()=>events.push('release')});
   controls.down('key:Space');tick(HOLD_MS);available=false;controls.up('key:Space');assert.deepEqual(events,['press','hold','lift','release']);
 });
+
+test('summon release stays consumed when lift changes state or synchronously cancels the gesture',t=>{
+  let phase='idle',advances=0,cancelOnLift=false;
+  const {controls,tick}=setup(t,{holdDelay:()=>SUMMON_MS,captureTap:()=>phase==='question'?()=>advances++:undefined,captureHold:()=>()=>{phase='awaiting-release';},lift:()=>{phase='question';if(cancelOnLift)controls.cancelGesture();},release:()=>{}});
+  controls.down('key:Space');tick(SUMMON_MS);controls.up('key:Space');controls.up('key:Space');tick(TAP_GAP_MS);assert.equal(advances,0);
+  phase='idle';cancelOnLift=true;controls.down('key:Space');tick(SUMMON_MS);controls.up('key:Space');tick(TAP_GAP_MS);assert.equal(advances,0);
+  cancelOnLift=false;controls.down('key:Space');controls.up('key:Space');tick(TAP_GAP_MS);assert.equal(advances,1,'a new deliberate tap is independent');
+});

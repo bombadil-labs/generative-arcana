@@ -88,7 +88,8 @@ export function createOwnerParlorHandler(options: OwnerParlorOptions) {
           const deckId = text(data.deckId, 200), token = text(data.token, 65536);
           const deck = await catalog.get(deckId); if (!deck || deck.ownerId !== who.id) throw new ParlorFault(404, 'deck_unavailable');
           const adapter = createArcanaAdapter(); adapter.engine.importDeck(deck.manifest.data, { runtimeId: deck.id, tagline: deck.manifest.tagline, spreads: deck.manifest.spreads });
-          reading = await adapter.engine.resolveReading(token, deckId);
+          try { reading = await adapter.engine.resolveReading(token, deckId); }
+          catch { throw new ParlorFault(400, 'invalid_reading'); }
           if (reading.legacy || reading.placements.length !== 3 || reading.question.length > 1200) throw new ParlorFault(400, 'invalid_reading');
           const character = text(data.character, 20); if (!Object.hasOwn(characters, character)) throw new ParlorFault(400, 'invalid_character');
           let system = instructions({ ...defaultSettings(), character: character as keyof typeof characters });
@@ -108,9 +109,22 @@ export function createOwnerParlorHandler(options: OwnerParlorOptions) {
         }
       }
       await verify(); if ((await principal.resolve(req, res))?.id !== who.id) throw new ParlorFault(403, 'owner_credentials_required');
-      const response = await (options.fetch ?? fetch)(url, { method: 'POST', redirect: 'error', cache: 'no-store', signal: abort.signal, headers, body: payload });
-      const bytes = await boundedSpeechBody(response, kind === 'speech' ? 12_000_000 : 100_000);
-      const value: unknown = JSON.parse(new TextDecoder().decode(bytes)); rejectSecrets(value, c);
+      let response: Response;
+      try { response = await (options.fetch ?? fetch)(url, { method: 'POST', redirect: 'error', cache: 'no-store', signal: abort.signal, headers, body: payload }); }
+      catch { throw new ParlorFault(502, 'provider_connection_failed'); }
+      if (!response.ok) {
+        // Status-only diagnostics: never read, forward or log a provider's error body/headers.
+        await response.body?.cancel().catch(() => {});
+        const code = response.status === 401 || response.status === 403 ? 'provider_access_refused'
+          : response.status === 400 || response.status === 422 ? 'provider_request_rejected'
+          : response.status === 404 ? 'provider_resource_unavailable'
+          : response.status === 429 ? 'provider_rate_limited' : 'provider_unavailable';
+        throw new ParlorFault(response.status === 429 ? 429 : 502, code);
+      }
+      let value: unknown;
+      try { const bytes = await boundedSpeechBody(response, kind === 'speech' ? 12_000_000 : 100_000); value = JSON.parse(new TextDecoder().decode(bytes)); }
+      catch { throw new ParlorFault(502, 'unusable_provider_response'); }
+      rejectSecrets(value, c);
       if (!record(value)) throw new ParlorFault(502, 'unusable_provider_response');
       let result: unknown;
       if (kind === 'speech') {
@@ -127,7 +141,8 @@ export function createOwnerParlorHandler(options: OwnerParlorOptions) {
         if (parts.some(p => typeof p.text !== 'string')) throw new ParlorFault(502, 'unusable_provider_response');
         const prose = parts.map(p => p.text).join('\n');
         if (!prose.trim() || prose.length > (kind === 'narrate' ? 18000 : 4000)) throw new ParlorFault(502, 'unusable_provider_response');
-        result = kind === 'narrate' ? parseNarration(prose, reading!) : { text: prose };
+        try { result = kind === 'narrate' ? parseNarration(prose, reading!) : { text: prose }; }
+        catch { throw new ParlorFault(502, 'unusable_provider_response'); }
       }
       rejectSecrets(result, c); await verify(); if ((await principal.resolve(req, res))?.id !== who.id) throw new ParlorFault(403, 'owner_credentials_required');
       json(res, 200, result);

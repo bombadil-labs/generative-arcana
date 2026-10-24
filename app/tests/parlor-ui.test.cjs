@@ -12,6 +12,7 @@ const { createRoot } = require('react-dom/client');
 const { act } = React;
 let vite,root,App,Provider,useSession,sessionControl,router,settingsApi;
 let authenticated,accountId,providerCalls,lateResolve,delayed,accessMode,hostedDenied,hostedBodies,parlorAllowed,deckCalls,ownerAvailable;
+let ownerEleven,ownerVoice,ttsRequests;
 const data=rawDeck();
 const deck={id:'parlor-deck',slug:data.slug,name:data.name,tagline:'Fixture deck',revision:1,visibility:'private',createdAt:'',updatedAt:'',manifest:{data,tagline:'Fixture deck'}};
 const flush=()=>act(async()=>{await new Promise(r=>setTimeout(r,0));});
@@ -40,10 +41,12 @@ beforeEach(async()=>{
   global.setTimeout=(callback,ms,...args)=>realSetTimeout(callback,ms===7000||ms===500?5:ms,...args);
   authenticated=true;parlorAllowed=true;deckCalls=0;accountId='test-account';providerCalls=0;delayed=false;lateResolve=undefined;
   accessMode='byok';hostedDenied=false;hostedBodies=[];ownerAvailable=false;
+  ownerEleven=false;ownerVoice='env-owner-voice';ttsRequests=[];
   window.history.replaceState(null,'','/parlor');window.localStorage.clear();
   settingsApi.saveSettings(window.localStorage,accountId,{...settingsApi.defaultSettings(),anthropicKey:'synthetic-ui-key',anthropicModel:'synthetic-model'},true);
   global.fetch=async(path,init={})=>{
-    if(path==='/api/parlor/capabilities')return hostedDenied?json({},403):json({mode:accessMode,models:[{provider:'anthropic',id:'server-model'}],voices:[],...(ownerAvailable?{ownerKeys:{anthropicModel:'claude-test-owner',elevenlabs:false,voiceId:'env-owner-voice'}}:{})});
+    if(path==='/api/parlor/capabilities')return hostedDenied?json({},403):json({mode:accessMode,models:[{provider:'anthropic',id:'server-model'}],voices:[],...(ownerAvailable?{ownerKeys:{anthropicModel:'claude-test-owner',elevenlabs:ownerEleven,voiceId:ownerVoice}}:{})});
+    if(path==='/api/parlor/owner/speech'){ttsRequests.push({method:init.method,...JSON.parse(init.body)});return json({error:'provider_access_refused',message:'private upstream response'},502);}
     if(path==='/api/parlor/narrate'||path==='/api/parlor/owner/narrate'){
       hostedBodies.push(JSON.parse(init.body));if(hostedDenied)return json({},403);
       const token=JSON.parse(Buffer.from(hostedBodies.at(-1).token,'base64url').toString());
@@ -104,6 +107,35 @@ test('owner setup starts without browser keys, preserves voice, and loses fallba
 
 test('owner availability keeps an explicitly remembered BYOK model and key in control',async()=>{
   ownerAvailable=true;await mount();await guest();assert.equal(providerCalls,1);assert.equal(hostedBodies.length,0);
+});
+
+test('legacy blank owner voice inherits default; failed summoning POST remains recoverable on release and five taps reset',async()=>{
+  ownerAvailable=true;ownerEleven=true;window.localStorage.clear();settingsApi.saveSettings(window.localStorage,accountId,settingsApi.defaultSettings(),true);
+  await mount();const voice=[...document.querySelectorAll('label')].find(el=>el.textContent.startsWith('ElevenLabs voice ID')).querySelector('input');assert.equal(voice.value,'env-owner-voice');
+  await click('Start the show');
+  await act(async()=>window.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'a',code:'KeyA',bubbles:true})));
+  await act(async()=>{await new Promise(r=>realSetTimeout(r,20));});await settle();
+  assert.equal(ttsRequests.length,1);assert.equal(ttsRequests[0].method,'POST');assert.equal(ttsRequests[0].voiceId,'env-owner-voice');assert.equal(document.querySelector('.parlor-ritual').dataset.phase,'error');assert.equal(document.querySelector('.parlor-caption').textContent,'');
+  await act(async()=>{for(let i=0;i<2;i++)window.dispatchEvent(new dom.window.KeyboardEvent('keyup',{key:'a',code:'KeyA',bubbles:true}));});await settle();
+  assert.equal(document.querySelector('.parlor-ritual').dataset.phase,'error');assert.equal(hostedBodies.length,0);assert.equal(document.querySelectorAll('.parlor-card').length,0);assert.equal(ttsRequests.length,1);assert.ok(!document.body.textContent.includes('private upstream response'));
+  await act(async()=>{for(let i=0;i<5;i++){window.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'a',code:'KeyA',bubbles:true}));window.dispatchEvent(new dom.window.KeyboardEvent('keyup',{key:'a',code:'KeyA',bubbles:true}));}});await settle();
+  assert.ok(document.querySelector('.parlor-idle'));assert.equal(hostedBodies.length,0);assert.equal(ttsRequests.length,1);
+});
+
+test('intentional silent summoning consumes release and requires a new deliberate tap before dealing',async()=>{
+  ownerAvailable=true;ownerEleven=true;window.localStorage.clear();settingsApi.saveSettings(window.localStorage,accountId,{...settingsApi.defaultSettings(),silent:true},true);
+  await mount();await click('Start the show');
+  await act(async()=>window.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:' ',code:'Space',bubbles:true})));
+  await act(async()=>{await new Promise(r=>realSetTimeout(r,20));});await settle();assert.equal(document.querySelector('.parlor-ritual').dataset.phase,'awaiting-release');assert.equal(hostedBodies.length,0);
+  await act(async()=>{window.dispatchEvent(new dom.window.KeyboardEvent('keyup',{key:' ',code:'Space',bubbles:true}));});await settle();
+  assert.equal(document.querySelector('.parlor-ritual').dataset.phase,'question');assert.equal(hostedBodies.length,0);assert.equal(ttsRequests.length,0);assert.equal(document.querySelectorAll('.parlor-card').length,0);
+  await tap();assert.equal(hostedBodies.length,1);assert.equal(document.querySelectorAll('.is-revealed').length,1);
+});
+
+test('owner missing voice requires explicit silent choice or a voice before starting',async()=>{
+  ownerAvailable=true;ownerEleven=true;ownerVoice=null;window.localStorage.clear();await mount();
+  assert.equal(button('Start the show').getAttribute('aria-disabled'),'true');assert.match(document.body.textContent,/Select your ElevenLabs voice ID/);
+  const silent=[...document.querySelectorAll('label')].find(el=>el.textContent==='Read without audio').querySelector('input');await act(async()=>silent.click());await settle();assert.equal(button('Start the show').getAttribute('aria-disabled'),'false');
 });
 
 test('fresh owner gets env voice/model defaults and can override or restore both without a browser key',async()=>{
