@@ -172,7 +172,7 @@ function TableSetup({ transcriptLogging, showDetails, changeDetails, detailsStor
     {detailsStorageError && <p role="alert">The display preference could not be saved; it applies for this session.</p>}
     <label className="parlor-check"><input type="checkbox" checked={operatorControls} onChange={event => setOperatorControls(event.target.checked)} />Show operator controls while testing</label>
     <button ref={startButton} className="parlor-primary" aria-disabled={!ready} onClick={() => { if (ready) start(); }}>Start the show</button>
-    <p className="parlor-show-hint">The idle table waits for a 300 ms hold before starting the seven-second summon, without recording. Keep holding until the visual cue says Release the button. After its introduction, hold for 450 ms, wait for Speak now, speak and release. A quick tap moves on after a 500 ms pause; three quick taps pause for the deck introduction (press once to return), and five quick taps with less than 500 ms between them return to blank idle. Overlapping keys count once. Escape returns to setup. Tab, modifier shortcuts and operator inputs keep their usual behavior. Test the mini keyboard and microphone on the party Mac before guests arrive.</p>
+    <p className="parlor-show-hint">The idle table waits for a 300 ms hold before starting the seven-second summon, without recording. Keep holding until the visual cue says Release the button. After its introduction, hold for 450 ms, wait for Speak now, speak and release. A quick tap moves on after a 500 ms pause; three quick taps pause for the deck introduction (press once per page, then once to return), and five quick taps with less than 500 ms between them return to blank idle. Overlapping keys count once. Escape returns to setup. Tab, modifier shortcuts and operator inputs keep their usual behavior. Test the mini keyboard and microphone on the party Mac before guests arrive.</p>
   </div>;
 }
 function Ritual({ transcriptLogging, showDetails, deckId, settings, leave, radioPreferences, changeRadio, operatorControls }: { transcriptLogging: boolean; deckId: string; settings: Settings; leave(): void; operatorControls: boolean; showDetails: boolean } & RadioOptions) {
@@ -203,7 +203,7 @@ function Ritual({ transcriptLogging, showDetails, deckId, settings, leave, radio
     lift: () => { if (machine.getSnapshot().guideOpen) return; machine.releaseSummon(); if (!["checking", "listening"].includes(microphone.getSnapshot().phase)) sound.hold(false); },
     captureTap: () => {
       const before = machine.getSnapshot(), input = microphone.getSnapshot();
-      if (before.guideOpen) return () => { if (machine.getSnapshot().guideOpen) { if (machine.getSnapshot().phase !== "idle") sound.unlock(); machine.closeGuide(); } };
+      if (before.guideOpen) return () => { if (machine.getSnapshot().guideOpen) { if (machine.getSnapshot().guidePage === 2 && machine.getSnapshot().phase !== "idle") sound.unlock(); machine.advanceGuide(); } };
       if (!tableInput(before, input, speechInputAvailable).tap) return;
       return () => { if (machine.getSnapshot() === before && microphone.getSnapshot() === input) machine.advance(); };
     },
@@ -307,7 +307,7 @@ function Ritual({ transcriptLogging, showDetails, deckId, settings, leave, radio
     <aside id="parlor-guest-cue" className="parlor-cue" aria-label="Table instructions" aria-description={cue.attention ? state.error || mic.error : undefined} role={cue.attention ? "alert" : "status"} aria-atomic="true">
       <p className="parlor-cue-title">{cue.title}</p>{cue.instruction && <p className="parlor-cue-detail">{cue.instruction}</p>}
     </aside>
-    {state.guideOpen && <DeckIntroduction deck={getDeck(deckId)!} />}
+    {state.guideOpen && <DeckIntroduction deck={getDeck(deckId)!} page={state.guidePage ?? 0} />}
     {operatorControls && !idle && <div className="parlor-operator-controls" data-parlor-operator aria-label="Operator controls">
       {/* Ordinary input is disabled while busy, but five taps must still reset.
           Keep focus on release: native disabled would blur and cancel transcription. */}

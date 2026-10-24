@@ -244,6 +244,70 @@
 .parlor-deck-introduction h2 { margin: 0; font-size: clamp(24px, 3vw, 42px); color: var(--parlor-gold); }
 .parlor-introduction-text { min-height: 0; overflow: clip; white-space: pre-wrap; overflow-wrap: anywhere; font: 400 clamp(19px, 1.8vw, 28px)/1.4 var(--font-display); }
 .parlor .parlor-introduction-cue { margin: 0; font: 400 clamp(16px, 1.3vw, 21px)/1.35 var(--font-body); color: #e9c98a; }
+.parlor-deck-introduction { gap: clamp(8px, 1.5dvh, 20px); padding: clamp(16px, 2.4vw, 36px); }
+.parlor-introduction-text { overflow: visible; white-space: normal; font-size: clamp(18px, 2vw, 28px); line-height: 1.35; display: grid; align-items: center; gap: clamp(14px, 3vw, 40px); }
+.parlor-introduction-text p { margin: 0 0 .65em; line-height: inherit; }
+.parlor-introduction-text p:last-child { margin-bottom: 0; }
+.parlor-guide-welcome { max-width: 40ch; margin: auto; }
+.parlor-guide-tagline { color: #e9c98a; font-style: italic; }
+.parlor-guide-page-2 { grid-template-columns: minmax(0, 1fr) minmax(0, .8fr); }
+.parlor-guide-art { min-height: 0; height: 100%; margin: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 8px; text-align: center; }
+.parlor-guide-art img { width: 100%; height: 100%; min-height: 0; object-fit: contain; }
+.parlor-guide-art figcaption { font-size: clamp(16px, 1.6vw, 22px); line-height: 1.25; }
+.parlor-guide-art small { display: block; color: #cfc1a5; font-size: .85em; }
+.parlor-guide-page-3 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; font-size: clamp(18px, 1.6vw, 24px); }
+.parlor-guide-suits { display: grid; gap: 14px; }
+.parlor-guide-suit { display: flex; gap: 12px; align-items: flex-start; }
+.parlor-guide-suit strong { color: #e9c98a; font-weight: 500; }
+.parlor-guide-icon { flex: 0 0 32px; width: 32px; height: 32px; color: #e9c98a; }
+.parlor-guide-suit p { margin: 2px 0 0; }
+.parlor-guide-ranks h3 { color: #e9c98a; font: inherit; margin: 0 0 5px; }
+.parlor-guide-ranks > p { margin-bottom: 0; }
+.parlor-guide-ranks h3:not(:first-child) { margin-top: 20px; }
+.parlor-guide-ranks dl { display: grid; gap: 8px; margin: 0; }
+.parlor-guide-ranks dl div { display: flex; flex-wrap: wrap; column-gap: 8px; }
+.parlor-guide-ranks dt { color: #e9c98a; }
+.parlor-guide-ranks dd { margin: 0; }
+@media (max-width: 600px) {
+  .parlor-deck-introduction { inset-inline: 12px; padding: 16px; }
+  .parlor-deck-introduction h2 { font-size: 25px; }
+  .parlor-guide-page-3 { grid-template-columns: 1fr; gap: 14px; font-size: 18px; }
+  .parlor-guide-suits { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .parlor-guide-suit { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 4px; }
+  .parlor-guide-suit > div { display: contents; }
+  .parlor-guide-suit strong { grid-column: 2; }
+  .parlor-guide-suit p { grid-column: 1 / -1; }
+  .parlor-guide-icon { width: 24px; height: 24px; }
+  .parlor-guide-ranks dl { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .parlor-guide-ranks h3:not(:first-child) { margin-top: 10px; }
+}
+@media (max-height: 650px) {
+  .parlor-deck-introduction { inset-block-start: 12px; padding: 14px 18px; gap: 8px; }
+  .parlor-deck-introduction h2 { font-size: 25px; }
+  .parlor-introduction-text { font-size: 18px; }
+  .parlor-guide-suits { gap: 8px; }
+  .parlor-guide-ranks dl { gap: 4px; }
+}
+@media (max-width: 380px) {
+  .parlor-guide-page-3 { gap: 8px; line-height: 1.2; }
+  .parlor-guide-suits { gap: 8px; }
+  .parlor-guide-ranks h3:not(:first-child) { margin-top: 6px; }
+}
+@media (min-width: 601px) and (min-height: 500px) {
+  .parlor-introduction-text { font-size: clamp(22px, 2vw, 28px); }
+}
+@media (max-height: 450px) and (min-width: 601px) {
+  .parlor-guide-page-3 { gap: 16px; }
+  .parlor-guide-suits { grid-template-columns: 1fr 1fr; }
+  .parlor-guide-suit { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 4px; }
+  .parlor-guide-suit > div { display: contents; }
+  .parlor-guide-suit strong { grid-column: 2; }
+  .parlor-guide-suit p { grid-column: 1 / -1; }
+  .parlor-guide-icon { width: 24px; height: 24px; }
+  .parlor-guide-ranks h3:first-child { display: none; }
+  .parlor-guide-ranks h3:not(:first-child) { margin-top: 4px; }
+  .parlor-guide-ranks dl { gap: 0; }
+}
 @media (max-width: 800px) {
   .parlor-show { --footer-space: 52px; --note-space: 52px; }
   .parlor .parlor-shortcut-note { width: calc(100% - 2 * var(--stage-pad)); right: var(--stage-pad); }

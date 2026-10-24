@@ -94,8 +94,14 @@ speech button follows the same busy lock and five-tap reset exception.
   summoning. The same 500 ms gap resolves the gesture only after a five-tap reset is
   ruled out. The overview uses authored major-story, suit and rank data; the Roaring
   Twenties year/court explanation appears only for that matching authored structure.
-  Readable pages turn automatically and repeat, with no scrolling. Press once to
-  return; that gesture is consumed and cannot advance, record or summon.
+  There are exactly three manual pages: the deck's introduction, its major themes
+  with one fixed artwork example, then suits and ranks. Press once per page; the
+  next press after page three returns to the paused reading. No page rotates on
+  a timer. Page turns and closing are consumed and cannot deal, record or summon.
+  The example resolves in the selected artwork set through the existing private
+  asset loader; it is labelled as a deck example, never selected from the reading.
+  Missing artwork has a text fallback. The Roaring Twenties example is The
+  Emancipation; the guide's short suit/court summaries reflect its authored axes.
 - **Five taps** with less than **500 ms** from each release to the next press reset the
   encounter immediately on the fifth release. This stops audio/recording, aborts pending
   requests and clears cards, query, captions and history, then returns to blank idle.
