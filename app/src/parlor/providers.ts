@@ -98,7 +98,7 @@ export function converse(settings: Settings, reading: ArcanaReading, turns: Turn
 }
 
 /** One bounded audio resource, released on completion, interruption, failure and unmount. */
-export async function speak(settings: Settings, text: string, signal: AbortSignal, onPlaying: () => void, reading?: ArcanaReading, onCaption: (text: string, timing: CaptionTiming) => void = () => {}, onWaiting: () => void = () => {}, pause?: PresentationPause): Promise<void> {
+export async function speak(settings: Settings, text: string, signal: AbortSignal, onPlaying: () => void, reading?: ArcanaReading, onCaption: (text: string, timing: CaptionTiming) => void = () => {}, onWaiting: () => void = () => {}, pause?: PresentationPause, onVocalization: (edge: 'lock' | 'loss') => void = () => {}): Promise<void> {
   let url: string | undefined;
   let audio: HTMLAudioElement | undefined;
   try {
@@ -129,6 +129,7 @@ export async function speak(settings: Settings, text: string, signal: AbortSigna
     const player = audio;
     await new Promise<void>((resolve, reject) => {
       let began = false, closed = false, ended = false, playAttempt = 0, frame: number | undefined, lastCaption = "";
+      const accent = (edge: 'lock' | 'loss') => { try { onVocalization(edge); } catch { /* Optional sound never interrupts speech. */ } };
       let unsubscribe = () => {};
       const update = () => {
         if (closed || !began || signal.aborted || pause?.paused || !alignment) return;
@@ -141,14 +142,16 @@ export async function speak(settings: Settings, text: string, signal: AbortSigna
       player.onplaying = () => {
         if (closed || signal.aborted) return;
         if (pause?.paused) { player.pause(); return; }
-        if (!began) { began = true; onCaption("", alignment ? "aligned" : "segment"); }
+        const first = !began;
+        if (first) { began = true; onCaption("", alignment ? "aligned" : "segment"); }
         if (alignment && frame === undefined && typeof requestAnimationFrame === "function") animate();
         onPlaying();
+        if (first) accent('lock');
       };
       player.onwaiting = player.onpause = () => { if (!closed && !signal.aborted) onWaiting(); };
       player.ontimeupdate = update;
       const finish = () => { clean(); if (signal.aborted || !began) { reject(new Error()); return; } onCaption(alignment ? alignment.characters.join("").trim() : plainSpeech(text), alignment ? "aligned" : "segment"); resolve(); };
-      player.onended = () => { if (closed) return; ended = true; if (!pause?.paused) finish(); };
+      player.onended = () => { if (closed || ended) return; ended = true; if (!pause?.paused) { if (began) accent('loss'); finish(); } };
       player.onerror = () => { clean(); reject(new Error()); };
       signal.addEventListener("abort", abort, { once: true });
       if (signal.aborted) { abort(); return; }

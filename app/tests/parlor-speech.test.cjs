@@ -9,17 +9,17 @@ const tick=()=>new Promise(r=>setImmediate(r));
 const {PresentationPause}=require('../.test-build/parlor/pause.js');
 
 for(const owner of [false,true])test(`deck guide resumes the same ${owner?'owner':'BYOK'} audio player and aborts safely`,async()=>{
-  const old={fetch:global.fetch,Audio:global.Audio};let player,requests=0,plays=0,pauses=0;const captions=[];
+  const old={fetch:global.fetch,Audio:global.Audio};let player,requests=0,plays=0,pauses=0;const captions=[],edges=[];
   try{
     global.fetch=async()=>{requests++;return Response.json({audio_base64:btoa('audio'),normalized_alignment:alignment});};
     global.Audio=class{currentTime=0;constructor(){player=this;}play(){plays++;return Promise.resolve();}pause(){pauses++;}removeAttribute(){}load(){}};
     const selected=owner?{...settings,elevenKey:'',ownerKeys:{elevenlabs:true}}:settings;
     const pause=new PresentationPause(),abort=new AbortController();let completed=false;
-    const pending=speak(selected,'One two',abort.signal,()=>{},undefined,t=>captions.push(t),()=>{},pause).then(()=>completed=true);
+    const pending=speak(selected,'One two',abort.signal,()=>{},undefined,t=>captions.push(t),()=>{},pause,edge=>edges.push(edge)).then(()=>completed=true);
     while(!player)await tick();player.onplaying();player.currentTime=.3;player.ontimeupdate();assert.equal(captions.at(-1),'One');
     pause.set(true);assert.equal(pauses,1);player.onplaying();player.ontimeupdate();await tick();assert.equal(completed,false);assert.equal(captions.at(-1),'One');
     pause.set(false);assert.equal(plays,2);assert.equal(player.currentTime,.3);assert.equal(requests,1);player.onplaying();assert.equal(captions.at(-1),'One');
-    pause.set(true);player.onended();await tick();assert.equal(completed,false,'queued completion is held behind guide');pause.set(false);await pending;assert.equal(captions.at(-1),'One two');assert.equal(requests,1);
+    pause.set(true);player.onended();await tick();assert.equal(completed,false,'queued completion is held behind guide');pause.set(false);await pending;assert.equal(captions.at(-1),'One two');assert.equal(requests,1);assert.deepEqual(edges,['lock'],'guide resume does not replay lock or a deferred end accent');
     player=null;const cancelled=speak(selected,'One two',abort.signal,()=>{},undefined,()=>{},()=>{},pause);const rejected=assert.rejects(cancelled,{name:'AbortError'});while(!player)await tick();pause.set(true);const late=player.onended;abort.abort();await rejected;const count=plays;pause.set(false);late();assert.equal(plays,count);assert.equal(player.onended,null);
   }finally{Object.assign(global,old);}
 });
@@ -57,23 +57,25 @@ test('alignment validates shape and monotonic finite times; captions follow actu
   for(const value of [null,{}, {...alignment,characters:[]},{...alignment,character_end_times_seconds:[.1]}, {...alignment,character_end_times_seconds:[.1,.2,NaN,.4,1.1,1.2,1.3]}, {...alignment,character_start_times_seconds:[0,.1,.2,.3,1,.9,1.2]}])assert.equal(parseAlignment(value),undefined);
 });
 for(const owner of [false,true])test(`v3 retains selected voice and aligned playback with ${owner?'owner server':'browser'} key`,async()=>{
-  const old={fetch:global.fetch,Audio:global.Audio,create:URL.createObjectURL,revoke:URL.revokeObjectURL};let player,request,revoked=0,played=0,waiting=0;const captions=[];
+  const old={fetch:global.fetch,Audio:global.Audio,create:URL.createObjectURL,revoke:URL.revokeObjectURL};let player,request,revoked=0,played=0,waiting=0;const captions=[],edges=[];
   try{
     global.fetch=async(url,init)=>{request={url,init};return Response.json({audio_base64:btoa('audio'),normalized_alignment:alignment});};
     URL.createObjectURL=()=> 'blob:mock';URL.revokeObjectURL=()=>revoked++;
     global.Audio=class{currentTime=0;constructor(){player=this;}play(){return Promise.resolve();}pause(){}removeAttribute(){}load(){}};
     // Provider normalization differs from the request: show the aligned words, not original digits.
     const selected=owner?{...settings,elevenKey:'',ownerKeys:{anthropicModel:null,elevenlabs:true}}:settings;
-    const pending=speak(selected,'1 2',new AbortController().signal,()=>played++,undefined,(text,timing)=>captions.push({text,timing}),()=>waiting++);
+    const pending=speak(selected,'1 2',new AbortController().signal,()=>played++,undefined,(text,timing)=>captions.push({text,timing}),()=>waiting++,undefined,edge=>edges.push(edge));
     for(let i=0;i<30&&!player;i++)await tick();assert.ok(player);
     assert.equal(request.url,owner?'/api/parlor/owner/speech':'https://api.elevenlabs.io/v1/text-to-speech/the-selected-voice/with-timestamps');
     const body=JSON.parse(request.init.body);if(owner){assert.equal(body.voiceId,'the-selected-voice');assert.deepEqual(Object.keys(request.init.headers),['content-type']);}else assert.equal(body.model_id,'eleven_v3');assert.equal(request.init.credentials,owner?'same-origin':'omit');assert.equal(request.init.redirect,'error');
     player.currentTime=.3;player.ontimeupdate();assert.deepEqual(captions,[],'nothing before actual playing');
     player.currentTime=0;player.onplaying();assert.equal(played,1);assert.deepEqual(captions.at(-1),{text:'',timing:'aligned'});
+    assert.deepEqual(edges,['lock']);
     player.currentTime=.3;player.ontimeupdate();assert.equal(captions.at(-1).text,'One');
     await tick();player.ontimeupdate();assert.equal(captions.at(-1).text,'One','wall time cannot advance captions');
     player.onwaiting();assert.equal(waiting,1);player.onplaying();assert.equal(played,2);assert.equal(captions.at(-1).text,'One','resume does not erase captions');player.onpause();assert.equal(waiting,2);player.onplaying();assert.equal(played,3);
-    player.currentTime=1.3;player.ontimeupdate();const lateWaiting=player.onwaiting;player.onended();await pending;assert.equal(captions.at(-1).text,'One two');assert.equal(revoked,1);assert.equal(player.ontimeupdate,null);assert.equal(player.onwaiting,null);lateWaiting();assert.equal(waiting,2);
+    assert.deepEqual(edges,['lock'],'caption chunks, buffering and resume never relock');
+    player.currentTime=1.3;player.ontimeupdate();const lateWaiting=player.onwaiting,lateEnd=player.onended,lateError=player.onerror;player.onended();await pending;lateEnd();lateError();assert.deepEqual(edges,['lock','loss']);assert.equal(captions.at(-1).text,'One two');assert.equal(revoked,1);assert.equal(player.ontimeupdate,null);assert.equal(player.onwaiting,null);lateWaiting();assert.equal(waiting,2);
   }finally{Object.assign(global,{fetch:old.fetch,Audio:old.Audio});URL.createObjectURL=old.create;URL.revokeObjectURL=old.revoke;}
 });
 test('missing/invalid alignment uses truthful segment-end reveal and never fakes word timing',async()=>{
