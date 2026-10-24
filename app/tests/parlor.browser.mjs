@@ -50,12 +50,13 @@ async function radio(mode){await page.locator(`.parlor-radio[data-mode="${mode}"
 async function pending(get){const end=Date.now()+5000;while(!get()&&Date.now()<end)await new Promise(r=>setTimeout(r,20));assert.ok(get(),'fixture request arrived');}
 const idleText='Press and hold the button to make contact with the beyond';
 async function idle(){await page.locator('.parlor-idle').waitFor();assert.equal((await page.locator('.parlor-show').innerText()).trim(),idleText+'\n\nThree button presses to learn about the deck, five to reset the reading');assert.equal(await page.locator('.parlor-card,.parlor-slot,.parlor-caption,.parlor-radio').count(),0);}
-async function summon(finish=true){
+async function summon(finish=true,skip=true){
   await idle();const n=await audioCount(),mic=await page.evaluate(()=>window.__micRequests);await pressA();await page.locator('.parlor-summoning').waitFor();assert.equal(await page.locator('.parlor-slot').count(),3);
   await page.clock.fastForward(7000);await waitAudio(n);assert.match(speechRequests.at(-1).text,/signal holds/);assert.doesNotMatch(speechRequests.at(-1).text,/button|release|press|tap|click|reset|advance/i);assert.equal(await page.evaluate(()=>window.__micRequests),mic);await cue().getByText('Keep holding.',{exact:true}).waitFor();await finishAudio();await page.getByText('Release the button.',{exact:true}).waitFor();assert.equal(await audioCount(),n+1);
   await page.keyboard.up('a');await waitAudio(n+1);assert.match(speechRequests.at(-1).text,/I am the spirit of the ether/);assert.doesNotMatch(speechRequests.at(-1).text,/button|press|hold|release|tap|click|reset|advance|cards|deck|spread/i);assert.equal(await page.evaluate(()=>window.__micRequests),mic);assert.equal(await caption().innerText(),'');
-  if(finish){await finishAudio();await phase('question').waitFor();}
+  if(finish){await finishAudio();await phase('question').waitFor();if(skip)await skipIntroduction();}
 }
+async function skipIntroduction(){const n=await audioCount();await advance();await waitAudio(n);await finishAudio();await phase('question').waitFor();}
 async function begin(){await button('Start the show').click();await summon();}
 async function talk(text,control=false){
   const target=control==='touch'?button('Hold to talk'):stage();await page.evaluate(text=>window.__utterance=text,text);
@@ -196,11 +197,17 @@ try{
       assert.equal(url.origin,'http://127.0.0.1:4187');assert.equal(authenticated&&allowed,true,'private recording only requested during owner encounter');
       return route.fulfill({contentType:'audio/mpeg',body:Buffer.from([73,68,51])});
     }
-    const ownerLanguage=path==='/api/parlor/owner/narrate'||path==='/api/parlor/owner/converse';
+    const ownerLanguage=['/api/parlor/owner/narrate','/api/parlor/owner/converse','/api/parlor/owner/introduce'].includes(path);
     if(url.hostname==='api.anthropic.com'||url.hostname==='api.openai.com'||ownerLanguage){
       assert.equal(ownerLanguage,ownerMode,'owner mode never sends browser requests to paid language providers');
       calls++;if(mode==='error')return json(route,{},429);
       const request=route.request().postDataJSON(),prompt=ownerLanguage?'':request.messages.at(-1).content;languageRequests.push(request);
+      if(path.endsWith('/introduce')||request.system?.includes('hasQuestion')){
+        const input=ownerLanguage?request.text:request.messages.at(-1).content;
+        const result={text:input==='An immediate question?'?'I can look toward that possibility.':'A name is optional. Is there something you would like to ask?',hasQuestion:input==='An immediate question?'};
+        if(mode==='delay')await new Promise(r=>release=r);
+        return json(route,ownerLanguage?result:{content:[{type:'text',text:JSON.stringify(result)}]});
+      }
       const identities=ownerLanguage?(path.endsWith('narrate')?JSON.parse(Buffer.from(request.token,'base64url')).c.map(([slug])=>({slug,name:slug})):null):prompt.includes('CARD IDENTITIES IN ORDER\n')?JSON.parse(prompt.split('CARD IDENTITIES IN ORDER\n')[1]):null;
       if(!identities)assert.doesNotMatch(JSON.stringify(ownerLanguage?request.turns:request.messages),/\[(?:sighs|exhales|sarcastic|curious)\]/,'history has no delivery tags');
       const text=identities?JSON.stringify({cards:identities.map(card=>({slug:card.slug,text:`[sarcastic] A distant landscape takes shape in the mist. A path opens where you thought there was none.${longNarration?' Reflect on the choice before you, and consider what you might learn by making room for another possibility.'.repeat(14):''}`})),synthesis:'The visions leave a choice that remains yours.'}):'[curious] I know nothing of cards. I see only the landscape that reaches me through the ether.';
@@ -316,7 +323,7 @@ try{
   ttsMode='error';await pressA();await page.clock.fastForward(7000);await page.locator(`.parlor-cue[role="alert"][aria-description*="${ownerMode?'account provider refused access':'Audio is unavailable'}"]`).waitFor();await radio('stopped');assert.equal(await caption().innerText(),'');await capture('radio-error');await page.keyboard.up('a');await page.clock.fastForward(700);assert.equal(calls,0,'failed summon release never starts narration');assert.equal(await page.locator('.parlor-card').count(),0);await phase('error').waitFor();ttsMode='ok';const retryCue=await audioCount();await tap();await page.clock.fastForward(500);await waitAudio(retryCue);await finishAudio();await waitAudio(retryCue+1);await finishAudio();await phase('question').waitFor();assert.equal(calls,0,'recovered intro still waits for a query or new tap');assert.equal(await page.evaluate(()=>window.__micRequests),0);await resetEncounter();
   await capture('idle-contact');await summon(false);assert.equal(await page.locator('.parlor-card').count(),0);
   await page.evaluate(()=>{window.__audio.currentTime=.5;window.__audio.ontimeupdate();});assert.ok((await caption().innerText()).length>0);assert.ok(!(await caption().innerText()).includes('speak your question'));assert.ok(!(await caption().innerText()).includes('['));
-  await page.waitForTimeout(150);assert.ok(!(await caption().innerText()).includes('speak your question'));await page.keyboard.down('b');await finishAudio();await page.clock.fastForward(500);assert.equal(await page.evaluate(()=>window.__micRequests),0,'a hold started during introduction cannot turn into recording');await page.keyboard.up('b');
+  await page.waitForTimeout(150);assert.ok(!(await caption().innerText()).includes('speak your question'));await page.keyboard.down('b');await finishAudio();await page.clock.fastForward(500);assert.equal(await page.evaluate(()=>window.__micRequests),0,'a hold started during introduction cannot turn into recording');await page.keyboard.up('b');await skipIntroduction();
   const first=await audioCount();mode='delay';await talk('A synthetic spoken query');await radio('searching');await pending(()=>release);await ignoredBusy();assert.equal(await caption().innerText(),'');
   await page.emulateMedia({reducedMotion:'no-preference'});assert.equal(await page.locator('.radio-needle').evaluate(el=>getComputedStyle(el).animationName),'radio-search');await capture('radio-inference-search');assert.equal(await progress(),0,'no invented inference percent');
   await page.waitForFunction(()=>window.__radioLevel()>0);const searchingLevel=await radioLevel();assert.ok(searchingLevel>0&&searchingLevel<=1);
@@ -506,11 +513,19 @@ try{
   const longPages=[];for(let i=0;i<20;i++){const text=await notes.textContent();longPages.push(text);assert.equal(await notes.evaluate(el=>el.scrollHeight<=el.clientHeight+1),true);await page.clock.fastForward(silentExports.silentPageMs(text)+100);await page.waitForTimeout(10);if(longPages.join(' ').includes('Scene:'))break;}
   assert.match(longPages.join(' '),/A long authored name/);assert.match(longPages.join(' '),/Scene:/);await resetEncounter();await escape();await detailsToggle.uncheck();await page.reload();assert.equal(await detailsToggle.isChecked(),false);await page.setViewportSize({width:1280,height:960});
   if(transcriptMode){
-    await page.getByText(/Text questions, generated responses and presentation diagnostics are sent to temporary Vercel runtime logs/).waitFor();
+    await page.getByText(/Text introductions \(including any volunteered names\), questions, generated responses and presentation diagnostics are sent to temporary Vercel runtime logs/).waitFor();
     const events=transcriptRequests.flatMap(b=>b.events??[]);for(const kind of ['user_input','assistant_generated','presentation_progress','presentation_completed','presentation_interrupted','encounter_closed'])assert.ok(events.some(e=>e.kind===kind),'browser emits '+kind);
     assert.ok(transcriptStarts>2,'reset obtains fresh encounter receipts');assert.ok(events.some(e=>e.timing==='silent')&&events.some(e=>e.timing==='aligned'));
     assert.equal(await page.evaluate(()=>Object.entries(localStorage).some(([k,v])=>/transcript|eventId|presentation_progress/.test(k+' '+v))),false,'no transcript archive in browser storage');
   }
+  // Optional opening: synthetic name, decline, immediate question, busy reset and no persisted alias.
+  await button('Start the show').click();await summon(true,false);const openingCalls=calls;
+  assert.match(await cue().innerText(),/name, alias, or your question/);await capture('optional-introduction-projector');
+  let openingAudio=await audioCount();await talk('Call me River');await waitAudio(openingAudio);assert.equal(await page.locator('.is-revealed').count(),0);await finishAudio();await phase('question').waitFor();assert.equal(calls,openingCalls+1);
+  assert.match(await cue().innerText(),/speak your query/);assert.equal(await page.evaluate(()=>JSON.stringify(localStorage).includes('Call me River')),false);
+  await resetEncounter();await summon(true,false);openingAudio=await audioCount();await talk('An immediate question?');await waitAudio(openingAudio);await ignoredBusy();await finishAudio();await phase('question').waitFor();assert.equal(await page.locator('.is-revealed').count(),0);assert.match(await cue().innerText(),/Press once to explore that question/);
+  const confirmCalls=calls;openingAudio=await audioCount();await advance();await waitAudio(openingAudio);assert.equal(calls,confirmCalls+1,'one deliberate confirmation makes one reading request');await finishAudio();await phase('ready').waitFor();
+  await resetEncounter();await summon(true,false);mode='delay';await talk('Name before reset');await pending(()=>release);await openGuide();await resetEncounter();release();release=null;mode='ok';await page.waitForTimeout(100);await idle();await escape();
   await begin();await stage().focus();await page.keyboard.down('Space');await cue().getByText('Speak now.',{exact:true}).waitFor();authenticated=false;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.getByText('Parlor access is restricted.',{exact:true}).waitFor();assert.equal(await page.locator('.parlor-show').count(),0);
   const transcriptCount=transcriptRequests.length;await page.clock.fastForward(5000);await page.waitForTimeout(50);assert.equal(transcriptRequests.length,transcriptCount,'logout stops queued logging');
   await page.clock.fastForward(100);assert.equal(await page.evaluate(()=>window.__radioContexts.every(c=>c.state==='closed')),true,'logout closes ambience contexts');

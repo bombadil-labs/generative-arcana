@@ -16,7 +16,7 @@ The server issues a random encounter ID inside a two-hour receipt, authenticated
 
 The same client lifecycle observes BYOK and owner-key paths:
 
-- `user_input`: accepted question or discussion transcription.
+- `user_input`: accepted optional introduction, question or discussion transcription; volunteered names are included as text, not a separate identity record.
 - `assistant_generated`: completed generated text, including prepared future segments, explicitly separate from delivery. Bounded card slugs/model identifiers, not full decks/images.
 - `presentation_started`: a delivery attempt, possibly still waiting for speech preparation.
 - `presentation_progress`: an observed caption checkpoint, at most once per five seconds for aligned speech or each silent page.

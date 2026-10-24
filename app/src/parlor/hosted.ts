@@ -27,7 +27,7 @@ export async function readParlorCapabilities(signal:AbortSignal):Promise<ParlorC
   if(body.mode!=='hosted'||!Array.isArray(body.models)||!body.models.length||body.models.some((m:{provider:string;id:string})=>!m||!['anthropic','openai'].includes(m.provider)||typeof m.id!=='string')||!Array.isArray(body.voices)||body.voices.some((v:unknown)=>typeof v!=='string'))throw new Error('Parlor is unavailable on this deployment.');
   return body as ParlorCapabilities;
 }
-export async function ownerRequest(kind:'narrate'|'converse'|'speech',data:Record<string,unknown>,signal:AbortSignal) {
+export async function ownerRequest(kind:'narrate'|'converse'|'speech'|'introduce',data:Record<string,unknown>,signal:AbortSignal) {
   const response=await fetch(`/api/parlor/owner/${kind}`,{method:'POST',credentials:'same-origin',cache:'no-store',redirect:'error',signal,headers:{'content-type':'application/json'},body:JSON.stringify(data)});
   if(!response.ok){
     const value:unknown=await response.json().catch(()=>null);

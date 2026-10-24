@@ -1,5 +1,6 @@
 import type { ArcanaReading } from "../engine/types";
 import type { PresentationPause } from "./pause";
+import { openingHistory, openingInstructions, parseOpening, type OpeningReply } from './opening';
 import { characters, useOwnerAnthropic, useOwnerEleven, type Settings } from "./settings";
 import { conversationContext, narrationContext, READER_INPUT_BYTES, CONTEXT_TOO_LARGE } from './context';
 export { conversationContext, narrationContext } from './context';
@@ -77,11 +78,24 @@ async function generate(settings: Settings, system: string, turns: Turn[], signa
     throw new ParlorError("Could not reach the provider. Check your connection and browser access, then retry.");
   }
 }
-export async function narrate(settings: Settings, reading: ArcanaReading, signal: AbortSignal): Promise<Narration> {
-  if(useOwnerAnthropic(settings)){const result=parseNarration(JSON.stringify(await (await ownerRequest('narrate',{deckId:reading.deck.id,token:reading.token,character:settings.character,provider:settings.provider,model:settings.anthropicModel},signal)).json()),reading);for(const card of result.cards)rejectKeyEcho(settings,card.text);rejectKeyEcho(settings,result.synthesis);return result;}
+export async function introduce(settings: Settings, deckId: string, text: string, signal: AbortSignal): Promise<OpeningReply> {
+  if (!text.trim() || text.length > 1200 || settings.hosted) throw new ParlorError('The introduction is unavailable. Skip it to continue.');
+  try {
+    const value = useOwnerAnthropic(settings)
+      ? await (await ownerRequest('introduce', { deckId, text, character: settings.character, provider: settings.provider, model: settings.anthropicModel }, signal)).json()
+      : JSON.parse(await generate(settings, openingInstructions(settings), [{ role: 'user', content: text }], signal));
+    const result = parseOpening(value); rejectKeyEcho(settings, result.text); return result;
+  } catch (error) {
+    if (signal.aborted || error instanceof OwnerRequestError || error instanceof ParlorError) throw error;
+    throw new ParlorError('The introduction could not finish. Retry, or return to setup.');
+  }
+}
+export async function narrate(settings: Settings, reading: ArcanaReading, signal: AbortSignal, introduction: Turn[] = []): Promise<Narration> {
+  const opening = openingHistory(introduction);
+  if(useOwnerAnthropic(settings)){const result=parseNarration(JSON.stringify(await (await ownerRequest('narrate',{deckId:reading.deck.id,token:reading.token,character:settings.character,provider:settings.provider,model:settings.anthropicModel,...(opening.length?{opening}:{})},signal)).json()),reading);for(const card of result.cards)rejectKeyEcho(settings,card.text);rejectKeyEcho(settings,result.synthesis);return result;}
   if(settings.hosted){try{return parseNarration(JSON.stringify(await (await hostedRequest('narrate',settings,reading,signal)).json()),reading);}catch(error){if(signal.aborted)throw error;throw new ParlorError(error instanceof Error?error.message:'Hosted narration unavailable.');}}
   const system = narrationInstructions(settings);
-  const result = parseNarration(await generate(settings, system, [{ role: "user", content: narrationContext(reading) }], signal), reading);
+  const result = parseNarration(await generate(settings, system, [...opening, { role: "user", content: narrationContext(reading) }], signal), reading);
   // JSON escapes can conceal a credential from the raw-text check. Check decoded captions too,
   // before either rendering them or sending them to the speech provider.
   for (const card of result.cards) rejectKeyEcho(settings, card.text);
